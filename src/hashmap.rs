@@ -1,13 +1,121 @@
 use crate::{read_u32, Memory};
 use ahash::RandomState;
+use std::sync::Arc;
 
 pub const LAYOUT_VERSION: u8 = 1;
+
+/*
+struct Pointer<M: Memory> {
+    addr: u32,
+    memory: Arc<M>
+}
+
+impl<M: Memory> Pointer<M> {
+    fn write(&self, data: &[u8]) {
+        self.memory.write(self.addr, data);
+    }
+
+    fn write_with_offset(&self, offset: u32, data: &[u8]) {
+        self.memory.write(self.addr + offset, data);
+    }
+}*/
+
+pub trait Allocator {
+    /// Allocates a piece of memory with the given size, and return its pointer.
+    // TODO: add layout?
+    fn allocate(&self, size: u32) -> u32;
+    // TODO: free
+}
+
+struct DumbAllocator<M: Memory> {
+    memory: M,
+}
+
+struct DumbAllocatorHeader {
+    magic: [u8; 3],
+    version: u8,
+    free_offset: u32,
+}
+
+impl<M: Memory> DumbAllocator<M> {
+    fn new(memory: M) -> Result<Self, AllocError> {
+        if memory.size() < 1 && memory.grow(1) == -1 {
+            return Err(AllocError::GrowFailed {
+                current: 0,
+                delta: 1,
+            });
+        }
+
+        let header_len = core::mem::size_of::<DumbAllocatorHeader>() as u32;
+
+        let header = DumbAllocatorHeader {
+            magic: *b"DAL",
+            version: 0,
+            free_offset: header_len, // beginning of free space.
+        };
+
+        let header_slice = unsafe {
+            core::slice::from_raw_parts(
+                &header as *const _ as *const u8,
+                core::mem::size_of::<DumbAllocatorHeader>(),
+            )
+        };
+
+        memory.write(0, header_slice);
+
+        Ok(Self { memory })
+    }
+
+    fn get_free_offset(&self) -> u32 {
+        let mut header: DumbAllocatorHeader = unsafe { core::mem::zeroed() };
+        let header_slice = unsafe {
+            core::slice::from_raw_parts_mut(
+                &mut header as *mut _ as *mut u8,
+                core::mem::size_of::<DumbAllocatorHeader>(),
+            )
+        };
+        self.memory.read(0, header_slice);
+        header.free_offset
+    }
+
+    fn set_free_offset(&self, new_free_offset: u32) {
+        let mut header: DumbAllocatorHeader = unsafe { core::mem::zeroed() };
+        let header_slice = unsafe {
+            core::slice::from_raw_parts_mut(
+                &mut header as *mut _ as *mut u8,
+                core::mem::size_of::<DumbAllocatorHeader>(),
+            )
+        };
+        self.memory.read(0, header_slice);
+        header.free_offset = new_free_offset;
+        self.memory.write(0, header_slice);
+    }
+}
+
+impl<M: Memory> Allocator for DumbAllocator<M> {
+    fn allocate(&self, size: u32) -> u32 {
+        // TODO: grow memory if needed.
+
+        let old_free_offset = self.get_free_offset();
+
+        self.set_free_offset(old_free_offset + size);
+
+        old_free_offset
+    }
+}
 
 // TODO: copied from log.rs
 #[derive(Debug, PartialEq, Eq)]
 pub enum AllocError {
     GrowFailed { current: u32, delta: u32 },
     AddressSpaceOverflow,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum LoadError {
+    MemoryEmpty,
+    BadMagic([u8; 3]),
+    UnsupportedVersion(u8),
 }
 
 struct Entry<M: Memory> {
@@ -82,19 +190,19 @@ struct Header {
     magic: [u8; 3],
     version: u8,
     num_buckets: u32,
-    free_block_offset: u32,
 }
 
-pub struct HashMap<M: Memory> {
+pub struct HashMap<M: Memory, A: Allocator> {
+    allocator: A,
     memory: M,
     num_buckets: u32,
     buckets_offset: u32,
     hasher: RandomState,
-    free_block_offset: u32,
+    own_address: u32,
 }
 
-impl<M: Clone + Memory> HashMap<M> {
-    pub fn new(memory: M, num_keys: u32) -> Result<Self, AllocError> {
+impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
+    pub fn new(allocator: A, memory: M, num_keys: u32) -> Result<Self, AllocError> {
         let header_len = core::mem::size_of::<Header>() as u32;
 
         // For now, assume number of buckets = number of keys
@@ -109,7 +217,6 @@ impl<M: Clone + Memory> HashMap<M> {
             magic: *b"HMP",
             version: LAYOUT_VERSION,
             num_buckets,
-            free_block_offset: header_len + index_len,
         };
 
         let header_slice = unsafe {
@@ -119,31 +226,59 @@ impl<M: Clone + Memory> HashMap<M> {
             )
         };
 
-        // TODO: check for proper size and grow memory accordingly.
-        if memory.size() < 1 {
-            if memory.grow(1) == -1 {
-                return Err(AllocError::GrowFailed {
-                    current: 0,
-                    delta: 1,
-                });
-            }
-        }
-        memory.write(0, header_slice);
+        let size_needed = header_len + index_len;
+
+        let hash_map_address = allocator.allocate(size_needed);
+
+        memory.write(hash_map_address, header_slice);
 
         Ok(Self {
+            allocator,
             memory,
             num_buckets,
             buckets_offset: header_len,
             // Setting seeds to be deterministic
             hasher: RandomState::with_seeds(0, 0, 0, 0),
-            free_block_offset: header_len + index_len,
+            own_address: hash_map_address,
         })
     }
 
-    fn insert(&mut self, key: &[u8], value: &[u8]) {
+    pub fn load(allocator: A, memory: M, address: u32) -> Result<Self, LoadError> {
+        let mut header: Header = unsafe { core::mem::zeroed() };
+        let header_slice = unsafe {
+            core::slice::from_raw_parts_mut(
+                &mut header as *mut _ as *mut u8,
+                core::mem::size_of::<Header>(),
+            )
+        };
+        if memory.size() == 0 {
+            return Err(LoadError::MemoryEmpty);
+        }
+        memory.read(address, header_slice);
+        if &header.magic != b"HMP" {
+            return Err(LoadError::BadMagic(header.magic));
+        }
+        if header.version != LAYOUT_VERSION {
+            return Err(LoadError::UnsupportedVersion(header.version));
+        }
+        let buckets_offset = core::mem::size_of::<Header>() as u32;
+        Ok(Self {
+            allocator,
+            memory,
+            num_buckets: header.num_buckets,
+            buckets_offset,
+            hasher: RandomState::with_seeds(0, 0, 0, 0),
+            own_address: address,
+        })
+    }
+
+    pub fn insert(&mut self, key: &[u8], value: &[u8]) {
         let bucket = self.get_bucket(key);
 
-        let mut entry_address = read_u32(&self.memory, self.buckets_offset + bucket);
+        let mut entry_address = read_u32(
+            &self.memory,
+            self.own_address + self.buckets_offset + bucket,
+        );
 
         if entry_address == 0 {
             // Bucket list is empty. Add new entry here.
@@ -153,13 +288,11 @@ impl<M: Clone + Memory> HashMap<M> {
                 next: 0,
             };
 
-            let new_entry_address = self.free_block_offset;
-
-            self.write_entry(e, key, value);
+            let new_entry_address = self.write_entry(e, key, value);
 
             // Update bucket pointer
             self.memory.write(
-                self.buckets_offset + bucket,
+                self.own_address + self.buckets_offset + bucket,
                 &new_entry_address.to_le_bytes(),
             );
         } else {
@@ -177,9 +310,7 @@ impl<M: Clone + Memory> HashMap<M> {
                 next: 0,
             };
 
-            let new_entry_address = self.free_block_offset;
-
-            self.write_entry(e, key, value);
+            let new_entry_address = self.write_entry(e, key, value);
 
             // Update entry pointer
             entry.entry.next = new_entry_address;
@@ -187,7 +318,7 @@ impl<M: Clone + Memory> HashMap<M> {
         }
     }
 
-    fn write_entry(&mut self, entry: RawEntry, key: &[u8], value: &[u8]) {
+    fn write_entry(&mut self, entry: RawEntry, key: &[u8], value: &[u8]) -> u32 {
         let entry_slice = unsafe {
             // TODO: look up the docs of this.
             core::slice::from_raw_parts(
@@ -196,18 +327,21 @@ impl<M: Clone + Memory> HashMap<M> {
             )
         };
 
-        self.memory.write(self.free_block_offset, entry_slice);
+        let entry_address = self
+            .allocator
+            .allocate((entry_slice.len() + key.len() + value.len()) as u32);
+
+        self.memory.write(entry_address, entry_slice);
 
         // Write the key and value pair immediately afterwards.
         self.memory
-            .write(self.free_block_offset + entry_slice.len() as u32, key);
+            .write(entry_address + entry_slice.len() as u32, key);
         self.memory.write(
-            self.free_block_offset + entry_slice.len() as u32 + key.len() as u32,
+            entry_address + entry_slice.len() as u32 + key.len() as u32,
             value,
         );
 
-        self.free_block_offset += (entry_slice.len() + key.len() + value.len()) as u32;
-        // TODO: update header with new offset.
+        entry_address
     }
 
     fn get_bucket(&self, key: &[u8]) -> u32 {
@@ -222,7 +356,11 @@ impl<M: Clone + Memory> HashMap<M> {
         let bucket = self.get_bucket(key);
 
         // Read entry.
-        let mut entry_address = read_u32(&self.memory, self.buckets_offset + bucket);
+        let mut entry_address = read_u32(
+            &self.memory,
+            self.own_address + self.buckets_offset + bucket,
+        );
+
         // FIXME: are we guaranteed that the address is zero?
         // Maybe we need to ensure that by initializing them.
         if entry_address == 0 {
@@ -242,7 +380,7 @@ impl<M: Clone + Memory> HashMap<M> {
             }
         }
 
-        return Some(entry.value())
+        return Some(entry.value());
     }
 }
 
@@ -260,7 +398,8 @@ mod test {
     fn initialization() {
         for i in 1..10 {
             let mem = make_memory();
-            let map = HashMap::new(mem.clone(), i).expect("failed to create map");
+            let allocator = DumbAllocator::new(mem.clone()).unwrap();
+            let map = HashMap::new(allocator, mem.clone(), i).expect("failed to create map");
 
             let mut header: Header = unsafe { core::mem::zeroed() };
             let header_slice = unsafe {
@@ -269,7 +408,7 @@ mod test {
                     core::mem::size_of::<Header>(),
                 )
             };
-            mem.read(0, header_slice);
+            mem.read(map.own_address, header_slice);
 
             assert_eq!(
                 header,
@@ -277,58 +416,48 @@ mod test {
                     magic: *b"HMP",
                     version: 1,
                     num_buckets: i,
-                    free_block_offset: core::mem::size_of::<Header>() as u32 + i * 4,
                 }
             );
 
             // The bucket pointers are initialized correctly.
             for bucket_index in 0..i {
-                assert_eq!(read_u32(&mem, map.buckets_offset + bucket_index * 4), 0);
+                assert_eq!(
+                    read_u32(
+                        &mem,
+                        map.own_address + map.buckets_offset + bucket_index * 4
+                    ),
+                    0
+                );
             }
         }
-
-        //assert_eq!(map.get(&[1]), Some(vec![2]));
-
-        /*
-        assert_eq!(log.len(), 0);
-        assert_eq!(log.max_len(), 5);
-
-        std::mem::drop(log);
-
-        let log = StableLog::load(mem).expect("failed to load log");
-        assert_eq!(log.len(), 0);
-        assert_eq!(log.max_len(), 5);*/
     }
 
     #[test]
     fn insert_get() {
         let mem = make_memory();
-        let mut map = HashMap::new(mem.clone(), 1).expect("failed to create map");
-        let free_block_offset_before_insert = map.free_block_offset;
+        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let mut map = HashMap::new(allocator, mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
-
-        // Assert that bucket is pointing correctly.
-        let entry_len = core::mem::size_of::<RawEntry>() as u32;
-        // 1 + 3 is the size of the key and value.
-        assert_eq!(
-            map.free_block_offset,
-            free_block_offset_before_insert + entry_len + 1 + 3
-        );
-
-        // Bucket is now pointing to the entry.
-        let header_len = core::mem::size_of::<Header>() as u32;
-        assert_eq!(read_u32(&mem, header_len), free_block_offset_before_insert);
-
         assert_eq!(map.get(&[1]), Some(vec![1, 2, 3]));
     }
 
     #[test]
-    fn insert_get_2() {
+    fn dropping_then_loading_preserves_data() {
         let mem = make_memory();
-        let mut map = HashMap::new(mem.clone(), 10).expect("failed to create map");
+        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let mut map = HashMap::new(allocator, mem.clone(), 10).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
         map.insert(&[2], &[4, 5, 6]);
 
+        assert_eq!(map.get(&[1]), Some(vec![1, 2, 3]));
+        assert_eq!(map.get(&[2]), Some(vec![4, 5, 6]));
+
+        let map_addr = map.own_address;
+        std::mem::drop(map);
+
+        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let mut map =
+            HashMap::load(allocator, mem.clone(), map_addr).expect("failed to create map");
         assert_eq!(map.get(&[1]), Some(vec![1, 2, 3]));
         assert_eq!(map.get(&[2]), Some(vec![4, 5, 6]));
     }
@@ -336,7 +465,8 @@ mod test {
     #[test]
     fn insert_collision() {
         let mem = make_memory();
-        let mut map = HashMap::new(mem.clone(), 1).expect("failed to create map");
+        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let mut map = HashMap::new(allocator, mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
         map.insert(&[2], &[4, 5, 6]);
         map.insert(&[3], &[7, 8]);
@@ -351,14 +481,16 @@ mod test {
     #[test]
     fn get_not_found_empty_bucket() {
         let mem = make_memory();
-        let map = HashMap::new(mem.clone(), 1).expect("failed to create map");
+        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let map = HashMap::new(allocator, mem.clone(), 1).expect("failed to create map");
         assert_eq!(map.get(&[1]), None);
     }
 
     #[test]
     fn get_not_found_non_empty_bucket() {
         let mem = make_memory();
-        let mut map = HashMap::new(mem.clone(), 1).expect("failed to create map");
+        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let mut map = HashMap::new(allocator, mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
         assert_eq!(map.get(&[2]), None);
     }
