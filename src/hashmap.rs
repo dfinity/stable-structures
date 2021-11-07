@@ -1,6 +1,7 @@
 use crate::allocator::{AllocError, Allocator};
 use crate::{read_u32, Memory};
 use ahash::RandomState;
+use core::marker::PhantomData;
 use std::sync::Arc;
 
 pub const LAYOUT_VERSION: u8 = 1;
@@ -11,6 +12,23 @@ pub enum LoadError {
     BadMagic([u8; 3]),
     UnsupportedVersion(u8),
 }
+
+/*
+struct Stable<T> {
+    ptr: u32,
+    phantom: PhantomData<T> // Do we need this?
+}
+
+impl<T> Stable<T> {
+    fn new(addr: u32) -> Self {
+        Self {
+            ptr: addr,
+            phantom: PhantomData::<T>
+        }
+    }
+
+    fn modify(s: Stable<T>,
+}*/
 
 struct Entry<M: Memory> {
     entry: RawEntry,
@@ -167,48 +185,64 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
     }
 
     pub fn insert(&mut self, key: &[u8], value: &[u8]) {
-        let bucket = self.get_bucket(key);
+        let bucket = self.compute_bucket(key);
 
-        let mut entry_address = read_u32(
-            &self.memory,
-            self.own_address + self.buckets_offset + bucket,
-        );
+        let mut bucket_header = self.own_address + self.buckets_offset + bucket;
+        let mut parent_addr = self.own_address + self.buckets_offset + bucket;
+        let mut node_addr = read_u32(&self.memory, parent_addr);
 
-        if entry_address == 0 {
-            // Bucket list is empty. Add new entry here.
-            let e = RawEntry {
-                size: (key.len() + value.len()) as u32,
-                value_offset: key.len() as u32,
-                next: 0,
-            };
+        while node_addr != 0 {
+            let mut node = Entry::load(node_addr, self.memory.clone());
 
-            let new_entry_address = self.write_entry(e, key, value);
+            // Does the key already exist?
+            if node.key() == key {
+                let e = RawEntry {
+                    size: (key.len() + value.len()) as u32,
+                    value_offset: key.len() as u32,
+                    next: node.next(),
+                };
 
-            // Update bucket pointer
-            self.memory.write(
-                self.own_address + self.buckets_offset + bucket,
-                &new_entry_address.to_le_bytes(),
-            );
-        } else {
-            // Traverse the list.
-            let mut entry = Entry::load(entry_address, self.memory.clone());
-            while entry.next() != 0 {
-                entry_address = entry.next();
-                entry = Entry::load(entry_address, self.memory.clone());
+                let new_entry_address = self.write_entry(e, key, value);
+
+                // Update the bucket pointer.
+                if parent_addr == bucket_header {
+                    // TODO: write_u32 method?
+                    self.memory
+                        .write(parent_addr, &new_entry_address.to_le_bytes());
+                } else {
+                    // parent is a node.
+                    let mut parent_node = Entry::load(parent_addr, self.memory.clone());
+                    parent_node.entry.next = new_entry_address;
+                    parent_node.save();
+                }
+
+                self.allocator.deallocate(node_addr, node.entry.size);
+                return;
             }
 
-            // Reached tail of list.
-            let e = RawEntry {
-                size: (key.len() + value.len()) as u32,
-                value_offset: key.len() as u32,
-                next: 0,
-            };
+            // Traverse.
+            parent_addr = node_addr;
+            node_addr = node.entry.next;
+            node = Entry::load(node_addr, self.memory.clone());
+        }
 
-            let new_entry_address = self.write_entry(e, key, value);
+        // Reached tail of list.
+        let e = RawEntry {
+            size: (key.len() + value.len()) as u32,
+            value_offset: key.len() as u32,
+            next: 0,
+        };
 
-            // Update entry pointer
-            entry.entry.next = new_entry_address;
-            entry.save();
+        let new_entry_address = self.write_entry(e, key, value);
+
+        // Update entry pointer
+        if parent_addr == bucket_header {
+            self.memory
+                .write(parent_addr, &new_entry_address.to_le_bytes());
+        } else {
+            let mut parent_node = Entry::load(parent_addr, self.memory.clone());
+            parent_node.entry.next = new_entry_address;
+            parent_node.save();
         }
     }
 
@@ -239,7 +273,8 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
         entry_address
     }
 
-    fn get_bucket(&self, key: &[u8]) -> u32 {
+    // Computes the bucket the key should be placed in.
+    fn compute_bucket(&self, key: &[u8]) -> u32 {
         use core::hash::{BuildHasher, Hash, Hasher};
         let mut state = self.hasher.build_hasher();
         key.hash(&mut state);
@@ -248,7 +283,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
     pub fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         // Compute bucket.
-        let bucket = self.get_bucket(key);
+        let bucket = self.compute_bucket(key);
 
         // Read entry.
         let mut entry_address = read_u32(
@@ -276,6 +311,46 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
         }
 
         return Some(entry.value());
+    }
+
+    pub fn remove(&mut self, key: &[u8]) -> Option<Vec<u8>> {
+        let bucket = self.compute_bucket(key);
+
+        let mut bucket_header = self.own_address + self.buckets_offset + bucket;
+        let mut parent_addr = self.own_address + self.buckets_offset + bucket;
+        let mut node_addr = read_u32(&self.memory, parent_addr);
+
+        while node_addr != 0 {
+            let mut node = Entry::load(node_addr, self.memory.clone());
+
+            // Does the key already exist?
+            if node.key() == key {
+                let val = node.value();
+
+                // Update the bucket pointer.
+                if parent_addr == bucket_header {
+                    // TODO: write_u32 method?
+                    self.memory
+                        .write(parent_addr, &node.entry.next.to_le_bytes());
+                } else {
+                    // parent is a node.
+                    let mut parent_node = Entry::load(parent_addr, self.memory.clone());
+                    parent_node.entry.next = node.next();
+                    parent_node.save();
+                }
+
+                self.allocator.deallocate(node_addr, node.entry.size);
+                return Some(val);
+            }
+
+            // Traverse.
+            parent_addr = node_addr;
+            node_addr = node.entry.next;
+            node = Entry::load(node_addr, self.memory.clone());
+        }
+
+        // Key not found.
+        None
     }
 }
 
@@ -419,7 +494,8 @@ mod test {
             HashMap::new(allocator.clone(), mem.clone(), 1).expect("failed to create map");
         map1.insert(&[1], &[1, 2, 3]);
 
-        let mut map2 = HashMap::new(allocator.clone(), mem.clone(), 1).expect("failed to create map");
+        let mut map2 =
+            HashMap::new(allocator.clone(), mem.clone(), 1).expect("failed to create map");
         map2.insert(&[1], &[4, 5, 6]);
 
         assert_eq!(map1.get(&[1]), Some(vec![1, 2, 3]));
@@ -451,5 +527,38 @@ mod test {
             HashMap::load(allocator, mem.clone(), map2_index).expect("failed to create map");
         assert_eq!(map1.get(&[1]), Some(vec![1, 2, 3]));
         assert_eq!(map2.get(&[1]), Some(vec![4, 5, 6]));
+    }
+
+    #[test]
+    fn overwrite_key() {
+        let mem = make_memory();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let mut map =
+            HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
+        map.insert(&[1], &[1, 2, 3]);
+        map.insert(&[2], &[4]);
+        assert_eq!(map.get(&[1]), Some(vec![1, 2, 3]));
+        assert_eq!(map.get(&[2]), Some(vec![4]));
+        map.insert(&[1], &[4, 5]);
+        assert_eq!(map.get(&[1]), Some(vec![4, 5]));
+        assert_eq!(map.get(&[2]), Some(vec![4]));
+        map.insert(&[1], &[6, 7, 8]);
+        assert_eq!(map.get(&[1]), Some(vec![6, 7, 8]));
+        assert_eq!(map.get(&[2]), Some(vec![4]));
+    }
+
+    #[test]
+    fn remove() {
+        let mem = make_memory();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let mut map =
+            HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
+        assert_eq!(map.remove(&[1]), None);
+        map.insert(&[1], &[1, 2, 3]);
+        map.insert(&[2], &[4]);
+        assert_eq!(map.remove(&[1]), Some(vec![1, 2, 3]));
+        assert_eq!(map.get(&[1]), None);
+        assert_eq!(map.remove(&[2]), Some(vec![4]));
+        assert_eq!(map.get(&[2]), None);
     }
 }
