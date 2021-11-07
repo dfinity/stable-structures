@@ -1,6 +1,6 @@
 use crate::{read_u32, Memory};
+use crate::allocator::{Allocator, AllocError};
 use ahash::RandomState;
-use std::sync::Arc;
 
 pub const LAYOUT_VERSION: u8 = 1;
 
@@ -19,97 +19,6 @@ impl<M: Memory> Pointer<M> {
         self.memory.write(self.addr + offset, data);
     }
 }*/
-
-pub trait Allocator {
-    /// Allocates a piece of memory with the given size, and return its pointer.
-    // TODO: add layout?
-    fn allocate(&self, size: u32) -> u32;
-    // TODO: free
-}
-
-struct DumbAllocator<M: Memory> {
-    memory: M,
-}
-
-struct DumbAllocatorHeader {
-    magic: [u8; 3],
-    version: u8,
-    free_offset: u32,
-}
-
-impl<M: Memory> DumbAllocator<M> {
-    fn new(memory: M) -> Result<Self, AllocError> {
-        if memory.size() < 1 && memory.grow(1) == -1 {
-            return Err(AllocError::GrowFailed {
-                current: 0,
-                delta: 1,
-            });
-        }
-
-        let header_len = core::mem::size_of::<DumbAllocatorHeader>() as u32;
-
-        let header = DumbAllocatorHeader {
-            magic: *b"DAL",
-            version: 0,
-            free_offset: header_len, // beginning of free space.
-        };
-
-        let header_slice = unsafe {
-            core::slice::from_raw_parts(
-                &header as *const _ as *const u8,
-                core::mem::size_of::<DumbAllocatorHeader>(),
-            )
-        };
-
-        memory.write(0, header_slice);
-
-        Ok(Self { memory })
-    }
-
-    fn get_free_offset(&self) -> u32 {
-        let mut header: DumbAllocatorHeader = unsafe { core::mem::zeroed() };
-        let header_slice = unsafe {
-            core::slice::from_raw_parts_mut(
-                &mut header as *mut _ as *mut u8,
-                core::mem::size_of::<DumbAllocatorHeader>(),
-            )
-        };
-        self.memory.read(0, header_slice);
-        header.free_offset
-    }
-
-    fn set_free_offset(&self, new_free_offset: u32) {
-        let mut header: DumbAllocatorHeader = unsafe { core::mem::zeroed() };
-        let header_slice = unsafe {
-            core::slice::from_raw_parts_mut(
-                &mut header as *mut _ as *mut u8,
-                core::mem::size_of::<DumbAllocatorHeader>(),
-            )
-        };
-        self.memory.read(0, header_slice);
-        header.free_offset = new_free_offset;
-        self.memory.write(0, header_slice);
-    }
-}
-
-impl<M: Memory> Allocator for DumbAllocator<M> {
-    fn allocate(&self, size: u32) -> u32 {
-        // TODO: grow memory if needed.
-
-        let old_free_offset = self.get_free_offset();
-
-        self.set_free_offset(old_free_offset + size);
-
-        old_free_offset
-    }
-}
-
-// TODO: copied from log.rs
-#[derive(Debug, PartialEq, Eq)]
-pub enum AllocError {
-    GrowFailed { current: u32, delta: u32 },
-    AddressSpaceOverflow,
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LoadError {
@@ -228,7 +137,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
         let size_needed = header_len + index_len;
 
-        let hash_map_address = allocator.allocate(size_needed);
+        let hash_map_address = allocator.allocate(size_needed).unwrap();
 
         memory.write(hash_map_address, header_slice);
 
@@ -329,7 +238,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
         let entry_address = self
             .allocator
-            .allocate((entry_slice.len() + key.len() + value.len()) as u32);
+            .allocate((entry_slice.len() + key.len() + value.len()) as u32).unwrap();
 
         self.memory.write(entry_address, entry_slice);
 
@@ -389,6 +298,7 @@ mod test {
     use super::*;
     use core::cell::RefCell;
     use std::rc::Rc;
+    use crate::allocator::dumb_allocator::DumbAllocator;
 
     fn make_memory() -> Rc<RefCell<Vec<u8>>> {
         Rc::new(RefCell::new(Vec::new()))
@@ -456,7 +366,7 @@ mod test {
         std::mem::drop(map);
 
         let allocator = DumbAllocator::new(mem.clone()).unwrap();
-        let mut map =
+        let map =
             HashMap::load(allocator, mem.clone(), map_addr).expect("failed to create map");
         assert_eq!(map.get(&[1]), Some(vec![1, 2, 3]));
         assert_eq!(map.get(&[2]), Some(vec![4, 5, 6]));
