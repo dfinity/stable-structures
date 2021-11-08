@@ -140,7 +140,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
         let size_needed = header_len + index_len;
 
-        let hash_map_address = allocator.allocate(size_needed).unwrap();
+        let hash_map_address = allocator.allocate_zeroed(size_needed).unwrap();
 
         memory.write(hash_map_address, header_slice);
 

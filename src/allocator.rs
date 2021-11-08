@@ -15,6 +15,8 @@ pub trait Allocator {
     fn allocate(&self, size: u32) -> Result<MemoryAddress, AllocError>;
 
     fn deallocate(&self, addr: MemoryAddress, size: u32);
+
+    fn allocate_zeroed(&self, size: u32) -> Result<MemoryAddress, AllocError>;
 }
 
 #[cfg(test)]
@@ -184,6 +186,13 @@ pub mod dumb_allocator {
             self.set_free_offset(old_free_offset + size);
 
             Ok(old_free_offset)
+        }
+
+        fn allocate_zeroed(&self, size: u32) -> Result<u32, AllocError> {
+            let ptr = self.allocate(size)?;
+            let zeros = vec![0; size as usize];
+            self.memory.write(ptr, &zeros);
+            Ok(ptr)
         }
 
         fn deallocate(&self, _addr: u32, _size: u32) {
