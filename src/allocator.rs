@@ -19,7 +19,7 @@ pub trait Allocator {
     fn allocate_zeroed(&self, size: u32) -> Result<MemoryAddress, AllocError>;
 }
 
-#[cfg(test)]
+//#[cfg(test)]
 pub mod dumb_allocator {
     use super::*;
     use crate::{Memory, WASM_PAGE_SIZE};
@@ -37,6 +37,7 @@ pub mod dumb_allocator {
         memory: M,
     }
 
+    #[repr(packed)]
     struct DumbAllocatorHeader {
         magic: [u8; 3],
         version: u8,
@@ -46,12 +47,21 @@ pub mod dumb_allocator {
     }
 
     impl<M: Memory> DumbAllocator<M> {
-        pub fn new(memory: M) -> Result<Self, AllocError> {
+        pub fn new(memory: M) -> Result<(Self, Option<Vec<u8>>), AllocError> {
             if memory.size() < 1 && memory.grow(1) == -1 {
                 return Err(AllocError::GrowFailed {
                     current: 0,
                     delta: 1,
                 });
+            }
+
+            // If magic is there, load instead.
+            let mut x = vec![0; 3];
+            memory.read(0, &mut x);
+
+            if x == *b"DAL" {
+                let loaded = Self::load(memory).unwrap();
+                return Ok((loaded.0, loaded.1));
             }
 
             let header_len = core::mem::size_of::<DumbAllocatorHeader>() as u32;
@@ -73,10 +83,11 @@ pub mod dumb_allocator {
 
             memory.write(0, header_slice);
 
-            Ok(Self { memory })
+            Ok((Self { memory }, None))
         }
 
         pub fn pre_upgrade(&self, index: &[u8]) {
+            // TODO: deallocate previous data.
             let root_address = self.allocate(index.len() as u32).unwrap();
 
             self.memory.write(root_address, index);
@@ -92,11 +103,17 @@ pub mod dumb_allocator {
 
             header.root_address = root_address;
             header.root_size = index.len() as u32;
-            
+
+            let header_slice = unsafe {
+                core::slice::from_raw_parts_mut(
+                    &mut header as *mut _ as *mut u8,
+                    core::mem::size_of::<DumbAllocatorHeader>(),
+                )
+            };
             self.memory.write(0, header_slice);
         }
 
-        pub fn load(memory: M) -> Result<(Self, Vec<u8>), LoadError> {
+        pub fn load(memory: M) -> Result<(Self, Option<Vec<u8>>), LoadError> {
             let mut header: DumbAllocatorHeader = unsafe { core::mem::zeroed() };
             let header_slice = unsafe {
                 core::slice::from_raw_parts_mut(
@@ -117,15 +134,15 @@ pub mod dumb_allocator {
                 return Err(LoadError::UnsupportedVersion(header.version));
             }
 
-            let mut root_data = vec![0; header.root_size as usize];
-            memory.read(header.root_address, &mut root_data);
+            let root_data = if header.root_size == 0 {
+                None
+            } else {
+                let mut d = vec![0; header.root_size as usize];
+                memory.read(header.root_address, &mut d);
+                Some(d)
+            };
 
-            Ok((
-                Self {
-                    memory,
-                },
-                root_data
-            ))
+            Ok((Self { memory }, root_data))
         }
 
         fn get_free_offset(&self) -> u32 {

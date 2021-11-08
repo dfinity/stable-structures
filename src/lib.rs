@@ -1,6 +1,8 @@
-//pub mod hash_map;
+pub mod allocator;
 #[cfg(target_arch = "wasm32")]
 mod ic0_api;
+pub mod hashmap;
+pub use hashmap::HashMap as HashMap;
 pub mod log;
 #[cfg(test)]
 mod tests;

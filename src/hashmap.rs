@@ -1,7 +1,6 @@
 use crate::allocator::{AllocError, Allocator};
 use crate::{read_u32, Memory};
 use ahash::RandomState;
-use core::marker::PhantomData;
 use std::sync::Arc;
 
 pub const LAYOUT_VERSION: u8 = 1;
@@ -97,6 +96,7 @@ struct RawEntry {
 }
 
 // TODO: make struct use u64
+// #[repr(packed)]
 #[derive(Debug, PartialEq)]
 struct Header {
     magic: [u8; 3],
@@ -110,7 +110,7 @@ pub struct HashMap<M: Memory, A: Allocator> {
     num_buckets: u32,
     buckets_offset: u32,
     hasher: RandomState,
-    own_address: u32,
+    pub own_address: u32,
 }
 
 impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
@@ -187,12 +187,12 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
     pub fn insert(&mut self, key: &[u8], value: &[u8]) {
         let bucket = self.compute_bucket(key);
 
-        let mut bucket_header = self.own_address + self.buckets_offset + bucket;
-        let mut parent_addr = self.own_address + self.buckets_offset + bucket;
+        let bucket_header = self.own_address + self.buckets_offset + bucket * 4;
+        let mut parent_addr = self.own_address + self.buckets_offset + bucket * 4;
         let mut node_addr = read_u32(&self.memory, parent_addr);
 
         while node_addr != 0 {
-            let mut node = Entry::load(node_addr, self.memory.clone());
+            let node = Entry::load(node_addr, self.memory.clone());
 
             // Does the key already exist?
             if node.key() == key {
@@ -223,7 +223,6 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
             // Traverse.
             parent_addr = node_addr;
             node_addr = node.entry.next;
-            node = Entry::load(node_addr, self.memory.clone());
         }
 
         // Reached tail of list.
@@ -288,11 +287,9 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
         // Read entry.
         let mut entry_address = read_u32(
             &self.memory,
-            self.own_address + self.buckets_offset + bucket,
+            self.own_address + self.buckets_offset + bucket * 4,
         );
 
-        // FIXME: are we guaranteed that the address is zero?
-        // Maybe we need to ensure that by initializing them.
         if entry_address == 0 {
             // Bucket is empty
             return None;
@@ -300,7 +297,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
         let mut entry = Entry::load(entry_address, self.memory.clone());
 
-        while &entry.key() != key {
+        while entry.key() != key {
             if entry.entry.next != 0 {
                 // traverse the list
                 entry_address = entry.entry.next;
@@ -310,18 +307,18 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
             }
         }
 
-        return Some(entry.value());
+        Some(entry.value())
     }
 
     pub fn remove(&mut self, key: &[u8]) -> Option<Vec<u8>> {
         let bucket = self.compute_bucket(key);
 
-        let mut bucket_header = self.own_address + self.buckets_offset + bucket;
-        let mut parent_addr = self.own_address + self.buckets_offset + bucket;
+        let bucket_header = self.own_address + self.buckets_offset + bucket * 4;
+        let mut parent_addr = self.own_address + self.buckets_offset + bucket * 4;
         let mut node_addr = read_u32(&self.memory, parent_addr);
 
         while node_addr != 0 {
-            let mut node = Entry::load(node_addr, self.memory.clone());
+            let node = Entry::load(node_addr, self.memory.clone());
 
             // Does the key already exist?
             if node.key() == key {
@@ -346,7 +343,6 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
             // Traverse.
             parent_addr = node_addr;
             node_addr = node.entry.next;
-            node = Entry::load(node_addr, self.memory.clone());
         }
 
         // Key not found.
@@ -369,7 +365,7 @@ mod test {
     fn initialization() {
         for i in 1..10 {
             let mem = make_memory();
-            let allocator = DumbAllocator::new(mem.clone()).unwrap();
+            let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
             let map =
                 HashMap::new(Arc::new(allocator), mem.clone(), i).expect("failed to create map");
 
@@ -405,9 +401,9 @@ mod test {
     }
 
     #[test]
-    fn insert_get() {
+    fn insert_get_single_bucket() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -415,9 +411,25 @@ mod test {
     }
 
     #[test]
+    fn insert_get_multiple_buckets() {
+        let mem = make_memory();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
+        let mut map =
+            HashMap::new(Arc::new(allocator), mem.clone(), 10).expect("failed to create map");
+
+        for i in 0..10 {
+            map.insert(&[i], &[i, i + 1, i + 2]);
+        }
+
+        for i in 0..10 {
+            assert_eq!(map.get(&[i]), Some(vec![i, i + 1, i + 2]));
+        }
+    }
+
+    #[test]
     fn dropping_then_loading_preserves_data() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 10).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -429,7 +441,7 @@ mod test {
         let map_addr = map.own_address;
         std::mem::drop(map);
 
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
         let map = HashMap::load(Arc::new(allocator), mem.clone(), map_addr)
             .expect("failed to create map");
         assert_eq!(map.get(&[1]), Some(vec![1, 2, 3]));
@@ -439,7 +451,7 @@ mod test {
     #[test]
     fn insert_collision() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -456,7 +468,7 @@ mod test {
     #[test]
     fn get_not_found_empty_bucket() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
         let map = HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         assert_eq!(map.get(&[1]), None);
     }
@@ -464,7 +476,7 @@ mod test {
     #[test]
     fn get_not_found_non_empty_bucket() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -474,7 +486,7 @@ mod test {
     #[test]
     fn multiple_hash_maps() {
         let mem = make_memory();
-        let allocator = Arc::new(DumbAllocator::new(mem.clone()).unwrap());
+        let allocator = Arc::new(DumbAllocator::new(mem.clone()).unwrap().0);
         let mut map1 =
             HashMap::new(allocator.clone(), mem.clone(), 1).expect("failed to create map");
         map1.insert(&[1], &[1, 2, 3]);
@@ -489,7 +501,7 @@ mod test {
     #[test]
     fn load_multiple_hash_maps() {
         let mem = make_memory();
-        let allocator = Arc::new(DumbAllocator::new(mem.clone()).unwrap());
+        let allocator = Arc::new(DumbAllocator::new(mem.clone()).unwrap().0);
         let mut map1 =
             HashMap::new(allocator.clone(), mem.clone(), 1).expect("failed to create map");
         map1.insert(&[1], &[1, 2, 3]);
@@ -514,17 +526,16 @@ mod test {
         std::mem::drop(allocator);
 
         let (allocator, root_data) = DumbAllocator::load(mem.clone()).unwrap();
-        println!("root data: {:?}", root_data);
         let allocator = Arc::new(allocator);
+        let root_data = root_data.unwrap();
 
         use std::convert::TryInto;
         let map1_index = u32::from_le_bytes(root_data[0..4].try_into().unwrap());
         let map2_index = u32::from_le_bytes(root_data[4..8].try_into().unwrap());
 
-        let mut map1 = HashMap::load(allocator.clone(), mem.clone(), map1_index)
+        let map1 = HashMap::load(allocator.clone(), mem.clone(), map1_index)
             .expect("failed to create map");
-        let mut map2 =
-            HashMap::load(allocator, mem.clone(), map2_index).expect("failed to create map");
+        let map2 = HashMap::load(allocator, mem.clone(), map2_index).expect("failed to create map");
         assert_eq!(map1.get(&[1]), Some(vec![1, 2, 3]));
         assert_eq!(map2.get(&[1]), Some(vec![4, 5, 6]));
     }
@@ -532,7 +543,7 @@ mod test {
     #[test]
     fn overwrite_key() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -550,7 +561,7 @@ mod test {
     #[test]
     fn remove() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = DumbAllocator::new(mem.clone()).unwrap().0;
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         assert_eq!(map.remove(&[1]), None);
