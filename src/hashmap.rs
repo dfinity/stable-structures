@@ -42,7 +42,7 @@ pub struct HashMap<M: Memory, A: Allocator> {
     pub own_address: u32,
 }
 
-impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
+impl<M: Memory, A: Allocator> HashMap<M, A> {
     pub fn new(allocator: Arc<A>, memory: M, num_keys: u32) -> Result<Self, AllocError> {
         let header_len = core::mem::size_of::<HashMapHeader>() as u32;
 
@@ -122,7 +122,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
         let mut node_addr = read_u32(&self.memory, parent_addr);
 
         while node_addr != 0 {
-            let node = Entry::load(node_addr, self.memory.clone());
+            let node = Entry::load(node_addr, &self.memory);
 
             // Does the key already exist?
             if node.key() == key {
@@ -132,14 +132,14 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
                     next: node.header.next,
                 };
 
-                let new_entry = Entry::new(e, key, value, self.memory.clone(), &*self.allocator);
+                let new_entry = Entry::new(e, key, value, &self.memory, &*self.allocator);
 
                 // Update the bucket pointer.
                 if parent_addr == bucket_header {
                     write_u32(&self.memory, parent_addr, new_entry.address);
                 } else {
                     // parent is a node.
-                    let mut parent_node = Entry::load(parent_addr, self.memory.clone());
+                    let mut parent_node = Entry::load(parent_addr, &self.memory);
                     parent_node.header.next = new_entry.address;
                     parent_node.save();
                 }
@@ -160,13 +160,13 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
             next: 0,
         };
 
-        let new_entry = Entry::new(e, key, value, self.memory.clone(), &*self.allocator);
+        let new_entry = Entry::new(e, key, value, &self.memory, &*self.allocator);
 
         // Update entry pointer
         if parent_addr == bucket_header {
             write_u32(&self.memory, parent_addr, new_entry.address);
         } else {
-            let mut parent_node = Entry::load(parent_addr, self.memory.clone());
+            let mut parent_node = Entry::load(parent_addr, &self.memory);
             parent_node.header.next = new_entry.address;
             parent_node.save();
         }
@@ -195,13 +195,13 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
             return None;
         }
 
-        let mut entry = Entry::load(entry_address, self.memory.clone());
+        let mut entry = Entry::load(entry_address, &self.memory);
 
         while entry.key() != key {
             if entry.header.next != 0 {
                 // traverse the list
                 entry_address = entry.header.next;
-                entry = Entry::load(entry_address, self.memory.clone());
+                entry = Entry::load(entry_address, &self.memory);
             } else {
                 return None;
             }
@@ -218,7 +218,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
         let mut node_addr = read_u32(&self.memory, parent_addr);
 
         while node_addr != 0 {
-            let node = Entry::load(node_addr, self.memory.clone());
+            let node = Entry::load(node_addr, &self.memory);
 
             // Does the key already exist?
             if node.key() == key {
@@ -229,7 +229,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
                     write_u32(&self.memory, parent_addr, node.header.next);
                 } else {
                     // parent is a node.
-                    let mut parent_node = Entry::load(parent_addr, self.memory.clone());
+                    let mut parent_node = Entry::load(parent_addr, &self.memory);
                     parent_node.header.next = node.header.next;
                     parent_node.save();
                 }
@@ -249,18 +249,19 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 }
 
 // A wrapper around an entry in the hashmap.
-struct Entry<M: Memory> {
+struct Entry<'a, M: Memory> {
     header: EntryHeader,
     address: u32,
-    memory: M,
+    memory: &'a M,
 }
 
-impl<M: Memory> Entry<M> {
+impl<'a, M: Memory> Entry<'a, M> {
+    // Creates and allocates a new entry.
     fn new<A: Allocator>(
         header: EntryHeader,
         key: &[u8],
         value: &[u8],
-        memory: M,
+        memory: &'a M,
         allocator: &A,
     ) -> Self {
         let entry_slice = unsafe {
@@ -270,13 +271,13 @@ impl<M: Memory> Entry<M> {
             )
         };
 
+        // Allocate the entry in memory.
         let address = allocator
             .allocate((entry_slice.len() + key.len() + value.len()) as u32)
             .unwrap();
 
+        // Write the entry, key, and value in sequence.
         memory.write(address, entry_slice);
-
-        // Write the key and value pair immediately afterwards.
         memory.write(address + entry_slice.len() as u32, key);
         memory.write(address + entry_slice.len() as u32 + key.len() as u32, value);
 
@@ -287,7 +288,7 @@ impl<M: Memory> Entry<M> {
         }
     }
 
-    fn load(address: u32, memory: M) -> Self {
+    fn load(address: u32, memory: &'a M) -> Self {
         let mut header: EntryHeader = unsafe { core::mem::zeroed() };
         let entry_slice = unsafe {
             core::slice::from_raw_parts_mut(
