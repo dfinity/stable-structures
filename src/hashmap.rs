@@ -33,6 +33,14 @@ struct EntryHeader {
     next: u32,
 }
 
+/// A "stable" hash map that can handle keys/values of arbitrary size.
+///
+/// The hash map is initialized with a number of buckets. Keys are mapped to
+/// a single bucket, and a linked list is created for each bucket to handle
+/// collisions.
+///
+/// The hash map is "stable" in the sense that it stores all its data in the
+/// given memory and can be loaded in O(1) time from that memory.
 pub struct HashMap<M: Memory, A: Allocator> {
     allocator: Arc<A>,
     memory: M,
@@ -43,11 +51,8 @@ pub struct HashMap<M: Memory, A: Allocator> {
 }
 
 impl<M: Memory, A: Allocator> HashMap<M, A> {
-    pub fn new(allocator: Arc<A>, memory: M, num_keys: u32) -> Result<Self, AllocError> {
+    pub fn new(allocator: Arc<A>, memory: M, num_buckets: u32) -> Result<Self, AllocError> {
         let header_len = core::mem::size_of::<HashMapHeader>() as u32;
-
-        // For now, assume number of buckets = number of keys
-        let num_buckets = num_keys;
 
         // Each bucket is a 32-bit pointer.
         let index_len = num_buckets
