@@ -42,12 +42,10 @@ pub mod dumb_allocator {
         magic: [u8; 3],
         version: u8,
         free_offset: u32,
-        root_address: u32,
-        root_size: u32,
     }
 
     impl<M: Memory> DumbAllocator<M> {
-        pub fn new(memory: M) -> Result<(Self, Option<Vec<u8>>), AllocError> {
+        pub fn new(memory: M) -> Result<Self, AllocError> {
             if memory.size() < 1 && memory.grow(1) == -1 {
                 return Err(AllocError::GrowFailed {
                     current: 0,
@@ -57,11 +55,10 @@ pub mod dumb_allocator {
 
             // If magic is there, load instead.
             let mut x = vec![0; 3];
-            memory.read(0, &mut x);
+            memory.read(8, &mut x);
 
             if x == *b"DAL" {
-                let loaded = Self::load(memory).unwrap();
-                return Ok((loaded.0, loaded.1));
+                return Ok(Self::load(memory).unwrap());
             }
 
             let header_len = core::mem::size_of::<DumbAllocatorHeader>() as u32;
@@ -69,9 +66,7 @@ pub mod dumb_allocator {
             let header = DumbAllocatorHeader {
                 magic: *b"DAL",
                 version: LAYOUT_VERSION,
-                free_offset: header_len, // beginning of free space.
-                root_address: 0,
-                root_size: 0,
+                free_offset: header_len + 8, // beginning of free space.
             };
 
             let header_slice = unsafe {
@@ -81,39 +76,12 @@ pub mod dumb_allocator {
                 )
             };
 
-            memory.write(0, header_slice);
+            memory.write(8, header_slice);
 
-            Ok((Self { memory }, None))
+            Ok(Self { memory })
         }
 
-        pub fn pre_upgrade(&self, index: &[u8]) {
-            // TODO: deallocate previous data.
-            let root_address = self.allocate(index.len() as u32).unwrap();
-
-            self.memory.write(root_address, index);
-
-            let mut header: DumbAllocatorHeader = unsafe { core::mem::zeroed() };
-            let header_slice = unsafe {
-                core::slice::from_raw_parts_mut(
-                    &mut header as *mut _ as *mut u8,
-                    core::mem::size_of::<DumbAllocatorHeader>(),
-                )
-            };
-            self.memory.read(0, header_slice);
-
-            header.root_address = root_address;
-            header.root_size = index.len() as u32;
-
-            let header_slice = unsafe {
-                core::slice::from_raw_parts_mut(
-                    &mut header as *mut _ as *mut u8,
-                    core::mem::size_of::<DumbAllocatorHeader>(),
-                )
-            };
-            self.memory.write(0, header_slice);
-        }
-
-        pub fn load(memory: M) -> Result<(Self, Option<Vec<u8>>), LoadError> {
+        pub fn load(memory: M) -> Result<Self, LoadError> {
             let mut header: DumbAllocatorHeader = unsafe { core::mem::zeroed() };
             let header_slice = unsafe {
                 core::slice::from_raw_parts_mut(
@@ -124,7 +92,7 @@ pub mod dumb_allocator {
             if memory.size() == 0 {
                 return Err(LoadError::MemoryEmpty);
             }
-            memory.read(0, header_slice);
+            memory.read(8, header_slice);
 
             if &header.magic != b"DAL" {
                 return Err(LoadError::BadMagic(header.magic));
@@ -134,15 +102,7 @@ pub mod dumb_allocator {
                 return Err(LoadError::UnsupportedVersion(header.version));
             }
 
-            let root_data = if header.root_size == 0 {
-                None
-            } else {
-                let mut d = vec![0; header.root_size as usize];
-                memory.read(header.root_address, &mut d);
-                Some(d)
-            };
-
-            Ok((Self { memory }, root_data))
+            Ok(Self { memory })
         }
 
         fn get_free_offset(&self) -> u32 {
@@ -153,7 +113,7 @@ pub mod dumb_allocator {
                     core::mem::size_of::<DumbAllocatorHeader>(),
                 )
             };
-            self.memory.read(0, header_slice);
+            self.memory.read(8, header_slice);
             header.free_offset
         }
 
@@ -165,9 +125,9 @@ pub mod dumb_allocator {
                     core::mem::size_of::<DumbAllocatorHeader>(),
                 )
             };
-            self.memory.read(0, header_slice);
+            self.memory.read(8, header_slice);
             header.free_offset = new_free_offset;
-            self.memory.write(0, header_slice);
+            self.memory.write(8, header_slice);
         }
     }
 
@@ -196,7 +156,6 @@ pub mod dumb_allocator {
                     });
                 }
             }
-            // TODO: grow memory if needed.
 
             let old_free_offset = self.get_free_offset();
 

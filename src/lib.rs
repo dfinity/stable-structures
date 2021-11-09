@@ -1,4 +1,5 @@
 pub mod allocator;
+use allocator::Allocator;
 #[cfg(target_arch = "wasm32")]
 mod ic0_api;
 pub mod hashmap;
@@ -38,6 +39,11 @@ fn read_u32<M: Memory>(m: &M, offset: u32) -> u32 {
     m.read(offset, &mut buf);
     u32::from_le_bytes(buf)
 }
+
+fn write_u32<M: Memory>(m: &M, offset: u32, n: u32) {
+    m.write(offset, &n.to_le_bytes());
+}
+
 
 /// RestrictedMemory creates a limited view of another memory.  This
 /// allows one to divide the main memory into non-intersecting ranges
@@ -102,4 +108,43 @@ impl<M: Memory> Memory for RestrictedMemory<M> {
         self.memory
             .write(self.page_range.start * WASM_PAGE_SIZE + offset, src)
     }
+}
+
+
+/// Root data is data stored in the memory and a pointer to this data is stored at the
+/// special address of zero. This is particularly useful during an upgrade. The root
+/// data can consist of metadata used to recover the data structures that were previously
+/// declared.
+pub fn write_root_data<M: Memory, A: Allocator>(memory: &M, allocator: &A, root_data: &[u8]) {
+    let old_root_address = read_u32(memory, 0);
+    let old_root_size = read_u32(memory, 4);
+
+    if old_root_address != 0 && old_root_size > 0 {
+        // Deallocate previous root data.
+        allocator.deallocate(old_root_address, old_root_size);
+    }
+
+    let root_address = allocator.allocate(root_data.len() as u32).unwrap();
+
+    memory.write(root_address, root_data);
+
+    write_u32(memory, 0, root_address);
+    write_u32(memory, 4, root_data.len() as u32);
+}
+
+pub fn read_root_data<M: Memory>(memory: &M) -> Option<Vec<u8>> {
+    if memory.size() == 0 {
+        return None;
+    }
+
+    let root_address = read_u32(memory, 0);
+    let root_size = read_u32(memory, 4);
+
+    if root_address == 0 || root_size == 0 {
+        return None;
+    }
+
+    let mut root_data = vec![0; root_size as usize];
+    memory.read(root_address, &mut root_data);
+    Some(root_data)
 }
