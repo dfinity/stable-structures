@@ -12,96 +12,25 @@ pub enum LoadError {
     UnsupportedVersion(u8),
 }
 
-/*
-struct Stable<T> {
-    ptr: u32,
-    phantom: PhantomData<T> // Do we need this?
-}
-
-impl<T> Stable<T> {
-    fn new(addr: u32) -> Self {
-        Self {
-            ptr: addr,
-            phantom: PhantomData::<T>
-        }
-    }
-
-    fn modify(s: Stable<T>,
-}*/
-
-struct Entry<M: Memory> {
-    entry: RawEntry,
-    entry_address: u32,
-    memory: M,
-}
-
-impl<M: Memory> Entry<M> {
-    fn load(address: u32, memory: M) -> Self {
-        let mut entry: RawEntry = unsafe { core::mem::zeroed() };
-        let entry_slice = unsafe {
-            core::slice::from_raw_parts_mut(
-                &mut entry as *mut _ as *mut u8,
-                core::mem::size_of::<RawEntry>(),
-            )
-        };
-        memory.read(address, entry_slice);
-
-        Self {
-            entry,
-            entry_address: address,
-            memory,
-        }
-    }
-
-    fn save(&self) {
-        let entry_slice = unsafe {
-            core::slice::from_raw_parts(
-                &self.entry as *const _ as *const u8,
-                core::mem::size_of::<RawEntry>(),
-            )
-        };
-
-        self.memory.write(self.entry_address, entry_slice);
-    }
-
-    fn key(&self) -> Vec<u8> {
-        let entry_len = core::mem::size_of::<RawEntry>() as u32;
-        let key_len = self.entry.value_offset;
-        let mut key = vec![0; key_len as usize];
-        self.memory.read(self.entry_address + entry_len, &mut key);
-        key
-    }
-
-    fn value(&self) -> Vec<u8> {
-        let entry_len = core::mem::size_of::<RawEntry>() as u32;
-        let value_len = self.entry.size - self.entry.value_offset;
-        let mut val = vec![0; value_len as usize];
-        self.memory.read(
-            self.entry_address + entry_len + self.entry.value_offset,
-            &mut val,
-        );
-        val
-    }
-
-    fn next(&self) -> u32 {
-        self.entry.next
-    }
-}
-
-#[repr(packed)]
-struct RawEntry {
-    size: u32,
-    value_offset: u32,
-    next: u32, // Pointer to next entry in bucket.
-}
-
-// TODO: make struct use u64
 #[repr(packed)]
 #[derive(Debug, PartialEq, Clone, Copy)]
-struct Header {
+struct HashMapHeader {
     magic: [u8; 3],
     version: u8,
     num_buckets: u32,
+}
+
+// A header that is placed before a (key, value).
+#[repr(packed)]
+struct EntryHeader {
+    // The offset where the value begins in memory
+    key_size: u32,
+
+    // The size of key + value.
+    value_size: u32,
+
+    // Pointer to the next entry.
+    next: u32,
 }
 
 pub struct HashMap<M: Memory, A: Allocator> {
@@ -115,7 +44,7 @@ pub struct HashMap<M: Memory, A: Allocator> {
 
 impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
     pub fn new(allocator: Arc<A>, memory: M, num_keys: u32) -> Result<Self, AllocError> {
-        let header_len = core::mem::size_of::<Header>() as u32;
+        let header_len = core::mem::size_of::<HashMapHeader>() as u32;
 
         // For now, assume number of buckets = number of keys
         let num_buckets = num_keys;
@@ -125,7 +54,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
             .checked_mul(std::mem::size_of::<u32>() as u32)
             .ok_or(AllocError::AddressSpaceOverflow)?;
 
-        let header = Header {
+        let header = HashMapHeader {
             magic: *b"HMP",
             version: LAYOUT_VERSION,
             num_buckets,
@@ -134,7 +63,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
         let header_slice = unsafe {
             core::slice::from_raw_parts(
                 &header as *const _ as *const u8,
-                core::mem::size_of::<Header>(),
+                core::mem::size_of::<HashMapHeader>(),
             )
         };
 
@@ -149,18 +78,19 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
             memory,
             num_buckets,
             buckets_offset: header_len,
-            // Setting seeds to be deterministic
+            // Setting seeds to be deterministic.
+            // We can randomize these seeds if we want to be HashDos resistant.
             hasher: RandomState::with_seeds(0, 0, 0, 0),
             own_address: hash_map_address,
         })
     }
 
     pub fn load(allocator: Arc<A>, memory: M, address: u32) -> Result<Self, LoadError> {
-        let mut header: Header = unsafe { core::mem::zeroed() };
+        let mut header: HashMapHeader = unsafe { core::mem::zeroed() };
         let header_slice = unsafe {
             core::slice::from_raw_parts_mut(
                 &mut header as *mut _ as *mut u8,
-                core::mem::size_of::<Header>(),
+                core::mem::size_of::<HashMapHeader>(),
             )
         };
         if memory.size() == 0 {
@@ -173,7 +103,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
         if header.version != LAYOUT_VERSION {
             return Err(LoadError::UnsupportedVersion(header.version));
         }
-        let buckets_offset = core::mem::size_of::<Header>() as u32;
+        let buckets_offset = core::mem::size_of::<HashMapHeader>() as u32;
         Ok(Self {
             allocator,
             memory,
@@ -196,77 +126,50 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
             // Does the key already exist?
             if node.key() == key {
-                let e = RawEntry {
-                    size: (key.len() + value.len()) as u32,
-                    value_offset: key.len() as u32,
-                    next: node.next(),
+                let e = EntryHeader {
+                    key_size: key.len() as u32,
+                    value_size: value.len() as u32,
+                    next: node.header.next,
                 };
 
-                let new_entry_address = self.write_entry(e, key, value);
+                let new_entry = Entry::new(e, key, value, self.memory.clone(), &*self.allocator);
 
                 // Update the bucket pointer.
                 if parent_addr == bucket_header {
-                    write_u32(&self.memory, parent_addr, new_entry_address);
+                    write_u32(&self.memory, parent_addr, new_entry.address);
                 } else {
                     // parent is a node.
                     let mut parent_node = Entry::load(parent_addr, self.memory.clone());
-                    parent_node.entry.next = new_entry_address;
+                    parent_node.header.next = new_entry.address;
                     parent_node.save();
                 }
 
-                self.allocator.deallocate(node_addr, node.entry.size);
+                self.allocator.deallocate(node_addr, node.size());
                 return;
             }
 
             // Traverse.
             parent_addr = node_addr;
-            node_addr = node.entry.next;
+            node_addr = node.header.next;
         }
 
         // Reached tail of list.
-        let e = RawEntry {
-            size: (key.len() + value.len()) as u32,
-            value_offset: key.len() as u32,
+        let e = EntryHeader {
+            key_size: key.len() as u32,
+            value_size: value.len() as u32,
             next: 0,
         };
 
-        let new_entry_address = self.write_entry(e, key, value);
+        let new_entry = Entry::new(e, key, value, self.memory.clone(), &*self.allocator);
 
         // Update entry pointer
         if parent_addr == bucket_header {
-            self.memory
-                .write(parent_addr, &new_entry_address.to_le_bytes());
+            write_u32(&self.memory, parent_addr, new_entry.address);
         } else {
             let mut parent_node = Entry::load(parent_addr, self.memory.clone());
-            parent_node.entry.next = new_entry_address;
+            parent_node.header.next = new_entry.address;
             parent_node.save();
         }
-    }
-
-    fn write_entry(&mut self, entry: RawEntry, key: &[u8], value: &[u8]) -> u32 {
-        let entry_slice = unsafe {
-            core::slice::from_raw_parts(
-                &entry as *const _ as *const u8,
-                core::mem::size_of::<RawEntry>(),
-            )
-        };
-
-        let entry_address = self
-            .allocator
-            .allocate((entry_slice.len() + key.len() + value.len()) as u32)
-            .unwrap();
-
-        self.memory.write(entry_address, entry_slice);
-
-        // Write the key and value pair immediately afterwards.
-        self.memory
-            .write(entry_address + entry_slice.len() as u32, key);
-        self.memory.write(
-            entry_address + entry_slice.len() as u32 + key.len() as u32,
-            value,
-        );
-
-        entry_address
     }
 
     // Computes the bucket the key should be placed in.
@@ -295,9 +198,9 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
         let mut entry = Entry::load(entry_address, self.memory.clone());
 
         while entry.key() != key {
-            if entry.entry.next != 0 {
+            if entry.header.next != 0 {
                 // traverse the list
-                entry_address = entry.entry.next;
+                entry_address = entry.header.next;
                 entry = Entry::load(entry_address, self.memory.clone());
             } else {
                 return None;
@@ -323,25 +226,114 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
                 // Update the bucket pointer.
                 if parent_addr == bucket_header {
-                    write_u32(&self.memory, parent_addr, node.entry.next);
+                    write_u32(&self.memory, parent_addr, node.header.next);
                 } else {
                     // parent is a node.
                     let mut parent_node = Entry::load(parent_addr, self.memory.clone());
-                    parent_node.entry.next = node.next();
+                    parent_node.header.next = node.header.next;
                     parent_node.save();
                 }
 
-                self.allocator.deallocate(node_addr, node.entry.size);
+                self.allocator.deallocate(node_addr, node.size());
                 return Some(val);
             }
 
             // Traverse.
             parent_addr = node_addr;
-            node_addr = node.entry.next;
+            node_addr = node.header.next;
         }
 
         // Key not found.
         None
+    }
+}
+
+// A wrapper around an entry in the hashmap.
+struct Entry<M: Memory> {
+    header: EntryHeader,
+    address: u32,
+    memory: M,
+}
+
+impl<M: Memory> Entry<M> {
+    fn new<A: Allocator>(
+        header: EntryHeader,
+        key: &[u8],
+        value: &[u8],
+        memory: M,
+        allocator: &A,
+    ) -> Self {
+        let entry_slice = unsafe {
+            core::slice::from_raw_parts(
+                &header as *const _ as *const u8,
+                core::mem::size_of::<EntryHeader>(),
+            )
+        };
+
+        let address = allocator
+            .allocate((entry_slice.len() + key.len() + value.len()) as u32)
+            .unwrap();
+
+        memory.write(address, entry_slice);
+
+        // Write the key and value pair immediately afterwards.
+        memory.write(address + entry_slice.len() as u32, key);
+        memory.write(address + entry_slice.len() as u32 + key.len() as u32, value);
+
+        Self {
+            header,
+            address,
+            memory,
+        }
+    }
+
+    fn load(address: u32, memory: M) -> Self {
+        let mut header: EntryHeader = unsafe { core::mem::zeroed() };
+        let entry_slice = unsafe {
+            core::slice::from_raw_parts_mut(
+                &mut header as *mut _ as *mut u8,
+                core::mem::size_of::<EntryHeader>(),
+            )
+        };
+        memory.read(address, entry_slice);
+
+        Self {
+            header,
+            address,
+            memory,
+        }
+    }
+
+    fn save(&self) {
+        let entry_slice = unsafe {
+            core::slice::from_raw_parts(
+                &self.header as *const _ as *const u8,
+                core::mem::size_of::<EntryHeader>(),
+            )
+        };
+
+        self.memory.write(self.address, entry_slice);
+    }
+
+    fn key(&self) -> Vec<u8> {
+        let entry_len = core::mem::size_of::<EntryHeader>() as u32;
+        let key_len = self.header.key_size;
+        let mut key = vec![0; key_len as usize];
+        self.memory.read(self.address + entry_len, &mut key);
+        key
+    }
+
+    fn value(&self) -> Vec<u8> {
+        let entry_len = core::mem::size_of::<EntryHeader>() as u32;
+        let value_len = self.header.value_size;
+        let mut val = vec![0; value_len as usize];
+        self.memory
+            .read(self.address + entry_len + self.header.key_size, &mut val);
+        val
+    }
+
+    fn size(&self) -> u32 {
+        self.header.key_size + self.header.value_size + core::mem::size_of::<EntryHeader>() as u32
     }
 }
 
@@ -364,18 +356,18 @@ mod test {
             let map =
                 HashMap::new(Arc::new(allocator), mem.clone(), i).expect("failed to create map");
 
-            let mut header: Header = unsafe { core::mem::zeroed() };
+            let mut header: HashMapHeader = unsafe { core::mem::zeroed() };
             let header_slice = unsafe {
                 core::slice::from_raw_parts_mut(
                     &mut header as *mut _ as *mut u8,
-                    core::mem::size_of::<Header>(),
+                    core::mem::size_of::<HashMapHeader>(),
                 )
             };
             mem.read(map.own_address, header_slice);
 
             assert_eq!(
                 header,
-                Header {
+                HashMapHeader {
                     magic: *b"HMP",
                     version: 1,
                     num_buckets: i,
