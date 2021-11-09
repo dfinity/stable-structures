@@ -1,0 +1,5 @@
+service: () -> {
+  insert: (vec nat8, vec nat8) -> ();
+  get: (vec nat8) -> (variant { Ok : vec nat8; NotFound }) query;
+  remove: (vec nat8) -> (variant { Ok : vec nat8; NotFound });
+}

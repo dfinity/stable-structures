@@ -1,0 +1,23 @@
+{
+  "canisters": {
+    "demo": {
+      "type": "custom",
+      "candid": "src/demo.did",
+      "wasm": "target/wasm32-unknown-unknown/release/stable-demo.wasm",
+      "build": "src/build.sh"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "dfx": "0.8.3",
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8001",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}

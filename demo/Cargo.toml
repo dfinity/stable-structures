@@ -1,0 +1,16 @@
+[package]
+name = "stable-demo"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+candid = "0.7.8"
+ic-cdk = "0.3.1"
+ic-cdk-macros = "0.3.1"
+stable-structures = { path = "../", version = "0.1.0" }
+
+
+[dev-dependencies]
+maplit = "1.0.2"
