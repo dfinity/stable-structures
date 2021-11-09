@@ -341,7 +341,7 @@ impl<'a, M: Memory> Entry<'a, M> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{allocator::dumb_allocator::DumbAllocator, read_root_data, write_root_data};
+    use crate::{allocator::mock_allocator::MockAllocator, read_root_data, write_root_data};
     use core::cell::RefCell;
     use std::rc::Rc;
 
@@ -353,7 +353,7 @@ mod test {
     fn initialization() {
         for i in 1..10 {
             let mem = make_memory();
-            let allocator = DumbAllocator::new(mem.clone()).unwrap();
+            let allocator = MockAllocator::new(mem.clone()).unwrap();
             let map =
                 HashMap::new(Arc::new(allocator), mem.clone(), i).expect("failed to create map");
 
@@ -391,7 +391,7 @@ mod test {
     #[test]
     fn insert_get_single_bucket() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -401,7 +401,7 @@ mod test {
     #[test]
     fn insert_get_multiple_buckets() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 10).expect("failed to create map");
 
@@ -417,7 +417,7 @@ mod test {
     #[test]
     fn dropping_then_loading_preserves_data() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 10).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -429,7 +429,7 @@ mod test {
         let map_addr = map.own_address;
         std::mem::drop(map);
 
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let map = HashMap::load(Arc::new(allocator), mem.clone(), map_addr)
             .expect("failed to create map");
         assert_eq!(map.get(&[1]), Some(vec![1, 2, 3]));
@@ -439,7 +439,7 @@ mod test {
     #[test]
     fn insert_collision() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -456,7 +456,7 @@ mod test {
     #[test]
     fn get_not_found_empty_bucket() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let map = HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         assert_eq!(map.get(&[1]), None);
     }
@@ -464,7 +464,7 @@ mod test {
     #[test]
     fn get_not_found_non_empty_bucket() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -474,7 +474,7 @@ mod test {
     #[test]
     fn multiple_hash_maps() {
         let mem = make_memory();
-        let allocator = Arc::new(DumbAllocator::new(mem.clone()).unwrap());
+        let allocator = Arc::new(MockAllocator::new(mem.clone()).unwrap());
         let mut map1 =
             HashMap::new(allocator.clone(), mem.clone(), 1).expect("failed to create map");
         map1.insert(&[1], &[1, 2, 3]);
@@ -489,7 +489,7 @@ mod test {
     #[test]
     fn load_multiple_hash_maps() {
         let mem = make_memory();
-        let allocator = Arc::new(DumbAllocator::new(mem.clone()).unwrap());
+        let allocator = Arc::new(MockAllocator::new(mem.clone()).unwrap());
         let mut map1 =
             HashMap::new(allocator.clone(), mem.clone(), 1).expect("failed to create map");
         map1.insert(&[1], &[1, 2, 3]);
@@ -515,7 +515,7 @@ mod test {
         std::mem::drop(root_data);
 
         let root_data = read_root_data(&mem).unwrap();
-        let allocator = Arc::new(DumbAllocator::load(mem.clone()).unwrap());
+        let allocator = Arc::new(MockAllocator::load(mem.clone()).unwrap());
 
         use std::convert::TryInto;
         let map1_index = u32::from_le_bytes(root_data[0..4].try_into().unwrap());
@@ -531,7 +531,7 @@ mod test {
     #[test]
     fn overwrite_key() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         map.insert(&[1], &[1, 2, 3]);
@@ -549,7 +549,7 @@ mod test {
     #[test]
     fn remove() {
         let mem = make_memory();
-        let allocator = DumbAllocator::new(mem.clone()).unwrap();
+        let allocator = MockAllocator::new(mem.clone()).unwrap();
         let mut map =
             HashMap::new(Arc::new(allocator), mem.clone(), 1).expect("failed to create map");
         assert_eq!(map.remove(&[1]), None);
