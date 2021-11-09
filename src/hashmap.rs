@@ -1,5 +1,5 @@
 use crate::allocator::{AllocError, Allocator};
-use crate::{read_u32, Memory};
+use crate::{read_u32, write_u32, Memory};
 use ahash::RandomState;
 use std::sync::Arc;
 
@@ -88,7 +88,7 @@ impl<M: Memory> Entry<M> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[repr(packed)]
 struct RawEntry {
     size: u32,
     value_offset: u32,
@@ -96,8 +96,8 @@ struct RawEntry {
 }
 
 // TODO: make struct use u64
-// #[repr(packed)]
-#[derive(Debug, PartialEq)]
+#[repr(packed)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 struct Header {
     magic: [u8; 3],
     version: u8,
@@ -206,9 +206,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
                 // Update the bucket pointer.
                 if parent_addr == bucket_header {
-                    // TODO: write_u32 method?
-                    self.memory
-                        .write(parent_addr, &new_entry_address.to_le_bytes());
+                    write_u32(&self.memory, parent_addr, new_entry_address);
                 } else {
                     // parent is a node.
                     let mut parent_node = Entry::load(parent_addr, self.memory.clone());
@@ -247,7 +245,6 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
     fn write_entry(&mut self, entry: RawEntry, key: &[u8], value: &[u8]) -> u32 {
         let entry_slice = unsafe {
-            // TODO: look up the docs of this.
             core::slice::from_raw_parts(
                 &entry as *const _ as *const u8,
                 core::mem::size_of::<RawEntry>(),
@@ -326,9 +323,7 @@ impl<M: Clone + Memory, A: Allocator> HashMap<M, A> {
 
                 // Update the bucket pointer.
                 if parent_addr == bucket_header {
-                    // TODO: write_u32 method?
-                    self.memory
-                        .write(parent_addr, &node.entry.next.to_le_bytes());
+                    write_u32(&self.memory, parent_addr, node.entry.next);
                 } else {
                     // parent is a node.
                     let mut parent_node = Entry::load(parent_addr, self.memory.clone());
