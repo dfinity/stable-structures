@@ -1,14 +1,22 @@
 //pub mod hash_map;
 #[cfg(target_arch = "wasm32")]
 mod ic0_api;
-pub mod log;
+//pub mod log;
+pub mod btree;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod log_tests;
+//#[cfg(test)]
+//mod log_tests;
 pub mod vec_mem;
 
-const WASM_PAGE_SIZE: u32 = 65536;
+const WASM_PAGE_SIZE: u64 = 65536;
+
+pub trait Memory64 {
+    fn size(&self) -> u64;
+    fn grow(&self, pages: u64) -> i64;
+    fn read(&self, offset: u64, dst: &mut [u8]);
+    fn write(&self, offset: u64, src: &[u8]);
+}
 
 pub trait Memory {
     /// Returns the current size of the stable memory in WebAssembly
@@ -40,20 +48,20 @@ fn read_u32<M: Memory>(m: &M, offset: u32) -> u32 {
 /// RestrictedMemory creates a limited view of another memory.  This
 /// allows one to divide the main memory into non-intersecting ranges
 /// and use different layouts in each region.
-pub struct RestrictedMemory<M: Memory> {
-    page_range: core::ops::Range<u32>,
+pub struct RestrictedMemory<M: Memory64> {
+    page_range: core::ops::Range<u64>,
     memory: M,
 }
 
-impl<M: Memory> RestrictedMemory<M> {
-    pub fn new(memory: M, page_range: core::ops::Range<u32>) -> Self {
-        assert!(page_range.end < u32::MAX / WASM_PAGE_SIZE);
+impl<M: Memory64> RestrictedMemory<M> {
+    pub fn new(memory: M, page_range: core::ops::Range<u64>) -> Self {
+        assert!(page_range.end < u64::MAX / WASM_PAGE_SIZE);
         Self { memory, page_range }
     }
 }
 
-impl<M: Memory> Memory for RestrictedMemory<M> {
-    fn size(&self) -> u32 {
+impl<M: Memory64> Memory64 for RestrictedMemory<M> {
+    fn size(&self) -> u64 {
         let base_size = self.memory.size();
         if base_size < self.page_range.start {
             0
@@ -64,7 +72,7 @@ impl<M: Memory> Memory for RestrictedMemory<M> {
         }
     }
 
-    fn grow(&self, delta: u32) -> i32 {
+    fn grow(&self, delta: u64) -> i64 {
         let base_size = self.memory.size();
         if base_size < self.page_range.start {
             self.memory
@@ -72,7 +80,7 @@ impl<M: Memory> Memory for RestrictedMemory<M> {
                 .min(0)
         } else if base_size >= self.page_range.end {
             if delta == 0 {
-                (self.page_range.end - self.page_range.start) as i32
+                (self.page_range.end - self.page_range.start) as i64
             } else {
                 -1
             }
@@ -85,18 +93,18 @@ impl<M: Memory> Memory for RestrictedMemory<M> {
                 if r < 0 {
                     r
                 } else {
-                    r - self.page_range.start as i32
+                    r - self.page_range.start as i64
                 }
             }
         }
     }
 
-    fn read(&self, offset: u32, dst: &mut [u8]) {
+    fn read(&self, offset: u64, dst: &mut [u8]) {
         self.memory
             .read(self.page_range.start * WASM_PAGE_SIZE + offset, dst)
     }
 
-    fn write(&self, offset: u32, src: &[u8]) {
+    fn write(&self, offset: u64, src: &[u8]) {
         self.memory
             .write(self.page_range.start * WASM_PAGE_SIZE + offset, src)
     }
