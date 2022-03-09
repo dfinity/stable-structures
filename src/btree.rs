@@ -19,7 +19,7 @@ type Ptr = u64;
 
 #[repr(packed)]
 #[derive(Debug, PartialEq, Clone, Copy)]
-struct Header {
+struct BTreeHeader {
     magic: [u8; 3],
     version: u8,
     root_offset: u64,
@@ -28,6 +28,7 @@ struct Header {
     //max_value_size: u32, // TODO: extend this to be aligned with 8-bytes?
 }
 
+#[derive(Debug)]
 pub enum LoadError {
     MemoryEmpty,
     BadMagic([u8; 3]),
@@ -366,9 +367,9 @@ pub struct Range;
 impl<M: Memory64> StableBTreeMap<M> {
     // TODO: make branching factor configurable.
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Self {
-        let header_len = core::mem::size_of::<Header>() as u64;
+        let header_len = core::mem::size_of::<BTreeHeader>() as u64;
 
-        let header = Header {
+        let header = BTreeHeader {
             magic: *b"BTR",
             version: LAYOUT_VERSION,
             root_offset: NULL,
@@ -378,7 +379,7 @@ impl<M: Memory64> StableBTreeMap<M> {
         let header_slice = unsafe {
             core::slice::from_raw_parts(
                 &header as *const _ as *const u8,
-                core::mem::size_of::<Header>(),
+                core::mem::size_of::<BTreeHeader>(),
             )
         };
 
@@ -408,11 +409,11 @@ impl<M: Memory64> StableBTreeMap<M> {
     }
 
     pub fn load(memory: M) -> Result<Self, LoadError> {
-        let mut header: Header = unsafe { core::mem::zeroed() };
+        let mut header: BTreeHeader = unsafe { core::mem::zeroed() };
         let header_slice = unsafe {
             core::slice::from_raw_parts_mut(
                 &mut header as *mut _ as *mut u8,
-                core::mem::size_of::<Header>(),
+                core::mem::size_of::<BTreeHeader>(),
             )
         };
         if memory.size() == 0 {
@@ -436,6 +437,26 @@ impl<M: Memory64> StableBTreeMap<M> {
                 values: vec![],
             }),*/
         })
+    }
+
+    fn save(&self) -> Result<(), WriteError> {
+        let header = BTreeHeader {
+            magic: *b"BTR",
+            version: LAYOUT_VERSION,
+            root_offset: self.root_offset,
+            free_list: self.free_list,
+        };
+
+        let header_slice = unsafe {
+            core::slice::from_raw_parts(
+                &header as *const _ as *const u8,
+                core::mem::size_of::<BTreeHeader>(),
+            )
+        };
+
+        let header_len = core::mem::size_of::<BTreeHeader>() as u64;
+
+        write(&self.memory, 0, header_slice)
     }
 
     pub fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
@@ -727,6 +748,7 @@ impl<M: Memory64> StableBTreeMap<M> {
                 };
 
                 node.save(&self.memory).unwrap();
+                self.save();
                 ret
             }
             Node::Internal(ref mut internal) => {
@@ -1246,6 +1268,20 @@ mod test {
             }
             _ => panic!("root should be internal"),
         }*/
+    }
+
+    #[test]
+    fn reloading() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0);
+
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
+
+        let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
+        assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
+
+        let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
+        assert_eq!(btree.remove(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
     }
 }
 
