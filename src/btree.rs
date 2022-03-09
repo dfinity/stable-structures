@@ -9,7 +9,7 @@ const MAX_KEY_SIZE: u32 = 64;
 const MAX_VALUE_SIZE: u32 = 64;
 
 // Taken from `BTreeMap`.
-const B: u64 = 6;
+const B: u64 = 6; // The minimum degree.
 const CAPACITY: u64 = 2 * B - 1;
 
 const LEAF_NODE_TYPE: u8 = 0;
@@ -318,6 +318,41 @@ impl Node {
         }
     }
 
+    fn address(&self) -> Ptr {
+        match &self {
+            Self::Leaf(leaf) => leaf.address,
+            Self::Internal(internal) => internal.address,
+        }
+    }
+
+    fn keys(&self) -> &[Key] {
+        match &self {
+            Self::Leaf(leaf) => &leaf.keys,
+            Self::Internal(internal) => &internal.keys,
+        }
+    }
+
+    fn keys_mut(&mut self) -> &mut Vec<Key> {
+        match self {
+            Self::Leaf(leaf) => &mut leaf.keys,
+            Self::Internal(internal) => &mut internal.keys,
+        }
+    }
+
+    fn values(&self) -> &[Value] {
+        match &self {
+            Self::Leaf(leaf) => &leaf.values,
+            Self::Internal(internal) => &internal.values,
+        }
+    }
+
+    fn values_mut(&mut self) -> &mut Vec<Value> {
+        match self {
+            Self::Leaf(leaf) => &mut leaf.values,
+            Self::Internal(internal) => &mut internal.values,
+        }
+    }
+
     fn save(&self, memory: &impl Memory64) -> Result<(), WriteError> {
         match &self {
             Self::Leaf(leaf) => leaf.save(memory),
@@ -479,11 +514,121 @@ impl<M: Memory64> StableBTreeMap<M> {
         }
     }
 
-    /*
-    pub fn remove(&mut self, key: &[u8]) -> Option<&[u8]> {
-        todo!();
+    pub fn remove(&mut self, key: &Key) -> Option<Value> {
+        if self.root_offset == NULL {
+            return None;
+        }
+
+        self.remove_helper(self.root_offset, key)
     }
 
+    fn remove_helper(&mut self, node_addr: Ptr, key: &Key) -> Option<Value> {
+        println!("remove helper");
+
+        let node = Node::load(node_addr, &self.memory);
+        match node {
+            Node::Leaf(mut leaf) => {
+                match leaf.keys.binary_search(key) {
+                    Ok(idx) => {
+                        // NOTE: this is O(n). Is this acceptable?
+                        let value = leaf.values.remove(idx);
+                        leaf.keys.remove(idx);
+
+                        // TODO: check if we need to merge the node.
+
+                        leaf.save(&self.memory);
+
+                        Some(value)
+                    }
+                    _ => None, // Key not found.
+                }
+            }
+            Node::Internal(mut internal) => {
+                println!("Internal node: {:?}", internal);
+                match internal.keys.binary_search(key) {
+                    Ok(idx) => {
+                        // The key is in the node.
+                        let value = internal.values[idx].clone(); // TODO: no clone
+
+                        // Check if the child that precedes `key` has at least `B` keys.
+                        let mut pre_child = Node::load(internal.children[idx], &self.memory);
+                        if pre_child.keys().len() >= B as usize {
+                            // Case 2.a:
+
+                            // Replace the `key` with its predecessor.
+                            internal.keys[idx] = pre_child.keys().last().unwrap().clone();
+                            internal.values[idx] = pre_child.values().last().unwrap().clone();
+
+                            // Recursively delete from the predecessor.
+                            self.remove_helper(internal.children[idx], pre_child.keys().last().unwrap());
+
+                            // Save the internal node.
+                            internal.save(&self.memory);
+                            return Some(value);
+                        }
+
+                        // Check if the child that succeeds `key` has at least `B` keys.
+                        let mut post_child = Node::load(internal.children[idx + 1], &self.memory);
+                        if post_child.keys().len() >= B as usize {
+                            // Replace the `key` with its successor.
+                            internal.keys[idx] = post_child.keys()[0].clone();
+                            internal.values[idx] = post_child.values()[0].clone();
+
+                            // Recursively delete the successor.
+                            self.remove_helper(internal.children[idx + 1], &post_child.keys()[0]);
+
+                            // Save the internal node.
+                            internal.save(&self.memory);
+                            return Some(value);
+                        }
+
+                        // Case 2.c:
+                        // Move the key into the prechild.
+                        pre_child.keys_mut().push(internal.keys.remove(idx));
+                        pre_child.values_mut().push(internal.values.remove(idx));
+
+                        // Remove the post child from the internal node.
+                        internal.children.remove(idx + 1);
+
+                        // TODO: what if the children are internal nodes?
+
+                        // Migrate all keys and values from post_child into pre_child
+                        pre_child.keys_mut().append(post_child.keys_mut());
+                        pre_child.values_mut().append(post_child.values_mut());
+
+                        // If the root node now has no keys, then delete it.
+                        if internal.address == self.root_offset && internal.keys.is_empty() {
+                            // Replace the root node with its (only) child.
+                            assert_eq!(internal.children.len(), 1);
+                            self.root_offset = internal.children[0];
+
+                            // TODO: save btree?
+                            // TODO: deallocate root
+                        }
+
+                        internal.save(&self.memory);
+                        pre_child.save(&self.memory);
+                        // TODO: deallocate postchild
+
+                        // Recursively delete the key.
+                        self.remove_helper(pre_child.address(), key)
+                    }
+                    Err(idx) => {
+                        /*
+                        // The key isn't in the node. Look for the node in the child.
+                        let child_address = internal.children[idx];
+                        println!("Child address: {:?}", child_address);
+
+                        // Recurse
+                        Self::get_helper(child_address, key, memory)*/
+                        todo!()
+                    }
+                }
+            }
+        }
+    }
+
+    /*
     pub fn range<T, R>(&self, range: R) -> Range
     where
         R: RangeBounds<T>,
@@ -913,6 +1058,194 @@ mod test {
             }
             _ => panic!("root should be internal"),
         }
+    }
+
+    #[test]
+    fn remove_simple() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0);
+
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
+        assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
+        assert_eq!(btree.remove(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
+        assert_eq!(btree.get(&vec![1, 2, 3]), None);
+    }
+
+    #[test]
+    fn remove_split_node() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0);
+
+        assert_eq!(btree.insert(vec![1], vec![2]), None);
+        assert_eq!(btree.insert(vec![2], vec![2]), None);
+        assert_eq!(btree.insert(vec![3], vec![2]), None);
+        assert_eq!(btree.insert(vec![4], vec![2]), None);
+        assert_eq!(btree.insert(vec![5], vec![2]), None);
+        assert_eq!(btree.insert(vec![6], vec![2]), None);
+        assert_eq!(btree.insert(vec![7], vec![2]), None);
+        assert_eq!(btree.insert(vec![8], vec![2]), None);
+        assert_eq!(btree.insert(vec![9], vec![2]), None);
+        assert_eq!(btree.insert(vec![10], vec![2]), None);
+        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![12], vec![2]), None);
+
+        // The result should looks like this:
+        //                [6]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+
+        for i in 1..=12 {
+            println!("i: {:?}", i);
+            assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+        }
+
+        // Remove node 6. Triggers case 2.b
+        assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+
+        // The result should looks like this:
+        //                [7]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
+        let root = Node::load(btree.root_offset, &mem);
+        match root {
+            Node::Internal(internal) => {
+                assert_eq!(internal.keys, vec![vec![7]]);
+                assert_eq!(internal.values, vec![vec![2]]);
+                assert_eq!(internal.children.len(), 2);
+
+                let child_0 = Node::load(internal.children[0], &mem);
+                match child_0 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(leaf.keys, vec![vec![1], vec![2], vec![3], vec![4], vec![5]]);
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+
+                let child_1 = Node::load(internal.children[1], &mem);
+                match child_1 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(
+                            leaf.keys,
+                            vec![vec![8], vec![9], vec![10], vec![11], vec![12]]
+                        );
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+            }
+            _ => panic!("root should be internal"),
+        }
+
+        // Remove node 7. Triggers case 2.c
+        assert_eq!(btree.remove(&vec![7]), Some(vec![2]));
+        // The result should looks like this:
+        //
+        // [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
+        let root = Node::load(btree.root_offset, &mem);
+        println!("root: {:?}", root);
+        match root {
+            Node::Leaf(leaf) => {
+                assert_eq!(
+                    leaf.keys,
+                    vec![
+                        vec![1],
+                        vec![2],
+                        vec![3],
+                        vec![4],
+                        vec![5],
+                        vec![8],
+                        vec![9],
+                        vec![10],
+                        vec![11],
+                        vec![12]
+                    ]
+                );
+                assert_eq!(leaf.values, vec![vec![2]; 10]);
+            }
+            _ => panic!("root should be leaf"),
+        }
+    }
+
+    #[test]
+    fn remove_split_node_2() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0);
+
+        assert_eq!(btree.insert(vec![1], vec![2]), None);
+        assert_eq!(btree.insert(vec![2], vec![2]), None);
+        assert_eq!(btree.insert(vec![3], vec![2]), None);
+        assert_eq!(btree.insert(vec![4], vec![2]), None);
+        assert_eq!(btree.insert(vec![5], vec![2]), None);
+        assert_eq!(btree.insert(vec![6], vec![2]), None);
+        assert_eq!(btree.insert(vec![7], vec![2]), None);
+        assert_eq!(btree.insert(vec![8], vec![2]), None);
+        assert_eq!(btree.insert(vec![9], vec![2]), None);
+        assert_eq!(btree.insert(vec![10], vec![2]), None);
+        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![0], vec![2]), None);
+
+        // The result should looks like this:
+        //                    [6]
+        //                   /   \
+        // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
+
+        for i in 0..=11 {
+            assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+        }
+
+        // Remove node 6. Triggers case 2.a
+        assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+
+        /*
+        // The result should looks like this:
+        //                [5]
+        //               /   \
+        // [0, 1, 2, 3, 4]   [7, 8, 9, 10, 11]
+        let root = Node::load(btree.root_offset, &mem);
+        match root {
+            Node::Internal(internal) => {
+                assert_eq!(internal.keys, vec![vec![5]]);
+                assert_eq!(internal.values, vec![vec![2]]);
+                assert_eq!(internal.children.len(), 2);
+
+                let child_0 = Node::load(internal.children[0], &mem);
+                match child_0 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(leaf.keys, vec![vec![0], vec![1], vec![2], vec![3], vec![4]]);
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+
+                let child_1 = Node::load(internal.children[1], &mem);
+                match child_1 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(
+                            leaf.keys,
+                            vec![vec![7], vec![8], vec![9], vec![10], vec![11]]
+                        );
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+            }
+            _ => panic!("root should be internal"),
+        }*/
     }
 }
 
