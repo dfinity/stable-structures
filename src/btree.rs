@@ -1282,6 +1282,9 @@ mod test {
 
         let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
         assert_eq!(btree.remove(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
+
+        let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
+        assert_eq!(btree.get(&vec![1, 2, 3]), None);
     }
 }
 
