@@ -239,7 +239,7 @@ impl Node {
         }*/
         memory.read(address, header_slice);
 
-        println!("num_entries: {:?}", header.num_entries);
+        //println!("num_entries: {:?}", header.num_entries);
 
         if header.node_type == LEAF_NODE_TYPE {
             // Load the entries.
@@ -247,13 +247,13 @@ impl Node {
             let mut values = vec![];
             let mut offset = header_len;
             for _ in 0..header.num_entries {
-                println!("reading entry");
+                //println!("reading entry");
                 let key_size = read_u32(memory, address + offset);
-                println!("key size: {:?}", key_size);
+                //println!("key size: {:?}", key_size);
                 offset += 4;
                 let mut key = vec![0; key_size as usize];
                 memory.read(address + offset, &mut key);
-                println!("key: {:?}", key);
+                //println!("key: {:?}", key);
                 offset += MAX_KEY_SIZE as u64;
 
                 let value_size = read_u32(memory, address + offset);
@@ -276,13 +276,13 @@ impl Node {
             let mut values = vec![];
             let mut offset = header_len;
             for _ in 0..header.num_entries {
-                println!("reading entry");
+                //println!("reading entry");
                 let key_size = read_u32(memory, address + offset);
-                println!("key size: {:?}", key_size);
+                // println!("key size: {:?}", key_size);
                 offset += 4;
                 let mut key = vec![0; key_size as usize];
                 memory.read(address + offset, &mut key);
-                println!("key: {:?}", key);
+                // println!("key: {:?}", key);
                 offset += MAX_KEY_SIZE as u64;
 
                 let value_size = read_u32(memory, address + offset);
@@ -297,7 +297,6 @@ impl Node {
 
             // Load children
             for _ in 0..header.num_entries + 1 {
-                println!("reading child");
                 let child = read_u64(memory, address + offset);
                 offset += 8;
                 children.push(child);
@@ -438,6 +437,7 @@ impl<M: Memory64> StableBTreeMap<M> {
             new_root.save(&self.memory).unwrap();
 
             self.split_child(&mut new_root, 0);
+            println!("new root: {:?}", new_root);
             self.insert_nonfull(Node::Internal(new_root), key, value)
         }
     }
@@ -557,13 +557,15 @@ impl<M: Memory64> StableBTreeMap<M> {
     }
 
     fn insert_nonfull(&mut self, mut node: Node, key: Key, value: Value) -> Option<Value> {
-        println!("INSERT NONFULL");
+        println!("INSERT NONFULL: key {:?}", key);
         match node {
             Node::Leaf(LeafNode {
                 ref mut keys,
                 ref mut values,
                 ..
             }) => {
+                println!("leaf node");
+                println!("Keys: {:?}", keys);
                 let ret = match keys.binary_search(&key) {
                     Ok(idx) => {
                         // The key was already in the map. Overwrite and return the previous value.
@@ -601,6 +603,10 @@ impl<M: Memory64> StableBTreeMap<M> {
                     println!("SPLIT CHILD FROM INSERT NONFULL");
                     self.split_child(internal, idx);
                 }
+
+                let idx = internal.keys.binary_search(&key).unwrap_or_else(|x| x);
+                let child_offset = internal.children[idx];
+                let child = Node::load(child_offset, &self.memory);
 
                 self.insert_nonfull(child, key, value)
             }
@@ -747,7 +753,7 @@ mod test {
     }
 
     #[test]
-    fn insert_more_than_b() {
+    fn insert_split_node() {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0);
 
@@ -770,9 +776,142 @@ mod test {
         //               /   \
         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-        for i in 1..13 {
+        for i in 1..=12 {
             println!("i: {:?}", i);
             assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+        }
+    }
+
+    #[test]
+    fn insert_split_multiple_nodes() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0);
+
+        assert_eq!(btree.insert(vec![1], vec![2]), None);
+        assert_eq!(btree.insert(vec![2], vec![2]), None);
+        assert_eq!(btree.insert(vec![3], vec![2]), None);
+        assert_eq!(btree.insert(vec![4], vec![2]), None);
+        assert_eq!(btree.insert(vec![5], vec![2]), None);
+        assert_eq!(btree.insert(vec![6], vec![2]), None);
+        assert_eq!(btree.insert(vec![7], vec![2]), None);
+        assert_eq!(btree.insert(vec![8], vec![2]), None);
+        assert_eq!(btree.insert(vec![9], vec![2]), None);
+        assert_eq!(btree.insert(vec![10], vec![2]), None);
+        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![12], vec![2]), None);
+
+        // The result should looks like this:
+        //                [6]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+
+        let root = Node::load(btree.root_offset, &mem);
+        match root {
+            Node::Internal(internal) => {
+                assert_eq!(internal.keys, vec![vec![6]]);
+                assert_eq!(internal.values, vec![vec![2]]);
+                assert_eq!(internal.children.len(), 2);
+
+                let child_0 = Node::load(internal.children[0], &mem);
+                match child_0 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(leaf.keys, vec![vec![1], vec![2], vec![3], vec![4], vec![5]]);
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+
+                let child_1 = Node::load(internal.children[1], &mem);
+                match child_1 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(
+                            leaf.keys,
+                            vec![vec![7], vec![8], vec![9], vec![10], vec![11], vec![12]]
+                        );
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+            }
+            _ => panic!("root should be internal"),
+        }
+
+        for i in 1..=12 {
+            println!("i: {:?}", i);
+            assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+        }
+
+        // Insert more to cause more splitting.
+        assert_eq!(btree.insert(vec![13], vec![2]), None);
+        assert_eq!(btree.insert(vec![14], vec![2]), None);
+        assert_eq!(btree.insert(vec![15], vec![2]), None);
+        assert_eq!(btree.insert(vec![16], vec![2]), None);
+        assert_eq!(btree.insert(vec![17], vec![2]), None);
+        // Should cause another split
+        assert_eq!(btree.insert(vec![18], vec![2]), None);
+
+        for i in 1..=18 {
+            println!("i: {:?}", i);
+            assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+        }
+
+        let root = Node::load(btree.root_offset, &mem);
+        match root {
+            Node::Internal(internal) => {
+                assert_eq!(internal.keys, vec![vec![6], vec![12]]);
+                assert_eq!(internal.values, vec![vec![2], vec![2]]);
+                assert_eq!(internal.children.len(), 3);
+
+                let child_0 = Node::load(internal.children[0], &mem);
+                match child_0 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(leaf.keys, vec![vec![1], vec![2], vec![3], vec![4], vec![5]]);
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+
+                let child_1 = Node::load(internal.children[1], &mem);
+                match child_1 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(
+                            leaf.keys,
+                            vec![vec![7], vec![8], vec![9], vec![10], vec![11]]
+                        );
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+
+                let child_2 = Node::load(internal.children[2], &mem);
+                match child_2 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(
+                            leaf.keys,
+                            vec![vec![13], vec![14], vec![15], vec![16], vec![17], vec![18]]
+                        );
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+            }
+            _ => panic!("root should be internal"),
         }
     }
 }
