@@ -1,13 +1,7 @@
+use crate::btree::{write, WriteError};
 use crate::{Memory64, WASM_PAGE_SIZE};
 
 const LAYOUT_VERSION: u8 = 1;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum WriteError {
-    IndexFull(u32),
-    GrowFailed { current: u64, delta: u64 },
-    AddressSpaceOverflow,
-}
 
 type Ptr = u64;
 const NULL: Ptr = 0;
@@ -19,7 +13,7 @@ struct MemoryBlock {
     next: Ptr,
 }
 
-/// OPEN QUESTION: should we keep the free list sorted? Alternative to use a bitmap.
+/// A free list constant-size chunk allocator.
 pub struct Allocator<M: Memory64> {
     addr: Ptr,
     block_size: u32,
@@ -44,28 +38,10 @@ pub enum LoadError {
 
 impl<M: Memory64> Allocator<M> {
     // Assume that everything after `head` is free.
-    pub fn new(memory: M, block_size: u32, addr: Ptr) -> Self {
+    pub fn new(memory: M, block_size: u32, addr: Ptr) -> Result<Self, WriteError> {
         println!("new allocator");
         let header_len = core::mem::size_of::<AllocatorHeader>() as u64;
-        let block_addr = addr + header_len;
-
-        // Start with only one block. No next.
-        let header = AllocatorHeader {
-            magic: *b"BTA", // btree allocator
-            version: LAYOUT_VERSION,
-            block_size,
-            head: block_addr,
-        };
-
-        let header_slice = unsafe {
-            core::slice::from_raw_parts(
-                &header as *const _ as *const u8,
-                core::mem::size_of::<AllocatorHeader>(),
-            )
-        };
-
-        println!("writing allocator header to address {}", addr);
-        write(&memory, addr, header_slice);
+        let head_addr = addr + header_len;
 
         // Start with only one block. No next.
         let block = MemoryBlock {
@@ -73,17 +49,19 @@ impl<M: Memory64> Allocator<M> {
             next: NULL,
         };
 
-        let a = Self {
+        let allocator = Self {
             addr,
-            block_size: header.block_size,
-            head: header.head,
+            block_size,
+            head: head_addr,
             memory,
         };
 
-        println!("saving first block to address {}", block_addr);
+        println!("saving first block to address {}", head_addr);
         // Store the block directly after the header.
-        a.save_block(block_addr, block);
-        a
+        allocator.save_block(head_addr, block)?;
+        allocator.save()?;
+
+        Ok(allocator)
     }
 
     pub fn load(memory: M, address: Ptr) -> Result<Self, LoadError> {
@@ -131,7 +109,7 @@ impl<M: Memory64> Allocator<M> {
             println!("read");
             let mut new_head = self.read(new_head_addr);
             println!("done");
-            self.save_block(new_head_addr, new_head);
+            self.save_block(new_head_addr, new_head).unwrap();
 
             self.head = new_head_addr;
 
@@ -190,7 +168,7 @@ impl<M: Memory64> Allocator<M> {
         header
     }
 
-    fn save_block(&self, address: Ptr, block: MemoryBlock) {
+    fn save_block(&self, address: Ptr, block: MemoryBlock) -> Result<(), WriteError> {
         let block_slice = unsafe {
             core::slice::from_raw_parts(
                 &block as *const _ as *const u8,
@@ -198,10 +176,10 @@ impl<M: Memory64> Allocator<M> {
             )
         };
 
-        write(&self.memory, address, block_slice).unwrap();
+        write(&self.memory, address, block_slice)
     }
 
-    pub fn save(&self) {
+    pub fn save(&self) -> Result<(), WriteError> {
         let header = AllocatorHeader {
             magic: *b"BTA", // btree allocator
             version: LAYOUT_VERSION,
@@ -217,39 +195,13 @@ impl<M: Memory64> Allocator<M> {
         };
 
         println!("Saving allocator to address: {}", self.addr);
-        write(&self.memory, self.addr, header_slice).unwrap();
+        write(&self.memory, self.addr, header_slice)
     }
 
     // How much space is currently being used.
     //fn size(&self) -> u64 {
     //     self.header_addr
     //}
-}
-
-// TODO: move this into a common place?
-fn write(memory: &impl Memory64, offset: u64, bytes: &[u8]) -> Result<(), WriteError> {
-    let last_byte = offset
-        .checked_add(bytes.len() as u64)
-        .ok_or(WriteError::AddressSpaceOverflow)?;
-    let size_pages = memory.size();
-    let size_bytes = size_pages
-        .checked_mul(WASM_PAGE_SIZE)
-        .ok_or(WriteError::AddressSpaceOverflow)?;
-    if size_bytes < last_byte {
-        let diff_bytes = last_byte - size_bytes;
-        let diff_pages = diff_bytes
-            .checked_add(WASM_PAGE_SIZE - 1)
-            .ok_or(WriteError::AddressSpaceOverflow)?
-            / WASM_PAGE_SIZE;
-        if memory.grow(diff_pages) == -1 {
-            return Err(WriteError::GrowFailed {
-                current: size_pages,
-                delta: diff_pages,
-            });
-        }
-    }
-    memory.write(offset, bytes);
-    Ok(())
 }
 
 #[cfg(test)]
@@ -288,7 +240,7 @@ mod test {
     fn allocate() {
         let mem = make_memory();
 
-        let mut allocator = Allocator::new(mem.clone(), 16 /* block size */, 0);
+        let mut allocator = Allocator::new(mem.clone(), 16 /* block size */, 0).unwrap();
 
         allocator.allocate();
         allocator.allocate();
@@ -304,7 +256,7 @@ mod test {
     fn allocate_deallocate() {
         let mem = make_memory();
 
-        let mut allocator = Allocator::new(mem.clone(), 16 /* block size */, 0);
+        let mut allocator = Allocator::new(mem.clone(), 16 /* block size */, 0).unwrap();
 
         let block_addr = allocator.allocate();
         let header_len = core::mem::size_of::<AllocatorHeader>() as u64;
@@ -317,7 +269,7 @@ mod test {
     fn allocate_deallocate_2() {
         let mem = make_memory();
 
-        let mut allocator = Allocator::new(mem.clone(), 16 /* block size */, 0);
+        let mut allocator = Allocator::new(mem.clone(), 16 /* block size */, 0).unwrap();
 
         let block_addr_1 = allocator.allocate();
         let block_addr_2 = allocator.allocate();
