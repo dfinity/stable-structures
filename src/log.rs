@@ -64,13 +64,11 @@ impl<M: Memory> StableLog<M> {
             )
         };
 
-        if memory.size() < 1 {
-            if memory.grow(1) == -1 {
-                return Err(AllocError::GrowFailed {
-                    current: 0,
-                    delta: 1,
-                });
-            }
+        if memory.size() < 1 && memory.grow(1) == -1 {
+            return Err(AllocError::GrowFailed {
+                current: 0,
+                delta: 1,
+            });
         }
         memory.write(0, header_slice);
 
