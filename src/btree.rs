@@ -252,13 +252,13 @@ impl Node {
             let mut values = vec![];
             let mut offset = header_len;
             for _ in 0..header.num_entries {
-                println!("reading entry");
+                //println!("reading entry");
                 let key_size = read_u32(memory, address + offset);
-                println!("key size: {:?}", key_size);
+                //println!("key size: {:?}", key_size);
                 offset += 4;
                 let mut key = vec![0; key_size as usize];
                 memory.read(address + offset, &mut key);
-                println!("key: {:?}", key);
+                //println!("key: {:?}", key);
                 offset += MAX_KEY_SIZE as u64;
 
                 let value_size = read_u32(memory, address + offset);
@@ -280,15 +280,15 @@ impl Node {
             let mut children = vec![];
             let mut values = vec![];
             let mut offset = header_len;
-            println!("num entries: {}", header.num_entries);
+            //println!("num entries: {}", header.num_entries);
             for _ in 0..header.num_entries {
-                println!("reading entry");
+                //println!("reading entry");
                 let key_size = read_u32(memory, address + offset);
-                println!("key size: {:?}", key_size);
+                //println!("key size: {:?}", key_size);
                 offset += 4;
                 let mut key = vec![0; key_size as usize];
                 memory.read(address + offset, &mut key);
-                println!("key: {:?}", key);
+                //println!("key: {:?}", key);
                 offset += MAX_KEY_SIZE as u64;
 
                 let value_size = read_u32(memory, address + offset);
@@ -527,7 +527,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             Node::Leaf(mut leaf) => {
                 match leaf.keys.binary_search(key) {
                     Ok(idx) => {
-                        // NOTE: this is O(n). Is this acceptable?
+                        // NOTE: this is O(B). Is this acceptable?
                         let value = leaf.values.remove(idx);
                         leaf.keys.remove(idx);
 
@@ -571,6 +571,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             return Some(value);
                         }
 
+                        // Case 2.b:
                         // Check if the child that succeeds `key` has at least `B` keys.
                         let mut post_child = Node::load(internal.children[idx + 1], &self.memory);
                         if post_child.keys().len() >= B as usize {
@@ -618,18 +619,273 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         self.remove_helper(pre_child.address(), key)
                     }
                     Err(idx) => {
-                        /*
                         // The key isn't in the node. Look for the node in the child.
-                        let child_address = internal.children[idx];
-                        println!("Child address: {:?}", child_address);
+                        //let child_address = internal.children[idx];
+                        //println!("Child address: {:?}", child_address);
 
-                        // Recurse
-                        Self::get_helper(child_address, key, memory)*/
-                        todo!()
+                        let mut subtree = Node::load(internal.children[idx], &self.memory);
+
+                        println!("IN REMOVING BRANCH");
+                        println!("index: {:?}", idx);
+                        println!("subtree: {:?}", subtree);
+                        if subtree.keys().len() >= B as usize {
+                            println!("CASE 3");
+                            return self.remove_helper(internal.children[idx], key);
+                        } else {
+                            // Does the child have a sibling with >= `B` keys?
+                            let mut left_sibling = if idx > 0 {
+                                Some(Node::load(internal.children[idx - 1], &self.memory))
+                            } else {
+                                None
+                            };
+
+                            let mut right_sibling = if idx + 1 < internal.children.len() {
+                                Some(Node::load(internal.children[idx + 1], &self.memory))
+                            } else {
+                                None
+                            };
+
+                            if let Some(ref mut left_sibling) = left_sibling {
+                                if left_sibling.keys().len() >= B as usize {
+                                    // Case 3.a left
+                                    // Move one entry from the parent into subtree.
+                                    subtree.keys_mut().insert(0, internal.keys[idx - 1].clone());
+                                    subtree.values_mut().insert(0, internal.values[idx - 1].clone());
+
+                                    // Move one entry from left_sibling into parent.
+                                    internal.keys[idx - 1] = left_sibling.keys_mut().pop().unwrap();
+                                    internal.values[idx - 1] =
+                                        left_sibling.values_mut().pop().unwrap();
+
+                                    // Move the last child of left sibling into subtree.
+                                    match (&mut subtree, left_sibling) {
+                                        (Node::Internal(subtree), Node::Internal(left_sibling)) => {
+                                            subtree
+                                                .children
+                                                .insert(0, left_sibling.children.pop().unwrap());
+                                            left_sibling.save(&self.memory);
+                                        }
+                                        (Node::Leaf(_), Node::Leaf(left_sibling)) => {
+                                            left_sibling.save(&self.memory);
+                                        }
+                                        _ => unreachable!(),
+                                    }
+
+                                    subtree.save(&self.memory);
+                                    internal.save(&self.memory);
+                                    return self.remove_helper(subtree.address(), key);
+                                }
+                            }
+
+                            if let Some(ref mut right_sibling) = right_sibling {
+                                if right_sibling.keys().len() >= B as usize {
+                                    //todo!("case 3.a.right");
+                                    // Move one entry from the parent into subtree.
+                                    subtree.keys_mut().push(internal.keys[idx].clone());
+                                    subtree.values_mut().push(internal.values[idx].clone());
+
+                                    // Move one entry from right_sibling into parent.
+                                    internal.keys[idx] = right_sibling.keys_mut().remove(0);
+                                    internal.values[idx] = right_sibling.values_mut().remove(0);
+
+                                    // Move the first child of right_sibling into subtree.
+                                    match (&mut subtree, right_sibling) {
+                                        (
+                                            Node::Internal(subtree),
+                                            Node::Internal(right_sibling),
+                                        ) => {
+                                            subtree.children.push(right_sibling.children.remove(0));
+                                            right_sibling.save(&self.memory);
+                                        }
+                                        (Node::Leaf(_), Node::Leaf(right_sibling)) => {
+                                            right_sibling.save(&self.memory);
+                                        }
+                                        _ => unreachable!(),
+                                    }
+
+                                    subtree.save(&self.memory);
+                                    internal.save(&self.memory);
+                                    return self.remove_helper(subtree.address(), key);
+                                }
+                            }
+
+                            // Case 3.b: all the siblings have `B` - 1 keys.
+                            println!("case 3b");
+
+                            println!("subtree: {:?}", subtree);
+                            println!("left sibling: {:?}", left_sibling);
+                            println!("right sibling: {:?}", right_sibling);
+
+                            // Merge
+                            if let Some(mut left_sibling) = left_sibling {
+                                println!("merging into left");
+                                // Merge child into left sibling.
+
+                                let left_sibling_address = left_sibling.address();
+                                let new_node = self.merge(
+                                    subtree,
+                                    left_sibling,
+                                    (
+                                        internal.keys.remove(idx - 1),
+                                        internal.values.remove(idx - 1),
+                                    ),
+                                );
+
+                                if internal.keys.is_empty() {
+                                    self.allocator.deallocate(internal.address);
+
+                                    if internal.address == self.root_offset {
+                                        println!("updating root address");
+                                        // Update the root.
+                                        self.root_offset = left_sibling_address;
+                                    }
+                                }
+
+                                return self.remove_helper(left_sibling_address, key);
+                            }
+
+                            if let Some(mut right_sibling) = right_sibling {
+                                println!("merging into right");
+                                // Merge child into right sibling.
+
+                                let right_sibling_address = right_sibling.address();
+                                let new_node = self.merge(
+                                    subtree,
+                                    right_sibling,
+                                    (internal.keys.remove(idx), internal.values.remove(idx)),
+                                );
+
+                                if internal.keys.is_empty() {
+                                    self.allocator.deallocate(internal.address);
+
+                                    if internal.address == self.root_offset {
+                                        println!("updating root address");
+                                        // Update the root.
+                                        self.root_offset = right_sibling_address;
+                                    }
+                                }
+
+                                return self.remove_helper(right_sibling_address, key);
+                                // First add the median key in to the right sibling.
+                                /*let median_key = internal.keys.remove(idx);
+                                let median_value = internal.values.remove(idx);
+
+                                let mut all_keys = vec![];
+                                let mut all_values = vec![];
+
+                                all_keys.append(&mut subtree.keys_mut());
+                                all_values.append(&mut subtree.values_mut());
+
+                                all_keys.push(median_key);
+                                all_values.push(median_value);
+
+                                all_keys.append(&mut right_sibling.keys_mut());
+                                all_values.append(&mut right_sibling.values_mut());
+
+                                // Remove the child from the children.
+                                internal.children.remove(idx);
+
+                                // Move all the keys/values/children into the right sibling.
+                                match (subtree, right_sibling) {
+                                    (
+                                        Node::Leaf(mut subtree_leaf),
+                                        Node::Leaf(mut right_sibling),
+                                    ) => {
+                                        right_sibling.keys = all_keys;
+                                        right_sibling.values = all_values;
+
+                                        println!("new right sibling: {:?}", right_sibling);
+                                        right_sibling.save(&self.memory);
+
+                                        self.allocator.deallocate(subtree_leaf.address);
+
+                                        if internal.keys.is_empty() {
+                                            self.allocator.deallocate(internal.address);
+
+                                            if internal.address == self.root_offset {
+                                                println!("updating root address");
+                                                // Update the root.
+                                                self.root_offset = right_sibling.address;
+                                            }
+                                        }
+
+                                        return self.remove_helper(right_sibling.address, key);
+                                    }
+                                    (
+                                        Node::Internal(mut internal),
+                                        Node::Internal(mut right_sibling),
+                                    ) => {
+                                        right_sibling.keys = all_keys;
+                                        right_sibling.values = all_values;
+
+                                        let mut all_children = vec![];
+                                        all_children.append(&mut internal.children);
+                                        all_children.append(&mut right_sibling.children);
+
+                                        right_sibling.children = all_children;
+
+                                        // Add children as well.
+                                        right_sibling.save(&self.memory);
+
+                                        self.allocator.deallocate(internal.address);
+                                        return self.remove_helper(right_sibling.address, key);
+                                    }
+                                    _ => unreachable!(),
+                                }*/
+                            }
+
+                            println!("left sibling: {:?}", left_sibling);
+                            println!("right sibling: {:?}", right_sibling);
+                            todo!("3.b");
+                        }
                     }
                 }
             }
         }
+    }
+
+    fn merge(&mut self, source: Node, into: Node, median: (Key, Value)) -> Node {
+        // TODO: assert that source and into are non-empty.
+        // TODO: assert that both types are the same.
+        let into_address = into.address();
+        let source_address = source.address();
+
+        // Figure out which node contains lower values than the other.
+        let (mut lower, mut higher) = if source.keys()[0] < into.keys()[0] {
+            (source, into)
+        } else {
+            (into, source)
+        };
+
+        lower.keys_mut().push(median.0);
+        lower.values_mut().push(median.1);
+
+        lower.keys_mut().append(higher.keys_mut());
+        lower.values_mut().append(higher.values_mut());
+
+        match &mut lower {
+            Node::Leaf(ref mut lower_leaf) => {
+                lower_leaf.address = into_address;
+                lower_leaf.save(&self.memory);
+            }
+            Node::Internal(ref mut lower_internal) => {
+                lower_internal.address = into_address;
+
+                if let Node::Internal(mut higher_internal) = higher {
+                    // Move the children.
+                    lower_internal
+                        .children
+                        .append(&mut higher_internal.children);
+                } else {
+                    unreachable!();
+                }
+
+                lower_internal.save(&self.memory);
+            }
+        }
+
+        self.allocator.deallocate(source_address);
+        lower
     }
 
     /*
@@ -778,27 +1034,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 self.insert_nonfull(child, key, value)
             }
         }
-
-        //todo!();
-        /*match node {
-            Node::Leaf(LeafNode { entries }) => {
-                match entries.binary_search_by_key(&key, |(key, value)| key.to_vec()) {
-                    // TODO: get rid of to_vec
-                    Ok(idx) => {
-                        // The key was already in the map. Overwrite and return the previous value.
-                        let old_value = entries[idx].1.clone();
-                        entries[idx].1 = value;
-                        Some(old_value)
-                    }
-                    Err(idx) => {
-                        // Key not present.
-                        entries.insert(idx, (key, value));
-                        None
-                    }
-                }
-            }
-            Node::Internal => todo!(),
-        }*/
     }
 }
 
@@ -1288,21 +1523,295 @@ mod test {
     }
 
     #[test]
+    fn remove_3a_right() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+
+        assert_eq!(btree.insert(vec![1], vec![2]), None);
+        assert_eq!(btree.insert(vec![2], vec![2]), None);
+        assert_eq!(btree.insert(vec![3], vec![2]), None);
+        assert_eq!(btree.insert(vec![4], vec![2]), None);
+        assert_eq!(btree.insert(vec![5], vec![2]), None);
+        assert_eq!(btree.insert(vec![6], vec![2]), None);
+        assert_eq!(btree.insert(vec![7], vec![2]), None);
+        assert_eq!(btree.insert(vec![8], vec![2]), None);
+        assert_eq!(btree.insert(vec![9], vec![2]), None);
+        assert_eq!(btree.insert(vec![10], vec![2]), None);
+        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![12], vec![2]), None);
+
+        // The result should looks like this:
+        //                [6]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+
+        // Remove node 3. Triggers case 3.a
+        assert_eq!(btree.remove(&vec![3]), Some(vec![2]));
+
+        // The result should looks like this:
+        //                [7]
+        //               /   \
+        // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
+        let root = Node::load(btree.root_offset, &mem);
+        match root {
+            Node::Internal(internal) => {
+                assert_eq!(internal.keys, vec![vec![7]]);
+                assert_eq!(internal.values, vec![vec![2]]);
+                assert_eq!(internal.children.len(), 2);
+
+                let child_0 = Node::load(internal.children[0], &mem);
+                match child_0 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(leaf.keys, vec![vec![1], vec![2], vec![4], vec![5], vec![6]]);
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+
+                let child_1 = Node::load(internal.children[1], &mem);
+                match child_1 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(
+                            leaf.keys,
+                            vec![vec![8], vec![9], vec![10], vec![11], vec![12]]
+                        );
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+            }
+            _ => panic!("root should be internal"),
+        }
+    }
+
+    #[test]
+    fn remove_3a_left() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+
+        assert_eq!(btree.insert(vec![1], vec![2]), None);
+        assert_eq!(btree.insert(vec![2], vec![2]), None);
+        assert_eq!(btree.insert(vec![3], vec![2]), None);
+        assert_eq!(btree.insert(vec![4], vec![2]), None);
+        assert_eq!(btree.insert(vec![5], vec![2]), None);
+        assert_eq!(btree.insert(vec![6], vec![2]), None);
+        assert_eq!(btree.insert(vec![7], vec![2]), None);
+        assert_eq!(btree.insert(vec![8], vec![2]), None);
+        assert_eq!(btree.insert(vec![9], vec![2]), None);
+        assert_eq!(btree.insert(vec![10], vec![2]), None);
+        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![0], vec![2]), None);
+
+        // The result should looks like this:
+        //                   [6]
+        //                  /   \
+        // [0, 1, 2, 3, 4, 5]   [7, 8, 9, 10, 11]
+
+        // Remove node 8. Triggers case 3.a left
+        assert_eq!(btree.remove(&vec![8]), Some(vec![2]));
+
+        // The result should looks like this:
+        //                [5]
+        //               /   \
+        // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
+        let root = Node::load(btree.root_offset, &mem);
+        match root {
+            Node::Internal(internal) => {
+                assert_eq!(internal.keys, vec![vec![5]]);
+                assert_eq!(internal.values, vec![vec![2]]);
+                assert_eq!(internal.children.len(), 2);
+
+                let child_0 = Node::load(internal.children[0], &mem);
+                match child_0 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(leaf.keys, vec![vec![0], vec![1], vec![2], vec![3], vec![4]]);
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+
+                let child_1 = Node::load(internal.children[1], &mem);
+                match child_1 {
+                    Node::Leaf(leaf) => {
+                        assert_eq!(
+                            leaf.keys,
+                            vec![vec![6], vec![7], vec![9], vec![10], vec![11]]
+                        );
+                        assert_eq!(
+                            leaf.values,
+                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
+                        );
+                    }
+                    _ => panic!("child should be leaf"),
+                }
+            }
+            _ => panic!("root should be internal"),
+        }
+    }
+
+    #[test]
+    fn remove_3b_left() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+
+        assert_eq!(btree.insert(vec![1], vec![2]), None);
+        assert_eq!(btree.insert(vec![2], vec![2]), None);
+        assert_eq!(btree.insert(vec![3], vec![2]), None);
+        assert_eq!(btree.insert(vec![4], vec![2]), None);
+        assert_eq!(btree.insert(vec![5], vec![2]), None);
+        assert_eq!(btree.insert(vec![6], vec![2]), None);
+        assert_eq!(btree.insert(vec![7], vec![2]), None);
+        assert_eq!(btree.insert(vec![8], vec![2]), None);
+        assert_eq!(btree.insert(vec![9], vec![2]), None);
+        assert_eq!(btree.insert(vec![10], vec![2]), None);
+        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![12], vec![2]), None);
+
+        // The result should looks like this:
+        //                [6]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+
+        for i in 1..=12 {
+            println!("i: {:?}", i);
+            assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+        }
+
+        // Remove node 6. Triggers case 2.b
+        assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+        // The result should looks like this:
+        //                [7]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
+        let root = Node::load(btree.root_offset, &mem);
+
+        // Remove node 3. Triggers case 3.b
+        assert_eq!(btree.remove(&vec![3]), Some(vec![2]));
+
+        // The result should looks like this:
+        //
+        // [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
+        let root = Node::load(btree.root_offset, &mem);
+        assert_eq!(
+            root.keys(),
+            vec![
+                vec![1],
+                vec![2],
+                vec![4],
+                vec![5],
+                vec![7],
+                vec![8],
+                vec![9],
+                vec![10],
+                vec![11],
+                vec![12]
+            ]
+        );
+        // TODO: assert node is a leaf node.
+    }
+
+    #[test]
+    fn remove_3b_right() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+
+        assert_eq!(btree.insert(vec![1], vec![2]), None);
+        assert_eq!(btree.insert(vec![2], vec![2]), None);
+        assert_eq!(btree.insert(vec![3], vec![2]), None);
+        assert_eq!(btree.insert(vec![4], vec![2]), None);
+        assert_eq!(btree.insert(vec![5], vec![2]), None);
+        assert_eq!(btree.insert(vec![6], vec![2]), None);
+        assert_eq!(btree.insert(vec![7], vec![2]), None);
+        assert_eq!(btree.insert(vec![8], vec![2]), None);
+        assert_eq!(btree.insert(vec![9], vec![2]), None);
+        assert_eq!(btree.insert(vec![10], vec![2]), None);
+        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![12], vec![2]), None);
+
+        // The result should looks like this:
+        //                [6]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+
+        for i in 1..=12 {
+            println!("i: {:?}", i);
+            assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+        }
+
+        // Remove node 6. Triggers case 2.b
+        assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+        // The result should looks like this:
+        //                [7]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
+        let root = Node::load(btree.root_offset, &mem);
+
+        // Remove node 10. Triggers case 3.b where we merge the right into the left.
+        assert_eq!(btree.remove(&vec![10]), Some(vec![2]));
+
+        // The result should looks like this:
+        //
+        // [1, 2, 3, 4, 5, 7, 8, 9, 11, 12]
+        let root = Node::load(btree.root_offset, &mem);
+        assert_eq!(
+            root.keys(),
+            vec![
+                vec![1],
+                vec![2],
+                vec![3],
+                vec![4],
+                vec![5],
+                vec![7],
+                vec![8],
+                vec![9],
+                vec![11],
+                vec![12]
+            ]
+        );
+        // TODO: assert node is a leaf node.
+    }
+
+    #[test]
     fn many_insertions() {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        for j in 0..=10 {
+        for j in 0..=1 {
             for i in 0..=255 {
                 assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
             }
         }
 
-        for j in 0..=10 {
+        for j in 0..=1 {
             for i in 0..=255 {
                 assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
             }
         }
+
+        /*for j in 0..=1 {
+            for i in 0..=255 {
+                assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
+            }
+        }*/
+
+        /*for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&vec![i, j]), None);
+            }
+        }*/
     }
     /*
     #[test]
