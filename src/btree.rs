@@ -691,7 +691,34 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 sibling.save(&self.memory);
                 parent.save(&self.memory);
             }
-            Node::Internal(_) => todo!(), //self.allocate_internal_node();
+            Node::Internal(mut full_child_internal) => {
+                let mut sibling = self.allocate_internal_node();
+
+                // Move the values above the median into the new sibling.
+                let mut keys_to_move = full_child_internal.keys.split_off(B as usize - 1);
+                let mut values_to_move = full_child_internal.values.split_off(B as usize - 1);
+                let mut children_to_move = full_child_internal.children.split_off(B as usize);
+
+                let median_key = keys_to_move.remove(0);
+                let median_value = values_to_move.remove(0);
+
+                println!("sibling keys: {:?}", keys_to_move);
+                sibling.keys = keys_to_move;
+                sibling.values = values_to_move;
+                sibling.children = children_to_move;
+
+                // Add sibling as a new child in parent.
+                parent.children.insert(full_child_idx + 1, sibling.address);
+                parent.keys.insert(full_child_idx, median_key);
+                parent.values.insert(full_child_idx, median_value);
+
+                println!("parent keys: {:?}", parent.keys);
+                println!("child keys: {:?}", full_child_internal.keys);
+
+                full_child_internal.save(&self.memory);
+                sibling.save(&self.memory);
+                parent.save(&self.memory);
+            }
         };
     }
 
@@ -1260,6 +1287,23 @@ mod test {
         assert_eq!(btree.get(&vec![1, 2, 3]), None);
     }
 
+    #[test]
+    fn many_insertions() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
+            }
+        }
+    }
     /*
     #[test]
     fn deallocating() {
