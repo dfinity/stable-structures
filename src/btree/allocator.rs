@@ -20,7 +20,8 @@ struct MemoryBlock {
 }
 
 /// OPEN QUESTION: should we keep the free list sorted? Alternative to use a bitmap.
-struct Allocator<M: Memory64> {
+pub struct Allocator<M: Memory64> {
+    addr: Ptr,
     block_size: u32,
     memory: M,
     head: Ptr,
@@ -43,15 +44,17 @@ pub enum LoadError {
 
 impl<M: Memory64> Allocator<M> {
     // Assume that everything after `head` is free.
-    fn new(memory: M, block_size: u32, addr: Ptr) -> Self {
+    pub fn new(memory: M, block_size: u32, addr: Ptr) -> Self {
+        println!("new allocator");
         let header_len = core::mem::size_of::<AllocatorHeader>() as u64;
+        let block_addr = addr + header_len;
 
         // Start with only one block. No next.
         let header = AllocatorHeader {
             magic: *b"BTA", // btree allocator
             version: LAYOUT_VERSION,
             block_size,
-            head: header_len,
+            head: block_addr,
         };
 
         let header_slice = unsafe {
@@ -61,6 +64,7 @@ impl<M: Memory64> Allocator<M> {
             )
         };
 
+        println!("writing allocator header to address {}", addr);
         write(&memory, addr, header_slice);
 
         // Start with only one block. No next.
@@ -70,13 +74,15 @@ impl<M: Memory64> Allocator<M> {
         };
 
         let a = Self {
+            addr,
             block_size: header.block_size,
             head: header.head,
             memory,
         };
 
+        println!("saving first block to address {}", block_addr);
         // Store the block directly after the header.
-        a.save(header_len, block);
+        a.save_block(block_addr, block);
         a
     }
 
@@ -91,14 +97,17 @@ impl<M: Memory64> Allocator<M> {
         if memory.size() == 0 {
             return Err(LoadError::MemoryEmpty);
         }
-        memory.read(0, header_slice);
+        memory.read(address, header_slice);
         if &header.magic != b"BTA" {
+            println!("magic found: {:?}", header.magic);
+            println!("magic expected: {:?}", b"BTA");
             return Err(LoadError::BadMagic(header.magic));
         }
         if header.version != LAYOUT_VERSION {
             return Err(LoadError::UnsupportedVersion(header.version));
         }
         Ok(Self {
+            addr: address,
             memory,
             block_size: header.block_size,
             head: header.head,
@@ -107,6 +116,7 @@ impl<M: Memory64> Allocator<M> {
 
     /// Allocates a block with `block_size`.
     pub fn allocate(&mut self) -> Ptr {
+        // FIXME: grow the memory if we need to.
         println!("reading head");
         let head_block = self.read(self.head);
         println!("done.");
@@ -121,7 +131,7 @@ impl<M: Memory64> Allocator<M> {
             println!("read");
             let mut new_head = self.read(new_head_addr);
             println!("done");
-            self.save(new_head_addr, new_head);
+            self.save_block(new_head_addr, new_head);
 
             self.head = new_head_addr;
 
@@ -136,13 +146,14 @@ impl<M: Memory64> Allocator<M> {
                 next: NULL,
             };
 
-            self.save(self.head, block);
+            self.save_block(self.head, block);
         }
 
         new_block_addr
     }
 
     pub fn deallocate(&mut self, address: Ptr) {
+        println!("deallocating address {}", address);
         // Assume that address is valid (was returned in `allocate` before).
         //if address < self.head {
         // address becomes the new head.
@@ -153,8 +164,8 @@ impl<M: Memory64> Allocator<M> {
 
         self.head = address;
 
-        self.save(address, block);
-        // TODO: save allocator itself.
+        self.save_block(address, block);
+        //self.save(); FIXME
         //}
     }
 
@@ -179,7 +190,7 @@ impl<M: Memory64> Allocator<M> {
         header
     }
 
-    fn save(&self, address: Ptr, block: MemoryBlock) {
+    fn save_block(&self, address: Ptr, block: MemoryBlock) {
         let block_slice = unsafe {
             core::slice::from_raw_parts(
                 &block as *const _ as *const u8,
@@ -188,6 +199,25 @@ impl<M: Memory64> Allocator<M> {
         };
 
         write(&self.memory, address, block_slice).unwrap();
+    }
+
+    pub fn save(&self) {
+        let header = AllocatorHeader {
+            magic: *b"BTA", // btree allocator
+            version: LAYOUT_VERSION,
+            block_size: self.block_size,
+            head: self.head,
+        };
+
+        let header_slice = unsafe {
+            core::slice::from_raw_parts(
+                &header as *const _ as *const u8,
+                core::mem::size_of::<AllocatorHeader>(),
+            )
+        };
+
+        println!("Saving allocator to address: {}", self.addr);
+        write(&self.memory, self.addr, header_slice).unwrap();
     }
 
     // How much space is currently being used.

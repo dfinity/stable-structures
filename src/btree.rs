@@ -2,6 +2,7 @@ use crate::{Memory64, WASM_PAGE_SIZE};
 //mod node;
 //use crate::btree::node;
 mod allocator;
+use crate::btree::allocator::Allocator;
 
 const LAYOUT_VERSION: u8 = 1;
 const NULL: u64 = 0;
@@ -24,8 +25,6 @@ struct BTreeHeader {
     magic: [u8; 3],
     version: u8,
     root_offset: u64,
-    free_blocks_header: Ptr,
-    free_blocks_tail: Ptr,
     //max_key_size: u32,
     //max_value_size: u32, // TODO: extend this to be aligned with 8-bytes?
 }
@@ -44,11 +43,10 @@ pub enum WriteError {
     AddressSpaceOverflow,
 }
 
-pub struct StableBTreeMap<M: Memory64> {
+pub struct StableBTreeMap<M: Memory64 + Clone> {
     memory: M,
     root_offset: Ptr,
-    free_blocks_header: Ptr,
-    free_blocks_tail: Ptr,
+    allocator: Allocator<M>,
     //max_key_size: u32,
     //max_value_size: u32,
     //root: Node,
@@ -83,6 +81,8 @@ impl LeafNode {
             node_type: LEAF_NODE_TYPE,
             num_entries: self.values.len() as u64,
         };
+
+        println!("header: {:?}", header);
 
         let header_slice = unsafe {
             core::slice::from_raw_parts(
@@ -239,6 +239,7 @@ impl Node {
     }
 
     fn load(address: u64, memory: &impl Memory64) -> Node {
+        println!("Loading node at address: {}", address);
         let mut header: NodeHeader = unsafe { core::mem::zeroed() };
         let header_slice = unsafe {
             core::slice::from_raw_parts_mut(
@@ -250,7 +251,9 @@ impl Node {
         /*if memory.size() == 0 {
             return Err(LoadError::MemoryEmpty);
         }*/
+        println!("reading");
         memory.read(address, header_slice);
+        println!("Header: {:?}", header);
 
         //println!("num_entries: {:?}", header.num_entries);
 
@@ -260,13 +263,13 @@ impl Node {
             let mut values = vec![];
             let mut offset = header_len;
             for _ in 0..header.num_entries {
-                //println!("reading entry");
+                println!("reading entry");
                 let key_size = read_u32(memory, address + offset);
-                //println!("key size: {:?}", key_size);
+                println!("key size: {:?}", key_size);
                 offset += 4;
                 let mut key = vec![0; key_size as usize];
                 memory.read(address + offset, &mut key);
-                //println!("key: {:?}", key);
+                println!("key: {:?}", key);
                 offset += MAX_KEY_SIZE as u64;
 
                 let value_size = read_u32(memory, address + offset);
@@ -283,19 +286,20 @@ impl Node {
                 keys,
                 values,
             })
-        } else {
+        } else if header.node_type == INTERNAL_NODE_TYPE {
             let mut keys = vec![];
             let mut children = vec![];
             let mut values = vec![];
             let mut offset = header_len;
+            println!("num entries: {}", header.num_entries);
             for _ in 0..header.num_entries {
-                //println!("reading entry");
+                println!("reading entry");
                 let key_size = read_u32(memory, address + offset);
-                // println!("key size: {:?}", key_size);
+                println!("key size: {:?}", key_size);
                 offset += 4;
                 let mut key = vec![0; key_size as usize];
                 memory.read(address + offset, &mut key);
-                // println!("key: {:?}", key);
+                println!("key: {:?}", key);
                 offset += MAX_KEY_SIZE as u64;
 
                 let value_size = read_u32(memory, address + offset);
@@ -321,6 +325,8 @@ impl Node {
                 keys,
                 children,
             })
+        } else {
+            unreachable!("Unknown node type");
         }
     }
 
@@ -376,7 +382,7 @@ impl Node {
 
 pub struct Range;
 
-impl<M: Memory64> StableBTreeMap<M> {
+impl<M: Memory64 + Clone> StableBTreeMap<M> {
     // TODO: make branching factor configurable.
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Self {
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
@@ -385,8 +391,6 @@ impl<M: Memory64> StableBTreeMap<M> {
             magic: *b"BTR",
             version: LAYOUT_VERSION,
             root_offset: NULL,
-            free_blocks_header: header_len,
-            free_blocks_tail: 0,
         };
 
         let header_slice = unsafe {
@@ -409,15 +413,9 @@ impl<M: Memory64> StableBTreeMap<M> {
         memory.write(0, header_slice);
 
         Self {
-            memory,
+            memory: memory.clone(),
             root_offset: header.root_offset,
-            free_blocks_header: header.free_blocks_header,
-            free_blocks_tail: header.free_blocks_tail, /*max_key_size,
-                                                       max_value_size,
-                                                       root: Node::Leaf(LeafNode {
-                                                           keys: vec![],
-                                                           values: vec![],
-                                                       }),*/
+            allocator: Allocator::new(memory, 4096 /* TODO */, header_len),
         }
     }
 
@@ -439,11 +437,13 @@ impl<M: Memory64> StableBTreeMap<M> {
         if header.version != LAYOUT_VERSION {
             return Err(LoadError::UnsupportedVersion(header.version));
         }
+
+        let header_len = core::mem::size_of::<BTreeHeader>() as u64;
+        println!("Loading allocator from address: {}", header_len);
         Ok(Self {
-            memory,
+            memory: memory.clone(),
             root_offset: header.root_offset,
-            free_blocks_header: header.free_blocks_header,
-            free_blocks_tail: header.free_blocks_tail,
+            allocator: Allocator::load(memory, header_len).unwrap(),
             /*max_key_size: 0,
             max_value_size: 0,
             root: Node::Leaf(LeafNode {
@@ -458,8 +458,6 @@ impl<M: Memory64> StableBTreeMap<M> {
             magic: *b"BTR",
             version: LAYOUT_VERSION,
             root_offset: self.root_offset,
-            free_blocks_header: self.free_blocks_header,
-            free_blocks_tail: self.free_blocks_tail,
         };
 
         let header_slice = unsafe {
@@ -471,20 +469,16 @@ impl<M: Memory64> StableBTreeMap<M> {
 
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
 
-        write(&self.memory, 0, header_slice)
+        write(&self.memory, 0, header_slice)?;
+
+        // Save the allocator.
+        self.allocator.save();
+        Ok(())
     }
 
     pub fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
         let root = if self.root_offset == NULL {
-            // Allocate a node.
-            let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
-            let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64);
-
-            // TODO: check there's still enough space.
-            // TODO: save updated free list to memory.
-            let node_address = self.free_blocks_header;
-
-            self.free_blocks_header += node_size;
+            let node_address = self.allocator.allocate();
             self.root_offset = node_address;
 
             Node::new_leaf(node_address)
@@ -522,7 +516,9 @@ impl<M: Memory64> StableBTreeMap<M> {
     }
 
     fn get_helper(node_addr: Ptr, key: &Key, memory: &impl Memory64) -> Option<Value> {
+        println!("get helper");
         let node = Node::load(node_addr, memory);
+        println!("Loaded node: {:?}", node);
         match node {
             Node::Leaf(LeafNode { keys, values, .. }) => {
                 println!("Leaf node");
@@ -555,7 +551,9 @@ impl<M: Memory64> StableBTreeMap<M> {
             return None;
         }
 
-        self.remove_helper(self.root_offset, key)
+        let ret = self.remove_helper(self.root_offset, key);
+        self.save();
+        ret
     }
 
     fn remove_helper(&mut self, node_addr: Ptr, key: &Key) -> Option<Value> {
@@ -573,8 +571,9 @@ impl<M: Memory64> StableBTreeMap<M> {
                         leaf.save(&self.memory);
 
                         if leaf.address == self.root_offset && leaf.keys.is_empty() {
-                            // TODO: deallocate leaf.
-                            todo!("deallocate node");
+                            self.allocator.deallocate(leaf.address);
+                            self.root_offset = NULL;
+                            // TODO: try to make deallocation more strongly typed.
                         }
 
                         Some(value)
@@ -679,32 +678,22 @@ impl<M: Memory64> StableBTreeMap<M> {
     }*/
 
     fn allocate_leaf_node(&mut self) -> LeafNode {
-        let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
-        let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64);
-
-        // TODO: check there's still enough space.
-        // TODO: save updated free list to memory.
-        let node_address = self.free_blocks_header;
-
-        self.free_blocks_header += node_size;
-        LeafNode::new(node_address)
+        //let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
+        //let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64);
+        LeafNode::new(self.allocator.allocate())
     }
 
     fn allocate_internal_node(&mut self) -> InternalNode {
-        let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
-        let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64) + /* children pointers */ 8 * (CAPACITY + 1);
+        //let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
+        //let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64) + /* children pointers */ 8 * (CAPACITY + 1);
 
-        // TODO: check there's still enough space.
-        // TODO: save updated free list to memory.
-        let node_address = self.free_blocks_header;
-
-        self.free_blocks_header += node_size;
+        let node_address = self.allocator.allocate();
 
         Node::new_internal(node_address)
     }
 
     fn deallocate_node(&mut self, node: Node) {
-        if self.free_blocks_header > node.address() {
+        /*if self.free_blocks_header > node.address() {
             // Free this block of memory.
             let memory_block = MemoryHeader {
                 prev: NULL,
@@ -712,7 +701,7 @@ impl<M: Memory64> StableBTreeMap<M> {
             };
 
             self.free_blocks_header = node.address();
-        } else {
+        } else {*/
             /*
             // free_list < node.address
             let memory_block = MemoryHeader {
@@ -721,7 +710,7 @@ impl<M: Memory64> StableBTreeMap<M> {
             };
 
             self.free_list = node.address();*/
-        }
+        //}
 
         /*
             // Write the block over the node.
