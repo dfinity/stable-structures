@@ -1,6 +1,7 @@
 use crate::{Memory64, WASM_PAGE_SIZE};
 //mod node;
 //use crate::btree::node;
+mod allocator;
 
 const LAYOUT_VERSION: u8 = 1;
 const NULL: u64 = 0;
@@ -23,7 +24,8 @@ struct BTreeHeader {
     magic: [u8; 3],
     version: u8,
     root_offset: u64,
-    free_list: u64,
+    free_blocks_header: Ptr,
+    free_blocks_tail: Ptr,
     //max_key_size: u32,
     //max_value_size: u32, // TODO: extend this to be aligned with 8-bytes?
 }
@@ -45,7 +47,8 @@ pub enum WriteError {
 pub struct StableBTreeMap<M: Memory64> {
     memory: M,
     root_offset: Ptr,
-    free_list: Ptr,
+    free_blocks_header: Ptr,
+    free_blocks_tail: Ptr,
     //max_key_size: u32,
     //max_value_size: u32,
     //root: Node,
@@ -197,6 +200,15 @@ impl InternalNode {
 enum Node {
     Internal(InternalNode),
     Leaf(LeafNode),
+}
+
+#[repr(packed)]
+struct MemoryHeader {
+    // A pointer to the previous free block.
+    prev: Ptr,
+
+    // A pointer to the next free block.
+    next: Ptr,
 }
 
 #[repr(packed)]
@@ -373,7 +385,8 @@ impl<M: Memory64> StableBTreeMap<M> {
             magic: *b"BTR",
             version: LAYOUT_VERSION,
             root_offset: NULL,
-            free_list: header_len,
+            free_blocks_header: header_len,
+            free_blocks_tail: 0,
         };
 
         let header_slice = unsafe {
@@ -398,13 +411,13 @@ impl<M: Memory64> StableBTreeMap<M> {
         Self {
             memory,
             root_offset: header.root_offset,
-            free_list: header.free_list,
-            /*max_key_size,
-            max_value_size,
-            root: Node::Leaf(LeafNode {
-                keys: vec![],
-                values: vec![],
-            }),*/
+            free_blocks_header: header.free_blocks_header,
+            free_blocks_tail: header.free_blocks_tail, /*max_key_size,
+                                                       max_value_size,
+                                                       root: Node::Leaf(LeafNode {
+                                                           keys: vec![],
+                                                           values: vec![],
+                                                       }),*/
         }
     }
 
@@ -429,7 +442,8 @@ impl<M: Memory64> StableBTreeMap<M> {
         Ok(Self {
             memory,
             root_offset: header.root_offset,
-            free_list: header.free_list,
+            free_blocks_header: header.free_blocks_header,
+            free_blocks_tail: header.free_blocks_tail,
             /*max_key_size: 0,
             max_value_size: 0,
             root: Node::Leaf(LeafNode {
@@ -444,7 +458,8 @@ impl<M: Memory64> StableBTreeMap<M> {
             magic: *b"BTR",
             version: LAYOUT_VERSION,
             root_offset: self.root_offset,
-            free_list: self.free_list,
+            free_blocks_header: self.free_blocks_header,
+            free_blocks_tail: self.free_blocks_tail,
         };
 
         let header_slice = unsafe {
@@ -467,9 +482,9 @@ impl<M: Memory64> StableBTreeMap<M> {
 
             // TODO: check there's still enough space.
             // TODO: save updated free list to memory.
-            let node_address = self.free_list;
+            let node_address = self.free_blocks_header;
 
-            self.free_list += node_size;
+            self.free_blocks_header += node_size;
             self.root_offset = node_address;
 
             Node::new_leaf(node_address)
@@ -555,9 +570,12 @@ impl<M: Memory64> StableBTreeMap<M> {
                         let value = leaf.values.remove(idx);
                         leaf.keys.remove(idx);
 
-                        // TODO: check if we need to merge the node.
-
                         leaf.save(&self.memory);
+
+                        if leaf.address == self.root_offset && leaf.keys.is_empty() {
+                            // TODO: deallocate leaf.
+                            todo!("deallocate node");
+                        }
 
                         Some(value)
                     }
@@ -581,7 +599,10 @@ impl<M: Memory64> StableBTreeMap<M> {
                             internal.values[idx] = pre_child.values().last().unwrap().clone();
 
                             // Recursively delete from the predecessor.
-                            self.remove_helper(internal.children[idx], pre_child.keys().last().unwrap());
+                            self.remove_helper(
+                                internal.children[idx],
+                                pre_child.keys().last().unwrap(),
+                            );
 
                             // Save the internal node.
                             internal.save(&self.memory);
@@ -663,9 +684,9 @@ impl<M: Memory64> StableBTreeMap<M> {
 
         // TODO: check there's still enough space.
         // TODO: save updated free list to memory.
-        let node_address = self.free_list;
+        let node_address = self.free_blocks_header;
 
-        self.free_list += node_size;
+        self.free_blocks_header += node_size;
         LeafNode::new(node_address)
     }
 
@@ -675,11 +696,46 @@ impl<M: Memory64> StableBTreeMap<M> {
 
         // TODO: check there's still enough space.
         // TODO: save updated free list to memory.
-        let node_address = self.free_list;
+        let node_address = self.free_blocks_header;
 
-        self.free_list += node_size;
+        self.free_blocks_header += node_size;
 
         Node::new_internal(node_address)
+    }
+
+    fn deallocate_node(&mut self, node: Node) {
+        if self.free_blocks_header > node.address() {
+            // Free this block of memory.
+            let memory_block = MemoryHeader {
+                prev: NULL,
+                next: self.free_blocks_header,
+            };
+
+            self.free_blocks_header = node.address();
+        } else {
+            /*
+            // free_list < node.address
+            let memory_block = MemoryHeader {
+                prev: self.free_list,
+                next: self.free_list,
+            };
+
+            self.free_list = node.address();*/
+        }
+
+        /*
+            // Write the block over the node.
+            let memory_block_slice = unsafe {
+                core::slice::from_raw_parts(
+                    &memory_block as *const _ as *const u8,
+                    core::mem::size_of::<MemoryHeader>(),
+                )
+            };
+
+            write(memory, node.address(), memory_block_slice).unwrap();
+        }
+        // Merge it with previous block.
+        */
     }
 
     fn split_child(&mut self, parent: &mut InternalNode, full_child_idx: usize) {
@@ -1286,6 +1342,21 @@ mod test {
         let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
         assert_eq!(btree.get(&vec![1, 2, 3]), None);
     }
+
+    /*
+    #[test]
+    fn deallocating() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0);
+
+        let old_free_list = btree.free_list;
+
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
+        assert_eq!(btree.remove(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
+
+        // Added an element and removed it. The free list should be unchanged.
+        assert_eq!(old_free_list, btree.free_list);
+    }*/
 }
 
 #[cfg(test)]
