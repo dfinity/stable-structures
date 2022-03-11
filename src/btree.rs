@@ -242,12 +242,12 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         let value = parent.values[idx].clone(); // TODO: no clone
 
                         // Check if the child that precedes `key` has at least `B` keys.
-                        let mut pre_child = Node::load(parent.children[idx], &self.memory);
-                        if pre_child.keys().len() >= B as usize {
+                        let mut left_child = Node::load(parent.children[idx], &self.memory);
+                        if left_child.keys().len() >= B as usize {
                             // Case 2.a:
 
                             // Replace the `key` with its predecessor.
-                            let predecessor = pre_child.get_max(&self.memory);
+                            let predecessor = left_child.get_max(&self.memory);
                             parent.keys[idx] = predecessor.0.clone();
                             parent.values[idx] = predecessor.1;
 
@@ -262,11 +262,11 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
                         // Case 2.b:
                         // Check if the child that succeeds `key` has at least `B` keys.
-                        let mut post_child = Node::load(parent.children[idx + 1], &self.memory);
-                        if post_child.keys().len() >= B as usize {
+                        let mut right_child = Node::load(parent.children[idx + 1], &self.memory);
+                        if right_child.keys().len() >= B as usize {
                             // Case 2.b
                             // Replace the `key` with its successor.
-                            let successor = post_child.get_min(&self.memory);
+                            let successor = right_child.get_min(&self.memory);
                             parent.keys[idx] = successor.0.clone();
                             parent.values[idx] = successor.1;
 
@@ -279,49 +279,56 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             return Some(value);
                         }
 
-                        // Case 2.c:
-                        // Delete the key from the internal node.
-                        // Move the key into the prechild.
-                        pre_child.keys_mut().push(parent.keys.remove(idx));
-                        pre_child.values_mut().push(parent.values.remove(idx));
+                        // Case 2.c: Both the left child and right child have B - 1 keys.
+                        //
+                        //                       parent
+                        //                  [..., key, ...]
+                        //                       /   \
+                        //            [left child]   [right child]
+                        //
+                        // In this case, we merge (left child, key, right child) into a single
+                        // node of size 2B - 1. The result will look like this:
+                        //
+                        //                       parent
+                        //                     [...  ...]
+                        //                         |
+                        //          [left child, `key`, right child] <= new child
+                        //
+                        // We then recurse on this new child to delete `key`.
+                        //
+                        // If `parent` becomes empty (which can only happen if it's the root),
+                        // then `parent` is deleted and `new_child` becomes the new root.
+                        debug_assert_eq!(left_child.keys().len(), B as usize - 1);
+                        debug_assert_eq!(right_child.keys().len(), B as usize - 1);
+
+                        // Merge the left and right children.
+                        let right_child_address = right_child.address();
+                        let new_child = self.merge(
+                            right_child,
+                            left_child,
+                            (parent.keys.remove(idx), parent.values.remove(idx)),
+                        );
 
                         // Remove the post child from the parent node.
                         parent.children.remove(idx + 1);
 
-                        // Migrate all keys and values from post_child into pre_child
-                        pre_child.keys_mut().append(post_child.keys_mut());
-                        pre_child.values_mut().append(post_child.values_mut());
+                        if parent.keys.is_empty() {
+                            debug_assert_eq!(parent.address, self.root_offset);
 
-                        // Migrate the children if any.
-                        match (&mut pre_child, &mut post_child) {
-                            (
-                                Node::Internal(ref mut pre_child),
-                                Node::Internal(ref mut post_child),
-                            ) => {
-                                // Add the children.
-                                pre_child.children.append(&mut post_child.children);
+                            if parent.address == self.root_offset {
+                                debug_assert_eq!(parent.children, vec![new_child.address()]);
+                                self.root_offset = new_child.address();
+
+                                // FIXME: Add test case that covers this deallocation.
+                                self.allocator.deallocate(parent.address);
                             }
-                            (Node::Leaf(_), Node::Leaf(_)) => { // do nothing
-                            }
-                            _ => unreachable!(),
-                        }
-
-                        // If the root node now has no keys, then delete it.
-                        if parent.address == self.root_offset && parent.keys.is_empty() {
-                            // Replace the root node with its (only) child.
-                            assert_eq!(parent.children.len(), 1);
-                            self.root_offset = parent.children[0];
-
-                            // TODO: save btree?
-                            // TODO: deallocate root
                         }
 
                         parent.save(&self.memory);
-                        pre_child.save(&self.memory);
-                        self.allocator.deallocate(post_child.address());
+                        new_child.save(&self.memory);
 
                         // Recursively delete the key.
-                        self.remove_helper(pre_child.address(), key)
+                        self.remove_helper(new_child.address(), key)
                     }
                     Err(idx) => {
                         // The key isn't in the node. Look for the node in the child.
