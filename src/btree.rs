@@ -433,10 +433,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                 let new_node = self.merge(
                                     subtree,
                                     left_sibling,
-                                    (
-                                        parent.keys.remove(idx - 1),
-                                        parent.values.remove(idx - 1),
-                                    ),
+                                    (parent.keys.remove(idx - 1), parent.values.remove(idx - 1)),
                                 );
                                 println!(
                                     "Removing child {} from parent",
