@@ -194,7 +194,7 @@ impl<M: Memory64> Allocator<M> {
             )
         };
 
-        println!("Saving allocator to address: {}", self.addr);
+        println!("Saving node to address: {}", self.addr);
         write(&self.memory, self.addr, header_slice)
     }
 

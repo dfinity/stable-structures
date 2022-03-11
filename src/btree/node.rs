@@ -1,4 +1,4 @@
-use crate::btree::{allocator::Allocator, write, read_u64, read_u32, WriteError};
+use crate::btree::{allocator::Allocator, read_u32, read_u64, write, WriteError};
 use crate::{Memory64, WASM_PAGE_SIZE};
 
 const LAYOUT_VERSION: u8 = 1;
@@ -35,8 +35,26 @@ impl LeafNode {
         }
     }
 
+    pub fn insert(&mut self, key: Key, value: Value) {
+        self.keys.push(key);
+        self.values.push(value);
+    }
+
+    pub fn remove(&mut self, index: usize) -> Value {
+        self.keys.remove(index);
+        self.values.remove(index)
+    }
+
     pub fn is_full(&self) -> bool {
         self.keys.len() >= CAPACITY as usize
+    }
+
+    pub fn get_max(&self, memory: &impl Memory64) -> (Key, Value) {
+        (self.keys.last().unwrap().to_vec(), self.values.last().unwrap().to_vec())
+    }
+
+    pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
+        (self.keys[0].clone(), self.values[0].clone())
     }
 
     pub fn save(&self, memory: &impl Memory64) -> Result<(), WriteError> {
@@ -98,6 +116,11 @@ impl InternalNode {
         self.keys.len() >= CAPACITY as usize
     }
 
+    pub fn insert(&mut self, key: Key, value: Value) {
+        self.keys.push(key);
+        self.values.push(value);
+    }
+
     // Returns the index of the child where the given `key` belongs.
     fn get_child_address(&self, key: &Key) -> Ptr {
         assert!(!self.children.is_empty());
@@ -107,8 +130,36 @@ impl InternalNode {
         self.children[idx]
     }
 
+    pub fn get_max(&self, memory: &impl Memory64) -> (Key, Value) {
+        let last_child = Node::load(*self.children.last().unwrap(), memory);
+        last_child.get_max(memory)
+    }
+
+    pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
+        let last_child = Node::load(self.children[0], memory);
+        last_child.get_min(memory)
+    }
+
     pub fn save(&self, memory: &impl Memory64) -> Result<(), WriteError> {
         println!("saving node at address {:?}", self.address);
+
+        assert_eq!(self.children.len(), self.keys.len() + 1);
+        //assert!(!self.keys.is_empty()); TODO: enable this assertion
+
+        // INVARIANT: the children's keys.
+        for i in 0..self.keys.len() {
+            let left_child = Node::load(self.children[i], memory);
+            let right_child = Node::load(self.children[i + 1], memory);
+
+            assert!(
+                left_child.keys().last().unwrap().clone() < self.keys[i],
+                "Keys not aligned. Left child: {:?}\nParent: {:?}",
+                left_child,
+                self
+            );
+            assert!(right_child.keys()[0] > self.keys[i]);
+        }
+
         let header = NodeHeader {
             node_type: INTERNAL_NODE_TYPE,
             num_entries: self.keys.len() as u64,
@@ -193,6 +244,20 @@ impl Node {
         }
     }
 
+    pub fn get_max(&self, memory: &impl Memory64) -> (Key, Value) {
+        match self {
+            Node::Leaf(n) => n.get_max(memory),
+            Node::Internal(n) => n.get_max(memory),
+        }
+    }
+    
+    pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
+        match self {
+            Node::Leaf(n) => n.get_min(memory),
+            Node::Internal(n) => n.get_min(memory),
+        }
+    }
+
     pub fn load(address: u64, memory: &impl Memory64) -> Node {
         println!("Loading node at address: {}", address);
         let mut header: NodeHeader = unsafe { core::mem::zeroed() };
@@ -206,9 +271,9 @@ impl Node {
         /*if memory.size() == 0 {
             return Err(LoadError::MemoryEmpty);
         }*/
-        println!("reading");
+        //println!("reading");
         memory.read(address, header_slice);
-        println!("Header: {:?}", header);
+        //println!("Header: {:?}", header);
 
         //println!("num_entries: {:?}", header.num_entries);
 
@@ -236,6 +301,7 @@ impl Node {
                 keys.push(key);
                 values.push(value);
             }
+            assert_eq!(keys.len(), values.len());
             Node::Leaf(LeafNode {
                 address,
                 keys,
@@ -274,6 +340,18 @@ impl Node {
                 children.push(child);
             }
 
+            assert_eq!(keys.len(), values.len());
+            assert_eq!(children.len(), keys.len() + 1);
+
+            /*// NOTE: this can slow things down.
+            for i in 0..keys.len() {
+                let left_child = Node::load(children[i], memory);
+                let right_child = Node::load(children[i + 1], memory);
+
+                assert!(left_child.keys().last().unwrap().clone() < keys[i]);
+                assert!(right_child.keys()[0] > keys[i]);
+            }*/
+
             Node::Internal(InternalNode {
                 address,
                 values,
@@ -282,6 +360,13 @@ impl Node {
             })
         } else {
             unreachable!("Unknown node type");
+        }
+    }
+
+    pub fn insert(&mut self, key: Key, value: Value) {
+        match self {
+            Self::Leaf(leaf) => leaf.insert(key, value),
+            Self::Internal(internal) => internal.insert(key, value),
         }
     }
 
@@ -328,6 +413,9 @@ impl Node {
     }
 
     pub fn save(&self, memory: &impl Memory64) -> Result<(), WriteError> {
+        let mut keys_sorted: Vec<Key> = self.keys().to_vec();
+        keys_sorted.sort();
+        assert_eq!(self.keys(), keys_sorted, "KEYS ARE NOT SORTED");
         match &self {
             Self::Leaf(leaf) => leaf.save(memory),
             Self::Internal(internal) => internal.save(memory),

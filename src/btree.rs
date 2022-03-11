@@ -1,10 +1,8 @@
 use crate::{Memory64, WASM_PAGE_SIZE};
-//mod node;
-//use crate::btree::node;
 mod allocator;
 mod node;
 use crate::btree::allocator::Allocator;
-use crate::btree::node::{Node, LeafNode, InternalNode};
+use crate::btree::node::{InternalNode, LeafNode, Node};
 
 const LAYOUT_VERSION: u8 = 1;
 const NULL: u64 = 0;
@@ -206,20 +204,19 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     }
 
     fn remove_helper(&mut self, node_addr: Ptr, key: &Key) -> Option<Value> {
-        println!("remove helper");
-
+        println!("REMOVING KEY: {:?}", key);
         let node = Node::load(node_addr, &self.memory);
         match node {
             Node::Leaf(mut leaf) => {
                 match leaf.keys.binary_search(key) {
                     Ok(idx) => {
                         // NOTE: this is O(B). Is this acceptable?
-                        let value = leaf.values.remove(idx);
-                        leaf.keys.remove(idx);
+                        let value = leaf.remove(idx);
 
                         leaf.save(&self.memory);
 
                         if leaf.address == self.root_offset && leaf.keys.is_empty() {
+                            println!("DEALLOCATE1");
                             self.allocator.deallocate(leaf.address);
                             self.root_offset = NULL;
                             // TODO: try to make deallocation more strongly typed.
@@ -235,21 +232,36 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 match internal.keys.binary_search(key) {
                     Ok(idx) => {
                         // The key is in the node.
+                        println!("Deleting key: {:?} from node {:?}", key, internal);
+                        println!("index: {:?}", idx);
                         let value = internal.values[idx].clone(); // TODO: no clone
 
                         // Check if the child that precedes `key` has at least `B` keys.
                         let mut pre_child = Node::load(internal.children[idx], &self.memory);
                         if pre_child.keys().len() >= B as usize {
+                            println!("CASE 2A");
                             // Case 2.a:
 
                             // Replace the `key` with its predecessor.
-                            internal.keys[idx] = pre_child.keys().last().unwrap().clone();
-                            internal.values[idx] = pre_child.values().last().unwrap().clone();
+                            let predecessor = pre_child.get_max(&self.memory);
+                            println!("PREDECESSOR: {:?}", predecessor);
+                            internal.keys[idx] = predecessor.0.clone();
+                            internal.values[idx] = predecessor.1;
 
-                            // Recursively delete from the predecessor.
-                            self.remove_helper(
-                                internal.children[idx],
-                                pre_child.keys().last().unwrap(),
+                            println!("Parent: {:?}", internal);
+                            //println!("left_child: {:?}", pre_child);
+                            println!(
+                                "left_child: {:?}",
+                                Node::load(internal.children[idx], &self.memory)
+                            );
+
+                            // Recursively delete the predecessor.
+                            self.remove_helper(internal.children[idx], &predecessor.0);
+
+                            println!("Parent: {:?}", internal);
+                            println!(
+                                "left_child: {:?}",
+                                Node::load(internal.children[idx], &self.memory)
                             );
 
                             // Save the internal node.
@@ -260,13 +272,17 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         // Case 2.b:
                         // Check if the child that succeeds `key` has at least `B` keys.
                         let mut post_child = Node::load(internal.children[idx + 1], &self.memory);
+                        println!("post child: {:?}", post_child);
                         if post_child.keys().len() >= B as usize {
+                            println!("CASE 2B");
                             // Replace the `key` with its successor.
-                            internal.keys[idx] = post_child.keys()[0].clone();
-                            internal.values[idx] = post_child.values()[0].clone();
+                            let successor = post_child.get_min(&self.memory);
+                            println!("SUCCESSOR: {:?}", successor);
+                            internal.keys[idx] = successor.0.clone();
+                            internal.values[idx] = successor.1;
 
                             // Recursively delete the successor.
-                            self.remove_helper(internal.children[idx + 1], &post_child.keys()[0]);
+                            self.remove_helper(internal.children[idx + 1], &successor.0);
 
                             // Save the internal node.
                             internal.save(&self.memory);
@@ -274,6 +290,13 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         }
 
                         // Case 2.c:
+                        println!("CASE 2C");
+                        println!("pre_child: {:?}", pre_child);
+                        println!("post_child: {:?}", post_child);
+
+                        println!("parent: {:?}", internal);
+                        // Delete the key from the internal node.
+                        //println!("DELETED: {:?}", internal.keys.remove(idx));
                         // Move the key into the prechild.
                         pre_child.keys_mut().push(internal.keys.remove(idx));
                         pre_child.values_mut().push(internal.values.remove(idx));
@@ -296,6 +319,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             // TODO: save btree?
                             // TODO: deallocate root
                         }
+                        println!("pre_child after: {:?}", pre_child);
 
                         internal.save(&self.memory);
                         pre_child.save(&self.memory);
@@ -336,7 +360,9 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                     // Case 3.a left
                                     // Move one entry from the parent into subtree.
                                     subtree.keys_mut().insert(0, internal.keys[idx - 1].clone());
-                                    subtree.values_mut().insert(0, internal.values[idx - 1].clone());
+                                    subtree
+                                        .values_mut()
+                                        .insert(0, internal.values[idx - 1].clone());
 
                                     // Move one entry from left_sibling into parent.
                                     internal.keys[idx - 1] = left_sibling.keys_mut().pop().unwrap();
@@ -408,6 +434,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                 // Merge child into left sibling.
 
                                 let left_sibling_address = left_sibling.address();
+                                println!("MERGE LEFT");
                                 let new_node = self.merge(
                                     subtree,
                                     left_sibling,
@@ -416,8 +443,13 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                         internal.values.remove(idx - 1),
                                     ),
                                 );
+                                println!(
+                                    "Removing child {} from parent",
+                                    internal.children.remove(idx)
+                                );
 
                                 if internal.keys.is_empty() {
+                                    println!("DEALLOCATE 2");
                                     self.allocator.deallocate(internal.address);
 
                                     if internal.address == self.root_offset {
@@ -425,6 +457,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                         // Update the root.
                                         self.root_offset = left_sibling_address;
                                     }
+                                } else {
+                                    internal.save(&self.memory);
                                 }
 
                                 return self.remove_helper(left_sibling_address, key);
@@ -435,13 +469,19 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                 // Merge child into right sibling.
 
                                 let right_sibling_address = right_sibling.address();
+                                println!("MERGE RIGHT");
                                 let new_node = self.merge(
                                     subtree,
                                     right_sibling,
                                     (internal.keys.remove(idx), internal.values.remove(idx)),
                                 );
+                                println!(
+                                    "Removing child {} from parent",
+                                    internal.children.remove(idx)
+                                );
 
                                 if internal.keys.is_empty() {
+                                    println!("DEALLOCATE3");
                                     self.allocator.deallocate(internal.address);
 
                                     if internal.address == self.root_offset {
@@ -449,6 +489,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                         // Update the root.
                                         self.root_offset = right_sibling_address;
                                     }
+                                } else {
+                                    internal.save(&self.memory);
                                 }
 
                                 return self.remove_helper(right_sibling_address, key);
@@ -570,6 +612,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             }
         }
 
+        println!("DEALLOCATE4");
         self.allocator.deallocate(source_address);
         lower
     }
@@ -1347,7 +1390,7 @@ mod test {
     }
 
     #[test]
-    fn remove_3b_left() {
+    fn remove_3b_merge_into_right() {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
@@ -1409,21 +1452,14 @@ mod test {
     }
 
     #[test]
-    fn remove_3b_right() {
+    fn remove_3b_merge_into_left() {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
-        assert_eq!(btree.insert(vec![2], vec![2]), None);
-        assert_eq!(btree.insert(vec![3], vec![2]), None);
-        assert_eq!(btree.insert(vec![4], vec![2]), None);
-        assert_eq!(btree.insert(vec![5], vec![2]), None);
-        assert_eq!(btree.insert(vec![6], vec![2]), None);
-        assert_eq!(btree.insert(vec![7], vec![2]), None);
-        assert_eq!(btree.insert(vec![8], vec![2]), None);
-        assert_eq!(btree.insert(vec![9], vec![2]), None);
-        assert_eq!(btree.insert(vec![10], vec![2]), None);
-        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![2]), None);
+        }
+
         // Should now split a node.
         assert_eq!(btree.insert(vec![12], vec![2]), None);
 
@@ -1433,12 +1469,12 @@ mod test {
         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
         for i in 1..=12 {
-            println!("i: {:?}", i);
             assert_eq!(btree.get(&vec![i]), Some(vec![2]));
         }
 
         // Remove node 6. Triggers case 2.b
         assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+
         // The result should looks like this:
         //                [7]
         //               /   \
@@ -1475,30 +1511,63 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        for j in 0..=1 {
+        for j in 0..=2 {
             for i in 0..=255 {
                 assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
             }
         }
 
-        for j in 0..=1 {
+        for j in 0..=2 {
             for i in 0..=255 {
                 assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
             }
         }
 
-        /*for j in 0..=1 {
+        for j in 0..=2 {
             for i in 0..=255 {
+                println!("i, j: {}, {}", i, j);
                 assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
             }
-        }*/
+        }
 
-        /*for j in 0..=10 {
+        for j in 0..=10 {
             for i in 0..=255 {
                 assert_eq!(btree.get(&vec![i, j]), None);
             }
-        }*/
+        }
     }
+
+    #[test]
+    fn many_insertions_2() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+
+        for j in (0..=2).rev() {
+            for i in (0..=255).rev() {
+                assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
+            }
+        }
+
+        for j in 0..=2 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
+            }
+        }
+
+        for j in (0..=2).rev() {
+            for i in (0..=255).rev() {
+                println!("i, j: {}, {}", i, j);
+                assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&vec![i, j]), None);
+            }
+        }
+    }
+
     /*
     #[test]
     fn deallocating() {
@@ -1514,4 +1583,3 @@ mod test {
         assert_eq!(old_free_list, btree.free_list);
     }*/
 }
-
