@@ -211,12 +211,13 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             Node::Leaf(mut leaf) => {
                 match leaf.keys.binary_search(key) {
                     Ok(idx) => {
-                        // The node is a leaf node and the key exists in it.
+                        // Case 1: The node is a leaf node and the key exists in it.
+                        // This is the simplest case. The key is removed from the leaf.
                         let value = leaf.remove(idx);
                         leaf.save(&self.memory);
 
                         if leaf.keys.is_empty() {
-                            assert_eq!(
+                            debug_assert_eq!(
                                 leaf.address, self.root_offset,
                                 "A leaf node can be empty only if it's the root"
                             );
@@ -236,15 +237,32 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 println!("parent node: {:?}", parent);
                 match parent.keys.binary_search(key) {
                     Ok(idx) => {
-                        // The key is in the node.
-                        println!("Deleting key: {:?} from node {:?}", key, parent);
-                        println!("index: {:?}", idx);
+                        // Case 2: The node is an internal node and the key exists in it.
+
                         let value = parent.values[idx].clone(); // TODO: no clone
 
                         // Check if the child that precedes `key` has at least `B` keys.
                         let mut left_child = Node::load(parent.children[idx], &self.memory);
                         if left_child.keys().len() >= B as usize {
-                            // Case 2.a:
+                            // Case 2.a: The node's left child has >= `B` keys.
+                            //
+                            //                       parent
+                            //                  [..., key, ...]
+                            //                       /   \
+                            //            [left child]   [...]
+                            //           /            \
+                            //        [...]         [..., key predecessor]
+                            //
+                            // In this case, we replace `key` with the key's predecessor from the
+                            // left child's subtree, then we recursively delete the key's
+                            // predecessor for the following end result:
+                            //
+                            //                       parent
+                            //            [..., key predecessor, ...]
+                            //                       /   \
+                            //            [left child]   [...]
+                            //           /            \
+                            //        [...]          [...]
 
                             // Replace the `key` with its predecessor.
                             let predecessor = left_child.get_max(&self.memory);
@@ -260,11 +278,29 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             return Some(value);
                         }
 
-                        // Case 2.b:
                         // Check if the child that succeeds `key` has at least `B` keys.
                         let mut right_child = Node::load(parent.children[idx + 1], &self.memory);
                         if right_child.keys().len() >= B as usize {
-                            // Case 2.b
+                            // Case 2.b: The node's right child has >= `B` keys.
+                            //
+                            //                       parent
+                            //                  [..., key, ...]
+                            //                       /   \
+                            //                   [...]   [right child]
+                            //                          /             \
+                            //              [key successor, ...]     [...]
+                            //
+                            // In this case, we replace `key` with the key's successor from the
+                            // right child's subtree, then we recursively delete the key's
+                            // successor for the following end result:
+                            //
+                            //                       parent
+                            //            [..., key successor, ...]
+                            //                       /   \
+                            //                  [...]   [right child]
+                            //                           /            \
+                            //                        [...]          [...]
+
                             // Replace the `key` with its successor.
                             let successor = right_child.get_min(&self.memory);
                             parent.keys[idx] = successor.0.clone();
@@ -309,6 +345,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             (parent.keys.remove(idx), parent.values.remove(idx)),
                         );
 
+                        // TODO: make removing entries + children more safe to not guarantee the
+                        // invarian that len(children) = len(keys) + 1 and len(keys) = len(values)
                         // Remove the post child from the parent node.
                         parent.children.remove(idx + 1);
 

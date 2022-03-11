@@ -140,6 +140,7 @@ impl<M: Memory64> Allocator<M> {
     }
 
     pub fn deallocate(&mut self, address: Ptr) {
+        // TODO: check that this is not already a free memory block?
         println!("deallocating address {}", address);
         // Assume that address is valid (was returned in `allocate` before).
         //if address < self.head {
