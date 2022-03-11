@@ -304,11 +304,23 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         // Remove the post child from the internal node.
                         internal.children.remove(idx + 1);
 
-                        // TODO: what if the children are internal nodes?
-
                         // Migrate all keys and values from post_child into pre_child
                         pre_child.keys_mut().append(post_child.keys_mut());
                         pre_child.values_mut().append(post_child.values_mut());
+
+                        // Migrate the children if any.
+                        match (&mut pre_child, post_child) {
+                            (
+                                Node::Internal(ref mut pre_child),
+                                Node::Internal(ref mut post_child),
+                            ) => {
+                                // Add the children.
+                                pre_child.children.append(&mut post_child.children);
+                            }
+                            (Node::Leaf(_), Node::Leaf(_)) => { // do nothing
+                            }
+                            _ => unreachable!(),
+                        }
 
                         // If the root node now has no keys, then delete it.
                         if internal.address == self.root_offset && internal.keys.is_empty() {
@@ -1511,19 +1523,19 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        for j in 0..=2 {
+        for j in 0..=10 {
             for i in 0..=255 {
                 assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
             }
         }
 
-        for j in 0..=2 {
+        for j in 0..=10 {
             for i in 0..=255 {
                 assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
             }
         }
 
-        for j in 0..=2 {
+        for j in 0..=10 {
             for i in 0..=255 {
                 println!("i, j: {}, {}", i, j);
                 assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
@@ -1542,19 +1554,19 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        for j in (0..=2).rev() {
+        for j in (0..=10).rev() {
             for i in (0..=255).rev() {
                 assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
             }
         }
 
-        for j in 0..=2 {
+        for j in 0..=10 {
             for i in 0..=255 {
                 assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
             }
         }
 
-        for j in (0..=2).rev() {
+        for j in (0..=10).rev() {
             for i in (0..=255).rev() {
                 println!("i, j: {}, {}", i, j);
                 assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
