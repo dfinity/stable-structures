@@ -1,5 +1,5 @@
 use crate::btree::{write, WriteError};
-use crate::{Memory64, WASM_PAGE_SIZE};
+use crate::Memory64;
 
 const LAYOUT_VERSION: u8 = 1;
 
@@ -153,8 +153,8 @@ impl<M: Memory64> Allocator<M> {
 
         self.save_chunk(address, chunk);
         self.num_allocations -= 1; // TODO: do we need to save?
-                                        //self.save(); FIXME
-                                        //}
+                                   //self.save(); FIXME
+                                   //}
     }
 
     fn read(&self, address: Ptr) -> Chunk {

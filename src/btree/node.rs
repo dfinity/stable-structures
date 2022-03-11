@@ -1,5 +1,5 @@
 use crate::btree::{allocator::Allocator, read_u32, read_u64, write, WriteError};
-use crate::{Memory64, WASM_PAGE_SIZE};
+use crate::Memory64;
 
 const LAYOUT_VERSION: u8 = 1;
 const NULL: u64 = 0;
@@ -50,7 +50,10 @@ impl LeafNode {
     }
 
     pub fn get_max(&self, memory: &impl Memory64) -> (Key, Value) {
-        (self.keys.last().unwrap().to_vec(), self.values.last().unwrap().to_vec())
+        (
+            self.keys.last().unwrap().to_vec(),
+            self.values.last().unwrap().to_vec(),
+        )
     }
 
     pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
@@ -250,7 +253,7 @@ impl Node {
             Node::Internal(n) => n.get_max(memory),
         }
     }
-    
+
     pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
         match self {
             Node::Leaf(n) => n.get_min(memory),
