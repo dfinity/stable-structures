@@ -215,13 +215,16 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         let value = leaf.remove(idx);
                         leaf.save(&self.memory);
 
-                        if leaf.address == self.root_offset && leaf.keys.is_empty() {
-                            self.allocator.deallocate(leaf.address);
-                            self.root_offset = NULL;
-                            // TODO: try to make deallocation more strongly typed.
-                        } else {
-                            // FIXME: enable this check.
-                            //unreachable!("The node cannot be empty if it's not the root");
+                        if leaf.keys.is_empty() {
+                            assert_eq!(
+                                leaf.address, self.root_offset,
+                                "A leaf node can be empty only if it's the root"
+                            );
+
+                            if leaf.address == self.root_offset {
+                                self.allocator.deallocate(leaf.address);
+                                self.root_offset = NULL;
+                            }
                         }
 
                         Some(value)
@@ -1514,6 +1517,7 @@ mod test {
             }
         }
 
+        // We've deallocated everything we allocated.
         assert_eq!(btree.allocator.num_allocations(), 0);
     }
 
@@ -1548,6 +1552,9 @@ mod test {
                 assert_eq!(btree.get(&vec![i, j]), None);
             }
         }
+
+        // We've deallocated everything we allocated.
+        assert_eq!(btree.allocator.num_allocations(), 0);
     }
 
     /*
