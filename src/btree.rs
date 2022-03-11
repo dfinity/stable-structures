@@ -1535,6 +1535,8 @@ mod test {
             }
         }
 
+        let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
+
         for j in 0..=10 {
             for i in 0..=255 {
                 println!("i, j: {}, {}", i, j);
@@ -1565,6 +1567,8 @@ mod test {
                 assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
             }
         }
+
+        let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
 
         for j in (0..=10).rev() {
             for i in (0..=255).rev() {
