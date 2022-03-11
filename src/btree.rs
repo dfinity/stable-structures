@@ -506,77 +506,9 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                 }
 
                                 return self.remove_helper(right_sibling_address, key);
-                                // First add the median key in to the right sibling.
-                                /*let median_key = internal.keys.remove(idx);
-                                let median_value = internal.values.remove(idx);
-
-                                let mut all_keys = vec![];
-                                let mut all_values = vec![];
-
-                                all_keys.append(&mut subtree.keys_mut());
-                                all_values.append(&mut subtree.values_mut());
-
-                                all_keys.push(median_key);
-                                all_values.push(median_value);
-
-                                all_keys.append(&mut right_sibling.keys_mut());
-                                all_values.append(&mut right_sibling.values_mut());
-
-                                // Remove the child from the children.
-                                internal.children.remove(idx);
-
-                                // Move all the keys/values/children into the right sibling.
-                                match (subtree, right_sibling) {
-                                    (
-                                        Node::Leaf(mut subtree_leaf),
-                                        Node::Leaf(mut right_sibling),
-                                    ) => {
-                                        right_sibling.keys = all_keys;
-                                        right_sibling.values = all_values;
-
-                                        println!("new right sibling: {:?}", right_sibling);
-                                        right_sibling.save(&self.memory);
-
-                                        self.allocator.deallocate(subtree_leaf.address);
-
-                                        if internal.keys.is_empty() {
-                                            self.allocator.deallocate(internal.address);
-
-                                            if internal.address == self.root_offset {
-                                                println!("updating root address");
-                                                // Update the root.
-                                                self.root_offset = right_sibling.address;
-                                            }
-                                        }
-
-                                        return self.remove_helper(right_sibling.address, key);
-                                    }
-                                    (
-                                        Node::Internal(mut internal),
-                                        Node::Internal(mut right_sibling),
-                                    ) => {
-                                        right_sibling.keys = all_keys;
-                                        right_sibling.values = all_values;
-
-                                        let mut all_children = vec![];
-                                        all_children.append(&mut internal.children);
-                                        all_children.append(&mut right_sibling.children);
-
-                                        right_sibling.children = all_children;
-
-                                        // Add children as well.
-                                        right_sibling.save(&self.memory);
-
-                                        self.allocator.deallocate(internal.address);
-                                        return self.remove_helper(right_sibling.address, key);
-                                    }
-                                    _ => unreachable!(),
-                                }*/
                             }
 
-                            println!("left sibling: {:?}", left_sibling);
-                            println!("right sibling: {:?}", right_sibling);
-                            todo!("3.b");
+                            unreachable!("at least one of the siblings must exist");
                         }
                     }
                 }
