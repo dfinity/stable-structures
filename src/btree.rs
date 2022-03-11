@@ -586,14 +586,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         lower
     }
 
-    /*
-    pub fn range<T, R>(&self, range: R) -> Range
-    where
-        R: RangeBounds<T>,
-    {
-        todo!();
-    }*/
-
     fn allocate_leaf_node(&mut self) -> LeafNode {
         //let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
         //let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64);
@@ -610,12 +602,12 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     }
 
     fn split_child(&mut self, parent: &mut InternalNode, full_child_idx: usize) {
-        println!("SPLIT CHILD");
-        assert!(!parent.is_full());
-        let full_child = Node::load(parent.children[full_child_idx], &self.memory);
+        // The parent must not be full.
+        debug_assert!(!parent.is_full());
 
-        // The child must be already full.
-        assert!(full_child.is_full());
+        // The child must be full.
+        let full_child = Node::load(parent.children[full_child_idx], &self.memory);
+        debug_assert!(full_child.is_full());
 
         // Create a sibling to this full child.
         match full_child {
@@ -623,15 +615,12 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 let mut sibling = self.allocate_leaf_node();
 
                 // Move the values above the median into the new sibling.
-                let mut keys_to_move = full_child_leaf.keys.split_off(B as usize - 1);
-                let mut values_to_move = full_child_leaf.values.split_off(B as usize - 1);
+                sibling.keys = full_child_leaf.keys.split_off(B as usize);
+                sibling.values = full_child_leaf.values.split_off(B as usize);
+                sibling.save(&self.memory);
 
-                let median_key = keys_to_move.remove(0);
-                let median_value = values_to_move.remove(0);
-
-                println!("sibling keys: {:?}", keys_to_move);
-                sibling.keys = keys_to_move;
-                sibling.values = values_to_move;
+                let median_key = full_child_leaf.keys.pop().unwrap();
+                let median_value = full_child_leaf.values.pop().unwrap();
 
                 // Add sibling as a new child in parent.
                 parent.children.insert(full_child_idx + 1, sibling.address);
@@ -642,24 +631,19 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 println!("child keys: {:?}", full_child_leaf.keys);
 
                 full_child_leaf.save(&self.memory);
-                sibling.save(&self.memory);
                 parent.save(&self.memory);
             }
             Node::Internal(mut full_child_internal) => {
                 let mut sibling = self.allocate_internal_node();
 
                 // Move the values above the median into the new sibling.
-                let mut keys_to_move = full_child_internal.keys.split_off(B as usize - 1);
-                let mut values_to_move = full_child_internal.values.split_off(B as usize - 1);
-                let mut children_to_move = full_child_internal.children.split_off(B as usize);
+                sibling.keys = full_child_internal.keys.split_off(B as usize);
+                sibling.values = full_child_internal.values.split_off(B as usize);
+                sibling.children = full_child_internal.children.split_off(B as usize);
+                sibling.save(&self.memory);
 
-                let median_key = keys_to_move.remove(0);
-                let median_value = values_to_move.remove(0);
-
-                println!("sibling keys: {:?}", keys_to_move);
-                sibling.keys = keys_to_move;
-                sibling.values = values_to_move;
-                sibling.children = children_to_move;
+                let median_key = full_child_internal.keys.pop().unwrap();
+                let median_value = full_child_internal.values.pop().unwrap();
 
                 // Add sibling as a new child in parent.
                 parent.children.insert(full_child_idx + 1, sibling.address);
@@ -670,7 +654,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 println!("child keys: {:?}", full_child_internal.keys);
 
                 full_child_internal.save(&self.memory);
-                sibling.save(&self.memory);
                 parent.save(&self.memory);
             }
         };
