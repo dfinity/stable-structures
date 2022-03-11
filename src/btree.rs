@@ -216,10 +216,12 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         leaf.save(&self.memory);
 
                         if leaf.address == self.root_offset && leaf.keys.is_empty() {
-                            println!("DEALLOCATE1");
                             self.allocator.deallocate(leaf.address);
                             self.root_offset = NULL;
                             // TODO: try to make deallocation more strongly typed.
+                        } else {
+                            // FIXME: enable this check.
+                            //unreachable!("The node cannot be empty if it's not the root");
                         }
 
                         Some(value)
@@ -309,7 +311,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         pre_child.values_mut().append(post_child.values_mut());
 
                         // Migrate the children if any.
-                        match (&mut pre_child, post_child) {
+                        match (&mut pre_child, &mut post_child) {
                             (
                                 Node::Internal(ref mut pre_child),
                                 Node::Internal(ref mut post_child),
@@ -331,11 +333,10 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             // TODO: save btree?
                             // TODO: deallocate root
                         }
-                        println!("pre_child after: {:?}", pre_child);
 
                         internal.save(&self.memory);
                         pre_child.save(&self.memory);
-                        // TODO: deallocate postchild
+                        self.allocator.deallocate(post_child.address());
 
                         // Recursively delete the key.
                         self.remove_helper(pre_child.address(), key)
@@ -813,6 +814,37 @@ mod test {
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
         assert_eq!(btree.get(&vec![4, 5]), Some(vec![7, 8, 9, 10]));
         assert_eq!(btree.get(&vec![]), Some(vec![11]));
+    }
+
+    #[test]
+    fn allocations() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+
+        for i in 0..CAPACITY as u8 {
+            assert_eq!(btree.insert(vec![i], vec![]), None);
+        }
+
+        // Only need a single allocation to store up to `CAPACITY` elements.
+        assert_eq!(btree.allocator.num_allocations(), 1);
+
+        assert_eq!(btree.insert(vec![255], vec![]), None);
+
+        // The node had to be split into three nodes.
+        assert_eq!(btree.allocator.num_allocations(), 3);
+    }
+
+    #[test]
+    fn allocations_2() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        assert_eq!(btree.allocator.num_allocations(), 0);
+
+        assert_eq!(btree.insert(vec![], vec![]), None);
+        assert_eq!(btree.allocator.num_allocations(), 1);
+
+        assert_eq!(btree.remove(&vec![]), Some(vec![]));
+        assert_eq!(btree.allocator.num_allocations(), 0);
     }
 
     #[test]
@@ -1481,6 +1513,8 @@ mod test {
                 assert_eq!(btree.get(&vec![i, j]), None);
             }
         }
+
+        assert_eq!(btree.allocator.num_allocations(), 0);
     }
 
     #[test]

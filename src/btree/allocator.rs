@@ -17,6 +17,7 @@ struct Chunk {
 pub struct Allocator<M: Memory64> {
     addr: Ptr,
     chunk_size: u32,
+    num_allocations: u64,
     memory: M,
     head: Ptr,
 }
@@ -26,6 +27,7 @@ struct AllocatorHeader {
     magic: [u8; 3],
     version: u8,
     chunk_size: u32,
+    num_allocations: u64,
     head: Ptr,
 }
 
@@ -52,6 +54,7 @@ impl<M: Memory64> Allocator<M> {
         let allocator = Self {
             addr,
             chunk_size,
+            num_allocations: 0,
             head: head_addr,
             memory,
         };
@@ -86,10 +89,15 @@ impl<M: Memory64> Allocator<M> {
         }
         Ok(Self {
             addr: address,
-            memory,
             chunk_size: header.chunk_size,
+            num_allocations: header.num_allocations,
             head: header.head,
+            memory,
         })
+    }
+
+    pub fn num_allocations(&self) -> u64 {
+        self.num_allocations
     }
 
     /// Allocates a chunk with `chunk_size`.
@@ -127,6 +135,7 @@ impl<M: Memory64> Allocator<M> {
             self.save_chunk(self.head, chunk);
         }
 
+        self.num_allocations += 1; // TODO: do we need to save?
         new_chunk_addr
     }
 
@@ -143,8 +152,9 @@ impl<M: Memory64> Allocator<M> {
         self.head = address;
 
         self.save_chunk(address, chunk);
-        //self.save(); FIXME
-        //}
+        self.num_allocations -= 1; // TODO: do we need to save?
+                                        //self.save(); FIXME
+                                        //}
     }
 
     fn read(&self, address: Ptr) -> Chunk {
@@ -183,6 +193,7 @@ impl<M: Memory64> Allocator<M> {
         let header = AllocatorHeader {
             magic: *b"BTA", // btree allocator
             version: LAYOUT_VERSION,
+            num_allocations: self.num_allocations,
             chunk_size: self.chunk_size,
             head: self.head,
         };
