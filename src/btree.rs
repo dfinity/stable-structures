@@ -57,6 +57,7 @@ pub struct Range;
 
 impl<M: Memory64 + Clone> StableBTreeMap<M> {
     // TODO: make branching factor configurable.
+    // TODO: use max_key_size and max_value_size
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Result<Self, WriteError> {
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
         let mut btree = Self {
@@ -210,9 +211,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             Node::Leaf(mut leaf) => {
                 match leaf.keys.binary_search(key) {
                     Ok(idx) => {
-                        // NOTE: this is O(B). Is this acceptable?
+                        // The node is a leaf node and the key exists in it.
                         let value = leaf.remove(idx);
-
                         leaf.save(&self.memory);
 
                         if leaf.address == self.root_offset && leaf.keys.is_empty() {
