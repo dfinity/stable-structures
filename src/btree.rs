@@ -123,10 +123,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             )
         };
 
-        write(&self.memory, 0, header_slice)?;
-
-        self.allocator.save()?;
-        Ok(())
+        write(&self.memory, 0, header_slice)
     }
 
     pub fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, WriteError> {
@@ -139,10 +136,9 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         }*/
 
         let root = if self.root_offset == NULL {
-            let node_address = self.allocator.allocate()?;
-            self.root_offset = node_address;
-
-            Node::new_leaf(node_address)
+            let node = Node::Leaf(self.allocate_leaf_node());
+            self.root_offset = node.address();
+            node
         } else {
             Node::load(self.root_offset, &self.memory)
         };
