@@ -219,8 +219,6 @@ impl Chunk {
     }
 }
 
-
-
 #[cfg(test)]
 mod test {
     use super::*;

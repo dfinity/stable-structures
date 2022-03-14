@@ -351,7 +351,10 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         let new_child = self.merge(
                             right_child,
                             left_child,
-                            (parent.keys_mut().remove(idx), parent.values_mut().remove(idx)),
+                            (
+                                parent.keys_mut().remove(idx),
+                                parent.values_mut().remove(idx),
+                            ),
                         )?;
 
                         // TODO: make removing entries + children more safe to not guarantee the
@@ -414,7 +417,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                         .insert(0, parent.values()[idx - 1].clone());
 
                                     // Move one entry from left_sibling into parent.
-                                    parent.keys_mut()[idx - 1] = left_sibling.keys_mut().pop().unwrap();
+                                    parent.keys_mut()[idx - 1] =
+                                        left_sibling.keys_mut().pop().unwrap();
                                     parent.values_mut()[idx - 1] =
                                         left_sibling.values_mut().pop().unwrap();
 
@@ -487,7 +491,10 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                 self.merge(
                                     subtree,
                                     left_sibling,
-                                    (parent.keys_mut().remove(idx - 1), parent.values_mut().remove(idx - 1)),
+                                    (
+                                        parent.keys_mut().remove(idx - 1),
+                                        parent.values_mut().remove(idx - 1),
+                                    ),
                                 )?;
                                 println!(
                                     "Removing child {} from parent",
@@ -519,7 +526,10 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                 self.merge(
                                     subtree,
                                     right_sibling,
-                                    (parent.keys_mut().remove(idx), parent.values_mut().remove(idx)),
+                                    (
+                                        parent.keys_mut().remove(idx),
+                                        parent.values_mut().remove(idx),
+                                    ),
                                 )?;
                                 println!(
                                     "Removing child {} from parent",
