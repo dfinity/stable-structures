@@ -21,8 +21,8 @@ type Value = Vec<u8>;
 #[derive(Debug, PartialEq)]
 pub struct LeafNode {
     pub address: Ptr,
-    pub keys: Vec<Key>,
-    pub values: Vec<Value>,
+    keys: Vec<Key>,
+    values: Vec<Value>,
 }
 
 impl LeafNode {
@@ -32,6 +32,22 @@ impl LeafNode {
             keys: vec![],
             values: vec![],
         }
+    }
+
+    pub fn keys(&self) -> &[Key] {
+        &self.keys
+    }
+
+    pub fn values(&self) -> &[Value] {
+        &self.values
+    }
+
+    pub fn keys_mut(&mut self) -> &mut Vec<Key> {
+        &mut self.keys
+    }
+
+    pub fn values_mut(&mut self) -> &mut Vec<Value> {
+        &mut self.values
     }
 
     pub fn insert(&mut self, key: Key, value: Value) {
@@ -105,14 +121,30 @@ impl LeafNode {
 #[derive(Debug, PartialEq)]
 pub struct InternalNode {
     pub address: Ptr,
-    pub keys: Vec<Key>,
-    pub values: Vec<Value>,
+    keys: Vec<Key>,
+    values: Vec<Value>,
     pub children: Vec<Ptr>, // Pointers to the children + the key
 }
 
 impl InternalNode {
     pub fn is_full(&self) -> bool {
         self.keys.len() >= CAPACITY as usize
+    }
+
+    pub fn keys(&self) -> &[Key] {
+        &self.keys
+    }
+
+    pub fn values(&self) -> &[Value] {
+        &self.values
+    }
+
+    pub fn keys_mut(&mut self) -> &mut Vec<Key> {
+        &mut self.keys
+    }
+
+    pub fn values_mut(&mut self) -> &mut Vec<Value> {
+        &mut self.values
     }
 
     pub fn insert(&mut self, key: Key, value: Value) {
@@ -454,6 +486,28 @@ mod test_internal_node {
     use crate::Memory64;
     use std::cell::RefCell;
     use std::rc::Rc;
+
+    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
+        Rc::new(RefCell::new(Vec::new()))
+    }
+
+    #[test]
+    fn node_save_load_is_noop() {
+        let mem = make_memory();
+        let mut node = Node::new_leaf(0);
+
+        // TODO: can we get rid of this if let?
+        if let Node::Leaf(ref mut leaf) = node {
+            leaf.keys.push(vec![1, 2, 3]);
+            leaf.values.push(vec![4, 5, 6]);
+        }
+
+        node.save(&mem).unwrap();
+
+        let node_2 = Node::load(0, &mem);
+
+        assert_eq!(node, node_2);
+    }
 
     #[test]
     fn get_child_address_1() {
