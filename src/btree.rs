@@ -58,13 +58,12 @@ pub struct StableBTreeMap<M: Memory64 + Clone> {
 type Key = Vec<u8>;
 type Value = Vec<u8>;
 
-pub struct Range;
-
 impl<M: Memory64 + Clone> StableBTreeMap<M> {
     // TODO: make branching factor configurable.
     // TODO: use max_key_size and max_value_size
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Result<Self, WriteError> {
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
+
         let btree = Self {
             memory: memory.clone(),
             root_offset: NULL,
@@ -126,14 +125,23 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         write(&self.memory, 0, header_slice)
     }
 
-    pub fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, WriteError> {
-        /*if key.len() > self.max_key_size as usize {
-            panic!("Key exceeds max size");
+    /// Inserts a key-value pair into the map.
+    ///
+    /// The previous value of the key, if present, is returned.
+    pub fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, InsertError> {
+        if key.len() > self.max_key_size as usize {
+            return Err(InsertError::KeyTooLarge {
+                given: key.len(),
+                max: self.max_key_size as usize,
+            });
         }
 
         if value.len() > self.max_value_size as usize {
-            panic!("Value exceeds max size");
-        }*/
+            return Err(InsertError::ValueTooLarge {
+                given: key.len(),
+                max: self.max_value_size as usize,
+            });
+        }
 
         let root = if self.root_offset == NULL {
             let node = Node::Leaf(self.allocate_leaf_node());
@@ -146,6 +154,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         // if node is not full
         if !root.is_full() {
             self.insert_nonfull(root, key, value)
+                .map_err(|err| InsertError::WriteError(err))
         } else {
             // The root is full. Allocate a new node that will be used as the new root.
             let mut new_root = self.allocate_internal_node();
@@ -161,6 +170,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             self.split_child(&mut new_root, 0)?;
             println!("new root: {:?}", new_root);
             self.insert_nonfull(Node::Internal(new_root), key, value)
+                .map_err(|err| InsertError::WriteError(err))
         }
     }
 
@@ -173,29 +183,20 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     }
 
     fn get_helper(node_addr: Ptr, key: &Key, memory: &impl Memory64) -> Option<Value> {
-        println!("get helper");
         let node = Node::load(node_addr, memory);
-        println!("Loaded node: {:?}", node);
         match node {
             Node::Leaf(LeafNode { keys, values, .. }) => {
-                println!("Leaf node");
-                println!("keys: {:?}", keys);
-
                 match keys.binary_search(key) {
                     Ok(idx) => Some(values[idx].clone()),
                     _ => None, // Key not found.
                 }
             }
             Node::Internal(internal) => {
-                println!("Internal node: {:?}", internal);
                 match internal.keys.binary_search(key) {
                     Ok(idx) => Some(internal.values[idx].clone()),
                     Err(idx) => {
-                        // The key isn't in the node. Look for the node in the child.
+                        // The key isn't in the node. Look for the key in the child.
                         let child_address = internal.children[idx];
-                        println!("Child address: {:?}", child_address);
-
-                        // Recurse
                         Self::get_helper(child_address, key, memory)
                     }
                 }
@@ -775,6 +776,19 @@ fn write(memory: &impl Memory64, offset: u64, bytes: &[u8]) -> Result<(), WriteE
     Ok(())
 }
 
+#[derive(Debug, PartialEq)]
+pub enum InsertError {
+    KeyTooLarge { given: usize, max: usize },
+    ValueTooLarge { given: usize, max: usize },
+    WriteError(WriteError),
+}
+
+impl From<WriteError> for InsertError {
+    fn from(err: WriteError) -> Self {
+        Self::WriteError(err)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -807,7 +821,7 @@ mod test {
     #[test]
     fn insert_get() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 3, 4).unwrap();
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
@@ -816,7 +830,7 @@ mod test {
     #[test]
     fn insert_overwrites_previous_value() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(
@@ -829,7 +843,7 @@ mod test {
     #[test]
     fn insert_get_multiple() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.insert(vec![4, 5], vec![7, 8, 9, 10]), Ok(None));
@@ -842,7 +856,7 @@ mod test {
     #[test]
     fn allocations() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 0..CAPACITY as u8 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -860,7 +874,7 @@ mod test {
     #[test]
     fn allocations_2() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
         assert_eq!(btree.allocator.num_allocations(), 0);
 
         assert_eq!(btree.insert(vec![], vec![]), Ok(None));
@@ -873,7 +887,7 @@ mod test {
     #[test]
     fn insert_same_key_multiple() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         assert_eq!(btree.insert(vec![1], vec![2]), Ok(None));
 
@@ -885,7 +899,7 @@ mod test {
     #[test]
     fn insert_split_node() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -907,7 +921,7 @@ mod test {
     #[test]
     fn insert_split_multiple_nodes() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
@@ -1032,7 +1046,7 @@ mod test {
     #[test]
     fn remove_simple() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
@@ -1043,7 +1057,7 @@ mod test {
     #[test]
     fn remove_split_node() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
@@ -1137,7 +1151,7 @@ mod test {
     #[test]
     fn remove_split_node_2() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
@@ -1203,7 +1217,7 @@ mod test {
     #[test]
     fn reloading() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
 
@@ -1220,7 +1234,7 @@ mod test {
     #[test]
     fn remove_3a_right() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
@@ -1281,7 +1295,7 @@ mod test {
     #[test]
     fn remove_3a_left() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
@@ -1342,7 +1356,7 @@ mod test {
     #[test]
     fn remove_3b_merge_into_right() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
@@ -1396,7 +1410,7 @@ mod test {
     #[test]
     fn remove_3b_merge_into_left() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
@@ -1451,7 +1465,7 @@ mod test {
     #[test]
     fn many_insertions() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for j in 0..=10 {
             for i in 0..=255 {
@@ -1487,7 +1501,7 @@ mod test {
     #[test]
     fn many_insertions_2() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for j in (0..=10).rev() {
             for i in (0..=255).rev() {
@@ -1523,7 +1537,7 @@ mod test {
     #[test]
     fn deallocating() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0);
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5);
 
         let old_free_list = btree.free_list;
 
@@ -1549,7 +1563,7 @@ mod remove {
     #[test]
     fn case_1() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));

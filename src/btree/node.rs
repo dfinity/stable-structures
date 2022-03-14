@@ -144,8 +144,6 @@ impl InternalNode {
     }
 
     pub fn save(&self, memory: &impl Memory64) -> Result<(), WriteError> {
-        println!("saving node at address {:?}", self.address);
-
         assert_eq!(self.children.len(), self.keys.len() + 1);
         //assert!(!self.keys.is_empty()); TODO: enable this assertion
 
