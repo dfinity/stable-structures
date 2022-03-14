@@ -68,7 +68,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         let btree = Self {
             memory: memory.clone(),
             root_offset: NULL,
-            allocator: Allocator::new(memory, 4096 /* TODO */, header_len)?,
+            allocator: Allocator::new(memory, header_len, 4096 /* TODO */)?,
             max_key_size,
             max_value_size,
         };
@@ -139,7 +139,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         }*/
 
         let root = if self.root_offset == NULL {
-            let node_address = self.allocator.allocate();
+            let node_address = self.allocator.allocate()?;
             self.root_offset = node_address;
 
             Node::new_leaf(node_address)
@@ -608,14 +608,14 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     fn allocate_leaf_node(&mut self) -> LeafNode {
         //let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
         //let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64);
-        LeafNode::new(self.allocator.allocate())
+        LeafNode::new(self.allocator.allocate().unwrap())
     }
 
     fn allocate_internal_node(&mut self) -> InternalNode {
         //let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
         //let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64) + /* children pointers */ 8 * (CAPACITY + 1);
 
-        let node_address = self.allocator.allocate();
+        let node_address = self.allocator.allocate().unwrap();
 
         Node::new_internal(node_address)
     }
