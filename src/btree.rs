@@ -7,20 +7,13 @@ use crate::btree::node::{InternalNode, LeafNode, Node};
 const LAYOUT_VERSION: u8 = 1;
 const NULL: u64 = 0;
 
-const MAX_KEY_SIZE: u32 = 64;
-const MAX_VALUE_SIZE: u32 = 64;
-
 // Taken from `BTreeMap`.
 const B: u64 = 6; // The minimum degree.
 const CAPACITY: u64 = 2 * B - 1;
 
-const LEAF_NODE_TYPE: u8 = 0;
-const INTERNAL_NODE_TYPE: u8 = 1;
-
 type Ptr = u64;
 
 #[repr(packed)]
-#[derive(Debug, PartialEq, Clone, Copy)]
 struct BTreeHeader {
     magic: [u8; 3],
     version: u8,
@@ -359,7 +352,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             right_child,
                             left_child,
                             (parent.keys.remove(idx), parent.values.remove(idx)),
-                        );
+                        )?;
 
                         // TODO: make removing entries + children more safe to not guarantee the
                         // invarian that len(children) = len(keys) + 1 and len(keys) = len(values)
@@ -431,16 +424,16 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                             subtree
                                                 .children
                                                 .insert(0, left_sibling.children.pop().unwrap());
-                                            left_sibling.save(&self.memory);
+                                            left_sibling.save(&self.memory)?;
                                         }
                                         (Node::Leaf(_), Node::Leaf(left_sibling)) => {
-                                            left_sibling.save(&self.memory);
+                                            left_sibling.save(&self.memory)?;
                                         }
                                         _ => unreachable!(),
                                     }
 
-                                    subtree.save(&self.memory);
-                                    parent.save(&self.memory);
+                                    subtree.save(&self.memory)?;
+                                    parent.save(&self.memory)?;
                                     return self.remove_helper(subtree.address(), key);
                                 }
                             }
@@ -463,10 +456,10 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                             Node::Internal(right_sibling),
                                         ) => {
                                             subtree.children.push(right_sibling.children.remove(0));
-                                            right_sibling.save(&self.memory);
+                                            right_sibling.save(&self.memory)?;
                                         }
                                         (Node::Leaf(_), Node::Leaf(right_sibling)) => {
-                                            right_sibling.save(&self.memory);
+                                            right_sibling.save(&self.memory)?;
                                         }
                                         _ => unreachable!(),
                                     }
@@ -495,7 +488,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                     subtree,
                                     left_sibling,
                                     (parent.keys.remove(idx - 1), parent.values.remove(idx - 1)),
-                                );
+                                )?;
                                 println!(
                                     "Removing child {} from parent",
                                     parent.children.remove(idx)
@@ -527,7 +520,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                     subtree,
                                     right_sibling,
                                     (parent.keys.remove(idx), parent.values.remove(idx)),
-                                );
+                                )?;
                                 println!(
                                     "Removing child {} from parent",
                                     parent.children.remove(idx)
@@ -543,7 +536,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                         self.root_offset = right_sibling_address;
                                     }
                                 } else {
-                                    parent.save(&self.memory);
+                                    parent.save(&self.memory)?;
                                 }
 
                                 return self.remove_helper(right_sibling_address, key);
@@ -557,7 +550,12 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         }
     }
 
-    fn merge(&mut self, source: Node, into: Node, median: (Key, Value)) -> Node {
+    fn merge(
+        &mut self,
+        source: Node,
+        into: Node,
+        median: (Key, Value),
+    ) -> Result<Node, WriteError> {
         // TODO: assert that source and into are non-empty.
         // TODO: assert that both types are the same.
         let into_address = into.address();
@@ -579,7 +577,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         match &mut lower {
             Node::Leaf(ref mut lower_leaf) => {
                 lower_leaf.address = into_address;
-                lower_leaf.save(&self.memory);
+                lower_leaf.save(&self.memory)?;
             }
             Node::Internal(ref mut lower_internal) => {
                 lower_internal.address = into_address;
@@ -593,13 +591,13 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                     unreachable!();
                 }
 
-                lower_internal.save(&self.memory);
+                lower_internal.save(&self.memory)?;
             }
         }
 
         println!("DEALLOCATE4");
         self.allocator.deallocate(source_address);
-        lower
+        Ok(lower)
     }
 
     fn allocate_leaf_node(&mut self) -> LeafNode {
@@ -631,14 +629,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
         // Create a sibling to this full child.
         let mut sibling = match full_child {
-            Node::Leaf(ref mut full_child_leaf) => {
-                let mut sibling = self.allocate_leaf_node();
-                Node::Leaf(sibling)
-            }
-            Node::Internal(ref mut full_child_internal) => {
-                let mut sibling = self.allocate_internal_node();
-                Node::Internal(sibling)
-            }
+            Node::Leaf(_) => Node::Leaf(self.allocate_leaf_node()),
+            Node::Internal(_) => Node::Internal(self.allocate_internal_node()),
         };
 
         // Move the values above the median into the new sibling.
@@ -792,7 +784,6 @@ impl From<WriteError> for InsertError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Memory64;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -1552,7 +1543,6 @@ mod test {
 #[cfg(test)]
 mod remove {
     use super::*;
-    use crate::Memory64;
     use std::cell::RefCell;
     use std::rc::Rc;
 

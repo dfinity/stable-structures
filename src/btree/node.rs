@@ -2,7 +2,6 @@ use crate::btree::{read_u32, read_u64, write, WriteError};
 use crate::Memory64;
 
 const LAYOUT_VERSION: u8 = 1;
-const NULL: u64 = 0;
 
 const MAX_KEY_SIZE: u32 = 64;
 const MAX_VALUE_SIZE: u32 = 64;
@@ -61,13 +60,10 @@ impl LeafNode {
     }
 
     pub fn save(&self, memory: &impl Memory64) -> Result<(), WriteError> {
-        println!("saving node at address {:?}", self.address);
         let header = NodeHeader {
             node_type: LEAF_NODE_TYPE,
             num_entries: self.values.len() as u64,
         };
-
-        println!("header: {:?}", header);
 
         let header_slice = unsafe {
             core::slice::from_raw_parts(
@@ -232,7 +228,6 @@ pub struct NewNode {
 }*/
 
 #[repr(packed)]
-#[derive(Debug, PartialEq)]
 struct NodeHeader {
     // 1 if internal node, 0 if a leaf node.
     node_type: u8, // TODO: can be one bit.
