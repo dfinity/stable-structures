@@ -1,5 +1,6 @@
 use crate::btree::{read_u32, read_u64, write, WriteError};
 use crate::Memory64;
+use core::mem;
 
 const LAYOUT_VERSION: u8 = 1;
 
@@ -50,9 +51,34 @@ impl LeafNode {
         &mut self.values
     }
 
-    pub fn insert(&mut self, key: Key, value: Value) {
+    pub fn push_entry(&mut self, key: Key, value: Value) {
         self.keys.push(key);
         self.values.push(value);
+    }
+
+    pub fn pop_entry(&mut self) -> Option<(Key, Value)> {
+        match self.keys.pop() {
+            Some(key) => Some((key, self.values.pop().unwrap())),
+            _ => None,
+        }
+    }
+
+    /// Swaps the entry at index `idx` with the given entry, returning the old entry.
+    pub fn swap_entry(&mut self, idx: usize, mut key: Key, mut value: Value) -> (Key, Value) {
+        mem::swap(&mut self.keys[idx], &mut key);
+        mem::swap(&mut self.values[idx], &mut value);
+        (key, value)
+    }
+
+    pub fn remove_entry_at(&mut self, idx: usize) -> (Key, Value) {
+        let key = self.keys.remove(idx);
+        let value = self.values.remove(idx);
+        (key, value)
+    }
+
+    pub fn insert_entry(&mut self, idx: usize, key: Key, value: Value) {
+        self.keys.insert(idx, key);
+        self.values.insert(idx, value);
     }
 
     pub fn remove(&mut self, index: usize) -> Value {
@@ -147,9 +173,34 @@ impl InternalNode {
         &mut self.values
     }
 
-    pub fn insert(&mut self, key: Key, value: Value) {
+    pub fn push_entry(&mut self, key: Key, value: Value) {
         self.keys.push(key);
         self.values.push(value);
+    }
+
+    pub fn pop_entry(&mut self) -> Option<(Key, Value)> {
+        match self.keys.pop() {
+            Some(key) => Some((key, self.values.pop().unwrap())),
+            _ => None,
+        }
+    }
+
+    /// Swaps the entry at index `idx` with the given entry, returning the old entry.
+    pub fn swap_entry(&mut self, idx: usize, mut key: Key, mut value: Value) -> (Key, Value) {
+        mem::swap(&mut self.keys[idx], &mut key);
+        mem::swap(&mut self.values[idx], &mut value);
+        (key, value)
+    }
+
+    pub fn insert_entry(&mut self, idx: usize, key: Key, value: Value) {
+        self.keys.insert(idx, key);
+        self.values.insert(idx, value);
+    }
+
+    pub fn remove_entry_at(&mut self, idx: usize) -> (Key, Value) {
+        let key = self.keys.remove(idx);
+        let value = self.values.remove(idx);
+        (key, value)
     }
 
     // Returns the index of the child where the given `key` belongs.
@@ -404,10 +455,39 @@ impl Node {
         }
     }
 
-    pub fn insert(&mut self, key: Key, value: Value) {
+    pub fn push_entry(&mut self, key: Key, value: Value) {
         match self {
-            Self::Leaf(leaf) => leaf.insert(key, value),
-            Self::Internal(internal) => internal.insert(key, value),
+            Self::Leaf(leaf) => leaf.push_entry(key, value),
+            Self::Internal(internal) => internal.push_entry(key, value),
+        }
+    }
+
+    pub fn pop_entry(&mut self) -> Option<(Key, Value)> {
+        match self {
+            Self::Leaf(leaf) => leaf.pop_entry(),
+            Self::Internal(internal) => internal.pop_entry(),
+        }
+    }
+
+    pub fn remove_entry_at(&mut self, idx: usize) -> (Key, Value) {
+        match self {
+            Self::Leaf(leaf) => leaf.remove_entry_at(idx),
+            Self::Internal(internal) => internal.remove_entry_at(idx),
+        }
+    }
+
+    /// Swaps the entry at index `idx` with the given entry, returning the old entry.
+    pub fn swap_entry(&mut self, idx: usize, key: Key, value: Value) -> (Key, Value) {
+        match self {
+            Self::Leaf(leaf) => leaf.swap_entry(idx, key, value),
+            Self::Internal(internal) => internal.swap_entry(idx, key, value),
+        }
+    }
+
+    pub fn insert_entry(&mut self, idx: usize, key: Key, value: Value) {
+        match self {
+            Self::Leaf(leaf) => leaf.insert_entry(idx, key, value),
+            Self::Internal(internal) => internal.insert_entry(idx, key, value),
         }
     }
 
