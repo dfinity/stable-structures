@@ -42,12 +42,17 @@ pub enum WriteError {
     AddressSpaceOverflow,
 }
 
+/// A "stable" map based on a B-tree.
 pub struct StableBTreeMap<M: Memory64 + Clone> {
-    memory: M,
     root_offset: Ptr,
-    allocator: Allocator<M>,
+    // The maximum size a key can have.
     max_key_size: u32,
+
+    // The maximum size a value can have.
     max_value_size: u32,
+
+    allocator: Allocator<M>,
+    memory: M,
 }
 
 type Key = Vec<u8>;
@@ -60,7 +65,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     // TODO: use max_key_size and max_value_size
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Result<Self, WriteError> {
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
-        let mut btree = Self {
+        let btree = Self {
             memory: memory.clone(),
             root_offset: NULL,
             allocator: Allocator::new(memory, 4096 /* TODO */, header_len)?,
@@ -120,11 +125,19 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
         write(&self.memory, 0, header_slice)?;
 
-        self.allocator.save();
+        self.allocator.save()?;
         Ok(())
     }
 
-    pub fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
+    pub fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, WriteError> {
+        /*if key.len() > self.max_key_size as usize {
+            panic!("Key exceeds max size");
+        }
+
+        if value.len() > self.max_value_size as usize {
+            panic!("Value exceeds max size");
+        }*/
+
         let root = if self.root_offset == NULL {
             let node_address = self.allocator.allocate();
             self.root_offset = node_address;
@@ -149,7 +162,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
             new_root.save(&self.memory).unwrap();
 
-            self.split_child(&mut new_root, 0);
+            self.split_child(&mut new_root, 0)?;
             println!("new root: {:?}", new_root);
             self.insert_nonfull(Node::Internal(new_root), key, value)
         }
@@ -194,19 +207,26 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         }
     }
 
-    pub fn remove(&mut self, key: &Key) -> Option<Value> {
+    /// Removes a key from the map, returning the previous value at the key if it exists.
+    pub fn remove(&mut self, key: &Key) -> Result<Option<Value>, WriteError> {
         if self.root_offset == NULL {
-            return None;
+            return Ok(None);
         }
 
         let ret = self.remove_helper(self.root_offset, key);
-        self.save();
+        self.save()?;
         ret
     }
 
-    fn remove_helper(&mut self, node_addr: Ptr, key: &Key) -> Option<Value> {
+    // A helper method for recursively removing a key from the B-tree.
+    fn remove_helper(&mut self, node_addr: Ptr, key: &Key) -> Result<Option<Value>, WriteError> {
         println!("REMOVING KEY: {:?}", key);
         let node = Node::load(node_addr, &self.memory);
+
+        if node_addr != self.root_offset {
+            debug_assert!(node.keys().len() >= B as usize);
+        }
+
         match node {
             Node::Leaf(mut leaf) => {
                 match leaf.keys.binary_search(key) {
@@ -214,12 +234,12 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
                         let value = leaf.remove(idx);
-                        leaf.save(&self.memory);
+                        leaf.save(&self.memory)?;
 
                         if leaf.keys.is_empty() {
                             debug_assert_eq!(
                                 leaf.address, self.root_offset,
-                                "A leaf node can be empty only if it's the root"
+                                "Removal can only result in an empty leaf node if that node is the root"
                             );
 
                             if leaf.address == self.root_offset {
@@ -228,9 +248,9 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             }
                         }
 
-                        Some(value)
+                        Ok(Some(value))
                     }
-                    _ => None, // Key not found.
+                    _ => Ok(None), // Key not found.
                 }
             }
             Node::Internal(mut parent) => {
@@ -242,7 +262,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         let value = parent.values[idx].clone(); // TODO: no clone
 
                         // Check if the child that precedes `key` has at least `B` keys.
-                        let mut left_child = Node::load(parent.children[idx], &self.memory);
+                        let left_child = Node::load(parent.children[idx], &self.memory);
                         if left_child.keys().len() >= B as usize {
                             // Case 2.a: The node's left child has >= `B` keys.
                             //
@@ -271,15 +291,15 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
                             // Recursively delete the predecessor.
                             // TODO: do this while getting the predecessor in a single pass.
-                            self.remove_helper(parent.children[idx], &predecessor.0);
+                            self.remove_helper(parent.children[idx], &predecessor.0)?;
 
                             // Save the parent node.
-                            parent.save(&self.memory);
-                            return Some(value);
+                            parent.save(&self.memory)?;
+                            return Ok(Some(value));
                         }
 
                         // Check if the child that succeeds `key` has at least `B` keys.
-                        let mut right_child = Node::load(parent.children[idx + 1], &self.memory);
+                        let right_child = Node::load(parent.children[idx + 1], &self.memory);
                         if right_child.keys().len() >= B as usize {
                             // Case 2.b: The node's right child has >= `B` keys.
                             //
@@ -308,11 +328,11 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
                             // Recursively delete the successor.
                             // TODO: do this while getting the successor in a single pass.
-                            self.remove_helper(parent.children[idx + 1], &successor.0);
+                            self.remove_helper(parent.children[idx + 1], &successor.0)?;
 
                             // Save the parent node.
-                            parent.save(&self.memory);
-                            return Some(value);
+                            parent.save(&self.memory)?;
+                            return Ok(Some(value));
                         }
 
                         // Case 2.c: Both the left child and right child have B - 1 keys.
@@ -338,7 +358,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         debug_assert_eq!(right_child.keys().len(), B as usize - 1);
 
                         // Merge the left and right children.
-                        let right_child_address = right_child.address();
                         let new_child = self.merge(
                             right_child,
                             left_child,
@@ -362,8 +381,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             }
                         }
 
-                        parent.save(&self.memory);
-                        new_child.save(&self.memory);
+                        parent.save(&self.memory)?;
+                        new_child.save(&self.memory)?;
 
                         // Recursively delete the key.
                         self.remove_helper(new_child.address(), key)
@@ -455,8 +474,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                         _ => unreachable!(),
                                     }
 
-                                    subtree.save(&self.memory);
-                                    parent.save(&self.memory);
+                                    subtree.save(&self.memory)?;
+                                    parent.save(&self.memory)?;
                                     return self.remove_helper(subtree.address(), key);
                                 }
                             }
@@ -469,13 +488,13 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             println!("right sibling: {:?}", right_sibling);
 
                             // Merge
-                            if let Some(mut left_sibling) = left_sibling {
+                            if let Some(left_sibling) = left_sibling {
                                 println!("merging into left");
                                 // Merge child into left sibling.
 
                                 let left_sibling_address = left_sibling.address();
                                 println!("MERGE LEFT");
-                                let new_node = self.merge(
+                                self.merge(
                                     subtree,
                                     left_sibling,
                                     (parent.keys.remove(idx - 1), parent.values.remove(idx - 1)),
@@ -495,19 +514,19 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                         self.root_offset = left_sibling_address;
                                     }
                                 } else {
-                                    parent.save(&self.memory);
+                                    parent.save(&self.memory)?;
                                 }
 
                                 return self.remove_helper(left_sibling_address, key);
                             }
 
-                            if let Some(mut right_sibling) = right_sibling {
+                            if let Some(right_sibling) = right_sibling {
                                 println!("merging into right");
                                 // Merge child into right sibling.
 
                                 let right_sibling_address = right_sibling.address();
                                 println!("MERGE RIGHT");
-                                let new_node = self.merge(
+                                self.merge(
                                     subtree,
                                     right_sibling,
                                     (parent.keys.remove(idx), parent.values.remove(idx)),
@@ -601,7 +620,11 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         Node::new_internal(node_address)
     }
 
-    fn split_child(&mut self, parent: &mut InternalNode, full_child_idx: usize) {
+    fn split_child(
+        &mut self,
+        parent: &mut InternalNode,
+        full_child_idx: usize,
+    ) -> Result<(), WriteError> {
         // The parent must not be full.
         debug_assert!(!parent.is_full());
 
@@ -617,7 +640,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 // Move the values above the median into the new sibling.
                 sibling.keys = full_child_leaf.keys.split_off(B as usize);
                 sibling.values = full_child_leaf.values.split_off(B as usize);
-                sibling.save(&self.memory);
+                sibling.save(&self.memory)?;
 
                 let median_key = full_child_leaf.keys.pop().unwrap();
                 let median_value = full_child_leaf.values.pop().unwrap();
@@ -630,8 +653,9 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 println!("parent keys: {:?}", parent.keys);
                 println!("child keys: {:?}", full_child_leaf.keys);
 
-                full_child_leaf.save(&self.memory);
-                parent.save(&self.memory);
+                full_child_leaf.save(&self.memory)?;
+                parent.save(&self.memory)?;
+                Ok(())
             }
             Node::Internal(mut full_child_internal) => {
                 let mut sibling = self.allocate_internal_node();
@@ -640,7 +664,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 sibling.keys = full_child_internal.keys.split_off(B as usize);
                 sibling.values = full_child_internal.values.split_off(B as usize);
                 sibling.children = full_child_internal.children.split_off(B as usize);
-                sibling.save(&self.memory);
+                sibling.save(&self.memory)?;
 
                 let median_key = full_child_internal.keys.pop().unwrap();
                 let median_value = full_child_internal.values.pop().unwrap();
@@ -650,16 +674,19 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 parent.keys.insert(full_child_idx, median_key);
                 parent.values.insert(full_child_idx, median_value);
 
-                println!("parent keys: {:?}", parent.keys);
-                println!("child keys: {:?}", full_child_internal.keys);
-
-                full_child_internal.save(&self.memory);
-                parent.save(&self.memory);
+                full_child_internal.save(&self.memory)?;
+                parent.save(&self.memory)?;
+                Ok(())
             }
-        };
+        }
     }
 
-    fn insert_nonfull(&mut self, mut node: Node, key: Key, value: Value) -> Option<Value> {
+    fn insert_nonfull(
+        &mut self,
+        mut node: Node,
+        key: Key,
+        value: Value,
+    ) -> Result<Option<Value>, WriteError> {
         println!("INSERT NONFULL: key {:?}", key);
         match node {
             Node::Leaf(LeafNode {
@@ -684,9 +711,9 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                     }
                 };
 
-                node.save(&self.memory).unwrap();
-                self.save();
-                ret
+                node.save(&self.memory)?;
+                self.save()?;
+                Ok(ret)
             }
             Node::Internal(ref mut internal) => {
                 // Find the child that we should add to.
@@ -704,8 +731,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 println!("Child Node: {:?}", child);
 
                 if child.is_full() {
-                    println!("SPLIT CHILD FROM INSERT NONFULL");
-                    self.split_child(internal, idx);
+                    self.split_child(internal, idx)?;
                 }
 
                 let idx = internal.keys.binary_search(&key).unwrap_or_else(|x| x);
@@ -793,7 +819,7 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
     }
 
@@ -802,10 +828,10 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(
             btree.insert(vec![1, 2, 3], vec![7, 8, 9]),
-            Some(vec![4, 5, 6])
+            Ok(Some(vec![4, 5, 6]))
         );
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![7, 8, 9]));
     }
@@ -815,9 +841,9 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
-        assert_eq!(btree.insert(vec![4, 5], vec![7, 8, 9, 10]), None);
-        assert_eq!(btree.insert(vec![], vec![11]), None);
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
+        assert_eq!(btree.insert(vec![4, 5], vec![7, 8, 9, 10]), Ok(None));
+        assert_eq!(btree.insert(vec![], vec![11]), Ok(None));
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
         assert_eq!(btree.get(&vec![4, 5]), Some(vec![7, 8, 9, 10]));
         assert_eq!(btree.get(&vec![]), Some(vec![11]));
@@ -829,13 +855,13 @@ mod test {
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
         for i in 0..CAPACITY as u8 {
-            assert_eq!(btree.insert(vec![i], vec![]), None);
+            assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
         }
 
         // Only need a single allocation to store up to `CAPACITY` elements.
         assert_eq!(btree.allocator.num_allocations(), 1);
 
-        assert_eq!(btree.insert(vec![255], vec![]), None);
+        assert_eq!(btree.insert(vec![255], vec![]), Ok(None));
 
         // The node had to be split into three nodes.
         assert_eq!(btree.allocator.num_allocations(), 3);
@@ -847,10 +873,10 @@ mod test {
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
         assert_eq!(btree.allocator.num_allocations(), 0);
 
-        assert_eq!(btree.insert(vec![], vec![]), None);
+        assert_eq!(btree.insert(vec![], vec![]), Ok(None));
         assert_eq!(btree.allocator.num_allocations(), 1);
 
-        assert_eq!(btree.remove(&vec![]), Some(vec![]));
+        assert_eq!(btree.remove(&vec![]), Ok(Some(vec![])));
         assert_eq!(btree.allocator.num_allocations(), 0);
     }
 
@@ -859,10 +885,10 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
+        assert_eq!(btree.insert(vec![1], vec![2]), Ok(None));
 
-        for i in 2..100 {
-            assert_eq!(btree.insert(vec![1], vec![i + 1]), Some(vec![i]));
+        for i in 2..10 {
+            assert_eq!(btree.insert(vec![1], vec![i + 1]), Ok(Some(vec![i])));
         }
     }
 
@@ -871,19 +897,12 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
-        assert_eq!(btree.insert(vec![2], vec![2]), None);
-        assert_eq!(btree.insert(vec![3], vec![2]), None);
-        assert_eq!(btree.insert(vec![4], vec![2]), None);
-        assert_eq!(btree.insert(vec![5], vec![2]), None);
-        assert_eq!(btree.insert(vec![6], vec![2]), None);
-        assert_eq!(btree.insert(vec![7], vec![2]), None);
-        assert_eq!(btree.insert(vec![8], vec![2]), None);
-        assert_eq!(btree.insert(vec![9], vec![2]), None);
-        assert_eq!(btree.insert(vec![10], vec![2]), None);
-        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
+        }
+
         // Should now split a node.
-        assert_eq!(btree.insert(vec![12], vec![2]), None);
+        assert_eq!(btree.insert(vec![12], vec![]), Ok(None));
 
         // The result should looks like this:
         //                [6]
@@ -891,8 +910,7 @@ mod test {
         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
         for i in 1..=12 {
-            println!("i: {:?}", i);
-            assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+            assert_eq!(btree.get(&vec![i]), Some(vec![]));
         }
     }
 
@@ -901,19 +919,11 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
-        assert_eq!(btree.insert(vec![2], vec![2]), None);
-        assert_eq!(btree.insert(vec![3], vec![2]), None);
-        assert_eq!(btree.insert(vec![4], vec![2]), None);
-        assert_eq!(btree.insert(vec![5], vec![2]), None);
-        assert_eq!(btree.insert(vec![6], vec![2]), None);
-        assert_eq!(btree.insert(vec![7], vec![2]), None);
-        assert_eq!(btree.insert(vec![8], vec![2]), None);
-        assert_eq!(btree.insert(vec![9], vec![2]), None);
-        assert_eq!(btree.insert(vec![10], vec![2]), None);
-        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
+        }
         // Should now split a node.
-        assert_eq!(btree.insert(vec![12], vec![2]), None);
+        assert_eq!(btree.insert(vec![12], vec![2]), Ok(None));
 
         // The result should looks like this:
         //                [6]
@@ -963,13 +973,13 @@ mod test {
         }
 
         // Insert more to cause more splitting.
-        assert_eq!(btree.insert(vec![13], vec![2]), None);
-        assert_eq!(btree.insert(vec![14], vec![2]), None);
-        assert_eq!(btree.insert(vec![15], vec![2]), None);
-        assert_eq!(btree.insert(vec![16], vec![2]), None);
-        assert_eq!(btree.insert(vec![17], vec![2]), None);
+        assert_eq!(btree.insert(vec![13], vec![2]), Ok(None));
+        assert_eq!(btree.insert(vec![14], vec![2]), Ok(None));
+        assert_eq!(btree.insert(vec![15], vec![2]), Ok(None));
+        assert_eq!(btree.insert(vec![16], vec![2]), Ok(None));
+        assert_eq!(btree.insert(vec![17], vec![2]), Ok(None));
         // Should cause another split
-        assert_eq!(btree.insert(vec![18], vec![2]), None);
+        assert_eq!(btree.insert(vec![18], vec![2]), Ok(None));
 
         for i in 1..=18 {
             println!("i: {:?}", i);
@@ -1034,9 +1044,9 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
-        assert_eq!(btree.remove(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
+        assert_eq!(btree.remove(&vec![1, 2, 3]), Ok(Some(vec![4, 5, 6])));
         assert_eq!(btree.get(&vec![1, 2, 3]), None);
     }
 
@@ -1045,19 +1055,11 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
-        assert_eq!(btree.insert(vec![2], vec![2]), None);
-        assert_eq!(btree.insert(vec![3], vec![2]), None);
-        assert_eq!(btree.insert(vec![4], vec![2]), None);
-        assert_eq!(btree.insert(vec![5], vec![2]), None);
-        assert_eq!(btree.insert(vec![6], vec![2]), None);
-        assert_eq!(btree.insert(vec![7], vec![2]), None);
-        assert_eq!(btree.insert(vec![8], vec![2]), None);
-        assert_eq!(btree.insert(vec![9], vec![2]), None);
-        assert_eq!(btree.insert(vec![10], vec![2]), None);
-        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
+        }
         // Should now split a node.
-        assert_eq!(btree.insert(vec![12], vec![2]), None);
+        assert_eq!(btree.insert(vec![12], vec![2]), Ok(None));
 
         // The result should looks like this:
         //                [6]
@@ -1065,12 +1067,11 @@ mod test {
         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
         for i in 1..=12 {
-            println!("i: {:?}", i);
             assert_eq!(btree.get(&vec![i]), Some(vec![2]));
         }
 
         // Remove node 6. Triggers case 2.b
-        assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![6]), Ok(Some(vec![2])));
 
         // The result should looks like this:
         //                [7]
@@ -1114,7 +1115,7 @@ mod test {
         }
 
         // Remove node 7. Triggers case 2.c
-        assert_eq!(btree.remove(&vec![7]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![7]), Ok(Some(vec![2])));
         // The result should looks like this:
         //
         // [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
@@ -1148,19 +1149,11 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
-        assert_eq!(btree.insert(vec![2], vec![2]), None);
-        assert_eq!(btree.insert(vec![3], vec![2]), None);
-        assert_eq!(btree.insert(vec![4], vec![2]), None);
-        assert_eq!(btree.insert(vec![5], vec![2]), None);
-        assert_eq!(btree.insert(vec![6], vec![2]), None);
-        assert_eq!(btree.insert(vec![7], vec![2]), None);
-        assert_eq!(btree.insert(vec![8], vec![2]), None);
-        assert_eq!(btree.insert(vec![9], vec![2]), None);
-        assert_eq!(btree.insert(vec![10], vec![2]), None);
-        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
+        }
         // Should now split a node.
-        assert_eq!(btree.insert(vec![0], vec![2]), None);
+        assert_eq!(btree.insert(vec![0], vec![2]), Ok(None));
 
         // The result should looks like this:
         //                    [6]
@@ -1172,7 +1165,7 @@ mod test {
         }
 
         // Remove node 6. Triggers case 2.a
-        assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![6]), Ok(Some(vec![2])));
 
         /*
         // The result should looks like this:
@@ -1222,13 +1215,13 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
 
         let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
 
         let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
-        assert_eq!(btree.remove(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
+        assert_eq!(btree.remove(&vec![1, 2, 3]), Ok(Some(vec![4, 5, 6])));
 
         let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
         assert_eq!(btree.get(&vec![1, 2, 3]), None);
@@ -1239,19 +1232,11 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
-        assert_eq!(btree.insert(vec![2], vec![2]), None);
-        assert_eq!(btree.insert(vec![3], vec![2]), None);
-        assert_eq!(btree.insert(vec![4], vec![2]), None);
-        assert_eq!(btree.insert(vec![5], vec![2]), None);
-        assert_eq!(btree.insert(vec![6], vec![2]), None);
-        assert_eq!(btree.insert(vec![7], vec![2]), None);
-        assert_eq!(btree.insert(vec![8], vec![2]), None);
-        assert_eq!(btree.insert(vec![9], vec![2]), None);
-        assert_eq!(btree.insert(vec![10], vec![2]), None);
-        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
+        }
         // Should now split a node.
-        assert_eq!(btree.insert(vec![12], vec![2]), None);
+        assert_eq!(btree.insert(vec![12], vec![2]), Ok(None));
 
         // The result should looks like this:
         //                [6]
@@ -1259,7 +1244,7 @@ mod test {
         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
         // Remove node 3. Triggers case 3.a
-        assert_eq!(btree.remove(&vec![3]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![3]), Ok(Some(vec![2])));
 
         // The result should looks like this:
         //                [7]
@@ -1308,19 +1293,11 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
-        assert_eq!(btree.insert(vec![2], vec![2]), None);
-        assert_eq!(btree.insert(vec![3], vec![2]), None);
-        assert_eq!(btree.insert(vec![4], vec![2]), None);
-        assert_eq!(btree.insert(vec![5], vec![2]), None);
-        assert_eq!(btree.insert(vec![6], vec![2]), None);
-        assert_eq!(btree.insert(vec![7], vec![2]), None);
-        assert_eq!(btree.insert(vec![8], vec![2]), None);
-        assert_eq!(btree.insert(vec![9], vec![2]), None);
-        assert_eq!(btree.insert(vec![10], vec![2]), None);
-        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
+        }
         // Should now split a node.
-        assert_eq!(btree.insert(vec![0], vec![2]), None);
+        assert_eq!(btree.insert(vec![0], vec![2]), Ok(None));
 
         // The result should looks like this:
         //                   [6]
@@ -1328,7 +1305,7 @@ mod test {
         // [0, 1, 2, 3, 4, 5]   [7, 8, 9, 10, 11]
 
         // Remove node 8. Triggers case 3.a left
-        assert_eq!(btree.remove(&vec![8]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![8]), Ok(Some(vec![2])));
 
         // The result should looks like this:
         //                [5]
@@ -1377,19 +1354,11 @@ mod test {
         let mem = make_memory();
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
-        assert_eq!(btree.insert(vec![1], vec![2]), None);
-        assert_eq!(btree.insert(vec![2], vec![2]), None);
-        assert_eq!(btree.insert(vec![3], vec![2]), None);
-        assert_eq!(btree.insert(vec![4], vec![2]), None);
-        assert_eq!(btree.insert(vec![5], vec![2]), None);
-        assert_eq!(btree.insert(vec![6], vec![2]), None);
-        assert_eq!(btree.insert(vec![7], vec![2]), None);
-        assert_eq!(btree.insert(vec![8], vec![2]), None);
-        assert_eq!(btree.insert(vec![9], vec![2]), None);
-        assert_eq!(btree.insert(vec![10], vec![2]), None);
-        assert_eq!(btree.insert(vec![11], vec![2]), None);
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
+        }
         // Should now split a node.
-        assert_eq!(btree.insert(vec![12], vec![2]), None);
+        assert_eq!(btree.insert(vec![12], vec![2]), Ok(None));
 
         // The result should looks like this:
         //                [6]
@@ -1402,7 +1371,7 @@ mod test {
         }
 
         // Remove node 6. Triggers case 2.b
-        assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![6]), Ok(Some(vec![2])));
         // The result should looks like this:
         //                [7]
         //               /   \
@@ -1410,7 +1379,7 @@ mod test {
         let root = Node::load(btree.root_offset, &mem);
 
         // Remove node 3. Triggers case 3.b
-        assert_eq!(btree.remove(&vec![3]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![3]), Ok(Some(vec![2])));
 
         // The result should looks like this:
         //
@@ -1440,11 +1409,11 @@ mod test {
         let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
 
         for i in 1..=11 {
-            assert_eq!(btree.insert(vec![i], vec![2]), None);
+            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
         }
 
         // Should now split a node.
-        assert_eq!(btree.insert(vec![12], vec![2]), None);
+        assert_eq!(btree.insert(vec![12], vec![2]), Ok(None));
 
         // The result should looks like this:
         //                [6]
@@ -1456,7 +1425,7 @@ mod test {
         }
 
         // Remove node 6. Triggers case 2.b
-        assert_eq!(btree.remove(&vec![6]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![6]), Ok(Some(vec![2])));
 
         // The result should looks like this:
         //                [7]
@@ -1465,7 +1434,7 @@ mod test {
         let root = Node::load(btree.root_offset, &mem);
 
         // Remove node 10. Triggers case 3.b where we merge the right into the left.
-        assert_eq!(btree.remove(&vec![10]), Some(vec![2]));
+        assert_eq!(btree.remove(&vec![10]), Ok(Some(vec![2])));
 
         // The result should looks like this:
         //
@@ -1496,7 +1465,7 @@ mod test {
 
         for j in 0..=10 {
             for i in 0..=255 {
-                assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
+                assert_eq!(btree.insert(vec![i, j], vec![i, j]), Ok(None));
             }
         }
 
@@ -1511,7 +1480,7 @@ mod test {
         for j in 0..=10 {
             for i in 0..=255 {
                 println!("i, j: {}, {}", i, j);
-                assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
+                assert_eq!(btree.remove(&vec![i, j]), Ok(Some(vec![i, j])));
             }
         }
 
@@ -1532,7 +1501,7 @@ mod test {
 
         for j in (0..=10).rev() {
             for i in (0..=255).rev() {
-                assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
+                assert_eq!(btree.insert(vec![i, j], vec![i, j]), Ok(None));
             }
         }
 
@@ -1546,8 +1515,7 @@ mod test {
 
         for j in (0..=10).rev() {
             for i in (0..=255).rev() {
-                println!("i, j: {}, {}", i, j);
-                assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
+                assert_eq!(btree.remove(&vec![i, j]), Ok(Some(vec![i, j])));
             }
         }
 
@@ -1575,4 +1543,38 @@ mod test {
         // Added an element and removed it. The free list should be unchanged.
         assert_eq!(old_free_list, btree.free_list);
     }*/
+}
+
+#[cfg(test)]
+mod remove {
+    use super::*;
+    use crate::Memory64;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
+        Rc::new(RefCell::new(Vec::new()))
+    }
+
+    #[test]
+    fn case_1() {
+        let mem = make_memory();
+        let mut btree = StableBTreeMap::new(mem.clone(), 0, 0).unwrap();
+
+        for i in 1..=11 {
+            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
+        }
+
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![12], vec![2]), Ok(None));
+
+        // The result should looks like this:
+        //                [6]
+        //               /   \
+        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+
+        for i in 1..=5 {
+            assert_eq!(btree.remove(&vec![i]), Ok(Some(vec![2])));
+        }
+    }
 }

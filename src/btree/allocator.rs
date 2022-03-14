@@ -115,7 +115,7 @@ impl<M: Memory64> Allocator<M> {
 
             // Read the next chunk and update the pointer.
             println!("read");
-            let mut new_head = self.read(new_head_addr);
+            let new_head = self.read(new_head_addr);
             println!("done");
             self.save_chunk(new_head_addr, new_head).unwrap();
 

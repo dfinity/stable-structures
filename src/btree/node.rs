@@ -1,4 +1,4 @@
-use crate::btree::{allocator::Allocator, read_u32, read_u64, write, WriteError};
+use crate::btree::{read_u32, read_u64, write, WriteError};
 use crate::Memory64;
 
 const LAYOUT_VERSION: u8 = 1;
@@ -49,14 +49,14 @@ impl LeafNode {
         self.keys.len() >= CAPACITY as usize
     }
 
-    pub fn get_max(&self, memory: &impl Memory64) -> (Key, Value) {
+    pub fn get_max(&self) -> (Key, Value) {
         (
             self.keys.last().unwrap().to_vec(),
             self.values.last().unwrap().to_vec(),
         )
     }
 
-    pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
+    pub fn get_min(&self) -> (Key, Value) {
         (self.keys[0].clone(), self.values[0].clone())
     }
 
@@ -220,6 +220,19 @@ pub enum Node {
     Leaf(LeafNode),
 }
 
+/*
+pub enum NodeType {
+    Leaf,
+    Internal,
+}
+
+pub struct NewNode {
+    address: Ptr,
+    keys: Vec<Key>,
+    values: Vec<Value>,
+    children: Option<Vec<Ptr>>,
+}*/
+
 #[repr(packed)]
 #[derive(Debug, PartialEq)]
 struct NodeHeader {
@@ -249,14 +262,14 @@ impl Node {
 
     pub fn get_max(&self, memory: &impl Memory64) -> (Key, Value) {
         match self {
-            Node::Leaf(n) => n.get_max(memory),
+            Node::Leaf(n) => n.get_max(),
             Node::Internal(n) => n.get_max(memory),
         }
     }
 
     pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
         match self {
-            Node::Leaf(n) => n.get_min(memory),
+            Node::Leaf(n) => n.get_min(),
             Node::Internal(n) => n.get_min(memory),
         }
     }
@@ -400,6 +413,21 @@ impl Node {
             Self::Internal(internal) => &mut internal.keys,
         }
     }
+
+    /*
+    pub fn children(&self) -> Option<&[Ptr]> {
+        match &self {
+            Self::Leaf(leaf) => None,
+            Self::Internal(internal) => Some(&internal.children),
+        }
+    }
+
+    pub fn children_mut(&self) -> Option<&[Ptr]> {
+        match &self {
+            Self::Leaf(leaf) => None,
+            Self::Internal(internal) => Some(&internal.children),
+        }
+    }*/
 
     pub fn values(&self) -> &[Value] {
         match &self {
