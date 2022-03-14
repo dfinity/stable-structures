@@ -629,56 +629,50 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         debug_assert!(!parent.is_full());
 
         // The child must be full.
-        let full_child = Node::load(parent.children[full_child_idx], &self.memory);
+        let mut full_child = Node::load(parent.children[full_child_idx], &self.memory);
         debug_assert!(full_child.is_full());
 
         // Create a sibling to this full child.
-        match full_child {
-            Node::Leaf(mut full_child_leaf) => {
+        let mut sibling = match full_child {
+            Node::Leaf(ref mut full_child_leaf) => {
                 let mut sibling = self.allocate_leaf_node();
-
-                // Move the values above the median into the new sibling.
-                sibling.keys = full_child_leaf.keys.split_off(B as usize);
-                sibling.values = full_child_leaf.values.split_off(B as usize);
-                sibling.save(&self.memory)?;
-
-                let median_key = full_child_leaf.keys.pop().unwrap();
-                let median_value = full_child_leaf.values.pop().unwrap();
-
-                // Add sibling as a new child in parent.
-                parent.children.insert(full_child_idx + 1, sibling.address);
-                parent.keys.insert(full_child_idx, median_key);
-                parent.values.insert(full_child_idx, median_value);
-
-                println!("parent keys: {:?}", parent.keys);
-                println!("child keys: {:?}", full_child_leaf.keys);
-
-                full_child_leaf.save(&self.memory)?;
-                parent.save(&self.memory)?;
-                Ok(())
+                Node::Leaf(sibling)
             }
-            Node::Internal(mut full_child_internal) => {
+            Node::Internal(ref mut full_child_internal) => {
                 let mut sibling = self.allocate_internal_node();
-
-                // Move the values above the median into the new sibling.
-                sibling.keys = full_child_internal.keys.split_off(B as usize);
-                sibling.values = full_child_internal.values.split_off(B as usize);
-                sibling.children = full_child_internal.children.split_off(B as usize);
-                sibling.save(&self.memory)?;
-
-                let median_key = full_child_internal.keys.pop().unwrap();
-                let median_value = full_child_internal.values.pop().unwrap();
-
-                // Add sibling as a new child in parent.
-                parent.children.insert(full_child_idx + 1, sibling.address);
-                parent.keys.insert(full_child_idx, median_key);
-                parent.values.insert(full_child_idx, median_value);
-
-                full_child_internal.save(&self.memory)?;
-                parent.save(&self.memory)?;
-                Ok(())
+                Node::Internal(sibling)
             }
+        };
+
+        // Move the values above the median into the new sibling.
+        sibling
+            .keys_mut()
+            .append(&mut full_child.keys_mut().split_off(B as usize));
+        sibling
+            .values_mut()
+            .append(&mut full_child.values_mut().split_off(B as usize));
+
+        match (&mut sibling, &mut full_child) {
+            (Node::Internal(sibling), Node::Internal(full_child)) => {
+                sibling.children = full_child.children.split_off(B as usize);
+            }
+            _ => {} // TODO: add unreachable
         }
+        sibling.save(&self.memory)?;
+
+        let median_key = full_child.keys_mut().pop().unwrap();
+        let median_value = full_child.values_mut().pop().unwrap();
+
+        // Add sibling as a new child in parent.
+        parent
+            .children
+            .insert(full_child_idx + 1, sibling.address());
+        parent.keys.insert(full_child_idx, median_key);
+        parent.values.insert(full_child_idx, median_value);
+
+        full_child.save(&self.memory)?;
+        parent.save(&self.memory)?;
+        Ok(())
     }
 
     fn insert_nonfull(
