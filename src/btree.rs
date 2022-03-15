@@ -166,10 +166,8 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             Node::load(self.root_offset, &self.memory)
         };
 
-        // if node is not full
         if !root.is_full() {
-            self.insert_nonfull(root, key, value)
-                .map_err(|err| InsertError::WriteError(err))
+            Ok(self.insert_nonfull(root, key, value)?)
         } else {
             // The root is full. Allocate a new node that will be used as the new root.
             let mut new_root = self.allocate_internal_node();
@@ -179,8 +177,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             new_root.save(&self.memory).unwrap();
 
             self.split_child(&mut new_root, 0)?;
-            self.insert_nonfull(Node::Internal(new_root), key, value)
-                .map_err(|err| InsertError::WriteError(err))
+            Ok(self.insert_nonfull(Node::Internal(new_root), key, value)?)
         }
     }
 
@@ -712,15 +709,15 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     //
     fn split_child(
         &mut self,
-        parent: &mut InternalNode,
+        node: &mut InternalNode,
         full_child_idx: usize,
     ) -> Result<(), WriteError> {
-        // The parent must not be full.
-        debug_assert!(!parent.is_full());
+        // The node must not be full.
+        assert!(!node.is_full());
 
-        // The child must be full.
-        let mut full_child = Node::load(parent.children[full_child_idx], &self.memory);
-        debug_assert!(full_child.is_full());
+        // The node's child must be full.
+        let mut full_child = Node::load(node.children[full_child_idx], &self.memory);
+        assert!(full_child.is_full());
 
         // Create a sibling to this full child.
         let mut sibling = match full_child {
@@ -729,6 +726,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         };
 
         // Move the values above the median into the new sibling.
+        // TODO: make this a single function call.
         sibling
             .keys_mut()
             .append(&mut full_child.keys_mut().split_off(B as usize));
@@ -740,20 +738,20 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             (Node::Internal(sibling), Node::Internal(full_child)) => {
                 sibling.children = full_child.children.split_off(B as usize);
             }
-            _ => {} // TODO: add unreachable
+            _ => {} // TODO: add unreachable (and if both are leaves should be reachable).
         }
         sibling.save(&self.memory)?;
 
         let (median_key, median_value) = full_child.pop_entry().unwrap();
 
-        // Add sibling as a new child in parent.
-        parent
+        // Add sibling as a new child in the node.
+        node
             .children
             .insert(full_child_idx + 1, sibling.address());
-        parent.insert_entry(full_child_idx, median_key, median_value);
+        node.insert_entry(full_child_idx, median_key, median_value);
 
         full_child.save(&self.memory)?;
-        parent.save(&self.memory)?;
+        node.save(&self.memory)?;
         Ok(())
     }
 }
