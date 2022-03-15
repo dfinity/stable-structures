@@ -35,7 +35,25 @@ pub enum WriteError {
     AddressSpaceOverflow,
 }
 
+// TODO: fix node allocation size.
+// TODO: refactor nodes to avoid all the duplicate code.
+// TODO: look into how we can avoid unreachables and unwraps.
+// TODO: review code and update documentation.
+
 /// A "stable" map based on a B-tree.
+///
+/// OPEN QUESTIONS:
+///
+/// 1) Currently the branching factor `B` is hard-coded constant. That's what Rust's `BTreeMap`
+///    uses. We can either make this a configurable parameter, or dynamically infer it from
+///    the sizes of the keys/values (e.g. choose a branching factor that makes a node fit a whole
+///    OS page.
+///
+/// 2) Right now the memory allocator is very simple and, if we're not being careful, it can lead
+///    to bugs (e.g. deallocating twice). Should we try to add more stringent checks, or is this
+///    goog enough?
+///
+/// 3) Crashing vs returning an error.
 pub struct StableBTreeMap<M: Memory64 + Clone> {
     root_offset: Ptr,
     // The maximum size a key can have.
@@ -676,6 +694,22 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         Node::new_internal(node_address)
     }
 
+    // Takes as input a nonfull internal `node` and index to its full child, then
+    // splits this child into two, adding an additional child to `node`.
+    //
+    // Example:
+    //
+    //                          [ ... M   Y ... ]
+    //                                  |
+    //                 [ N  O  P  Q  R  S  T  U  V  W  X ]
+    //
+    //
+    // After splitting becomes:
+    //
+    //                         [ ... M  S  Y ... ]
+    //                                 / \
+    //                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
+    //
     fn split_child(
         &mut self,
         parent: &mut InternalNode,
