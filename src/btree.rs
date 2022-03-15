@@ -2,7 +2,7 @@ use crate::{Memory64, WASM_PAGE_SIZE};
 mod allocator;
 mod node;
 use crate::btree::allocator::Allocator;
-use crate::btree::node::{InternalNode, LeafNode, Node};
+use crate::btree::node::{InternalNode, LeafNode, Node, Node2, NodeType};
 
 const LAYOUT_VERSION: u8 = 1;
 const NULL: u64 = 0;
@@ -159,46 +159,46 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         }
 
         let root = if self.root_offset == NULL {
-            let node = Node::Leaf(self.allocate_leaf_node());
-            self.root_offset = node.address();
+            let node = self.allocate_node(NodeType::Leaf);
+            self.root_offset = node.address;
             node
         } else {
-            Node::load(self.root_offset, &self.memory)
+            Node2::load(self.root_offset, &self.memory)
         };
 
         if !root.is_full() {
             Ok(self.insert_nonfull(root, key, value)?)
         } else {
             // The root is full. Allocate a new node that will be used as the new root.
-            let mut new_root = self.allocate_internal_node();
+            let mut new_root = self.allocate_node(NodeType::Internal);
             new_root.children.push(self.root_offset);
             self.root_offset = new_root.address;
 
             new_root.save(&self.memory).unwrap();
 
             self.split_child(&mut new_root, 0)?;
-            Ok(self.insert_nonfull(Node::Internal(new_root), key, value)?)
+            Ok(self.insert_nonfull(new_root, key, value)?)
         }
     }
 
     fn insert_nonfull(
         &mut self,
-        mut node: Node,
+        mut node: Node2,
         key: Key,
         value: Value,
     ) -> Result<Option<Value>, WriteError> {
         println!("INSERT NONFULL: key {:?}", key);
-        match node {
-            Node::Leaf(ref mut leaf) => {
-                let ret = match leaf.keys().binary_search(&key) {
+        match node.node_type {
+            NodeType::Leaf => {
+                let ret = match node.entries.binary_search_by(|e| e.0.cmp(&key)) {
                     Ok(idx) => {
                         // The key was already in the map. Overwrite and return the previous value.
-                        let (_, old_value) = leaf.swap_entry(idx, key, value);
+                        let (_, old_value) = node.swap_entry(idx, (key, value));
                         Some(old_value)
                     }
                     Err(idx) => {
                         // Key not present.
-                        leaf.insert_entry(idx, key, value);
+                        node.entries.insert(idx, (key, value));
                         None
                     }
                 };
@@ -207,17 +207,23 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 self.save()?; // TODO: is this necessary?
                 Ok(ret)
             }
-            Node::Internal(ref mut internal) => {
+            NodeType::Internal => {
                 // Find the child that we should add to.
-                let idx = internal.keys().binary_search(&key).unwrap_or_else(|idx| idx);
+                let idx = node
+                    .entries
+                    .binary_search_by(|e| e.0.cmp(&key))
+                    .unwrap_or_else(|idx| idx);
 
-                let child = Node::load(internal.children[idx], &self.memory);
+                let child = Node2::load(node.children[idx], &self.memory);
                 if child.is_full() {
-                    self.split_child(internal, idx)?;
+                    self.split_child(&mut node, idx)?;
                 }
 
-                let idx = internal.keys().binary_search(&key).unwrap_or_else(|idx| idx);
-                let child = Node::load(internal.children[idx], &self.memory);
+                let idx = node
+                    .entries
+                    .binary_search_by(|e| e.0.cmp(&key))
+                    .unwrap_or_else(|idx| idx);
+                let child = Node2::load(node.children[idx], &self.memory);
 
                 debug_assert!(!child.is_full());
 
@@ -682,6 +688,17 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         LeafNode::new(self.allocator.allocate().unwrap())
     }
 
+    fn allocate_node(&mut self, node_type: NodeType) -> Node2 {
+        //let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
+        //let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64);
+        Node2 {
+            address: self.allocator.allocate().unwrap(),
+            entries: vec![],
+            children: vec![],
+            node_type,
+        }
+    }
+
     fn allocate_internal_node(&mut self) -> InternalNode {
         //let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
         //let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64) + /* children pointers */ 8 * (CAPACITY + 1);
@@ -707,49 +724,33 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     //                                 / \
     //                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
     //
-    fn split_child(
-        &mut self,
-        node: &mut InternalNode,
-        full_child_idx: usize,
-    ) -> Result<(), WriteError> {
+    fn split_child(&mut self, node: &mut Node2, full_child_idx: usize) -> Result<(), WriteError> {
         // The node must not be full.
         assert!(!node.is_full());
 
         // The node's child must be full.
-        let mut full_child = Node::load(node.children[full_child_idx], &self.memory);
+        let mut full_child = Node2::load(node.children[full_child_idx], &self.memory);
         assert!(full_child.is_full());
 
-        // Create a sibling to this full child.
-        let mut sibling = match full_child {
-            Node::Leaf(_) => Node::Leaf(self.allocate_leaf_node()),
-            Node::Internal(_) => Node::Internal(self.allocate_internal_node()),
-        };
+        // Create a sibling to this full child (which has to be the same type).
+        let mut sibling = self.allocate_node(full_child.node_type);
 
         // Move the values above the median into the new sibling.
-        // TODO: make this a single function call.
-        sibling
-            .keys_mut()
-            .append(&mut full_child.keys_mut().split_off(B as usize));
-        sibling
-            .values_mut()
-            .append(&mut full_child.values_mut().split_off(B as usize));
+        sibling.entries = full_child.entries.split_off(B as usize);
 
-        match (&mut sibling, &mut full_child) {
-            (Node::Internal(sibling), Node::Internal(full_child)) => {
-                sibling.children = full_child.children.split_off(B as usize);
-            }
-            _ => {} // TODO: add unreachable (and if both are leaves should be reachable).
+        if full_child.node_type == NodeType::Internal {
+            sibling.children = full_child.children.split_off(B as usize);
         }
-        sibling.save(&self.memory)?;
-
-        let (median_key, median_value) = full_child.pop_entry().unwrap();
 
         // Add sibling as a new child in the node.
-        node
-            .children
-            .insert(full_child_idx + 1, sibling.address());
-        node.insert_entry(full_child_idx, median_key, median_value);
+        node.children.insert(full_child_idx + 1, sibling.address);
 
+        // Move the median entry into the node.
+        let (median_key, median_value) = full_child.entries.pop().unwrap();
+        node.entries
+            .insert(full_child_idx, (median_key, median_value));
+
+        sibling.save(&self.memory)?;
         full_child.save(&self.memory)?;
         node.save(&self.memory)?;
         Ok(())
