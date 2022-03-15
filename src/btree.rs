@@ -53,7 +53,6 @@ type Value = Vec<u8>;
 
 impl<M: Memory64 + Clone> StableBTreeMap<M> {
     // TODO: make branching factor configurable.
-    // TODO: use max_key_size and max_value_size
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Result<Self, WriteError> {
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
 
@@ -69,6 +68,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         Ok(btree)
     }
 
+    /// Loads the map from memory.
     pub fn load(memory: M) -> Result<Self, LoadError> {
         let mut header: BTreeHeader = unsafe { core::mem::zeroed() };
         let header_slice = unsafe {
@@ -77,23 +77,27 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 core::mem::size_of::<BTreeHeader>(),
             )
         };
+
         if memory.size() == 0 {
             return Err(LoadError::MemoryEmpty);
         }
+
         memory.read(0, header_slice);
+
         if &header.magic != b"BTR" {
             return Err(LoadError::BadMagic(header.magic));
         }
+
         if header.version != LAYOUT_VERSION {
             return Err(LoadError::UnsupportedVersion(header.version));
         }
 
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
-        println!("Loading allocator from address: {}", header_len);
+
         Ok(Self {
             memory: memory.clone(),
             root_offset: header.root_offset,
-            allocator: Allocator::load(memory, header_len).unwrap(),
+            allocator: Allocator::load(memory, header_len)?,
             max_key_size: header.max_key_size,
             max_value_size: header.max_value_size,
         })
@@ -152,18 +156,58 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             // The root is full. Allocate a new node that will be used as the new root.
             let mut new_root = self.allocate_internal_node();
             new_root.children.push(self.root_offset);
-            println!(
-                "Updating root from {:?} to {:?}",
-                self.root_offset, new_root.address
-            );
             self.root_offset = new_root.address;
 
             new_root.save(&self.memory).unwrap();
 
             self.split_child(&mut new_root, 0)?;
-            println!("new root: {:?}", new_root);
             self.insert_nonfull(Node::Internal(new_root), key, value)
                 .map_err(|err| InsertError::WriteError(err))
+        }
+    }
+
+    fn insert_nonfull(
+        &mut self,
+        mut node: Node,
+        key: Key,
+        value: Value,
+    ) -> Result<Option<Value>, WriteError> {
+        println!("INSERT NONFULL: key {:?}", key);
+        match node {
+            Node::Leaf(ref mut leaf) => {
+                let ret = match leaf.keys().binary_search(&key) {
+                    Ok(idx) => {
+                        // The key was already in the map. Overwrite and return the previous value.
+                        let (_, old_value) = leaf.swap_entry(idx, key, value);
+                        Some(old_value)
+                    }
+                    Err(idx) => {
+                        // Key not present.
+                        leaf.insert_entry(idx, key, value);
+                        None
+                    }
+                };
+
+                node.save(&self.memory)?;
+                self.save()?; // TODO: is this necessary?
+                Ok(ret)
+            }
+            Node::Internal(ref mut internal) => {
+                // Find the child that we should add to.
+                let idx = internal.keys().binary_search(&key).unwrap_or_else(|idx| idx);
+
+                let child = Node::load(internal.children[idx], &self.memory);
+                if child.is_full() {
+                    self.split_child(internal, idx)?;
+                }
+
+                let idx = internal.keys().binary_search(&key).unwrap_or_else(|idx| idx);
+                let child = Node::load(internal.children[idx], &self.memory);
+
+                debug_assert!(!child.is_full());
+
+                self.insert_nonfull(child, key, value)
+            }
         }
     }
 
@@ -273,7 +317,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             //            [left child]   [...]
                             //           /            \
                             //        [...]          [...]
-
 
                             // Recursively delete the predecessor.
                             // TODO: do this in a single pass.
@@ -678,60 +721,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         full_child.save(&self.memory)?;
         parent.save(&self.memory)?;
         Ok(())
-    }
-
-    fn insert_nonfull(
-        &mut self,
-        mut node: Node,
-        key: Key,
-        value: Value,
-    ) -> Result<Option<Value>, WriteError> {
-        println!("INSERT NONFULL: key {:?}", key);
-        match node {
-            Node::Leaf(ref mut leaf) => {
-                let ret = match leaf.keys().binary_search(&key) {
-                    Ok(idx) => {
-                        // The key was already in the map. Overwrite and return the previous value.
-                        let (_, old_value) = leaf.swap_entry(idx, key, value);
-                        Some(old_value)
-                    }
-                    Err(idx) => {
-                        // Key not present.
-                        leaf.insert_entry(idx, key, value);
-                        None
-                    }
-                };
-
-                node.save(&self.memory)?;
-                self.save()?;
-                Ok(ret)
-            }
-            Node::Internal(ref mut internal) => {
-                // Find the child that we should add to.
-                // Load the child from memory.
-                //
-                // if child is full, split the child
-                // insert_nonfull(child_after_split, key, value,
-                println!("internal node: {:?}", internal);
-
-                let idx = internal.keys().binary_search(&key).unwrap_or_else(|x| x);
-                let child_offset = internal.children[idx];
-                println!("loading child at offset: {}", child_offset);
-                let child = Node::load(child_offset, &self.memory);
-
-                println!("Child Node: {:?}", child);
-
-                if child.is_full() {
-                    self.split_child(internal, idx)?;
-                }
-
-                let idx = internal.keys().binary_search(&key).unwrap_or_else(|x| x);
-                let child_offset = internal.children[idx];
-                let child = Node::load(child_offset, &self.memory);
-
-                self.insert_nonfull(child, key, value)
-            }
-        }
     }
 }
 
