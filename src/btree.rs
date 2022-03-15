@@ -232,6 +232,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         }
     }
 
+    /// Returns the value associated with the given key if it exists.
     pub fn get(&self, key: &Key) -> Option<Value> {
         if self.root_offset == NULL {
             return None;
@@ -241,21 +242,15 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     }
 
     fn get_helper(node_addr: Ptr, key: &Key, memory: &impl Memory64) -> Option<Value> {
-        let node = Node::load(node_addr, memory);
-        match node {
-            Node::Leaf(node) => {
-                match node.keys().binary_search(key) {
-                    Ok(idx) => Some(node.values()[idx].clone()),
-                    _ => None, // Key not found.
-                }
-            }
-            Node::Internal(internal) => {
-                match internal.keys().binary_search(key) {
-                    Ok(idx) => Some(internal.values()[idx].clone()),
-                    Err(idx) => {
+        let node = Node2::load(node_addr, memory);
+        match node.entries.binary_search_by(|e| e.0.cmp(&key)) {
+            Ok(idx) => Some(node.entries[idx].1.clone()),
+            Err(idx) => {
+                match node.node_type {
+                    NodeType::Leaf => None, // Key not found.
+                    NodeType::Internal => {
                         // The key isn't in the node. Look for the key in the child.
-                        let child_address = internal.children[idx];
-                        Self::get_helper(child_address, key, memory)
+                        Self::get_helper(node.children[idx], key, memory)
                     }
                 }
             }
@@ -276,29 +271,29 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     // A helper method for recursively removing a key from the B-tree.
     fn remove_helper(&mut self, node_addr: Ptr, key: &Key) -> Result<Option<Value>, WriteError> {
         println!("REMOVING KEY: {:?}", key);
-        let node = Node::load(node_addr, &self.memory);
+        let mut node = Node2::load(node_addr, &self.memory);
 
-        if node_addr != self.root_offset {
-            debug_assert!(node.keys().len() >= B as usize);
+        if node.address != self.root_offset {
+            debug_assert!(node.entries.len() >= B as usize);
         }
 
-        match node {
-            Node::Leaf(mut leaf) => {
-                match leaf.keys().binary_search(key) {
+        match node.node_type {
+            NodeType::Leaf => {
+                match node.entries.binary_search_by(|e| e.0.cmp(&key)) {
                     Ok(idx) => {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
-                        let value = leaf.remove(idx);
-                        leaf.save(&self.memory)?;
+                        let value = node.entries.remove(idx).1;
+                        node.save(&self.memory)?;
 
-                        if leaf.keys().is_empty() {
+                        if node.entries.is_empty() {
                             debug_assert_eq!(
-                                leaf.address, self.root_offset,
+                                node.address, self.root_offset,
                                 "Removal can only result in an empty leaf node if that node is the root"
                             );
 
-                            if leaf.address == self.root_offset {
-                                self.allocator.deallocate(leaf.address);
+                            if node.address == self.root_offset {
+                                self.allocator.deallocate(node.address);
                                 self.root_offset = NULL;
                             }
                         }
@@ -308,17 +303,16 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                     _ => Ok(None), // Key not found.
                 }
             }
-            Node::Internal(mut parent) => {
-                println!("parent node: {:?}", parent);
-                match parent.keys().binary_search(key) {
+            NodeType::Internal => {
+                match node.entries.binary_search_by(|e| e.0.cmp(&key)) {
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
-                        let value = parent.values()[idx].clone(); // TODO: no clone
+                        let value = node.entries[idx].1.clone(); // TODO: no clone
 
                         // Check if the child that precedes `key` has at least `B` keys.
-                        let left_child = Node::load(parent.children[idx], &self.memory);
-                        if left_child.keys().len() >= B as usize {
+                        let left_child = Node2::load(node.children[idx], &self.memory);
+                        if left_child.entries.len() >= B as usize {
                             // Case 2.a: The node's left child has >= `B` keys.
                             //
                             //                       parent
@@ -342,19 +336,19 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             // Recursively delete the predecessor.
                             // TODO: do this in a single pass.
                             let predecessor = left_child.get_max(&self.memory);
-                            self.remove_helper(parent.children[idx], &predecessor.0)?;
+                            self.remove_helper(node.children[idx], &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
-                            parent.swap_entry(idx, predecessor.0, predecessor.1);
+                            node.swap_entry(idx, predecessor);
 
                             // Save the parent node.
-                            parent.save(&self.memory)?;
+                            node.save(&self.memory)?;
                             return Ok(Some(value));
                         }
 
                         // Check if the child that succeeds `key` has at least `B` keys.
-                        let right_child = Node::load(parent.children[idx + 1], &self.memory);
-                        if right_child.keys().len() >= B as usize {
+                        let right_child = Node2::load(node.children[idx + 1], &self.memory);
+                        if right_child.entries.len() >= B as usize {
                             // Case 2.b: The node's right child has >= `B` keys.
                             //
                             //                       parent
@@ -378,13 +372,13 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             // Recursively delete the successor.
                             // TODO: do this in a single pass.
                             let successor = right_child.get_min(&self.memory);
-                            self.remove_helper(parent.children[idx + 1], &successor.0)?;
+                            self.remove_helper(node.children[idx + 1], &successor.0)?;
 
                             // Replace the `key` with its successor.
-                            parent.swap_entry(idx, successor.0, successor.1);
+                            node.swap_entry(idx, successor);
 
                             // Save the parent node.
-                            parent.save(&self.memory)?;
+                            node.save(&self.memory)?;
                             return Ok(Some(value));
                         }
 
@@ -407,64 +401,64 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         //
                         // If `parent` becomes empty (which can only happen if it's the root),
                         // then `parent` is deleted and `new_child` becomes the new root.
-                        debug_assert_eq!(left_child.keys().len(), B as usize - 1);
-                        debug_assert_eq!(right_child.keys().len(), B as usize - 1);
+                        debug_assert_eq!(left_child.entries.len(), B as usize - 1);
+                        debug_assert_eq!(right_child.entries.len(), B as usize - 1);
 
                         // Merge the left and right children.
                         let new_child =
-                            self.merge(right_child, left_child, parent.remove_entry_at(idx))?;
+                            self.merge(right_child, left_child, node.entries.remove(idx))?;
 
                         // TODO: make removing entries + children more safe to not guarantee the
                         // invarian that len(children) = len(keys) + 1 and len(keys) = len(values)
                         // Remove the post child from the parent node.
-                        parent.children.remove(idx + 1);
+                        node.children.remove(idx + 1);
 
-                        if parent.keys().is_empty() {
-                            debug_assert_eq!(parent.address, self.root_offset);
+                        if node.entries.is_empty() {
+                            debug_assert_eq!(node.address, self.root_offset);
 
-                            if parent.address == self.root_offset {
-                                debug_assert_eq!(parent.children, vec![new_child.address()]);
-                                self.root_offset = new_child.address();
+                            if node.address == self.root_offset {
+                                debug_assert_eq!(node.children, vec![new_child.address]);
+                                self.root_offset = new_child.address;
 
                                 // FIXME: Add test case that covers this deallocation.
-                                self.allocator.deallocate(parent.address);
+                                self.allocator.deallocate(node.address);
                             }
                         }
 
-                        parent.save(&self.memory)?;
+                        node.save(&self.memory)?;
                         new_child.save(&self.memory)?;
 
                         // Recursively delete the key.
-                        self.remove_helper(new_child.address(), key)
+                        self.remove_helper(new_child.address, key)
                     }
                     Err(idx) => {
                         // Case 3: The node is an internal node and the key does NOT exist in it.
 
                         // If the key does exist in the tree, it will exist in the subtree at index
                         // `idx`.
-                        let mut child = Node::load(parent.children[idx], &self.memory);
+                        let mut child = Node2::load(node.children[idx], &self.memory);
 
-                        if child.keys().len() >= B as usize {
+                        if child.entries.len() >= B as usize {
                             // The child has enough nodes. Recurse to delete the `key` from the
                             // `child`.
-                            return self.remove_helper(parent.children[idx], key);
+                            return self.remove_helper(node.children[idx], key);
                         }
 
                         // The child has < `B` keys. Let's see if it has a sibling with >= `B` keys.
                         let mut left_sibling = if idx > 0 {
-                            Some(Node::load(parent.children[idx - 1], &self.memory))
+                            Some(Node2::load(node.children[idx - 1], &self.memory))
                         } else {
                             None
                         };
 
-                        let mut right_sibling = if idx + 1 < parent.children.len() {
-                            Some(Node::load(parent.children[idx + 1], &self.memory))
+                        let mut right_sibling = if idx + 1 < node.children.len() {
+                            Some(Node2::load(node.children[idx + 1], &self.memory))
                         } else {
                             None
                         };
 
                         if let Some(ref mut left_sibling) = left_sibling {
-                            if left_sibling.keys().len() >= B as usize {
+                            if left_sibling.entries.len() >= B as usize {
                                 // Case 3.a (left): The child has a left sibling with >= `B` keys.
                                 //
                                 //                            [d] (parent)
@@ -487,40 +481,35 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
                                 // Remove the last entry from the left sibling.
                                 let (left_sibling_key, left_sibling_value) =
-                                    left_sibling.pop_entry().unwrap();
+                                    left_sibling.entries.pop().unwrap();
 
                                 // Replace the parent's entry with the one from the left sibling.
-                                let (parent_key, parent_value) = parent.swap_entry(
-                                    idx - 1,
-                                    left_sibling_key,
-                                    left_sibling_value,
-                                );
+                                let (parent_key, parent_value) = node
+                                    .swap_entry(idx - 1, (left_sibling_key, left_sibling_value));
 
                                 // Move the entry from the parent into the child.
-                                child.insert_entry(0, parent_key, parent_value);
+                                child.entries.insert(0, (parent_key, parent_value));
 
                                 // Move the last child from left sibling into child.
-                                match (&mut child, left_sibling) {
-                                    (Node::Internal(child), Node::Internal(left_sibling)) => {
-                                        child
-                                            .children
-                                            .insert(0, left_sibling.children.pop().unwrap());
-                                        left_sibling.save(&self.memory)?;
-                                    }
-                                    (Node::Leaf(_), Node::Leaf(left_sibling)) => {
-                                        left_sibling.save(&self.memory)?;
-                                    }
-                                    _ => unreachable!(),
+                                if let Some(last_child) = left_sibling.children.pop() {
+                                    assert_eq!(left_sibling.node_type, NodeType::Internal);
+                                    assert_eq!(child.node_type, NodeType::Internal);
+
+                                    child.children.insert(0, last_child);
+                                } else {
+                                    assert_eq!(left_sibling.node_type, NodeType::Leaf);
+                                    assert_eq!(child.node_type, NodeType::Leaf);
                                 }
 
+                                left_sibling.save(&self.memory)?;
                                 child.save(&self.memory)?;
-                                parent.save(&self.memory)?;
-                                return self.remove_helper(child.address(), key);
+                                node.save(&self.memory)?;
+                                return self.remove_helper(child.address, key);
                             }
                         }
 
                         if let Some(right_sibling) = &mut right_sibling {
-                            if right_sibling.keys().len() >= B as usize {
+                            if right_sibling.entries.len() >= B as usize {
                                 // Case 3.a (right): The child has a right sibling with >= `B` keys.
                                 //
                                 //                            [c] (parent)
@@ -543,30 +532,30 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
                                 // Remove the first entry from the right sibling.
                                 let (right_sibling_key, right_sibling_value) =
-                                    right_sibling.remove_entry_at(0);
+                                    right_sibling.entries.remove(0);
 
                                 // Replace the parent's entry with the one from the right sibling.
-                                let (parent_key, parent_value) =
-                                    parent.swap_entry(idx, right_sibling_key, right_sibling_value);
+                                let parent_entry =
+                                    node.swap_entry(idx, (right_sibling_key, right_sibling_value));
 
                                 // Move the entry from the parent into the child.
-                                child.push_entry(parent_key, parent_value);
+                                child.entries.push(parent_entry);
 
                                 // Move the first child of right_sibling into subtree.
-                                match (&mut child, right_sibling) {
-                                    (Node::Internal(subtree), Node::Internal(right_sibling)) => {
-                                        subtree.children.push(right_sibling.children.remove(0));
-                                        right_sibling.save(&self.memory)?;
+                                match right_sibling.node_type {
+                                    NodeType::Internal => {
+                                        assert_eq!(child.node_type, NodeType::Internal);
+                                        child.children.push(right_sibling.children.remove(0));
                                     }
-                                    (Node::Leaf(_), Node::Leaf(right_sibling)) => {
-                                        right_sibling.save(&self.memory)?;
+                                    NodeType::Leaf => {
+                                        assert_eq!(child.node_type, NodeType::Leaf);
                                     }
-                                    _ => unreachable!(),
                                 }
 
+                                right_sibling.save(&self.memory)?;
                                 child.save(&self.memory)?;
-                                parent.save(&self.memory)?;
-                                return self.remove_helper(child.address(), key);
+                                node.save(&self.memory)?;
+                                return self.remove_helper(child.address, key);
                             }
                         }
 
@@ -577,23 +566,23 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             println!("merging into left");
                             // Merge child into left sibling.
 
-                            let left_sibling_address = left_sibling.address();
+                            let left_sibling_address = left_sibling.address;
                             println!("MERGE LEFT");
-                            self.merge(child, left_sibling, parent.remove_entry_at(idx - 1))?;
+                            self.merge(child, left_sibling, node.entries.remove(idx - 1))?;
                             // Removing child from parent.
-                            parent.children.remove(idx);
+                            node.children.remove(idx);
 
-                            if parent.keys().is_empty() {
+                            if node.entries.is_empty() {
                                 println!("DEALLOCATE 2");
-                                self.allocator.deallocate(parent.address);
+                                self.allocator.deallocate(node.address);
 
-                                if parent.address == self.root_offset {
+                                if node.address == self.root_offset {
                                     println!("updating root address");
                                     // Update the root.
                                     self.root_offset = left_sibling_address;
                                 }
                             } else {
-                                parent.save(&self.memory)?;
+                                node.save(&self.memory)?;
                             }
 
                             return self.remove_helper(left_sibling_address, key);
@@ -603,24 +592,24 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                             println!("merging into right");
                             // Merge child into right sibling.
 
-                            let right_sibling_address = right_sibling.address();
+                            let right_sibling_address = right_sibling.address;
                             println!("MERGE RIGHT");
-                            self.merge(child, right_sibling, parent.remove_entry_at(idx))?;
+                            self.merge(child, right_sibling, node.entries.remove(idx))?;
 
                             // Removing child from parent.
-                            parent.children.remove(idx);
+                            node.children.remove(idx);
 
-                            if parent.keys().is_empty() {
+                            if node.entries.is_empty() {
                                 println!("DEALLOCATE3");
-                                self.allocator.deallocate(parent.address);
+                                self.allocator.deallocate(node.address);
 
-                                if parent.address == self.root_offset {
+                                if node.address == self.root_offset {
                                     println!("updating root address");
                                     // Update the root.
                                     self.root_offset = right_sibling_address;
                                 }
                             } else {
-                                parent.save(&self.memory)?;
+                                node.save(&self.memory)?;
                             }
 
                             return self.remove_helper(right_sibling_address, key);
@@ -635,47 +624,32 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
     fn merge(
         &mut self,
-        source: Node,
-        into: Node,
+        source: Node2,
+        into: Node2,
         median: (Key, Value),
-    ) -> Result<Node, WriteError> {
+    ) -> Result<Node2, WriteError> {
         // TODO: assert that source and into are non-empty.
         // TODO: assert that both types are the same.
-        let into_address = into.address();
-        let source_address = source.address();
+        let into_address = into.address;
+        let source_address = source.address;
 
         // Figure out which node contains lower values than the other.
-        let (mut lower, mut higher) = if source.keys()[0] < into.keys()[0] {
+        let (mut lower, mut higher) = if source.entries[0].0 < into.entries[0].0 {
             (source, into)
         } else {
             (into, source)
         };
 
-        lower.push_entry(median.0, median.1);
+        lower.entries.push(median);
 
-        lower.keys_mut().append(higher.keys_mut());
-        lower.values_mut().append(higher.values_mut());
+        lower.entries.append(&mut higher.entries);
 
-        match &mut lower {
-            Node::Leaf(ref mut lower_leaf) => {
-                lower_leaf.address = into_address;
-                lower_leaf.save(&self.memory)?;
-            }
-            Node::Internal(ref mut lower_internal) => {
-                lower_internal.address = into_address;
+        lower.address = into_address;
 
-                if let Node::Internal(mut higher_internal) = higher {
-                    // Move the children.
-                    lower_internal
-                        .children
-                        .append(&mut higher_internal.children);
-                } else {
-                    unreachable!();
-                }
+        // Move the children (if any exist).
+        lower.children.append(&mut higher.children);
 
-                lower_internal.save(&self.memory)?;
-            }
-        }
+        lower.save(&self.memory)?;
 
         println!("DEALLOCATE4");
         self.allocator.deallocate(source_address);

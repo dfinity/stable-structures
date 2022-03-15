@@ -166,6 +166,24 @@ pub struct Node2 {
 }
 
 impl Node2 {
+    pub fn get_max(&self, memory: &impl Memory64) -> (Key, Value) {
+        if self.children.is_empty() {
+            self.entries.last().unwrap().clone()
+        } else {
+            let last_child = Self::load(*self.children.last().unwrap(), memory);
+            last_child.get_max(memory)
+        }
+    }
+
+    pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
+        if self.children.is_empty() {
+            self.entries[0].clone()
+        } else {
+            let first_child = Self::load(self.children[0], memory);
+            first_child.get_min(memory)
+        }
+    }
+
     pub fn is_full(&self) -> bool {
         self.entries.len() >= CAPACITY as usize
     }
