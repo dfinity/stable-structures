@@ -8,8 +8,6 @@ type Ptr = u64;
 const NULL: Ptr = 0;
 
 /// A free list constant-size chunk allocator.
-///
-/// NOTE: we're not really tracking free chunks.
 pub struct Allocator<M: Memory> {
     // The address in memory where the allocator header is stored.
     addr: Ptr,

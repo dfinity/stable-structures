@@ -35,6 +35,9 @@ pub enum WriteError {
 }
 
 /// A "stable" map based on a B-tree.
+///
+/// The implementation is based on the algorithm outlined in:
+/// http://staff.ustc.edu.cn/~csli/graduate/algorithms/book6/chap19.htm
 pub struct StableBTreeMap<M: Memory> {
     root_offset: Ptr,
     // The maximum size a key can have.
@@ -44,6 +47,7 @@ pub struct StableBTreeMap<M: Memory> {
     max_value_size: u32,
 
     allocator: Allocator<M>,
+
     memory: M,
 }
 
@@ -172,11 +176,14 @@ impl<M: Memory + Clone> StableBTreeMap<M> {
         key: Key,
         value: Value,
     ) -> Result<Option<Value>, WriteError> {
+        // We're guaranteed by the caller that the provided node is not full.
+        assert!(!node.is_full());
+
         match node.node_type {
             NodeType::Leaf => {
                 let ret = match node.entries.binary_search_by(|e| e.0.cmp(&key)) {
                     Ok(idx) => {
-                        // The key was already in the map. Overwrite and return the previous value.
+                        // The key was already in the node. Overwrite and return the previous value.
                         let (_, old_value) = node.swap_entry(idx, (key, value));
                         Some(old_value)
                     }
@@ -192,7 +199,7 @@ impl<M: Memory + Clone> StableBTreeMap<M> {
                 Ok(ret)
             }
             NodeType::Internal => {
-                // Find the child that we should add to.
+                // The node is an internal node. Find the child that we should add the entry to.
                 let idx = node
                     .entries
                     .binary_search_by(|e| e.0.cmp(&key))
@@ -200,6 +207,7 @@ impl<M: Memory + Clone> StableBTreeMap<M> {
 
                 let mut child = self.load_node(node.children[idx]);
                 if child.is_full() {
+                    // The child is full. Split the child.
                     self.split_child(&mut node, idx)?;
 
                     let idx = node
@@ -209,6 +217,7 @@ impl<M: Memory + Clone> StableBTreeMap<M> {
                     child = self.load_node(node.children[idx]);
                 }
 
+                // The child should now be not full.
                 assert!(!child.is_full());
 
                 self.insert_nonfull(child, key, value)
