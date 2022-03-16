@@ -68,6 +68,42 @@ impl Node {
         entry
     }
 
+    // Verify that for each entry in the node, its left child contains keys that
+    // are smaller than the entry and its right child contains keys that are
+    // larger than the entry.
+    #[cfg(debug_assertions)]
+    fn maybe_verify_child_keys(&self, memory: &impl Memory64) {
+        if self.node_type == NodeType::Internal {
+            for i in 0..self.entries.len() {
+                let left_child = Node::load(
+                    self.children[i],
+                    memory,
+                    self.max_key_size,
+                    self.max_value_size,
+                );
+                let right_child = Node::load(
+                    self.children[i + 1],
+                    memory,
+                    self.max_key_size,
+                    self.max_value_size,
+                );
+
+                assert!(
+                    left_child.entries.last().unwrap().0 < self.entries[i].0,
+                    "Keys not aligned. Left child: {:?}\nParent: {:?}",
+                    left_child,
+                    self
+                );
+                assert!(right_child.entries[0].0 > self.entries[i].0);
+            }
+        }
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn maybe_verify_child_keys(&self, memory: &impl Memory64) {
+        // Do not run this verification in release mode as it is slow.
+    }
+
     pub fn save(&self, memory: &impl Memory64) -> Result<(), WriteError> {
         match self.node_type {
             NodeType::Leaf => {
@@ -78,21 +114,10 @@ impl Node {
             }
         };
 
-        //assert!(!self.keys.is_empty()); TODO: enable this assertion
+        //assert!(!self.entries.is_empty()); //TODO: enable this assertion
 
-        // INVARIANT: the children's keys.
-        /*for i in 0..self.keys.len() {
-            let left_child = Node::load(self.children[i], memory);
-            let right_child = Node::load(self.children[i + 1], memory);
-
-            assert!(
-                left_child.keys().last().unwrap().clone() < self.keys[i],
-                "Keys not aligned. Left child: {:?}\nParent: {:?}",
-                left_child,
-                self
-            );
-            assert!(right_child.keys()[0] > self.keys[i]);
-        }*/
+        // Run additional verifications in debug mode to detect errors.
+        self.maybe_verify_child_keys(memory);
 
         let header = NodeHeader {
             node_type: match self.node_type {
@@ -233,13 +258,13 @@ struct NodeHeader {
 /// The following is the layout of a node in memory:
 ///
 ///  1) Node Header
-/// 
+///
 ///  2) Each node can contain up to `CAPACITY` entries, each entry contains:
 ///     - size of key (4 bytes)
 ///     - key (`max_key_size` bytes)
 ///     - size of value (4 bytes)
 ///     - value (`max_value_size` bytes)
-/// 
+///
 ///  3) Each node can contain up to `CAPACITY + 1` children, each child contains:
 ///     - child (8 bytes)
 pub fn get_node_size_in_bytes(max_key_size: u32, max_value_size: u32) -> u32 {
@@ -248,34 +273,4 @@ pub fn get_node_size_in_bytes(max_key_size: u32, max_value_size: u32) -> u32 {
     let child_size = core::mem::size_of::<Ptr>() as u32;
 
     node_header_len + CAPACITY * entry_size + (CAPACITY + 1) * child_size
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
-        Rc::new(RefCell::new(Vec::new()))
-    }
-
-    #[test]
-    fn node_save_load_is_noop() {
-        let mem = make_memory();
-        let mut node = Node {
-            address: 0,
-            entries: vec![(vec![1, 2, 3], vec![4, 5, 6])],
-            children: vec![1, 2],
-            node_type: NodeType::Internal,
-            max_key_size: 3,
-            max_value_size: 3,
-        };
-
-        node.save(&mem).unwrap();
-
-        let node_2 = Node::load(0, &mem, 3, 3);
-
-        assert_eq!(node, node_2);
-    }
 }

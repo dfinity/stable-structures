@@ -65,7 +65,6 @@ type Key = Vec<u8>;
 type Value = Vec<u8>;
 
 impl<M: Memory64 + Clone> StableBTreeMap<M> {
-    // TODO: make branching factor configurable.
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Result<Self, WriteError> {
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
 
@@ -202,7 +201,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                 };
 
                 node.save(&self.memory)?;
-                self.save()?; // TODO: is this necessary?
+                self.save()?;
                 Ok(ret)
             }
             NodeType::Internal => {
@@ -223,7 +222,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                     .unwrap_or_else(|idx| idx);
                 let child = self.load_node(node.children[idx]);
 
-                debug_assert!(!child.is_full());
+                assert!(!child.is_full());
 
                 self.insert_nonfull(child, key, value)
             }
@@ -305,7 +304,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
-                        let value = node.entries[idx].1.clone(); // TODO: no clone
+                        let value = node.entries[idx].1.clone();
 
                         // Check if the child that precedes `key` has at least `B` keys.
                         let left_child = self.load_node(node.children[idx]);
@@ -405,8 +404,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         let new_child =
                             self.merge(right_child, left_child, node.entries.remove(idx))?;
 
-                        // TODO: make removing entries + children more safe to not guarantee the
-                        // invarian that len(children) = len(keys) + 1 and len(keys) = len(values)
                         // Remove the post child from the parent node.
                         node.children.remove(idx + 1);
 
@@ -417,7 +414,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                                 debug_assert_eq!(node.children, vec![new_child.address]);
                                 self.root_offset = new_child.address;
 
-                                // FIXME: Add test case that covers this deallocation.
+                                // TODO: Add test case that covers this deallocation.
                                 self.allocator.deallocate(node.address);
                             }
                         }
@@ -617,8 +614,10 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         into: Node,
         median: (Key, Value),
     ) -> Result<Node, WriteError> {
-        // TODO: assert that source and into are non-empty.
-        // TODO: assert that both types are the same.
+        assert_eq!(source.node_type, into.node_type);
+        assert!(source.entries.len() > 0);
+        assert!(into.entries.len() > 0);
+
         let into_address = into.address;
         let source_address = source.address;
 
@@ -1154,13 +1153,13 @@ mod test {
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
 
-        let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
+        let btree = StableBTreeMap::load(mem.clone()).unwrap();
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
 
         let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
         assert_eq!(btree.remove(&vec![1, 2, 3]), Ok(Some(vec![4, 5, 6])));
 
-        let mut btree = StableBTreeMap::load(mem.clone()).unwrap();
+        let btree = StableBTreeMap::load(mem.clone()).unwrap();
         assert_eq!(btree.get(&vec![1, 2, 3]), None);
     }
 
