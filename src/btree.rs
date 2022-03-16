@@ -1,4 +1,4 @@
-use crate::{Memory64, WASM_PAGE_SIZE};
+use crate::{Memory, WASM_PAGE_SIZE};
 mod allocator;
 mod node;
 use crate::btree::allocator::Allocator;
@@ -49,7 +49,7 @@ pub enum WriteError {
 ///    goog enough?
 ///
 /// 3) Crashing vs returning an error.
-pub struct StableBTreeMap<M: Memory64 + Clone> {
+pub struct StableBTreeMap<M: Memory + Clone> {
     root_offset: Ptr,
     // The maximum size a key can have.
     max_key_size: u32,
@@ -64,7 +64,7 @@ pub struct StableBTreeMap<M: Memory64 + Clone> {
 type Key = Vec<u8>;
 type Value = Vec<u8>;
 
-impl<M: Memory64 + Clone> StableBTreeMap<M> {
+impl<M: Memory + Clone> StableBTreeMap<M> {
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Result<Self, WriteError> {
         let header_len = core::mem::size_of::<BTreeHeader>() as u64;
 
@@ -714,7 +714,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
 /// A helper function that reads a single 32bit integer encoded as
 /// little-endian from the specified memory at the specified offset.
-fn read_u32<M: Memory64>(m: &M, offset: u64) -> u32 {
+fn read_u32<M: Memory>(m: &M, offset: u64) -> u32 {
     let mut buf: [u8; 4] = [0; 4];
     m.read(offset, &mut buf);
     u32::from_le_bytes(buf)
@@ -722,13 +722,13 @@ fn read_u32<M: Memory64>(m: &M, offset: u64) -> u32 {
 
 /// A helper function that reads a single 32bit integer encoded as
 /// little-endian from the specified memory at the specified offset.
-fn read_u64<M: Memory64>(m: &M, offset: u64) -> u64 {
+fn read_u64<M: Memory>(m: &M, offset: u64) -> u64 {
     let mut buf: [u8; 8] = [0; 8];
     m.read(offset, &mut buf);
     u64::from_le_bytes(buf)
 }
 
-fn write(memory: &impl Memory64, offset: u64, bytes: &[u8]) -> Result<(), WriteError> {
+fn write(memory: &impl Memory, offset: u64, bytes: &[u8]) -> Result<(), WriteError> {
     let last_byte = offset
         .checked_add(bytes.len() as u64)
         .ok_or(WriteError::AddressSpaceOverflow)?;

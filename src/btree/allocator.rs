@@ -1,5 +1,5 @@
 use crate::btree::{write, LoadError, WriteError};
-use crate::Memory64;
+use crate::Memory;
 
 const ALLOCATOR_LAYOUT_VERSION: u8 = 1;
 const CHUNK_LAYOUT_VERSION: u8 = 1;
@@ -10,7 +10,7 @@ const NULL: Ptr = 0;
 /// A free list constant-size chunk allocator.
 ///
 /// NOTE: we're not really tracking free chunks.
-pub struct Allocator<M: Memory64> {
+pub struct Allocator<M: Memory> {
     // The address in memory where the allocator header is stored.
     addr: Ptr,
 
@@ -35,7 +35,7 @@ struct AllocatorHeader {
     head: Ptr,
 }
 
-impl<M: Memory64> Allocator<M> {
+impl<M: Memory> Allocator<M> {
     /// Initialize an allocator and store it in address `addr`.
     ///
     /// The allocator assumes that all memory from `addr` onwards is free.
@@ -188,7 +188,7 @@ impl Chunk {
         }
     }
 
-    fn save(&self, address: Ptr, memory: &impl Memory64) -> Result<(), WriteError> {
+    fn save(&self, address: Ptr, memory: &impl Memory) -> Result<(), WriteError> {
         let chunk_slice = unsafe {
             core::slice::from_raw_parts(self as *const _ as *const u8, core::mem::size_of::<Self>())
         };
@@ -196,7 +196,7 @@ impl Chunk {
         write(memory, address, chunk_slice)
     }
 
-    fn load(address: Ptr, memory: &impl Memory64) -> Result<Self, LoadError> {
+    fn load(address: Ptr, memory: &impl Memory) -> Result<Self, LoadError> {
         let mut header: Chunk = unsafe { core::mem::zeroed() };
         let header_slice = unsafe {
             core::slice::from_raw_parts_mut(
@@ -222,7 +222,7 @@ impl Chunk {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{Memory64, WASM_PAGE_SIZE};
+    use crate::{Memory, WASM_PAGE_SIZE};
     use std::cell::RefCell;
     use std::rc::Rc;
 

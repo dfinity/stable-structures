@@ -19,6 +19,7 @@ impl Memory for RefCell<Vec<u8>> {
                 }
                 self.borrow_mut()
                     .resize((n * WASM_PAGE_SIZE as u64) as usize, 0);
+                size as i64
             }
             None => -1,
         }

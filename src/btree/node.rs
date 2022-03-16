@@ -1,5 +1,5 @@
 use crate::btree::{read_u32, read_u64, write, WriteError};
-use crate::Memory64;
+use crate::Memory;
 use core::mem;
 
 // Taken from `BTreeMap`.
@@ -30,7 +30,7 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn get_max(&self, memory: &impl Memory64) -> (Key, Value) {
+    pub fn get_max(&self, memory: &impl Memory) -> (Key, Value) {
         if self.children.is_empty() {
             self.entries.last().unwrap().clone()
         } else {
@@ -44,7 +44,7 @@ impl Node {
         }
     }
 
-    pub fn get_min(&self, memory: &impl Memory64) -> (Key, Value) {
+    pub fn get_min(&self, memory: &impl Memory) -> (Key, Value) {
         if self.children.is_empty() {
             self.entries[0].clone()
         } else {
@@ -72,7 +72,7 @@ impl Node {
     // are smaller than the entry and its right child contains keys that are
     // larger than the entry.
     #[cfg(debug_assertions)]
-    fn maybe_verify_child_keys(&self, memory: &impl Memory64) {
+    fn maybe_verify_child_keys(&self, memory: &impl Memory) {
         if self.node_type == NodeType::Internal {
             for i in 0..self.entries.len() {
                 let left_child = Node::load(
@@ -100,11 +100,11 @@ impl Node {
     }
 
     #[cfg(not(debug_assertions))]
-    fn maybe_verify_child_keys(&self, memory: &impl Memory64) {
+    fn maybe_verify_child_keys(&self, memory: &impl Memory) {
         // Do not run this verification in release mode as it is slow.
     }
 
-    pub fn save(&self, memory: &impl Memory64) -> Result<(), WriteError> {
+    pub fn save(&self, memory: &impl Memory) -> Result<(), WriteError> {
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());
@@ -172,7 +172,7 @@ impl Node {
 
     pub fn load(
         address: Ptr,
-        memory: &impl Memory64,
+        memory: &impl Memory,
         max_key_size: u32,
         max_value_size: u32,
     ) -> Self {

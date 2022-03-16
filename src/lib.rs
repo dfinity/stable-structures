@@ -1,7 +1,7 @@
 //pub mod hash_map;
 #[cfg(target_arch = "wasm32")]
 mod ic0_api;
-//pub mod log;
+pub mod log;
 pub mod btree;
 #[cfg(test)]
 mod log_tests;
