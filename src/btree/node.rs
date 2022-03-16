@@ -237,9 +237,9 @@ mod test_internal_node {
         let mem = make_memory();
         let mut node = Node {
             address: 0,
-            entries: vec![(vec![1, 2, 3], vec![4,5,6])],
+            entries: vec![(vec![1, 2, 3], vec![4, 5, 6])],
             children: vec![1, 2],
-            node_type: NodeType::Internal
+            node_type: NodeType::Internal,
         };
 
         node.save(&mem).unwrap();
