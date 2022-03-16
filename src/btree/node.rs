@@ -187,11 +187,9 @@ impl Node {
         /*if memory.size() == 0 {
             return Err(LoadError::MemoryEmpty);
         }*/
-        //println!("reading");
-        memory.read(address, header_slice);
-        //println!("Header: {:?}", header);
 
-        //println!("num_entries: {:?}", header.num_entries);
+        memory.read(address, header_slice);
+
         // Load the entries.
         let mut entries = vec![];
         let mut offset = header_len;
@@ -221,14 +219,6 @@ impl Node {
             }
 
             assert_eq!(children.len(), entries.len() + 1);
-            /*// NOTE: this can slow things down.
-            for i in 0..keys.len() {
-                let left_child = Node::load(children[i], memory);
-                let right_child = Node::load(children[i + 1], memory);
-
-                assert!(left_child.keys().last().unwrap().clone() < keys[i]);
-                assert!(right_child.keys()[0] > keys[i]);
-            }*/
         }
 
         Self {

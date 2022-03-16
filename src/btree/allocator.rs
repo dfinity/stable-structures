@@ -74,8 +74,6 @@ impl<M: Memory> Allocator<M> {
         }
         memory.read(addr, header_slice);
         if &header.magic != b"BTA" {
-            println!("magic found: {:?}", header.magic);
-            println!("magic expected: {:?}", b"BTA");
             return Err(LoadError::BadMagic(header.magic));
         }
         if header.version != ALLOCATOR_LAYOUT_VERSION {
