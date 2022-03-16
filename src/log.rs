@@ -12,7 +12,7 @@ struct Header {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum AllocError {
-    GrowFailed { current: u32, delta: u32 },
+    GrowFailed { current: u64, delta: u64 },
     AddressSpaceOverflow,
 }
 
@@ -26,7 +26,7 @@ pub enum LoadError {
 #[derive(Debug, PartialEq, Eq)]
 pub enum WriteError {
     IndexFull(u32),
-    GrowFailed { current: u32, delta: u32 },
+    GrowFailed { current: u64, delta: u64 },
     AddressSpaceOverflow,
 }
 
@@ -64,13 +64,11 @@ impl<M: Memory> StableLog<M> {
             )
         };
 
-        if memory.size() < 1 {
-            if memory.grow(1) == -1 {
-                return Err(AllocError::GrowFailed {
-                    current: 0,
-                    delta: 1,
-                });
-            }
+        if memory.size() < 1 && memory.grow(1) == -1 {
+            return Err(AllocError::GrowFailed {
+                current: 0,
+                delta: 1,
+            });
         }
         memory.write(0, header_slice);
 
@@ -102,7 +100,7 @@ impl<M: Memory> StableLog<M> {
             return Err(LoadError::UnsupportedVersion(header.version));
         }
         let index_offset = core::mem::size_of::<Header>() as u32;
-        let num_entries = crate::read_u32(&memory, index_offset);
+        let num_entries = crate::read_u32(&memory, index_offset as u64);
         Ok(Self {
             max_entries: header.max_entries,
             num_entries: Cell::new(num_entries),
@@ -143,7 +141,7 @@ impl<M: Memory> StableLog<M> {
         unsafe {
             buf.set_len(len as usize);
         }
-        self.memory.read(self.entries_offset + offset, buf);
+        self.memory.read((self.entries_offset + offset) as u64, buf);
         Ok(())
     }
 
@@ -160,7 +158,7 @@ impl<M: Memory> StableLog<M> {
         let offset = if n == 0 {
             0
         } else {
-            crate::read_u32(&self.memory, self.index_entry_offset(n - 1))
+            crate::read_u32(&self.memory, self.index_entry_offset(n - 1) as u64)
         };
 
         let new_offset = offset
@@ -184,10 +182,13 @@ impl<M: Memory> StableLog<M> {
             return Err(NoSuchEntry);
         }
         if idx == 0 {
-            Ok((0, crate::read_u32(&self.memory, self.index_entry_offset(0))))
+            Ok((
+                0,
+                crate::read_u32(&self.memory, self.index_entry_offset(0) as u64),
+            ))
         } else {
-            let offset = crate::read_u32(&self.memory, self.index_entry_offset(idx - 1));
-            let next = crate::read_u32(&self.memory, self.index_entry_offset(idx));
+            let offset = crate::read_u32(&self.memory, self.index_entry_offset(idx - 1) as u64);
+            let next = crate::read_u32(&self.memory, self.index_entry_offset(idx) as u64);
             Ok((offset, next - offset))
         }
     }
@@ -204,20 +205,20 @@ impl<M: Memory> StableLog<M> {
         let size_bytes = size_pages
             .checked_mul(WASM_PAGE_SIZE)
             .ok_or(WriteError::AddressSpaceOverflow)?;
-        if size_bytes < last_byte {
-            let diff_bytes = last_byte - size_bytes;
+        if size_bytes < last_byte as u64 {
+            let diff_bytes = last_byte as u64 - size_bytes;
             let diff_pages = diff_bytes
                 .checked_add(WASM_PAGE_SIZE - 1)
                 .ok_or(WriteError::AddressSpaceOverflow)?
                 / WASM_PAGE_SIZE;
-            if self.memory.grow(diff_pages) == -1 {
+            if self.memory.grow(diff_pages as u64) == -1 {
                 return Err(WriteError::GrowFailed {
                     current: size_pages,
                     delta: diff_pages,
                 });
             }
         }
-        self.memory.write(offset, bytes);
+        self.memory.write(offset as u64, bytes);
         Ok(())
     }
 }

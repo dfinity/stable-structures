@@ -1,11 +1,11 @@
-use crate::{Memory64, WASM_PAGE_SIZE};
+use crate::{Memory, WASM_PAGE_SIZE};
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::Rc;
 
 const MAX_PAGES: u64 = i64::MAX as u64 / WASM_PAGE_SIZE;
 
-impl Memory64 for RefCell<Vec<u8>> {
+impl Memory for RefCell<Vec<u8>> {
     fn size(&self) -> u64 {
         self.borrow().len() as u64 / WASM_PAGE_SIZE
     }
@@ -17,8 +17,8 @@ impl Memory64 for RefCell<Vec<u8>> {
                 if n > MAX_PAGES {
                     return -1;
                 }
-                self.borrow_mut().resize((n * WASM_PAGE_SIZE) as usize, 0);
-                size as i64
+                self.borrow_mut()
+                    .resize((n * WASM_PAGE_SIZE as u64) as usize, 0);
             }
             None => -1,
         }
@@ -44,11 +44,11 @@ impl Memory64 for RefCell<Vec<u8>> {
         if n as usize > self.borrow().len() {
             panic!("write: out of bounds");
         }
-        &mut self.borrow_mut()[offset as usize..n as usize].copy_from_slice(src);
+        self.borrow_mut()[offset as usize..n as usize].copy_from_slice(src);
     }
 }
 
-impl<M: Memory64> Memory64 for Rc<M> {
+impl<M: Memory> Memory for Rc<M> {
     fn size(&self) -> u64 {
         self.deref().size()
     }

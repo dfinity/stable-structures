@@ -33,7 +33,7 @@ fn test_restricted_memory_rw() {
 
     mem.write(10, b"DEADBEEF");
     let mut buf = [0u8; 10];
-    base.read(3 * WASM_PAGE_SIZE + 10, &mut buf[0..8]);
+    base.read(3 * WASM_PAGE_SIZE as u64 + 10, &mut buf[0..8]);
     assert_eq!(&buf[0..8], b"DEADBEEF");
 
     mem.read(10, &mut buf[2..10]);
