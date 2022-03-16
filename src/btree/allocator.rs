@@ -1,5 +1,5 @@
 use crate::btree::{write, LoadError, WriteError};
-use crate::{Memory64, WASM_PAGE_SIZE};
+use crate::Memory64;
 
 const ALLOCATOR_LAYOUT_VERSION: u8 = 1;
 const CHUNK_LAYOUT_VERSION: u8 = 1;
@@ -222,7 +222,7 @@ impl Chunk {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Memory64;
+    use crate::{Memory64, WASM_PAGE_SIZE};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -235,7 +235,7 @@ mod test {
         let mem = make_memory();
 
         // Create a new allocator.
-        let allocator = Allocator::new(mem.clone(), 0, 16 /* chunk size */);
+        Allocator::new(mem.clone(), 0, 16 /* chunk size */).unwrap();
 
         // Load it from memory.
         let allocator = Allocator::load(mem.clone(), 0).unwrap();
@@ -295,7 +295,7 @@ mod test {
         assert_eq!(allocator.num_allocations, 3);
 
         // Load and reload to verify that the data is the same.
-        let mut allocator = Allocator::load(mem.clone(), 0).unwrap();
+        let allocator = Allocator::load(mem.clone(), 0).unwrap();
         assert_eq!(
             allocator.head,
             header_len + WASM_PAGE_SIZE /*chunk size*/ * 3
@@ -317,7 +317,7 @@ mod test {
         assert_eq!(allocator.num_allocations, 0);
 
         // Load and reload to verify that the data is the same.
-        let mut allocator = Allocator::load(mem.clone(), 0).unwrap();
+        let allocator = Allocator::load(mem.clone(), 0).unwrap();
         assert_eq!(allocator.head, header_len);
         assert_eq!(allocator.num_allocations, 0);
     }
@@ -328,10 +328,9 @@ mod test {
 
         let mut allocator = Allocator::new(mem.clone(), 0, 16 /* chunk size */).unwrap();
 
-        let chunk_addr_1 = allocator.allocate().unwrap();
+        let _chunk_addr_1 = allocator.allocate().unwrap();
         let chunk_addr_2 = allocator.allocate().unwrap();
 
-        let header_len = core::mem::size_of::<AllocatorHeader>() as u64;
         assert_eq!(allocator.head, chunk_addr_2 + 16 /*chunk size*/);
         allocator.deallocate(chunk_addr_2);
         assert_eq!(allocator.head, chunk_addr_2);

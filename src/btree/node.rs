@@ -2,11 +2,6 @@ use crate::btree::{read_u32, read_u64, write, WriteError};
 use crate::Memory64;
 use core::mem;
 
-const LAYOUT_VERSION: u8 = 1;
-
-const MAX_KEY_SIZE: u32 = 64;
-const MAX_VALUE_SIZE: u32 = 64;
-
 // Taken from `BTreeMap`.
 const B: u64 = 6; // The minimum degree.
 const CAPACITY: u64 = 2 * B - 1;
@@ -15,7 +10,6 @@ const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
 
 type Ptr = u64;
-
 type Key = Vec<u8>;
 type Value = Vec<u8>;
 
@@ -31,6 +25,8 @@ pub struct Node {
     pub entries: Vec<(Key, Value)>,
     pub children: Vec<Ptr>,
     pub node_type: NodeType,
+    pub max_key_size: u32,
+    pub max_value_size: u32,
 }
 
 impl Node {
@@ -38,7 +34,12 @@ impl Node {
         if self.children.is_empty() {
             self.entries.last().unwrap().clone()
         } else {
-            let last_child = Self::load(*self.children.last().unwrap(), memory);
+            let last_child = Self::load(
+                *self.children.last().unwrap(),
+                memory,
+                self.max_key_size,
+                self.max_value_size,
+            );
             last_child.get_max(memory)
         }
     }
@@ -47,7 +48,12 @@ impl Node {
         if self.children.is_empty() {
             self.entries[0].clone()
         } else {
-            let first_child = Self::load(self.children[0], memory);
+            let first_child = Self::load(
+                self.children[0],
+                memory,
+                self.max_key_size,
+                self.max_value_size,
+            );
             first_child.get_min(memory)
         }
     }
@@ -119,7 +125,7 @@ impl Node {
             )?;
             offset += 4;
             write(memory, self.address + offset, &key)?;
-            offset += MAX_KEY_SIZE as u64;
+            offset += self.max_key_size as u64;
             write(
                 memory,
                 self.address + offset,
@@ -127,7 +133,7 @@ impl Node {
             )?;
             offset += 4;
             write(memory, self.address + offset, &value)?;
-            offset += MAX_VALUE_SIZE as u64;
+            offset += self.max_value_size as u64;
         }
 
         // Write the children
@@ -139,7 +145,12 @@ impl Node {
         Ok(())
     }
 
-    pub fn load(address: u64, memory: &impl Memory64) -> Self {
+    pub fn load(
+        address: Ptr,
+        memory: &impl Memory64,
+        max_key_size: u32,
+        max_value_size: u32,
+    ) -> Self {
         println!("Loading node at address: {}", address);
         let mut header: NodeHeader = unsafe { core::mem::zeroed() };
         let header_slice = unsafe {
@@ -161,20 +172,17 @@ impl Node {
         let mut entries = vec![];
         let mut offset = header_len;
         for _ in 0..header.num_entries {
-            //println!("reading entry");
             let key_size = read_u32(memory, address + offset);
-            //println!("key size: {:?}", key_size);
             offset += 4;
             let mut key = vec![0; key_size as usize];
             memory.read(address + offset, &mut key);
-            //println!("key: {:?}", key);
-            offset += MAX_KEY_SIZE as u64;
+            offset += max_key_size as u64;
 
             let value_size = read_u32(memory, address + offset);
             offset += 4;
             let mut value = vec![0; value_size as usize];
             memory.read(address + offset, &mut value);
-            offset += MAX_VALUE_SIZE as u64;
+            offset += max_value_size as u64;
 
             entries.push((key, value));
         }
@@ -208,23 +216,21 @@ impl Node {
                 INTERNAL_NODE_TYPE => NodeType::Internal,
                 other => unreachable!("Unknown node type {}", other),
             },
+            max_key_size,
+            max_value_size,
         }
     }
 }
 
 #[repr(packed)]
 struct NodeHeader {
-    // 1 if internal node, 0 if a leaf node.
-    node_type: u8, // TODO: can be one bit.
-    //flags: u8 // a byte for flags (e.g. node type, is root, etc.)
-    num_entries: u64, // TODO: this can be smaller than u64,
+    node_type: u8,
+    num_entries: u64,
 }
 
-// TODO: This function isn't used.
 #[cfg(test)]
-mod test_internal_node {
+mod test {
     use super::*;
-    use crate::Memory64;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -240,11 +246,13 @@ mod test_internal_node {
             entries: vec![(vec![1, 2, 3], vec![4, 5, 6])],
             children: vec![1, 2],
             node_type: NodeType::Internal,
+            max_key_size: 3,
+            max_value_size: 3,
         };
 
         node.save(&mem).unwrap();
 
-        let node_2 = Node::load(0, &mem);
+        let node_2 = Node::load(0, &mem, 3, 3);
 
         assert_eq!(node, node_2);
     }

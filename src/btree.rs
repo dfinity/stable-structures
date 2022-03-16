@@ -162,7 +162,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             self.root_offset = node.address;
             node
         } else {
-            Node::load(self.root_offset, &self.memory)
+            self.load_node(self.root_offset)
         };
 
         if !root.is_full() {
@@ -213,7 +213,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                     .binary_search_by(|e| e.0.cmp(&key))
                     .unwrap_or_else(|idx| idx);
 
-                let child = Node::load(node.children[idx], &self.memory);
+                let child = self.load_node(node.children[idx]);
                 if child.is_full() {
                     self.split_child(&mut node, idx)?;
                 }
@@ -222,7 +222,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                     .entries
                     .binary_search_by(|e| e.0.cmp(&key))
                     .unwrap_or_else(|idx| idx);
-                let child = Node::load(node.children[idx], &self.memory);
+                let child = self.load_node(node.children[idx]);
 
                 debug_assert!(!child.is_full());
 
@@ -237,11 +237,11 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             return None;
         }
 
-        Self::get_helper(self.root_offset, key, &self.memory)
+        self.get_helper(self.root_offset, key)
     }
 
-    fn get_helper(node_addr: Ptr, key: &Key, memory: &impl Memory64) -> Option<Value> {
-        let node = Node::load(node_addr, memory);
+    fn get_helper(&self, node_addr: Ptr, key: &Key) -> Option<Value> {
+        let node = self.load_node(node_addr);
         match node.entries.binary_search_by(|e| e.0.cmp(&key)) {
             Ok(idx) => Some(node.entries[idx].1.clone()),
             Err(idx) => {
@@ -249,7 +249,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                     NodeType::Leaf => None, // Key not found.
                     NodeType::Internal => {
                         // The key isn't in the node. Look for the key in the child.
-                        Self::get_helper(node.children[idx], key, memory)
+                        self.get_helper(node.children[idx], key)
                     }
                 }
             }
@@ -270,7 +270,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
     // A helper method for recursively removing a key from the B-tree.
     fn remove_helper(&mut self, node_addr: Ptr, key: &Key) -> Result<Option<Value>, WriteError> {
         println!("REMOVING KEY: {:?}", key);
-        let mut node = Node::load(node_addr, &self.memory);
+        let mut node = self.load_node(node_addr);
 
         if node.address != self.root_offset {
             debug_assert!(node.entries.len() >= B as usize);
@@ -310,7 +310,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         let value = node.entries[idx].1.clone(); // TODO: no clone
 
                         // Check if the child that precedes `key` has at least `B` keys.
-                        let left_child = Node::load(node.children[idx], &self.memory);
+                        let left_child = self.load_node(node.children[idx]);
                         if left_child.entries.len() >= B as usize {
                             // Case 2.a: The node's left child has >= `B` keys.
                             //
@@ -346,7 +346,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         }
 
                         // Check if the child that succeeds `key` has at least `B` keys.
-                        let right_child = Node::load(node.children[idx + 1], &self.memory);
+                        let right_child = self.load_node(node.children[idx + 1]);
                         if right_child.entries.len() >= B as usize {
                             // Case 2.b: The node's right child has >= `B` keys.
                             //
@@ -435,7 +435,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
                         // If the key does exist in the tree, it will exist in the subtree at index
                         // `idx`.
-                        let mut child = Node::load(node.children[idx], &self.memory);
+                        let mut child = self.load_node(node.children[idx]);
 
                         if child.entries.len() >= B as usize {
                             // The child has enough nodes. Recurse to delete the `key` from the
@@ -445,13 +445,13 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
                         // The child has < `B` keys. Let's see if it has a sibling with >= `B` keys.
                         let mut left_sibling = if idx > 0 {
-                            Some(Node::load(node.children[idx - 1], &self.memory))
+                            Some(self.load_node(node.children[idx - 1]))
                         } else {
                             None
                         };
 
                         let mut right_sibling = if idx + 1 < node.children.len() {
-                            Some(Node::load(node.children[idx + 1], &self.memory))
+                            Some(self.load_node(node.children[idx + 1]))
                         } else {
                             None
                         };
@@ -663,7 +663,18 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
             entries: vec![],
             children: vec![],
             node_type,
+            max_key_size: self.max_key_size,
+            max_value_size: self.max_value_size,
         }
+    }
+
+    fn load_node(&self, address: Ptr) -> Node {
+        Node::load(
+            address,
+            &self.memory,
+            self.max_key_size,
+            self.max_value_size,
+        )
     }
 
     // Takes as input a nonfull internal `node` and index to its full child, then
@@ -687,7 +698,7 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         assert!(!node.is_full());
 
         // The node's child must be full.
-        let mut full_child = Node::load(node.children[full_child_idx], &self.memory);
+        let mut full_child = self.load_node(node.children[full_child_idx]);
         assert!(full_child.is_full());
 
         // Create a sibling to this full child (which has to be the same type).
@@ -895,12 +906,12 @@ mod test {
         //               /   \
         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Internal);
         assert_eq!(root.entries, vec![(vec![6], vec![])]);
         assert_eq!(root.children.len(), 2);
 
-        let child_0 = Node::load(root.children[0], &mem);
+        let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
             child_0.entries,
@@ -913,7 +924,7 @@ mod test {
             ]
         );
 
-        let child_1 = Node::load(root.children[1], &mem);
+        let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
             child_1.entries,
@@ -944,12 +955,12 @@ mod test {
             assert_eq!(btree.get(&vec![i]), Some(vec![]));
         }
 
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Internal);
         assert_eq!(root.entries, vec![(vec![6], vec![]), (vec![12], vec![])]);
         assert_eq!(root.children.len(), 3);
 
-        let child_0 = Node::load(root.children[0], &mem);
+        let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
             child_0.entries,
@@ -962,7 +973,7 @@ mod test {
             ]
         );
 
-        let child_1 = Node::load(root.children[1], &mem);
+        let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
             child_1.entries,
@@ -975,7 +986,7 @@ mod test {
             ]
         );
 
-        let child_2 = Node::load(root.children[2], &mem);
+        let child_2 = btree.load_node(root.children[2]);
         assert_eq!(child_2.node_type, NodeType::Leaf);
         assert_eq!(
             child_2.entries,
@@ -1028,12 +1039,12 @@ mod test {
         //                [7]
         //               /   \
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Internal);
         assert_eq!(root.entries, vec![(vec![7], vec![])]);
         assert_eq!(root.children.len(), 2);
 
-        let child_0 = Node::load(root.children[0], &mem);
+        let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
             child_0.entries,
@@ -1046,7 +1057,7 @@ mod test {
             ]
         );
 
-        let child_1 = Node::load(root.children[1], &mem);
+        let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
             child_1.entries,
@@ -1064,7 +1075,7 @@ mod test {
         // The result should looks like this:
         //
         // [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Leaf);
         assert_eq!(
             root.entries,
@@ -1111,7 +1122,7 @@ mod test {
         //                [5]
         //               /   \
         // [0, 1, 2, 3, 4]   [7, 8, 9, 10, 11]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         match root {
             Node::Internal(internal) => {
                 assert_eq!(internal.keys, vec![vec![5]]);
@@ -1189,12 +1200,12 @@ mod test {
         //                [7]
         //               /   \
         // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Internal);
         assert_eq!(root.entries, vec![(vec![7], vec![])]);
         assert_eq!(root.children.len(), 2);
 
-        let child_0 = Node::load(root.children[0], &mem);
+        let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
             child_0.entries,
@@ -1207,7 +1218,7 @@ mod test {
             ]
         );
 
-        let child_1 = Node::load(root.children[1], &mem);
+        let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
             child_1.entries,
@@ -1244,12 +1255,12 @@ mod test {
         //                [5]
         //               /   \
         // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Internal);
         assert_eq!(root.entries, vec![(vec![5], vec![])]);
         assert_eq!(root.children.len(), 2);
 
-        let child_0 = Node::load(root.children[0], &mem);
+        let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
             child_0.entries,
@@ -1262,7 +1273,7 @@ mod test {
             ]
         );
 
-        let child_1 = Node::load(root.children[1], &mem);
+        let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
             child_1.entries,
@@ -1302,7 +1313,36 @@ mod test {
         //                [7]
         //               /   \
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
+        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.entries, vec![(vec![7], vec![])]);
+        assert_eq!(root.children.len(), 2);
+
+        let child_0 = btree.load_node(root.children[0]);
+        assert_eq!(child_0.node_type, NodeType::Leaf);
+        assert_eq!(
+            child_0.entries,
+            vec![
+                (vec![1], vec![]),
+                (vec![2], vec![]),
+                (vec![3], vec![]),
+                (vec![4], vec![]),
+                (vec![5], vec![]),
+            ]
+        );
+
+        let child_1 = btree.load_node(root.children[1]);
+        assert_eq!(child_1.node_type, NodeType::Leaf);
+        assert_eq!(
+            child_1.entries,
+            vec![
+                (vec![8], vec![]),
+                (vec![9], vec![]),
+                (vec![10], vec![]),
+                (vec![11], vec![]),
+                (vec![12], vec![]),
+            ]
+        );
 
         // Remove node 3. Triggers case 3.b
         assert_eq!(btree.remove(&vec![3]), Ok(Some(vec![])));
@@ -1310,7 +1350,7 @@ mod test {
         // The result should looks like this:
         //
         // [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Leaf);
         assert_eq!(
             root.entries,
@@ -1357,12 +1397,12 @@ mod test {
         //                [7]
         //               /   \
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Internal);
         assert_eq!(root.entries, vec![(vec![7], vec![])]);
         assert_eq!(root.children.len(), 2);
 
-        let child_0 = Node::load(root.children[0], &mem);
+        let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
             child_0.entries,
@@ -1375,7 +1415,7 @@ mod test {
             ]
         );
 
-        let child_1 = Node::load(root.children[1], &mem);
+        let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
             child_1.entries,
@@ -1394,7 +1434,7 @@ mod test {
         // The result should looks like this:
         //
         // [1, 2, 3, 4, 5, 7, 8, 9, 11, 12]
-        let root = Node::load(btree.root_offset, &mem);
+        let root = btree.load_node(btree.root_offset);
         assert_eq!(root.node_type, NodeType::Leaf);
         assert_eq!(
             root.entries,
