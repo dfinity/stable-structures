@@ -35,19 +35,6 @@ pub enum WriteError {
 }
 
 /// A "stable" map based on a B-tree.
-///
-/// OPEN QUESTIONS:
-///
-/// 1) Currently the branching factor `B` is hard-coded constant. That's what Rust's `BTreeMap`
-///    uses. We can either make this a configurable parameter, or dynamically infer it from
-///    the sizes of the keys/values (e.g. choose a branching factor that makes a node fit a whole
-///    OS page.
-///
-/// 2) Right now the memory allocator is very simple and, if we're not being careful, it can lead
-///    to bugs (e.g. deallocating twice). Should we try to add more stringent checks, or is this
-///    goog enough?
-///
-/// 3) Crashing vs returning an error.
 pub struct StableBTreeMap<M: Memory> {
     root_offset: Ptr,
     // The maximum size a key can have.
@@ -156,6 +143,7 @@ impl<M: Memory + Clone> StableBTreeMap<M> {
         }
 
         let root = if self.root_offset == NULL {
+            // Not root present. Allocate one.
             let node = self.allocate_node(NodeType::Leaf);
             self.root_offset = node.address;
             node
@@ -210,16 +198,16 @@ impl<M: Memory + Clone> StableBTreeMap<M> {
                     .binary_search_by(|e| e.0.cmp(&key))
                     .unwrap_or_else(|idx| idx);
 
-                let child = self.load_node(node.children[idx]);
+                let mut child = self.load_node(node.children[idx]);
                 if child.is_full() {
                     self.split_child(&mut node, idx)?;
-                }
 
-                let idx = node
-                    .entries
-                    .binary_search_by(|e| e.0.cmp(&key))
-                    .unwrap_or_else(|idx| idx);
-                let child = self.load_node(node.children[idx]);
+                    let idx = node
+                        .entries
+                        .binary_search_by(|e| e.0.cmp(&key))
+                        .unwrap_or_else(|idx| idx);
+                    child = self.load_node(node.children[idx]);
+                }
 
                 assert!(!child.is_full());
 
