@@ -149,7 +149,7 @@ impl Node {
                 &(key.len() as u32).to_le_bytes(),
             )?;
             offset += 4;
-            write(memory, self.address + offset, &key)?;
+            write(memory, self.address + offset, key)?;
             offset += self.max_key_size as u64;
             write(
                 memory,
@@ -157,7 +157,7 @@ impl Node {
                 &(value.len() as u32).to_le_bytes(),
             )?;
             offset += 4;
-            write(memory, self.address + offset, &value)?;
+            write(memory, self.address + offset, value)?;
             offset += self.max_value_size as u64;
         }
 

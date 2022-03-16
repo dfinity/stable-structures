@@ -134,6 +134,8 @@ impl<M: Memory> Allocator<M> {
     }
 
     /// Returns the number of chunks currently allocated.
+    /// Currently only used for tests.
+    #[cfg(test)]
     pub fn num_allocations(&self) -> u64 {
         self.num_allocations
     }
@@ -244,14 +246,14 @@ mod test {
 
         // Load the first memory chunk.
         let chunk = Chunk::load(allocator.head, &mem).unwrap();
-        assert_eq!(chunk.next, NULL);
+        assert!(chunk.next == NULL);
     }
 
     #[test]
     fn allocate() {
         let mem = make_memory();
 
-        let mut allocator = Allocator::new(mem.clone(), 0, 16 /* chunk size */).unwrap();
+        let mut allocator = Allocator::new(mem, 0, 16 /* chunk size */).unwrap();
 
         allocator.allocate().unwrap();
         allocator.allocate().unwrap();
@@ -291,7 +293,7 @@ mod test {
         assert_eq!(allocator.num_allocations, 3);
 
         // Load and reload to verify that the data is the same.
-        let allocator = Allocator::load(mem.clone(), 0).unwrap();
+        let allocator = Allocator::load(mem, 0).unwrap();
         assert_eq!(
             allocator.head,
             header_len + WASM_PAGE_SIZE /*chunk size*/ * 3
@@ -313,7 +315,7 @@ mod test {
         assert_eq!(allocator.num_allocations, 0);
 
         // Load and reload to verify that the data is the same.
-        let allocator = Allocator::load(mem.clone(), 0).unwrap();
+        let allocator = Allocator::load(mem, 0).unwrap();
         assert_eq!(allocator.head, header_len);
         assert_eq!(allocator.num_allocations, 0);
     }
@@ -322,7 +324,7 @@ mod test {
     fn allocate_deallocate_2() {
         let mem = make_memory();
 
-        let mut allocator = Allocator::new(mem.clone(), 0, 16 /* chunk size */).unwrap();
+        let mut allocator = Allocator::new(mem, 0, 16 /* chunk size */).unwrap();
 
         let _chunk_addr_1 = allocator.allocate().unwrap();
         let chunk_addr_2 = allocator.allocate().unwrap();
