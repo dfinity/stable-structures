@@ -3,8 +3,8 @@ use crate::Memory64;
 use core::mem;
 
 // Taken from `BTreeMap`.
-const B: u64 = 6; // The minimum degree.
-const CAPACITY: u64 = 2 * B - 1;
+const B: u32 = 6;
+const CAPACITY: u32 = 2 * B - 1;
 
 const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
@@ -151,7 +151,6 @@ impl Node {
         max_key_size: u32,
         max_value_size: u32,
     ) -> Self {
-        println!("Loading node at address: {}", address);
         let mut header: NodeHeader = unsafe { core::mem::zeroed() };
         let header_slice = unsafe {
             core::slice::from_raw_parts_mut(
@@ -224,8 +223,31 @@ impl Node {
 
 #[repr(packed)]
 struct NodeHeader {
+    // TODO: add magic
     node_type: u8,
     num_entries: u64,
+}
+
+/// Returns the size of a node in bytes.
+///
+/// The following is the layout of a node in memory:
+///
+///  1) Node Header
+/// 
+///  2) Each node can contain up to `CAPACITY` entries, each entry contains:
+///     - size of key (4 bytes)
+///     - key (`max_key_size` bytes)
+///     - size of value (4 bytes)
+///     - value (`max_value_size` bytes)
+/// 
+///  3) Each node can contain up to `CAPACITY + 1` children, each child contains:
+///     - child (8 bytes)
+pub fn get_node_size_in_bytes(max_key_size: u32, max_value_size: u32) -> u32 {
+    let node_header_len = core::mem::size_of::<NodeHeader>() as u32;
+    let entry_size = max_key_size + 4 + max_value_size + 4;
+    let child_size = core::mem::size_of::<Ptr>() as u32;
+
+    node_header_len + CAPACITY * entry_size + (CAPACITY + 1) * child_size
 }
 
 #[cfg(test)]

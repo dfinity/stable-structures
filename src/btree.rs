@@ -2,13 +2,13 @@ use crate::{Memory64, WASM_PAGE_SIZE};
 mod allocator;
 mod node;
 use crate::btree::allocator::Allocator;
-use crate::btree::node::{Node, NodeType};
+use crate::btree::node::{get_node_size_in_bytes, Node, NodeType};
 
 const LAYOUT_VERSION: u8 = 1;
 const NULL: u64 = 0;
 
 // Taken from `BTreeMap`.
-const B: u64 = 6; // The minimum degree.
+const B: u64 = 6; // The branching factor.
 const CAPACITY: u64 = 2 * B - 1;
 
 type Ptr = u64;
@@ -34,10 +34,6 @@ pub enum WriteError {
     GrowFailed { current: u64, delta: u64 },
     AddressSpaceOverflow,
 }
-
-// TODO: fix node allocation size.
-// TODO: look into how we can avoid unreachables and unwraps.
-// TODO: review code and update documentation.
 
 /// A "stable" map based on a B-tree.
 ///
@@ -76,7 +72,11 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         let btree = Self {
             memory: memory.clone(),
             root_offset: NULL,
-            allocator: Allocator::new(memory, header_len, 4096 /* TODO */)?,
+            allocator: Allocator::new(
+                memory,
+                header_len,
+                get_node_size_in_bytes(max_key_size, max_value_size),
+            )?,
             max_key_size,
             max_value_size,
         };
@@ -186,7 +186,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
         key: Key,
         value: Value,
     ) -> Result<Option<Value>, WriteError> {
-        println!("INSERT NONFULL: key {:?}", key);
         match node.node_type {
             NodeType::Leaf => {
                 let ret = match node.entries.binary_search_by(|e| e.0.cmp(&key)) {
@@ -269,7 +268,6 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
     // A helper method for recursively removing a key from the B-tree.
     fn remove_helper(&mut self, node_addr: Ptr, key: &Key) -> Result<Option<Value>, WriteError> {
-        println!("REMOVING KEY: {:?}", key);
         let mut node = self.load_node(node_addr);
 
         if node.address != self.root_offset {
@@ -562,21 +560,17 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
                         // Merge
                         if let Some(left_sibling) = left_sibling {
-                            println!("merging into left");
                             // Merge child into left sibling.
 
                             let left_sibling_address = left_sibling.address;
-                            println!("MERGE LEFT");
                             self.merge(child, left_sibling, node.entries.remove(idx - 1))?;
                             // Removing child from parent.
                             node.children.remove(idx);
 
                             if node.entries.is_empty() {
-                                println!("DEALLOCATE 2");
                                 self.allocator.deallocate(node.address);
 
                                 if node.address == self.root_offset {
-                                    println!("updating root address");
                                     // Update the root.
                                     self.root_offset = left_sibling_address;
                                 }
@@ -588,22 +582,18 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
                         }
 
                         if let Some(right_sibling) = right_sibling {
-                            println!("merging into right");
                             // Merge child into right sibling.
 
                             let right_sibling_address = right_sibling.address;
-                            println!("MERGE RIGHT");
                             self.merge(child, right_sibling, node.entries.remove(idx))?;
 
                             // Removing child from parent.
                             node.children.remove(idx);
 
                             if node.entries.is_empty() {
-                                println!("DEALLOCATE3");
                                 self.allocator.deallocate(node.address);
 
                                 if node.address == self.root_offset {
-                                    println!("updating root address");
                                     // Update the root.
                                     self.root_offset = right_sibling_address;
                                 }
@@ -650,14 +640,11 @@ impl<M: Memory64 + Clone> StableBTreeMap<M> {
 
         lower.save(&self.memory)?;
 
-        println!("DEALLOCATE4");
         self.allocator.deallocate(source_address);
         Ok(lower)
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node {
-        //let node_header_len = core::mem::size_of::<NodeHeader>() as u64;
-        //let node_size = node_header_len + CAPACITY * ((MAX_KEY_SIZE + MAX_VALUE_SIZE) as u64);
         Node {
             address: self.allocator.allocate().unwrap(),
             entries: vec![],
@@ -1474,7 +1461,6 @@ mod test {
 
         for j in 0..=10 {
             for i in 0..=255 {
-                println!("i, j: {}, {}", i, j);
                 assert_eq!(btree.remove(&vec![i, j]), Ok(Some(vec![i, j])));
             }
         }
