@@ -104,7 +104,7 @@ impl Node {
         // Do not run this verification in release mode as it is slow.
     }
 
-    pub fn save(&self, memory: &impl Memory) -> Result<(), WriteError> {
+    pub fn save<M: Memory>(&self, memory: &M) -> Result<(), WriteError> {
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());

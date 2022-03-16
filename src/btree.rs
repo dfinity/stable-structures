@@ -1,4 +1,4 @@
-use crate::{Memory, WASM_PAGE_SIZE};
+use crate::{read_u32, read_u64, Memory, WASM_PAGE_SIZE};
 mod allocator;
 mod node;
 use crate::btree::allocator::Allocator;
@@ -8,8 +8,7 @@ const LAYOUT_VERSION: u8 = 1;
 const NULL: u64 = 0;
 
 // Taken from `BTreeMap`.
-const B: u64 = 6; // The branching factor.
-const CAPACITY: u64 = 2 * B - 1;
+const B: u64 = 6; // The minimum degree of the tree.
 
 type Ptr = u64;
 
@@ -49,7 +48,7 @@ pub enum WriteError {
 ///    goog enough?
 ///
 /// 3) Crashing vs returning an error.
-pub struct StableBTreeMap<M: Memory + Clone> {
+pub struct StableBTreeMap<M: Memory> {
     root_offset: Ptr,
     // The maximum size a key can have.
     max_key_size: u32,
@@ -712,23 +711,7 @@ impl<M: Memory + Clone> StableBTreeMap<M> {
     }
 }
 
-/// A helper function that reads a single 32bit integer encoded as
-/// little-endian from the specified memory at the specified offset.
-fn read_u32<M: Memory>(m: &M, offset: u64) -> u32 {
-    let mut buf: [u8; 4] = [0; 4];
-    m.read(offset, &mut buf);
-    u32::from_le_bytes(buf)
-}
-
-/// A helper function that reads a single 32bit integer encoded as
-/// little-endian from the specified memory at the specified offset.
-fn read_u64<M: Memory>(m: &M, offset: u64) -> u64 {
-    let mut buf: [u8; 8] = [0; 8];
-    m.read(offset, &mut buf);
-    u64::from_le_bytes(buf)
-}
-
-fn write(memory: &impl Memory, offset: u64, bytes: &[u8]) -> Result<(), WriteError> {
+fn write<M: Memory>(memory: &M, offset: u64, bytes: &[u8]) -> Result<(), WriteError> {
     let last_byte = offset
         .checked_add(bytes.len() as u64)
         .ok_or(WriteError::AddressSpaceOverflow)?;
@@ -771,6 +754,8 @@ mod test {
     use super::*;
     use std::cell::RefCell;
     use std::rc::Rc;
+
+    const CAPACITY: u64 = 2 * B - 1;
 
     fn make_memory() -> Rc<RefCell<Vec<u8>>> {
         Rc::new(RefCell::new(Vec::new()))
@@ -1086,10 +1071,10 @@ mod test {
         let mut btree = StableBTreeMap::new(mem.clone(), 5, 5).unwrap();
 
         for i in 1..=11 {
-            assert_eq!(btree.insert(vec![i], vec![2]), Ok(None));
+            assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
         }
         // Should now split a node.
-        assert_eq!(btree.insert(vec![0], vec![2]), Ok(None));
+        assert_eq!(btree.insert(vec![0], vec![]), Ok(None));
 
         // The result should looks like this:
         //                    [6]
@@ -1097,53 +1082,46 @@ mod test {
         // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
 
         for i in 0..=11 {
-            assert_eq!(btree.get(&vec![i]), Some(vec![2]));
+            assert_eq!(btree.get(&vec![i]), Some(vec![]));
         }
 
         // Remove node 6. Triggers case 2.a
-        assert_eq!(btree.remove(&vec![6]), Ok(Some(vec![2])));
+        assert_eq!(btree.remove(&vec![6]), Ok(Some(vec![])));
 
-        /*
         // The result should looks like this:
         //                [5]
         //               /   \
         // [0, 1, 2, 3, 4]   [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_offset);
-        match root {
-            Node::Internal(internal) => {
-                assert_eq!(internal.keys, vec![vec![5]]);
-                assert_eq!(internal.values, vec![vec![2]]);
-                assert_eq!(internal.children.len(), 2);
+        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.entries, vec![(vec![5], vec![])]);
+        assert_eq!(root.children.len(), 2);
 
-                let child_0 = Node::load(internal.children[0], &mem);
-                match child_0 {
-                    Node::Leaf(leaf) => {
-                        assert_eq!(leaf.keys, vec![vec![0], vec![1], vec![2], vec![3], vec![4]]);
-                        assert_eq!(
-                            leaf.values(),
-                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
-                        );
-                    }
-                    _ => panic!("child should be leaf"),
-                }
+        let child_0 = btree.load_node(root.children[0]);
+        assert_eq!(child_0.node_type, NodeType::Leaf);
+        assert_eq!(
+            child_0.entries,
+            vec![
+                (vec![0], vec![]),
+                (vec![1], vec![]),
+                (vec![2], vec![]),
+                (vec![3], vec![]),
+                (vec![4], vec![]),
+            ]
+        );
 
-                let child_1 = Node::load(internal.children[1], &mem);
-                match child_1 {
-                    Node::Leaf(leaf) => {
-                        assert_eq!(
-                            leaf.keys,
-                            vec![vec![7], vec![8], vec![9], vec![10], vec![11]]
-                        );
-                        assert_eq!(
-                            leaf.values(),
-                            vec![vec![2], vec![2], vec![2], vec![2], vec![2]]
-                        );
-                    }
-                    _ => panic!("child should be leaf"),
-                }
-            }
-            _ => panic!("root should be internal"),
-        }*/
+        let child_1 = btree.load_node(root.children[1]);
+        assert_eq!(child_1.node_type, NodeType::Leaf);
+        assert_eq!(
+            child_1.entries,
+            vec![
+                (vec![7], vec![]),
+                (vec![8], vec![]),
+                (vec![9], vec![]),
+                (vec![10], vec![]),
+                (vec![11], vec![]),
+            ]
+        );
     }
 
     #[test]

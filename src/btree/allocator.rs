@@ -188,7 +188,7 @@ impl Chunk {
         }
     }
 
-    fn save(&self, address: Ptr, memory: &impl Memory) -> Result<(), WriteError> {
+    fn save<M: Memory>(&self, address: Ptr, memory: &M) -> Result<(), WriteError> {
         let chunk_slice = unsafe {
             core::slice::from_raw_parts(self as *const _ as *const u8, core::mem::size_of::<Self>())
         };

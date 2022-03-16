@@ -38,6 +38,14 @@ fn read_u32<M: Memory>(m: &M, offset: u64) -> u32 {
     u32::from_le_bytes(buf)
 }
 
+/// A helper function that reads a single 64bit integer encoded as
+/// little-endian from the specified memory at the specified offset.
+fn read_u64<M: Memory>(m: &M, offset: u64) -> u64 {
+    let mut buf: [u8; 8] = [0; 8];
+    m.read(offset, &mut buf);
+    u64::from_le_bytes(buf)
+}
+
 /// RestrictedMemory creates a limited view of another memory.  This
 /// allows one to divide the main memory into non-intersecting ranges
 /// and use different layouts in each region.
