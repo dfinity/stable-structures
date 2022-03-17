@@ -1,5 +1,6 @@
 //pub mod hash_map;
 pub mod btree;
+pub use btree::StableBTreeMap;
 #[cfg(target_arch = "wasm32")]
 mod ic0_api;
 pub mod log;

@@ -141,7 +141,7 @@ impl<M: Memory + Clone> StableBTreeMap<M> {
 
         if value.len() > self.max_value_size as usize {
             return Err(InsertError::ValueTooLarge {
-                given: key.len(),
+                given: value.len(),
                 max: self.max_value_size as usize,
             });
         }
