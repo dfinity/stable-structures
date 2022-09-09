@@ -32,7 +32,7 @@ struct HeaderV1 {
 }
 
 /// Indicates a failure to initialize a Cell.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum InitError {
     /// The version of the library does not support version of the cell layout encoded in the
     /// memory.
@@ -45,7 +45,7 @@ pub enum InitError {
 }
 
 /// Indicates a failure to set cell's value.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ValueError {
     /// The value is too large to fit into the cell memory.
     ValueTooLarge { value_size: u64 },

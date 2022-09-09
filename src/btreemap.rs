@@ -884,7 +884,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> StableBTreeMap<M, K, V> {
 }
 
 /// An error returned when inserting entries into the map.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum InsertError {
     KeyTooLarge { given: usize, max: usize },
     ValueTooLarge { given: usize, max: usize },

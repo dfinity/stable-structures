@@ -19,7 +19,7 @@ const U32_SIZE: Bytes = Bytes::new(4);
 // Entries in the node are key-value pairs and both are blobs.
 pub type Entry = (Vec<u8>, Vec<u8>);
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum NodeType {
     Leaf,
     Internal,
@@ -38,7 +38,7 @@ pub enum NodeType {
 ///     - value (`max_value_size` bytes)
 ///
 /// Each node can contain up to `CAPACITY + 1` children, each child is 8 bytes.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Node {
     pub address: Address,
     pub entries: Vec<Entry>,
