@@ -5,6 +5,8 @@ mod ic0_memory; // Memory API for canisters.
 pub mod log;
 pub mod memory_manager;
 pub mod storable;
+#[cfg(test)]
+mod tests;
 mod types;
 pub mod vec_mem;
 
