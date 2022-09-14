@@ -27,6 +27,16 @@ pub trait Storable {
 // complexity of exposing these errors in the API of stable structures, an `unwrap`
 // in case of a detected error is preferable and safer.
 
+impl Storable for () {
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        std::borrow::Cow::Borrowed(&[])
+    }
+
+    fn from_bytes(bytes: Vec<u8>) -> Self {
+        assert!(bytes.is_empty());
+    }
+}
+
 impl Storable for Vec<u8> {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         std::borrow::Cow::Borrowed(self)
