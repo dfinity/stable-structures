@@ -32,7 +32,9 @@ impl Storable for () {
         std::borrow::Cow::Borrowed(&[])
     }
 
-    fn from_bytes(_bytes: Vec<u8>) -> Self {}
+    fn from_bytes(bytes: Vec<u8>) -> Self {
+        assert!(bytes.is_empty());
+    }
 }
 
 impl Storable for Vec<u8> {
