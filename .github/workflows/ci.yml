@@ -1,4 +1,4 @@
-name: Check and Test
+name: CI
 on: [pull_request]
 
 jobs:
@@ -67,6 +67,6 @@ jobs:
           dfx cache install
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      - name: Run syncing test
+      - name: Run test
         run: |
           bash examples/test.sh
