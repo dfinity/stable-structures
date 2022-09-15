@@ -1,3 +1,4 @@
+//! A key/value store based on a B-Tree.
 mod allocator;
 mod iter;
 mod node;
@@ -93,7 +94,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> StableBTreeMap<M, K, V> {
     ///
     ///    |  BTreeHeader  |  Allocator | ... free memory for nodes |
     ///
-    /// See [`Allocator`] for more details on its own memory layout.
+    /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M, max_key_size: u32, max_value_size: u32) -> Self {
         // Because we assume that we have exclusive access to the memory,
         // we can store the `BTreeHeader` at address zero, and the allocator is

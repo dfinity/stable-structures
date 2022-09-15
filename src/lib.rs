@@ -1,3 +1,10 @@
+//! # Stable Structures for the Internet Computer
+//!
+//! This library is a collection of data structures for developing canisters on the
+//! [Internet Computer](https://internetcomputer.org/).
+//!
+//! The data stuctures are designed to directly use stable memory as the backing store, allowing
+//! them to grow to GiBs in size without the need for `pre_upgrade`/`post_upgrade` hooks.
 pub mod btreemap;
 pub mod cell;
 #[cfg(target_arch = "wasm32")]
@@ -23,7 +30,7 @@ pub type DefaultMemoryImpl = Ic0StableMemory;
 #[cfg(not(target_arch = "wasm32"))]
 pub type DefaultMemoryImpl = VectorMemory;
 
-pub const WASM_PAGE_SIZE: u64 = 65536;
+const WASM_PAGE_SIZE: u64 = 65536;
 
 pub trait Memory {
     /// Returns the current size of the stable memory in WebAssembly

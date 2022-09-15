@@ -1,3 +1,4 @@
+//! A serializable value stored in the stable memory.
 use crate::storable::Storable;
 use crate::{Memory, WASM_PAGE_SIZE};
 use std::borrow::Borrow;
