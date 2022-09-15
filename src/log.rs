@@ -1,4 +1,5 @@
-//! This module implements append-only list data structure, also known as log.
+//! An append-only list data structure, also known as log.
+//!
 //! It supports arbitrary-sized entries and dynamic sizing to arbitrary number of entries (as long as the underlying memory offers enough space).
 //! This requires two _independently growable_ Memory trait objects. For canister development it is recommended to use a [crate::memory_manager].
 //!
