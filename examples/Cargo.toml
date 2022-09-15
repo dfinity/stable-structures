@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/basic_example",
+    "src/custom_types_example",
+]

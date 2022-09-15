@@ -1,0 +1,28 @@
+{
+  "dfx": "0.11.2",
+  "canisters": {
+    "basic_example": {
+      "candid": "src/basic_example/candid.did",
+      "package": "basic_example",
+      "type": "rust"
+    },
+    "custom_types_example": {
+      "candid": "src/custom_types_example/candid.did",
+      "package": "custom_types_example",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}
