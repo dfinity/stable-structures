@@ -1,0 +1,4 @@
+service : {
+    "get": (text) -> (opt vec nat8) query;
+    "set": (text, vec nat8) -> (opt vec nat8);
+}
