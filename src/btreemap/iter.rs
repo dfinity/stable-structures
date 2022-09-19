@@ -1,6 +1,6 @@
 use super::{
     node::{Node, NodeType},
-    StableBTreeMap,
+    BTreeMap,
 };
 use crate::{types::NULL, Address, Memory, Storable};
 
@@ -16,11 +16,11 @@ pub(crate) enum Index {
     Entry(usize),
 }
 
-/// An iterator over the entries of a [`StableBTreeMap`].
+/// An iterator over the entries of a [`BTreeMap`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct Iter<'a, M: Memory, K: Storable, V: Storable> {
     // A reference to the map being iterated on.
-    map: &'a StableBTreeMap<M, K, V>,
+    map: &'a BTreeMap<M, K, V>,
 
     // A stack of cursors indicating the current position in the tree.
     cursors: Vec<Cursor>,
@@ -35,7 +35,7 @@ pub struct Iter<'a, M: Memory, K: Storable, V: Storable> {
 }
 
 impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
-    pub(crate) fn new(map: &'a StableBTreeMap<M, K, V>) -> Self {
+    pub(crate) fn new(map: &'a BTreeMap<M, K, V>) -> Self {
         Self {
             map,
             // Initialize the cursors with the address of the root of the map.
@@ -46,7 +46,7 @@ impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     }
 
     /// Returns an empty iterator.
-    pub(crate) fn null(map: &'a StableBTreeMap<M, K, V>) -> Self {
+    pub(crate) fn null(map: &'a BTreeMap<M, K, V>) -> Self {
         Self {
             map,
             cursors: vec![],
@@ -56,7 +56,7 @@ impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     }
 
     pub(crate) fn new_with_prefix(
-        map: &'a StableBTreeMap<M, K, V>,
+        map: &'a BTreeMap<M, K, V>,
         prefix: Vec<u8>,
         cursors: Vec<Cursor>,
     ) -> Self {
@@ -69,7 +69,7 @@ impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     }
 
     pub(crate) fn new_with_prefix_and_offset(
-        map: &'a StableBTreeMap<M, K, V>,
+        map: &'a BTreeMap<M, K, V>,
         prefix: Vec<u8>,
         offset: Vec<u8>,
         cursors: Vec<Cursor>,
@@ -193,7 +193,7 @@ mod test {
     #[test]
     fn iterate_leaf() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 1, 1);
+        let mut btree = BTreeMap::new(mem, 1, 1);
 
         for i in 0..CAPACITY as u8 {
             btree.insert(vec![i], vec![i + 1]).unwrap();
@@ -212,7 +212,7 @@ mod test {
     #[test]
     fn iterate_children() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 1, 1);
+        let mut btree = BTreeMap::new(mem, 1, 1);
 
         // Insert the elements in reverse order.
         for i in (0..100).rev() {

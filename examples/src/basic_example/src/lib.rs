@@ -1,8 +1,8 @@
-use ic_stable_structures::memory_manager::{ManagedMemory, MemoryId, MemoryManager};
+use ic_stable_structures::memory_manager::{VirtualMemory, MemoryId, MemoryManager};
 use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
 use std::cell::RefCell;
 
-type Memory = ManagedMemory<DefaultMemoryImpl>;
+type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 // `StableBTreeMap` requires specifying the maximum size in bytes that keys/values can hold. An
 // entry in the map always takes up the maximum size in memory (i.e. MAX_KEY_SIZE + MAX_VALUE_SIZE),

@@ -74,14 +74,14 @@ const HEADER_RESERVED_BYTES: usize = 32;
 
 /// A memory manager simulates multiple memories within a single memory.
 ///
-/// The memory manager can return up to 254 unique instances of [`ManagedMemory`], and each can be
+/// The memory manager can return up to 255 unique instances of [`VirtualMemory`], and each can be
 /// used independently and can grow up to the bounds of the underlying memory.
 ///
-/// The memory manager divides the memory into "buckets" of 1024 pages. Each [`ManagedMemory`] is
+/// The memory manager divides the memory into "buckets" of 1024 pages. Each [`VirtualMemory`] is
 /// internally represented as a list of buckets. Buckets of different memories can be interleaved,
-/// but the [`ManagedMemory`] interface gives the illusion of a continuous address space.
+/// but the [`VirtualMemory`] interface gives the illusion of a continuous address space.
 ///
-/// Because a [`ManagedMemory`] is a list of buckets, this implies that internally it grows one
+/// Because a [`VirtualMemory`] is a list of buckets, this implies that internally it grows one
 /// bucket at time (1024 pages). This implication makes the memory manager ideal for a small number
 /// of memories storing large amounts of data, as opposed to a large number of memories storing
 /// small amounts of data.
@@ -149,8 +149,8 @@ impl<M: Memory> MemoryManager<M> {
     }
 
     /// Returns the memory associated with the given ID.
-    pub fn get(&self, id: MemoryId) -> ManagedMemory<M> {
-        ManagedMemory {
+    pub fn get(&self, id: MemoryId) -> VirtualMemory<M> {
+        VirtualMemory {
             id,
             memory_manager: self.inner.clone(),
         }
@@ -183,12 +183,12 @@ impl Header {
 }
 
 #[derive(Clone)]
-pub struct ManagedMemory<M: Memory> {
+pub struct VirtualMemory<M: Memory> {
     id: MemoryId,
     memory_manager: Rc<RefCell<MemoryManagerInner<M>>>,
 }
 
-impl<M: Memory> Memory for ManagedMemory<M> {
+impl<M: Memory> Memory for VirtualMemory<M> {
     fn size(&self) -> u64 {
         self.memory_manager.borrow().memory_size(self.id)
     }
@@ -441,7 +441,7 @@ struct Segment {
 // ↑               ↑               ↑               ↑
 // Bucket 0        Bucket 1        Bucket 2        Bucket 3
 //
-// The [`ManagedMemory`] is internally divided into fixed-size buckets. In the memory's virtual
+// The [`VirtualMemory`] is internally divided into fixed-size buckets. In the memory's virtual
 // address space, all these buckets are consecutive, but in real memory this may not be the case.
 //
 // A virtual segment would first be split at the bucket boundaries. The example virtual segment

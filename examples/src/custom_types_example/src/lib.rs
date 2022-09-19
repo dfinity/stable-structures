@@ -1,9 +1,9 @@
 use candid::{CandidType, Decode, Deserialize, Encode};
-use ic_stable_structures::memory_manager::{ManagedMemory, MemoryId, MemoryManager};
+use ic_stable_structures::memory_manager::{VirtualMemory, MemoryId, MemoryManager};
 use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap, Storable};
 use std::{borrow::Cow, cell::RefCell};
 
-type Memory = ManagedMemory<DefaultMemoryImpl>;
+type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 const MAX_KEY_SIZE: u32 = 8;
 const MAX_VALUE_SIZE: u32 = 100;

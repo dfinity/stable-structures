@@ -17,7 +17,7 @@ mod tests;
 mod types;
 pub mod vec_mem;
 
-pub use btreemap::StableBTreeMap;
+pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
 #[cfg(target_arch = "wasm32")]
 pub use ic0_memory::Ic0StableMemory;
 pub use storable::Storable;

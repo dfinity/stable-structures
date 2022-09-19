@@ -20,7 +20,7 @@ const MAGIC: &[u8; 3] = b"BTR";
 ///
 /// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
 /// by Cormen et al.
-pub struct StableBTreeMap<M: Memory, K: Storable, V: Storable> {
+pub struct BTreeMap<M: Memory, K: Storable, V: Storable> {
     // The address of the root node. If a root node doesn't exist, the address
     // is set to NULL.
     root_addr: Address,
@@ -61,30 +61,30 @@ impl BTreeHeader {
     }
 }
 
-impl<M: Memory + Clone, K: Storable, V: Storable> StableBTreeMap<M, K, V> {
-    /// Initializes a `StableBTreeMap`.
+impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
+    /// Initializes a `BTreeMap`.
     ///
-    /// If the memory provided already contains a `StableBTreeMap`, then that
-    /// map is loaded. Otherwise, a new `StableBTreeMap` instance is created.
+    /// If the memory provided already contains a `BTreeMap`, then that
+    /// map is loaded. Otherwise, a new `BTreeMap` instance is created.
     pub fn init(memory: M, max_key_size: u32, max_value_size: u32) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
-            return StableBTreeMap::new(memory, max_key_size, max_value_size);
+            return BTreeMap::new(memory, max_key_size, max_value_size);
         }
 
-        // Check if the magic in the memory corresponds to a StableBTreeMap.
+        // Check if the magic in the memory corresponds to a BTreeMap.
         let mut dst = vec![0; 3];
         memory.read(0, &mut dst);
         if dst != MAGIC {
-            // No StableBTreeMap found. Create a new instance.
-            StableBTreeMap::new(memory, max_key_size, max_value_size)
+            // No BTreeMap found. Create a new instance.
+            BTreeMap::new(memory, max_key_size, max_value_size)
         } else {
-            // The memory already contains a StableBTreeMap. Load it.
-            StableBTreeMap::load(memory)
+            // The memory already contains a BTreeMap. Load it.
+            BTreeMap::load(memory)
         }
     }
 
-    /// Creates a new instance a `StableBTreeMap`.
+    /// Creates a new instance a `BTreeMap`.
     ///
     /// The given `memory` is assumed to be exclusively reserved for this data
     /// structure and that it starts at address zero. Typically `memory` will
@@ -931,12 +931,12 @@ mod test {
     #[test]
     fn init_preserves_data() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::init(mem.clone(), 3, 4);
+        let mut btree = BTreeMap::init(mem.clone(), 3, 4);
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
 
         // Reload the btree
-        let btree = StableBTreeMap::init(mem, 3, 4);
+        let btree = BTreeMap::init(mem, 3, 4);
 
         // Data still exists.
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
@@ -945,7 +945,7 @@ mod test {
     #[test]
     fn insert_get() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 3, 4);
+        let mut btree = BTreeMap::new(mem, 3, 4);
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
@@ -954,7 +954,7 @@ mod test {
     #[test]
     fn insert_overwrites_previous_value() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(
@@ -967,7 +967,7 @@ mod test {
     #[test]
     fn insert_get_multiple() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.insert(vec![4, 5], vec![7, 8, 9, 10]), Ok(None));
@@ -980,7 +980,7 @@ mod test {
     #[test]
     fn insert_overwrite_median_key_in_full_child_node() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 1..=17 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1017,7 +1017,7 @@ mod test {
     #[test]
     fn insert_overwrite_key_in_full_root_node() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1041,7 +1041,7 @@ mod test {
     #[test]
     fn allocations() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 0..CAPACITY as u8 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1059,7 +1059,7 @@ mod test {
     #[test]
     fn allocations_2() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
         assert_eq!(btree.insert(vec![], vec![]), Ok(None));
@@ -1072,7 +1072,7 @@ mod test {
     #[test]
     fn insert_same_key_multiple() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         assert_eq!(btree.insert(vec![1], vec![2]), Ok(None));
 
@@ -1084,7 +1084,7 @@ mod test {
     #[test]
     fn insert_split_node() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1106,7 +1106,7 @@ mod test {
     #[test]
     fn overwrite_test() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         let num_elements: u8 = 255;
 
@@ -1131,7 +1131,7 @@ mod test {
     #[test]
     fn insert_split_multiple_nodes() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1242,7 +1242,7 @@ mod test {
     #[test]
     fn remove_simple() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), Ok(None));
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
@@ -1253,7 +1253,7 @@ mod test {
     #[test]
     fn remove_case_2a_and_2c() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5);
+        let mut btree = BTreeMap::new(mem.clone(), 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1297,7 +1297,7 @@ mod test {
         assert_eq!(btree.remove(&vec![5]), Some(vec![]));
 
         // Reload the btree to verify that we saved it correctly.
-        let btree = StableBTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
+        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
 
         // The result should look like this:
         // [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
@@ -1314,7 +1314,7 @@ mod test {
     #[test]
     fn remove_case_2b() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1378,7 +1378,7 @@ mod test {
     #[test]
     fn remove_case_3a_right() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1419,7 +1419,7 @@ mod test {
     #[test]
     fn remove_case_3a_left() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1459,7 +1459,7 @@ mod test {
     #[test]
     fn remove_case_3b_merge_into_right() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5);
+        let mut btree = BTreeMap::new(mem.clone(), 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1502,7 +1502,7 @@ mod test {
         assert_eq!(btree.remove(&vec![3]), Some(vec![]));
 
         // Reload the btree to verify that we saved it correctly.
-        let btree = StableBTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
+        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
 
         // The result should look like this:
         //
@@ -1532,7 +1532,7 @@ mod test {
     #[test]
     fn remove_case_3b_merge_into_left() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5);
+        let mut btree = BTreeMap::new(mem.clone(), 5, 5);
 
         for i in 1..=11 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1577,7 +1577,7 @@ mod test {
         assert_eq!(btree.remove(&vec![10]), Some(vec![]));
 
         // Reload the btree to verify that we saved it correctly.
-        let btree = StableBTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
+        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
 
         // The result should look like this:
         //
@@ -1596,7 +1596,7 @@ mod test {
     #[test]
     fn many_insertions() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5);
+        let mut btree = BTreeMap::new(mem.clone(), 5, 5);
 
         for j in 0..=10 {
             for i in 0..=255 {
@@ -1610,7 +1610,7 @@ mod test {
             }
         }
 
-        let mut btree = StableBTreeMap::load(mem);
+        let mut btree = BTreeMap::load(mem);
 
         for j in 0..=10 {
             for i in 0..=255 {
@@ -1631,7 +1631,7 @@ mod test {
     #[test]
     fn many_insertions_2() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5);
+        let mut btree = BTreeMap::new(mem.clone(), 5, 5);
 
         for j in (0..=10).rev() {
             for i in (0..=255).rev() {
@@ -1645,7 +1645,7 @@ mod test {
             }
         }
 
-        let mut btree = StableBTreeMap::load(mem);
+        let mut btree = BTreeMap::load(mem);
 
         for j in (0..=10).rev() {
             for i in (0..=255).rev() {
@@ -1666,7 +1666,7 @@ mod test {
     #[test]
     fn reloading() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem.clone(), 5, 5);
+        let mut btree = BTreeMap::new(mem.clone(), 5, 5);
 
         // The btree is initially empty.
         assert_eq!(btree.len(), 0);
@@ -1679,19 +1679,19 @@ mod test {
 
         // Reload the btree. The element should still be there, and `len()`
         // should still be `1`.
-        let btree = StableBTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem.clone());
+        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem.clone());
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
         assert_eq!(btree.len(), 1);
         assert!(!btree.is_empty());
 
         // Remove an element. Length should be zero.
-        let mut btree = StableBTreeMap::load(mem.clone());
+        let mut btree = BTreeMap::load(mem.clone());
         assert_eq!(btree.remove(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
         assert_eq!(btree.len(), 0);
         assert!(btree.is_empty());
 
         // Reload. Btree should still be empty.
-        let btree = StableBTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
+        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
         assert_eq!(btree.get(&vec![1, 2, 3]), None);
         assert_eq!(btree.len(), 0);
         assert!(btree.is_empty());
@@ -1700,7 +1700,7 @@ mod test {
     #[test]
     fn len() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 0..1000u32 {
             assert_eq!(btree.insert(i.to_le_bytes().to_vec(), vec![]), Ok(None));
@@ -1720,7 +1720,7 @@ mod test {
     #[test]
     fn contains_key() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         // Insert even numbers from 0 to 1000.
         for i in (0..1000u32).step_by(2) {
@@ -1737,7 +1737,7 @@ mod test {
     #[test]
     fn range_empty() {
         let mem = make_memory();
-        let btree = StableBTreeMap::<_, Vec<u8>, Vec<u8>>::new(mem, 5, 5);
+        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::new(mem, 5, 5);
 
         // Test prefixes that don't exist in the map.
         assert_eq!(btree.range(vec![0], None).collect::<Vec<_>>(), vec![]);
@@ -1751,7 +1751,7 @@ mod test {
     #[test]
     fn range_leaf_prefix_greater_than_all_entries() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         btree.insert(vec![0], vec![]).unwrap();
 
@@ -1763,7 +1763,7 @@ mod test {
     #[test]
     fn range_internal_prefix_greater_than_all_entries() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         for i in 1..=12 {
             assert_eq!(btree.insert(vec![i], vec![]), Ok(None));
@@ -1784,7 +1784,7 @@ mod test {
     #[test]
     fn range_various_prefixes() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         btree.insert(vec![0, 1], vec![]).unwrap();
         btree.insert(vec![0, 2], vec![]).unwrap();
@@ -1846,7 +1846,7 @@ mod test {
     #[test]
     fn range_various_prefixes_2() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         btree.insert(vec![0, 1], vec![]).unwrap();
         btree.insert(vec![0, 2], vec![]).unwrap();
@@ -1956,7 +1956,7 @@ mod test {
     #[test]
     fn range_large() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::<_, Vec<u8>, Vec<u8>>::new(mem, 5, 5);
+        let mut btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::new(mem, 5, 5);
 
         // Insert 1000 elements with prefix 0 and another 1000 elements with prefix 1.
         for prefix in 0..=1 {
@@ -1997,7 +1997,7 @@ mod test {
     #[test]
     fn range_various_prefixes_with_offset() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         btree.insert(vec![0, 1], vec![]).unwrap();
         btree.insert(vec![0, 2], vec![]).unwrap();
@@ -2049,7 +2049,7 @@ mod test {
     #[test]
     fn range_various_prefixes_with_offset_2() {
         let mem = make_memory();
-        let mut btree = StableBTreeMap::new(mem, 5, 5);
+        let mut btree = BTreeMap::new(mem, 5, 5);
 
         btree.insert(vec![0, 1], vec![]).unwrap();
         btree.insert(vec![0, 2], vec![]).unwrap();
