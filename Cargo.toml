@@ -2,6 +2,14 @@
 name = "ic-stable-structures"
 version = "0.1.0"
 edition = "2021"
+description = "A collection of data structures for fearless canister upgrades."
+homepage = "https://docs.rs/ic-stable-structures"
+documentation = "https://docs.rs/ic-stable-structures"
+license = "Apache-2.0"
+readme = "README.md"
+keywords = ["internet-computer", "dfinity", "stable structures"]
+include = ["src", "Cargo.toml", "LICENSE", "README.md"]
+repository = "https://github.com/dfinity/stable-structures"
 
 [dev-dependencies]
 maplit = "1.0.2"
