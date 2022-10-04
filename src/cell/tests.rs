@@ -23,6 +23,13 @@ fn test_cell_init() {
 }
 
 #[test]
+fn test_cell_init_empty() {
+    let mem = VectorMemory::default();
+    let cell = Cell::init(mem, vec![]).unwrap();
+    assert_eq!(Vec::<u8>::new(), *cell.get());
+}
+
+#[test]
 fn test_out_of_space() {
     let mem = RestrictedMemory::new(VectorMemory::default(), 0..1);
     let data = [1u8; 100];
