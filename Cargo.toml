@@ -1,6 +1,6 @@
 [package]
 name = "ic-stable-structures"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A collection of data structures for fearless canister upgrades."
 homepage = "https://docs.rs/ic-stable-structures"
