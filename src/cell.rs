@@ -165,7 +165,7 @@ impl<T: Storable, M: Memory> Cell<T, M> {
         }
         let size = memory.size();
         let available_space = size * WASM_PAGE_SIZE;
-        if len as u64 > available_space.saturating_sub(HEADER_V1_SIZE) {
+        if len as u64 > available_space.saturating_sub(HEADER_V1_SIZE) || size == 0 {
             let grow_by =
                 (len as u64 + HEADER_V1_SIZE + WASM_PAGE_SIZE - size * WASM_PAGE_SIZE - 1)
                     / WASM_PAGE_SIZE;
