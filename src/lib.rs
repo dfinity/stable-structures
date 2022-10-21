@@ -5,21 +5,26 @@
 //!
 //! The data stuctures are designed to directly use stable memory as the backing store, allowing
 //! them to grow to GiBs in size without the need for `pre_upgrade`/`post_upgrade` hooks.
+extern crate core;
+
 pub mod btreemap;
 pub mod cell;
 #[cfg(target_arch = "wasm32")]
 mod ic0_memory; // Memory API for canisters.
 pub mod log;
 pub mod memory_manager;
+pub mod reader;
 pub mod storable;
 #[cfg(test)]
 mod tests;
 mod types;
 pub mod vec_mem;
-
+pub mod writer;
 pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
 #[cfg(target_arch = "wasm32")]
 pub use ic0_memory::Ic0StableMemory;
+use std::error;
+use std::fmt::{Display, Formatter};
 pub use storable::Storable;
 use types::Address;
 pub use vec_mem::VectorMemory;
@@ -78,10 +83,22 @@ fn write_u64<M: Memory>(m: &M, addr: Address, val: u64) {
 }
 
 #[derive(Debug)]
-struct GrowFailed {
+pub struct GrowFailed {
     current_size: u64,
     delta: u64,
 }
+
+impl Display for GrowFailed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Failed to grow memory: current size={}, delta={}",
+            self.current_size, self.delta
+        )
+    }
+}
+
+impl error::Error for GrowFailed {}
 
 /// Writes the bytes at the specified offset, growing the memory size if needed.
 fn safe_write<M: Memory>(memory: &M, offset: u64, bytes: &[u8]) -> Result<(), GrowFailed> {
