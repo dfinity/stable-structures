@@ -25,7 +25,7 @@ proptest! {
     #[test]
     fn should_write_many_slices(
         buffer_size in proptest::option::of(0..2 * WASM_PAGE_SIZE as usize),
-        bytes in proptest::collection::vec(0..u8::MAX, 0..2000),
+        bytes in proptest::collection::vec(0..u8::MAX, 1..2000),
         repetitions in 1..15usize,
         offset in 0..2 * WASM_PAGE_SIZE
     ) {
