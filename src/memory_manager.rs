@@ -99,7 +99,7 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// --------------------------------------------------
 /// Number of allocated buckets           ↕ 2 bytes
 /// --------------------------------------------------
-/// Max number of buckets = N             ↕ 2 bytes
+/// Bucket size (in pages) = N            ↕ 2 bytes
 /// --------------------------------------------------
 /// Reserved space                        ↕ 32 bytes
 /// --------------------------------------------------
@@ -119,15 +119,15 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// --------------------------------------------------
 /// Bucket `MAX_NUM_BUCKETS`              ↕ 1 byte
 /// --------------------------------------------------
-/// Unallocated space
+/// Unallocated space                     ↕ 30'688 bytes
 /// -------------------------------------------------- <- Buckets (Page 1)
 /// Bucket 1                              ↕ 1024 pages
-/// -------------------------------------------------- <- Page 1025
+/// -------------------------------------------------- <- Page N + 1
 /// Bucket 2                              ↕ 1024 pages
 /// --------------------------------------------------
 /// ...
-/// -------------------------------------------------- <- Page ((N - 1) * 1024 + 1)
-/// Bucket N                              ↕ 1024 pages
+/// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
+/// Bucket MAX_NUM_BUCKETS                ↕ 1024 pages
 /// ```
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
