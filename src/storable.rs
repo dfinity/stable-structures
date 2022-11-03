@@ -59,50 +59,50 @@ impl Storable for String {
 
 impl Storable for u128 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        std::borrow::Cow::Owned(self.to_le_bytes().to_vec())
+        std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_le_bytes(bytes.try_into().unwrap())
+        Self::from_be_bytes(bytes.try_into().unwrap())
     }
 }
 
 impl Storable for u64 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        std::borrow::Cow::Owned(self.to_le_bytes().to_vec())
+        std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_le_bytes(bytes.try_into().unwrap())
+        Self::from_be_bytes(bytes.try_into().unwrap())
     }
 }
 
 impl Storable for u32 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        std::borrow::Cow::Owned(self.to_le_bytes().to_vec())
+        std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_le_bytes(bytes.try_into().unwrap())
+        Self::from_be_bytes(bytes.try_into().unwrap())
     }
 }
 
 impl Storable for u16 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        std::borrow::Cow::Owned(self.to_le_bytes().to_vec())
+        std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_le_bytes(bytes.try_into().unwrap())
+        Self::from_be_bytes(bytes.try_into().unwrap())
     }
 }
 
 impl Storable for u8 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        std::borrow::Cow::Owned(self.to_le_bytes().to_vec())
+        std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_le_bytes(bytes.try_into().unwrap())
+        Self::from_be_bytes(bytes.try_into().unwrap())
     }
 }
