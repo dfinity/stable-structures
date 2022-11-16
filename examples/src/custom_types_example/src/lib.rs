@@ -1,11 +1,10 @@
 use candid::{CandidType, Decode, Deserialize, Encode};
-use ic_stable_structures::memory_manager::{VirtualMemory, MemoryId, MemoryManager};
-use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap, Storable};
+use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
+use ic_stable_structures::{BoundedStorable, DefaultMemoryImpl, StableBTreeMap, Storable};
 use std::{borrow::Cow, cell::RefCell};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
-const MAX_KEY_SIZE: u32 = 8;
 const MAX_VALUE_SIZE: u32 = 100;
 
 #[derive(CandidType, Deserialize)]
@@ -15,14 +14,14 @@ struct UserProfile {
 }
 
 // For a type to be used in a `StableBTreeMap`, it needs to implement the `Storable`
-// trait, which specifies how the type can be serialized/deserialized.
+// and `BoundedStorable` traits, which specify how the type can be serialized/deserialized.
 //
 // In this example, we're using candid to serialize/deserialize the struct, but you
 // can use anything as long as you're maintaining backward-compatibility. The
 // backward-compatibility allows you to change your struct over time (e.g. adding
 // new fields).
 //
-// The `Storable` trait is already implemented for many common types (e.g. u64, String),
+// The `Storable` trait is already implemented for several common types (e.g. u64),
 // so you can use those directly without implementing the `Storable` trait for them.
 impl Storable for UserProfile {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
@@ -31,6 +30,12 @@ impl Storable for UserProfile {
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
         Decode!(&bytes, Self).unwrap()
+    }
+}
+
+impl BoundedStorable for UserProfile {
+    fn max_size() -> u32 {
+        MAX_VALUE_SIZE
     }
 }
 
@@ -43,8 +48,6 @@ thread_local! {
     static MAP: RefCell<StableBTreeMap<Memory, u64, UserProfile>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
-            MAX_KEY_SIZE,
-            MAX_VALUE_SIZE
         )
     );
 }

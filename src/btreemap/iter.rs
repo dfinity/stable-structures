@@ -2,7 +2,7 @@ use super::{
     node::{Node, NodeType},
     BTreeMap,
 };
-use crate::{types::NULL, Address, Memory, Storable};
+use crate::{types::NULL, Address, BoundedStorable, Memory};
 
 /// An indicator of the current position in the map.
 pub(crate) enum Cursor {
@@ -18,7 +18,7 @@ pub(crate) enum Index {
 
 /// An iterator over the entries of a [`BTreeMap`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct Iter<'a, M: Memory, K: Storable, V: Storable> {
+pub struct Iter<'a, M: Memory, K: BoundedStorable, V: BoundedStorable> {
     // A reference to the map being iterated on.
     map: &'a BTreeMap<M, K, V>,
 
@@ -34,7 +34,7 @@ pub struct Iter<'a, M: Memory, K: Storable, V: Storable> {
     offset: Option<Vec<u8>>,
 }
 
-impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
+impl<'a, M: Memory, K: BoundedStorable, V: BoundedStorable> Iter<'a, M, K, V> {
     pub(crate) fn new(map: &'a BTreeMap<M, K, V>) -> Self {
         Self {
             map,
@@ -83,7 +83,7 @@ impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     }
 }
 
-impl<M: Memory + Clone, K: Storable, V: Storable> Iterator for Iter<'_, M, K, V> {
+impl<M: Memory + Clone, K: BoundedStorable, V: BoundedStorable> Iterator for Iter<'_, M, K, V> {
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -193,16 +193,16 @@ mod test {
     #[test]
     fn iterate_leaf() {
         let mem = make_memory();
-        let mut btree = BTreeMap::new(mem, 1, 1);
+        let mut btree = BTreeMap::new(mem);
 
         for i in 0..CAPACITY as u8 {
-            btree.insert(vec![i], vec![i + 1]).unwrap();
+            btree.insert(i, i + 1).unwrap();
         }
 
         let mut i = 0;
         for (key, value) in btree.iter() {
-            assert_eq!(key, vec![i]);
-            assert_eq!(value, vec![i + 1]);
+            assert_eq!(key, i);
+            assert_eq!(value, i + 1);
             i += 1;
         }
 
@@ -212,18 +212,18 @@ mod test {
     #[test]
     fn iterate_children() {
         let mem = make_memory();
-        let mut btree = BTreeMap::new(mem, 1, 1);
+        let mut btree = BTreeMap::new(mem);
 
         // Insert the elements in reverse order.
-        for i in (0..100).rev() {
-            btree.insert(vec![i], vec![i + 1]).unwrap();
+        for i in (0..100u64).rev() {
+            btree.insert(i, i + 1).unwrap();
         }
 
         // Iteration should be in ascending order.
         let mut i = 0;
         for (key, value) in btree.iter() {
-            assert_eq!(key, vec![i]);
-            assert_eq!(value, vec![i + 1]);
+            assert_eq!(key, i);
+            assert_eq!(value, i + 1);
             i += 1;
         }
 

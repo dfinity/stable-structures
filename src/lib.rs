@@ -25,7 +25,7 @@ pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
 pub use ic0_memory::Ic0StableMemory;
 use std::error;
 use std::fmt::{Display, Formatter};
-pub use storable::Storable;
+pub use storable::{BoundedStorable, Storable};
 use types::Address;
 pub use vec_mem::VectorMemory;
 
