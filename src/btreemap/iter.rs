@@ -2,7 +2,7 @@ use super::{
     node::{Node, NodeType},
     BTreeMap,
 };
-use crate::{types::NULL, Address, BoundedStorable, Memory};
+use crate::{types::NULL, Address, Memory, Storable};
 
 /// An indicator of the current position in the map.
 pub(crate) enum Cursor {
@@ -18,7 +18,7 @@ pub(crate) enum Index {
 
 /// An iterator over the entries of a [`BTreeMap`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct Iter<'a, M: Memory, K: BoundedStorable, V: BoundedStorable> {
+pub struct Iter<'a, M: Memory, K: Storable, V: Storable> {
     // A reference to the map being iterated on.
     map: &'a BTreeMap<M, K, V>,
 
@@ -34,7 +34,7 @@ pub struct Iter<'a, M: Memory, K: BoundedStorable, V: BoundedStorable> {
     offset: Option<Vec<u8>>,
 }
 
-impl<'a, M: Memory, K: BoundedStorable, V: BoundedStorable> Iter<'a, M, K, V> {
+impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     pub(crate) fn new(map: &'a BTreeMap<M, K, V>) -> Self {
         Self {
             map,
@@ -83,7 +83,7 @@ impl<'a, M: Memory, K: BoundedStorable, V: BoundedStorable> Iter<'a, M, K, V> {
     }
 }
 
-impl<M: Memory + Clone, K: BoundedStorable, V: BoundedStorable> Iterator for Iter<'_, M, K, V> {
+impl<M: Memory + Clone, K: Storable, V: Storable> Iterator for Iter<'_, M, K, V> {
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
