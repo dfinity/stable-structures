@@ -86,6 +86,7 @@ version = "0.2.0"
 dependencies = [
  "maplit",
  "proptest",
+ "tempfile",
 ]
 
 [[package]]
