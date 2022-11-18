@@ -193,16 +193,16 @@ mod test {
     #[test]
     fn iterate_leaf() {
         let mem = make_memory();
-        let mut btree = BTreeMap::new(mem, 1, 1);
+        let mut btree = BTreeMap::new(mem);
 
         for i in 0..CAPACITY as u8 {
-            btree.insert(vec![i], vec![i + 1]).unwrap();
+            btree.insert(i, i + 1).unwrap();
         }
 
         let mut i = 0;
         for (key, value) in btree.iter() {
-            assert_eq!(key, vec![i]);
-            assert_eq!(value, vec![i + 1]);
+            assert_eq!(key, i);
+            assert_eq!(value, i + 1);
             i += 1;
         }
 
@@ -212,18 +212,18 @@ mod test {
     #[test]
     fn iterate_children() {
         let mem = make_memory();
-        let mut btree = BTreeMap::new(mem, 1, 1);
+        let mut btree = BTreeMap::new(mem);
 
         // Insert the elements in reverse order.
-        for i in (0..100).rev() {
-            btree.insert(vec![i], vec![i + 1]).unwrap();
+        for i in (0..100u64).rev() {
+            btree.insert(i, i + 1).unwrap();
         }
 
         // Iteration should be in ascending order.
         let mut i = 0;
         for (key, value) in btree.iter() {
-            assert_eq!(key, vec![i]);
-            assert_eq!(value, vec![i + 1]);
+            assert_eq!(key, i);
+            assert_eq!(value, i + 1);
             i += 1;
         }
 

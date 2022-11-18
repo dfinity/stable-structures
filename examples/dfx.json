@@ -6,6 +6,11 @@
       "package": "basic_example",
       "type": "rust"
     },
+    "vecs_and_strings": {
+      "candid": "src/vecs_and_strings/candid.did",
+      "package": "vecs_and_strings",
+      "type": "rust"
+    },
     "custom_types_example": {
       "candid": "src/custom_types_example/candid.did",
       "package": "custom_types_example",

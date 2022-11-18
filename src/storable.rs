@@ -15,6 +15,12 @@ pub trait Storable {
     fn from_bytes(bytes: Vec<u8>) -> Self;
 }
 
+/// A trait indicating that a `Storable` element is bounded in size.
+pub trait BoundedStorable: Storable {
+    /// The maximum size, in bytes, of the type when serialized.
+    fn max_size() -> u32;
+}
+
 // NOTE: Below are a few implementations of `Storable` for common types.
 // Some of these implementations use `unwrap`, as opposed to returning a `Result`
 // with a possible error. The reason behind this decision is that these
@@ -34,6 +40,12 @@ impl Storable for () {
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
         assert!(bytes.is_empty());
+    }
+}
+
+impl BoundedStorable for () {
+    fn max_size() -> u32 {
+        0
     }
 }
 
@@ -67,6 +79,12 @@ impl Storable for u128 {
     }
 }
 
+impl BoundedStorable for u128 {
+    fn max_size() -> u32 {
+        16
+    }
+}
+
 impl Storable for u64 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
@@ -74,6 +92,12 @@ impl Storable for u64 {
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
+    }
+}
+
+impl BoundedStorable for u64 {
+    fn max_size() -> u32 {
+        8
     }
 }
 
@@ -87,6 +111,12 @@ impl Storable for u32 {
     }
 }
 
+impl BoundedStorable for u32 {
+    fn max_size() -> u32 {
+        4
+    }
+}
+
 impl Storable for u16 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
@@ -97,6 +127,12 @@ impl Storable for u16 {
     }
 }
 
+impl BoundedStorable for u16 {
+    fn max_size() -> u32 {
+        2
+    }
+}
+
 impl Storable for u8 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
@@ -104,5 +140,11 @@ impl Storable for u8 {
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
         Self::from_be_bytes(bytes.try_into().unwrap())
+    }
+}
+
+impl BoundedStorable for u8 {
+    fn max_size() -> u32 {
+        1
     }
 }
