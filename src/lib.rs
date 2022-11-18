@@ -9,6 +9,7 @@ extern crate core;
 
 pub mod btreemap;
 pub mod cell;
+pub mod file_mem;
 #[cfg(target_arch = "wasm32")]
 mod ic0_memory; // Memory API for canisters.
 pub mod log;
@@ -21,6 +22,7 @@ mod types;
 pub mod vec_mem;
 pub mod writer;
 pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
+pub use file_mem::FileMemory;
 #[cfg(target_arch = "wasm32")]
 pub use ic0_memory::Ic0StableMemory;
 use std::error;
@@ -93,7 +95,8 @@ impl Display for GrowFailed {
         write!(
             f,
             "Failed to grow memory: current size={}, delta={}",
-            self.current_size, self.delta
+            self.current_size,
+            self.delta
         )
     }
 }
