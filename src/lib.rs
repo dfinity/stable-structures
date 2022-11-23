@@ -19,6 +19,7 @@ pub mod storable;
 #[cfg(test)]
 mod tests;
 mod types;
+pub mod vec;
 pub mod vec_mem;
 pub mod writer;
 pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
@@ -28,7 +29,7 @@ pub use ic0_memory::Ic0StableMemory;
 use std::error;
 use std::fmt::{Display, Formatter};
 pub use storable::{BoundedStorable, Storable};
-use types::Address;
+use types::{Address, Bytes};
 pub use vec_mem::VectorMemory;
 
 #[cfg(target_arch = "wasm32")]
@@ -144,6 +145,26 @@ fn write<M: Memory>(memory: &M, offset: u64, bytes: &[u8]) {
             current_size + delta,
             delta
         );
+    }
+}
+
+fn copy<T: BoundedStorable, M: Memory>(memory: &M, src: Address, dest: Address, count: u64) {
+    if dest <= src {
+        for i in 0..count {
+            let index = i * T::max_size() as u64;
+            let src_addr = src + Bytes::from(index);
+            let dst_addr = dest + Bytes::from(index);
+            let tmp: T = read_struct(src_addr, memory);
+            write_struct(&tmp, dst_addr, memory);
+        }
+    } else {
+        for i in 0..count {
+            let index = (count - i - 1) * T::max_size() as u64;
+            let src_addr = src + Bytes::from(index);
+            let dst_addr = dest + Bytes::from(index);
+            let tmp: T = read_struct(src_addr, memory);
+            write_struct(&tmp, dst_addr, memory);
+        }
     }
 }
 
