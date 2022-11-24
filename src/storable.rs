@@ -19,10 +19,9 @@ pub trait Storable {
 pub trait BoundedStorable: Storable {
     /// The maximum size, in bytes, of the type when serialized.
     const MAX_SIZE: u32;
-}
 
-pub trait EncodableStorable: BoundedStorable {
-    const FIXED_LEN: bool;
+    /// Indicates if the serialized type has a fixed length.
+    const FIXED_SIZE: bool;
 }
 
 // NOTE: Below are a few implementations of `Storable` for common types.
@@ -49,10 +48,7 @@ impl Storable for () {
 
 impl BoundedStorable for () {
     const MAX_SIZE: u32 = 0;
-}
-
-impl EncodableStorable for () {
-    const FIXED_LEN: bool = true;
+    const FIXED_SIZE: bool = true;
 }
 
 impl Storable for Vec<u8> {
@@ -87,10 +83,7 @@ impl Storable for u128 {
 
 impl BoundedStorable for u128 {
     const MAX_SIZE: u32 = 16;
-}
-
-impl EncodableStorable for u128 {
-    const FIXED_LEN: bool = true;
+    const FIXED_SIZE: bool = true;
 }
 
 impl Storable for u64 {
@@ -105,10 +98,7 @@ impl Storable for u64 {
 
 impl BoundedStorable for u64 {
     const MAX_SIZE: u32 = 8;
-}
-
-impl EncodableStorable for u64 {
-    const FIXED_LEN: bool = true;
+    const FIXED_SIZE: bool = true;
 }
 
 impl Storable for u32 {
@@ -123,10 +113,7 @@ impl Storable for u32 {
 
 impl BoundedStorable for u32 {
     const MAX_SIZE: u32 = 4;
-}
-
-impl EncodableStorable for u32 {
-    const FIXED_LEN: bool = true;
+    const FIXED_SIZE: bool = true;
 }
 
 impl Storable for u16 {
@@ -141,10 +128,7 @@ impl Storable for u16 {
 
 impl BoundedStorable for u16 {
     const MAX_SIZE: u32 = 2;
-}
-
-impl EncodableStorable for u16 {
-    const FIXED_LEN: bool = true;
+    const FIXED_SIZE: bool = true;
 }
 
 impl Storable for u8 {
@@ -159,8 +143,5 @@ impl Storable for u8 {
 
 impl BoundedStorable for u8 {
     const MAX_SIZE: u32 = 1;
-}
-
-impl EncodableStorable for u8 {
-    const FIXED_LEN: bool = true;
+    const FIXED_SIZE: bool = true;
 }

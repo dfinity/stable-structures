@@ -961,6 +961,7 @@ mod test {
     // Make `Vec<u8>` bounded so that it can be used as a key/value in the btree.
     impl BoundedStorable for Vec<u8> {
         const MAX_SIZE: u32 = 10;
+        const FIXED_SIZE: bool = true;
     }
 
     #[test]

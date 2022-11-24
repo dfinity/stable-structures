@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::{
     copy, read_struct, read_u32,
     types::{Address, Bytes},
-    write_struct, write_u32, EncodableStorable, Memory,
+    write_struct, write_u32, BoundedStorable, Memory,
 };
 
 const LAYOUT_VERSION: u8 = 1;
@@ -51,16 +51,17 @@ impl StableVecHeader {
     }
 }
 
-impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
-    const ENTRY_SIZE: usize = (T::MAX_SIZE + if T::FIXED_LEN { 0 } else { 4 }) as usize;
+impl<M: Memory, T: BoundedStorable> StableVec<M, T> {
+    const ENTRY_SIZE: usize = (T::MAX_SIZE + if T::FIXED_SIZE { 0 } else { 4 }) as usize;
 
     #[must_use]
     pub fn new(memory: M) -> Self {
         Self::new_with_sizes(memory, T::MAX_SIZE as u64)
     }
 
+    #[must_use]
     pub fn new_with_sizes(memory: M, max_value_size: u64) -> Self {
-        let heap = Self {
+        let v = Self {
             memory,
             max_value_size,
             base: Address::from(0) + StableVecHeader::size(),
@@ -68,8 +69,8 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
             _phantom: PhantomData,
         };
 
-        heap.save();
-        heap
+        v.save();
+        v
     }
 
     pub fn load(memory: M) -> Self {
@@ -81,7 +82,7 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
         let header: StableVecHeader = read_struct(Address::from(0), &memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
-        assert_eq!(header.fixed_value_size, T::FIXED_LEN);
+        assert_eq!(header.fixed_value_size, T::FIXED_SIZE);
         let expected_value_size = header.max_value_size;
         assert!(
             max_value_size <= expected_value_size,
@@ -103,7 +104,7 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
             magic: *MAGIC,
             version: LAYOUT_VERSION,
             max_value_size: self.max_value_size,
-            fixed_value_size: T::FIXED_LEN,
+            fixed_value_size: T::FIXED_SIZE,
             len: self.len,
             _buffer: [0; 24],
         };
@@ -125,7 +126,7 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
     fn read_value(&self, index: usize) -> T {
         let mut p = self.index_to_entry_addr(index);
         // ret = read_struct(ptr, &self.memory);
-        let mut buf = if T::FIXED_LEN {
+        let mut buf = if T::FIXED_SIZE {
             vec![0; T::MAX_SIZE as usize]
         } else {
             let size = read_u32(&self.memory, p) as usize;
@@ -140,7 +141,7 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
     fn write_value(&mut self, index: usize, value: &T) {
         let value = value.to_bytes();
         let mut p = self.index_to_entry_addr(index);
-        if !T::FIXED_LEN {
+        if !T::FIXED_SIZE {
             write_u32(&self.memory, p, value.len() as u32);
             p += Bytes::from(4u64);
         }
@@ -211,6 +212,10 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
         }
     }
 
+    pub unsafe fn get_unchecked(&self, index: usize) -> T {
+        self.read_value(index)
+    }
+
     pub fn get(&self, index: usize) -> Option<T> {
         if index >= self.len() {
             None
@@ -219,9 +224,9 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
         }
     }
 
-    pub fn set(&mut self, index: usize, value: T) {
+    pub fn set(&mut self, index: usize, value: &T) {
         assert!(index < self.len());
-        self.write_value(index, &value);
+        self.write_value(index, value);
     }
 
     pub fn reserve(&mut self, additional: usize) {
@@ -254,7 +259,7 @@ impl<M, T> StableVec<M, T> {
     }
 }
 
-impl<M: Memory, T: EncodableStorable> From<(M, &[T])> for StableVec<M, T> {
+impl<M: Memory, T: BoundedStorable> From<(M, &[T])> for StableVec<M, T> {
     fn from(s: (M, &[T])) -> Self {
         let mut v: StableVec<M, T> = StableVec::new(s.0);
         for t in s.1 {
@@ -264,7 +269,7 @@ impl<M: Memory, T: EncodableStorable> From<(M, &[T])> for StableVec<M, T> {
     }
 }
 
-impl<M: Memory, T: EncodableStorable, const N: usize> From<(M, [T; N])> for StableVec<M, T> {
+impl<M: Memory, T: BoundedStorable, const N: usize> From<(M, [T; N])> for StableVec<M, T> {
     fn from(s: (M, [T; N])) -> Self {
         let slice: &[T] = &s.1;
         StableVec::from((s.0, slice))

@@ -34,9 +34,8 @@ impl Storable for UserProfile {
 }
 
 impl BoundedStorable for UserProfile {
-    fn max_size() -> u32 {
-        MAX_VALUE_SIZE
-    }
+    const MAX_SIZE: u32 = MAX_VALUE_SIZE;
+    const FIXED_SIZE: bool = false;
 }
 
 thread_local! {

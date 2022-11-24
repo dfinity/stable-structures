@@ -28,7 +28,7 @@ pub use file_mem::FileMemory;
 pub use ic0_memory::Ic0StableMemory;
 use std::error;
 use std::fmt::{Display, Formatter};
-pub use storable::{BoundedStorable, EncodableStorable, Storable};
+pub use storable::{BoundedStorable, Storable};
 use types::{Address, Bytes};
 pub use vec_mem::VectorMemory;
 

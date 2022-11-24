@@ -27,9 +27,8 @@ impl Storable for UserName {
 }
 
 impl BoundedStorable for UserName {
-    fn max_size() -> u32 {
-        MAX_USER_NAME_SIZE
-    }
+    const MAX_SIZE: u32 = MAX_USER_NAME_SIZE;
+    const FIXED_SIZE: bool = false;
 }
 
 struct UserData(Vec<u8>);
@@ -46,9 +45,8 @@ impl Storable for UserData {
 }
 
 impl BoundedStorable for UserData {
-    fn max_size() -> u32 {
-        MAX_USER_DATA_SIZE
-    }
+    const MAX_SIZE: u32 = MAX_USER_DATA_SIZE;
+    const FIXED_SIZE: bool = false;
 }
 
 thread_local! {
