@@ -1,16 +1,16 @@
 use std::marker::PhantomData;
 
 use crate::{
-    copy, read_struct,
+    copy, read_struct, read_u32,
     types::{Address, Bytes},
-    write_struct, EncodableStorable, Memory, read_u32, write_u32,
+    write_struct, write_u32, EncodableStorable, Memory,
 };
 
 const LAYOUT_VERSION: u8 = 1;
 const MAGIC: &[u8; 3] = b"VEC";
 
 /// Memory layout:
-/// 
+///
 /// T::fixed_value_size = true
 /// +--------------------------------------+
 /// | header | val | val | val | val | ... |
@@ -21,7 +21,7 @@ const MAGIC: &[u8; 3] = b"VEC";
 /// | header | [size; val] | [size; val] | ... |
 /// +------------------------------------------+
 /// size: u32
-/// 
+///
 /// Returns the pointer to the entry (read: not necessarily the value).
 pub struct StableVec<M, T> {
     memory: M,
@@ -33,7 +33,6 @@ pub struct StableVec<M, T> {
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<T>,
 }
-
 
 #[repr(packed)]
 struct StableVecHeader {
@@ -53,9 +52,11 @@ impl StableVecHeader {
 }
 
 impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
+    const ENTRY_SIZE: usize = (T::MAX_SIZE + if T::FIXED_LEN { 0 } else { 4 }) as usize;
+
     #[must_use]
     pub fn new(memory: M) -> Self {
-        Self::new_with_sizes(memory, T::max_size() as u64)
+        Self::new_with_sizes(memory, T::MAX_SIZE as u64)
     }
 
     pub fn new_with_sizes(memory: M, max_value_size: u64) -> Self {
@@ -72,7 +73,7 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
     }
 
     pub fn load(memory: M) -> Self {
-        Self::load_with_sizes(memory, T::max_size() as u64)
+        Self::load_with_sizes(memory, T::MAX_SIZE as u64)
     }
 
     pub fn load_with_sizes(memory: M, max_value_size: u64) -> Self {
@@ -117,16 +118,15 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
 
     #[inline]
     fn index_to_entry_addr(&self, index: usize) -> Address {
-        let entry_size = (T::max_size() + if T::FIXED_LEN {0} else {4}) as u64;
-        self.base + Bytes::from(entry_size * (index as u64))
+        self.base + Bytes::from((Self::ENTRY_SIZE * index) as u64)
     }
 
     #[inline]
     fn read_value(&self, index: usize) -> T {
         let mut p = self.index_to_entry_addr(index);
-            // ret = read_struct(ptr, &self.memory);
+        // ret = read_struct(ptr, &self.memory);
         let mut buf = if T::FIXED_LEN {
-            vec![0; T::max_size() as usize] 
+            vec![0; T::MAX_SIZE as usize]
         } else {
             let size = read_u32(&self.memory, p) as usize;
             p += Bytes::from(4u64);
@@ -159,7 +159,13 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
         // Move all entries starting at index one to the right.
         let src = self.index_to_entry_addr(index);
         let dst = self.index_to_entry_addr(index + 1);
-        copy::<T, M>(&self.memory, src, dst, (len - index) as u64);
+        copy(
+            &self.memory,
+            src,
+            dst,
+            (len - index) as u64,
+            Self::ENTRY_SIZE,
+        );
 
         self.write_value(index, element);
 
@@ -168,27 +174,20 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
     }
 
     pub fn remove(&mut self, index: usize) -> T {
-        #[cold]
-        #[inline(never)]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("removal index (is {index}) should be < len (is {len})");
-        }
-
         let len = self.len();
-        if index >= len {
-            assert_failed(index, len);
-        }
+        assert!(index < len);
 
         let ret = self.read_value(index);
 
         // Shift everything down to fill in that spot.
-        copy::<T, M>(
+        copy::<M>(
             &self.memory,
             self.index_to_entry_addr(index + 1),
             self.index_to_entry_addr(index),
             (len - index - 1) as u64,
+            Self::ENTRY_SIZE,
         );
- 
+
         self.len -= 1;
         self.save();
         ret
@@ -230,8 +229,7 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
         let round_up = |x| ((x + page_size - 1) & !(page_size - 1));
 
         // We need to reserve space for the u32 that indicates the size.
-        let entry_size = self.max_value_size + if T::FIXED_LEN {0} else {4};
-        let add_bytes = additional as u64 * entry_size;
+        let add_bytes = (additional * Self::ENTRY_SIZE) as u64;
         let add_pages = round_up(add_bytes) / page_size;
 
         self.memory.grow(add_pages);
@@ -239,18 +237,14 @@ impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        let entry_size = self.max_value_size + if T::FIXED_LEN {0} else {4};
-
         let page_size = 64 * 1024;
         let bytes = self.memory.size() * page_size;
         let free_bytes = bytes - StableVecHeader::size().get();
-        (free_bytes / entry_size) as usize
+        (free_bytes / Self::ENTRY_SIZE as u64) as usize
     }
 }
 
 impl<M, T> StableVec<M, T> {
- 
-
     pub fn len(&self) -> usize {
         self.len
     }
@@ -258,7 +252,6 @@ impl<M, T> StableVec<M, T> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-
 }
 
 impl<M: Memory, T: EncodableStorable> From<(M, &[T])> for StableVec<M, T> {
@@ -271,9 +264,7 @@ impl<M: Memory, T: EncodableStorable> From<(M, &[T])> for StableVec<M, T> {
     }
 }
 
-impl<M: Memory, T: EncodableStorable, const N: usize> From<(M, [T; N])>
-    for StableVec<M, T>
-{
+impl<M: Memory, T: EncodableStorable, const N: usize> From<(M, [T; N])> for StableVec<M, T> {
     fn from(s: (M, [T; N])) -> Self {
         let slice: &[T] = &s.1;
         StableVec::from((s.0, slice))
@@ -348,7 +339,7 @@ mod test {
     pub fn test_load_from_mem() {
         let mem = make_memory();
         {
-            let _v = StableVec::from((mem.clone(), [0u32,1u32,2u32,3u32,4u32]));
+            let _v = StableVec::from((mem.clone(), [0u32, 1u32, 2u32, 3u32, 4u32]));
         }
 
         let mut v: StableVec<Rc<RefCell<Vec<u8>>>, u32> = StableVec::load(mem);
@@ -360,6 +351,5 @@ mod test {
         assert_eq!(v.pop(), Some(0u32));
 
         assert_eq!(v.pop(), None);
-
     }
 }

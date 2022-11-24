@@ -18,7 +18,7 @@ pub trait Storable {
 /// A trait indicating that a `Storable` element is bounded in size.
 pub trait BoundedStorable: Storable {
     /// The maximum size, in bytes, of the type when serialized.
-    fn max_size() -> u32;
+    const MAX_SIZE: u32;
 }
 
 pub trait EncodableStorable: BoundedStorable {
@@ -48,9 +48,7 @@ impl Storable for () {
 }
 
 impl BoundedStorable for () {
-    fn max_size() -> u32 {
-        0
-    }
+    const MAX_SIZE: u32 = 0;
 }
 
 impl EncodableStorable for () {
@@ -88,9 +86,7 @@ impl Storable for u128 {
 }
 
 impl BoundedStorable for u128 {
-    fn max_size() -> u32 {
-        16
-    }
+    const MAX_SIZE: u32 = 16;
 }
 
 impl EncodableStorable for u128 {
@@ -108,9 +104,7 @@ impl Storable for u64 {
 }
 
 impl BoundedStorable for u64 {
-    fn max_size() -> u32 {
-        8
-    }
+    const MAX_SIZE: u32 = 8;
 }
 
 impl EncodableStorable for u64 {
@@ -128,9 +122,7 @@ impl Storable for u32 {
 }
 
 impl BoundedStorable for u32 {
-    fn max_size() -> u32 {
-        4
-    }
+    const MAX_SIZE: u32 = 4;
 }
 
 impl EncodableStorable for u32 {
@@ -148,9 +140,7 @@ impl Storable for u16 {
 }
 
 impl BoundedStorable for u16 {
-    fn max_size() -> u32 {
-        2
-    }
+    const MAX_SIZE: u32 = 2;
 }
 
 impl EncodableStorable for u16 {
@@ -168,9 +158,7 @@ impl Storable for u8 {
 }
 
 impl BoundedStorable for u8 {
-    fn max_size() -> u32 {
-        1
-    }
+    const MAX_SIZE: u32 = 1;
 }
 
 impl EncodableStorable for u8 {

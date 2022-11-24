@@ -28,7 +28,7 @@ pub use file_mem::FileMemory;
 pub use ic0_memory::Ic0StableMemory;
 use std::error;
 use std::fmt::{Display, Formatter};
-pub use storable::{EncodableStorable, BoundedStorable, Storable};
+pub use storable::{BoundedStorable, EncodableStorable, Storable};
 use types::{Address, Bytes};
 pub use vec_mem::VectorMemory;
 
@@ -148,23 +148,22 @@ fn write<M: Memory>(memory: &M, offset: u64, bytes: &[u8]) {
     }
 }
 
-fn copy<T: EncodableStorable, M: Memory>(memory: &M, src: Address, dest: Address, count: u64) {
-    let entry_size = (T::max_size() + if T::FIXED_LEN {0} else {4}) as usize;
+fn copy<M: Memory>(memory: &M, src: Address, dest: Address, count: u64, chunk_size: usize) {
     if dest <= src {
         for i in 0..count {
-            let index = i * entry_size as u64;
+            let index = i * chunk_size as u64;
             let src_addr = src + Bytes::from(index);
             let dst_addr = dest + Bytes::from(index);
-            let mut tmp = vec![0; entry_size];
+            let mut tmp = vec![0; chunk_size];
             memory.read(src_addr.get(), tmp.as_mut());
             memory.write(dst_addr.get(), tmp.as_ref());
         }
     } else {
         for i in 0..count {
-            let index = (count - i - 1) * entry_size as u64;
+            let index = (count - i - 1) * chunk_size as u64;
             let src_addr = src + Bytes::from(index);
             let dst_addr = dest + Bytes::from(index);
-            let mut tmp = vec![0; entry_size];
+            let mut tmp = vec![0; chunk_size];
             memory.read(src_addr.get(), tmp.as_mut());
             memory.write(dst_addr.get(), tmp.as_ref());
         }
