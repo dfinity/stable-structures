@@ -21,6 +21,10 @@ pub trait BoundedStorable: Storable {
     fn max_size() -> u32;
 }
 
+pub trait EncodableStorable: BoundedStorable {
+    const FIXED_LEN: bool;
+}
+
 // NOTE: Below are a few implementations of `Storable` for common types.
 // Some of these implementations use `unwrap`, as opposed to returning a `Result`
 // with a possible error. The reason behind this decision is that these
@@ -47,6 +51,10 @@ impl BoundedStorable for () {
     fn max_size() -> u32 {
         0
     }
+}
+
+impl EncodableStorable for () {
+    const FIXED_LEN: bool = true;
 }
 
 impl Storable for Vec<u8> {
@@ -85,6 +93,10 @@ impl BoundedStorable for u128 {
     }
 }
 
+impl EncodableStorable for u128 {
+    const FIXED_LEN: bool = true;
+}
+
 impl Storable for u64 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
@@ -99,6 +111,10 @@ impl BoundedStorable for u64 {
     fn max_size() -> u32 {
         8
     }
+}
+
+impl EncodableStorable for u64 {
+    const FIXED_LEN: bool = true;
 }
 
 impl Storable for u32 {
@@ -117,6 +133,10 @@ impl BoundedStorable for u32 {
     }
 }
 
+impl EncodableStorable for u32 {
+    const FIXED_LEN: bool = true;
+}
+
 impl Storable for u16 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
@@ -133,6 +153,10 @@ impl BoundedStorable for u16 {
     }
 }
 
+impl EncodableStorable for u16 {
+    const FIXED_LEN: bool = true;
+}
+
 impl Storable for u8 {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         std::borrow::Cow::Owned(self.to_be_bytes().to_vec())
@@ -147,4 +171,8 @@ impl BoundedStorable for u8 {
     fn max_size() -> u32 {
         1
     }
+}
+
+impl EncodableStorable for u8 {
+    const FIXED_LEN: bool = true;
 }

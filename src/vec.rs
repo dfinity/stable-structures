@@ -3,12 +3,26 @@ use std::marker::PhantomData;
 use crate::{
     copy, read_struct,
     types::{Address, Bytes},
-    write_struct, BoundedStorable, Memory,
+    write_struct, EncodableStorable, Memory, read_u32, write_u32,
 };
 
 const LAYOUT_VERSION: u8 = 1;
 const MAGIC: &[u8; 3] = b"VEC";
 
+/// Memory layout:
+/// 
+/// T::fixed_value_size = true
+/// +--------------------------------------+
+/// | header | val | val | val | val | ... |
+/// +--------------------------------------+
+///
+/// T::fixed_value_size = false
+/// +------------------------------------------+
+/// | header | [size; val] | [size; val] | ... |
+/// +------------------------------------------+
+/// size: u32
+/// 
+/// Returns the pointer to the entry (read: not necessarily the value).
 pub struct StableVec<M, T> {
     memory: M,
     max_value_size: u64,
@@ -20,11 +34,13 @@ pub struct StableVec<M, T> {
     _phantom: PhantomData<T>,
 }
 
+
 #[repr(packed)]
 struct StableVecHeader {
     magic: [u8; 3],
     version: u8,
     max_value_size: u64,
+    fixed_value_size: bool,
     len: usize,
     // Additional space reserved to add new fields without breaking backward-compatibility.
     _buffer: [u8; 24],
@@ -36,7 +52,7 @@ impl StableVecHeader {
     }
 }
 
-impl<M: Memory + Clone, T: BoundedStorable> StableVec<M, T> {
+impl<M: Memory, T: EncodableStorable> StableVec<M, T> {
     #[must_use]
     pub fn new(memory: M) -> Self {
         Self::new_with_sizes(memory, T::max_size() as u64)
@@ -64,6 +80,7 @@ impl<M: Memory + Clone, T: BoundedStorable> StableVec<M, T> {
         let header: StableVecHeader = read_struct(Address::from(0), &memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
+        assert_eq!(header.fixed_value_size, T::FIXED_LEN);
         let expected_value_size = header.max_value_size;
         assert!(
             max_value_size <= expected_value_size,
@@ -85,6 +102,7 @@ impl<M: Memory + Clone, T: BoundedStorable> StableVec<M, T> {
             magic: *MAGIC,
             version: LAYOUT_VERSION,
             max_value_size: self.max_value_size,
+            fixed_value_size: T::FIXED_LEN,
             len: self.len,
             _buffer: [0; 24],
         };
@@ -92,54 +110,61 @@ impl<M: Memory + Clone, T: BoundedStorable> StableVec<M, T> {
         write_struct(&header, Address::from(0), &self.memory);
     }
 
-    fn index_to_addr(&self, index: usize) -> Address {
-        self.base + Bytes::from(self.max_value_size * (index as u64))
+    pub fn clear(&mut self) {
+        self.len = 0;
+        self.save();
     }
-}
 
-impl<M: Memory + Clone, T: BoundedStorable> StableVec<M, T> {
     #[inline]
-    pub fn capacity(&self) -> usize {
-        let page_size = 64 * 1024;
-        let bytes = self.memory.size() * page_size;
-        let free_bytes = bytes - StableVecHeader::size().get();
-        (free_bytes / self.max_value_size) as usize
+    fn index_to_entry_addr(&self, index: usize) -> Address {
+        let entry_size = (T::max_size() + if T::FIXED_LEN {0} else {4}) as u64;
+        self.base + Bytes::from(entry_size * (index as u64))
     }
 
-    pub fn reserve(&mut self, additional: usize) {
-        let page_size = 64 * 1024;
-        let round_up = |x| ((x + page_size - 1) & !(page_size - 1));
+    #[inline]
+    fn read_value(&self, index: usize) -> T {
+        let mut p = self.index_to_entry_addr(index);
+            // ret = read_struct(ptr, &self.memory);
+        let mut buf = if T::FIXED_LEN {
+            vec![0; T::max_size() as usize] 
+        } else {
+            let size = read_u32(&self.memory, p) as usize;
+            p += Bytes::from(4u64);
+            vec![0; size]
+        };
+        self.memory.read(p.get(), &mut buf);
+        T::from_bytes(buf)
+    }
 
-        let add_bytes = additional as u64 * self.max_value_size;
-        let add_pages = round_up(add_bytes) / page_size;
-
-        self.memory.grow(add_pages);
+    #[inline]
+    fn write_value(&mut self, index: usize, value: &T) {
+        let value = value.to_bytes();
+        let mut p = self.index_to_entry_addr(index);
+        if !T::FIXED_LEN {
+            write_u32(&self.memory, p, value.len() as u32);
+            p += Bytes::from(4u64);
+        }
+        self.memory.write(p.get(), &value);
     }
 
     pub fn insert(&mut self, index: usize, element: &T) {
-        #[cold]
-        #[inline(never)]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("insertion index (is {index}) should be <= len (is {len})");
-        }
-
         let len = self.len();
-        if index > len {
-            assert_failed(index, len);
-        }
+        assert!(index <= len);
 
         // space for the new element
         if len == self.capacity() {
             self.reserve(1);
         }
 
-        let p = self.index_to_addr(index);
-        let src = p;
-        let dst = p + Bytes::from(self.max_value_size as u64);
+        // Move all entries starting at index one to the right.
+        let src = self.index_to_entry_addr(index);
+        let dst = self.index_to_entry_addr(index + 1);
         copy::<T, M>(&self.memory, src, dst, (len - index) as u64);
-        write_struct(element, p, &self.memory);
+
+        self.write_value(index, element);
 
         self.len += 1;
+        self.save();
     }
 
     pub fn remove(&mut self, index: usize) -> T {
@@ -154,28 +179,26 @@ impl<M: Memory + Clone, T: BoundedStorable> StableVec<M, T> {
             assert_failed(index, len);
         }
 
-        let ret;
-        {
-            let ptr = self.index_to_addr(index);
-            ret = read_struct(ptr, &self.memory);
+        let ret = self.read_value(index);
 
-            // Shift everything down to fill in that spot.
-            copy::<T, M>(
-                &self.memory,
-                self.index_to_addr(index + 1),
-                ptr,
-                (len - index - 1) as u64,
-            );
-        }
+        // Shift everything down to fill in that spot.
+        copy::<T, M>(
+            &self.memory,
+            self.index_to_entry_addr(index + 1),
+            self.index_to_entry_addr(index),
+            (len - index - 1) as u64,
+        );
+ 
         self.len -= 1;
+        self.save();
         ret
     }
 
     #[inline]
     pub fn push(&mut self, value: &T) {
-        let end = self.index_to_addr(self.len);
-        write_struct(value, end, &self.memory);
+        self.write_value(self.len(), value);
         self.len += 1;
+        self.save();
     }
 
     #[inline]
@@ -184,13 +207,49 @@ impl<M: Memory + Clone, T: BoundedStorable> StableVec<M, T> {
             None
         } else {
             self.len -= 1;
-            Some(read_struct(self.index_to_addr(self.len()), &self.memory))
+            self.save();
+            Some(self.read_value(self.len()))
         }
     }
 
-    pub fn clear(&mut self) {
-        self.len = 0;
+    pub fn get(&self, index: usize) -> Option<T> {
+        if index >= self.len() {
+            None
+        } else {
+            Some(self.read_value(index))
+        }
     }
+
+    pub fn set(&mut self, index: usize, value: T) {
+        assert!(index < self.len());
+        self.write_value(index, &value);
+    }
+
+    pub fn reserve(&mut self, additional: usize) {
+        let page_size = 64 * 1024;
+        let round_up = |x| ((x + page_size - 1) & !(page_size - 1));
+
+        // We need to reserve space for the u32 that indicates the size.
+        let entry_size = self.max_value_size + if T::FIXED_LEN {0} else {4};
+        let add_bytes = additional as u64 * entry_size;
+        let add_pages = round_up(add_bytes) / page_size;
+
+        self.memory.grow(add_pages);
+    }
+
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        let entry_size = self.max_value_size + if T::FIXED_LEN {0} else {4};
+
+        let page_size = 64 * 1024;
+        let bytes = self.memory.size() * page_size;
+        let free_bytes = bytes - StableVecHeader::size().get();
+        (free_bytes / entry_size) as usize
+    }
+}
+
+impl<M, T> StableVec<M, T> {
+ 
 
     pub fn len(&self) -> usize {
         self.len
@@ -200,18 +259,9 @@ impl<M: Memory + Clone, T: BoundedStorable> StableVec<M, T> {
         self.len() == 0
     }
 
-    pub fn get(&self, index: usize) -> T {
-        assert!(index < self.len());
-        read_struct(self.index_to_addr(index), &self.memory)
-    }
-
-    pub fn set(&self, index: usize, value: T) {
-        assert!(index < self.len());
-        write_struct(&value, self.index_to_addr(index), &self.memory);
-    }
 }
 
-impl<M: Memory + Clone, T: Clone + BoundedStorable> From<(M, &[T])> for StableVec<M, T> {
+impl<M: Memory, T: EncodableStorable> From<(M, &[T])> for StableVec<M, T> {
     fn from(s: (M, &[T])) -> Self {
         let mut v: StableVec<M, T> = StableVec::new(s.0);
         for t in s.1 {
@@ -221,7 +271,7 @@ impl<M: Memory + Clone, T: Clone + BoundedStorable> From<(M, &[T])> for StableVe
     }
 }
 
-impl<M: Memory + Clone, T: Clone + BoundedStorable, const N: usize> From<(M, [T; N])>
+impl<M: Memory, T: EncodableStorable, const N: usize> From<(M, [T; N])>
     for StableVec<M, T>
 {
     fn from(s: (M, [T; N])) -> Self {
@@ -248,8 +298,8 @@ mod test {
         v.insert(1, &1u32);
 
         assert_eq!(v.len(), 2);
-        assert_eq!(v.get(1), 1);
-        assert_eq!(v.get(0), 0);
+        assert_eq!(v.get(1), Some(1));
+        assert_eq!(v.get(0), Some(0));
     }
 
     #[test]
@@ -258,8 +308,8 @@ mod test {
         let mut v = StableVec::from((mem, [0u32, 1u32]));
 
         assert_eq!(v.len(), 2);
-        assert_eq!(v.get(1), 1);
-        assert_eq!(v.get(0), 0);
+        assert_eq!(v.get(1), Some(1));
+        assert_eq!(v.get(0), Some(0));
 
         assert_eq!(v.remove(0), 0);
         assert_eq!(v.len(), 1);
@@ -292,5 +342,24 @@ mod test {
         assert_eq!(v.pop(), None);
         v.push(&val);
         assert_eq!(v.pop(), Some(val));
+    }
+
+    #[test]
+    pub fn test_load_from_mem() {
+        let mem = make_memory();
+        {
+            let _v = StableVec::from((mem.clone(), [0u32,1u32,2u32,3u32,4u32]));
+        }
+
+        let mut v: StableVec<Rc<RefCell<Vec<u8>>>, u32> = StableVec::load(mem);
+
+        assert_eq!(v.pop(), Some(4u32));
+        assert_eq!(v.pop(), Some(3u32));
+        assert_eq!(v.pop(), Some(2u32));
+        assert_eq!(v.pop(), Some(1u32));
+        assert_eq!(v.pop(), Some(0u32));
+
+        assert_eq!(v.pop(), None);
+
     }
 }
