@@ -1,4 +1,4 @@
-use crate::{BoundedStorable, vec::StableVec, Memory};
+use crate::{vec::Vec as StableVec, BoundedStorable, Memory};
 
 pub struct BinaryHeap<M, T> {
     data: StableVec<M, T>,
@@ -7,7 +7,9 @@ pub struct BinaryHeap<M, T> {
 impl<M: Memory, T: Ord + BoundedStorable> BinaryHeap<M, T> {
     #[must_use]
     pub fn new(memory: M) -> BinaryHeap<M, T> {
-        Self { data: StableVec::new(memory) }
+        Self {
+            data: StableVec::new(memory),
+        }
     }
 
     #[must_use]
@@ -67,7 +69,7 @@ impl<M: Memory, T: Ord + BoundedStorable> BinaryHeap<M, T> {
         assert!(pos < self.len());
         // Take out the value at `pos` and create a hole.
         // SAFETY: Assert guarantees that pos < self.len()
-        let mut hole = unsafe{Hole::new(&mut self.data, pos)};
+        let mut hole = unsafe { Hole::new(&mut self.data, pos) };
 
         while hole.pos() > start {
             let parent = (hole.pos() - 1) / 2;
@@ -195,17 +197,20 @@ impl<M, T> BinaryHeap<M, T> {
     }
 }
 
-
-struct Hole<'a, M, T> 
-where M: Memory, T: BoundedStorable
+struct Hole<'a, M, T>
+where
+    M: Memory,
+    T: BoundedStorable,
 {
     data: &'a mut StableVec<M, T>,
     value: T,
     pos: usize,
 }
 
-impl<'a, M, T> Hole<'a, M, T> 
-where M: Memory, T: BoundedStorable 
+impl<'a, M, T> Hole<'a, M, T>
+where
+    M: Memory,
+    T: BoundedStorable,
 {
     /// Create a new `Hole` at index `pos`.
     ///
@@ -255,7 +260,11 @@ where M: Memory, T: BoundedStorable
     }
 }
 
-impl<M, T> Drop for Hole<'_, M, T> where M: Memory, T: BoundedStorable {
+impl<M, T> Drop for Hole<'_, M, T>
+where
+    M: Memory,
+    T: BoundedStorable,
+{
     #[inline]
     fn drop(&mut self) {
         // fill the hole again
@@ -263,7 +272,11 @@ impl<M, T> Drop for Hole<'_, M, T> where M: Memory, T: BoundedStorable {
     }
 }
 
-impl<M, T: Ord> From<StableVec<M, T>> for BinaryHeap<M, T> where M: Memory, T: BoundedStorable {
+impl<M, T: Ord> From<StableVec<M, T>> for BinaryHeap<M, T>
+where
+    M: Memory,
+    T: BoundedStorable,
+{
     /// Converts a `Vec<T>` into a `BinaryHeap<T>`.
     ///
     /// This conversion happens in-place, and has *O*(*n*) time complexity.
@@ -274,7 +287,9 @@ impl<M, T: Ord> From<StableVec<M, T>> for BinaryHeap<M, T> where M: Memory, T: B
     }
 }
 
-impl<M: Memory + Clone, T: BoundedStorable + Ord, const N: usize> From<(M, [T; N])> for BinaryHeap<M, T> {
+impl<M: Memory + Clone, T: BoundedStorable + Ord, const N: usize> From<(M, [T; N])>
+    for BinaryHeap<M, T>
+{
     fn from(arr: (M, [T; N])) -> Self {
         Self::from(StableVec::from(arr))
     }
@@ -287,5 +302,56 @@ impl<M, T> From<BinaryHeap<M, T>> for StableVec<M, T> {
     /// constant time complexity.
     fn from(heap: BinaryHeap<M, T>) -> StableVec<M, T> {
         heap.data
+    }
+}
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rand::{seq::SliceRandom, thread_rng};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
+        Rc::new(RefCell::new(Vec::new()))
+    }
+
+    #[test]
+    pub fn test_push_pop() {
+        let mem = make_memory();
+        let mut heap = BinaryHeap::new(mem);
+
+        let mut rng = thread_rng();
+        let mut inputs: Vec<u32> = (0..100).collect();
+        inputs.shuffle(&mut rng);
+
+        for i in inputs {
+            heap.push(i);
+        }
+
+        for i in (0..100).rev() {
+            assert_eq!(heap.pop(), Some(i));
+        }
+
+        assert_eq!(heap.pop(), None);
+    }
+
+    #[test]
+    pub fn test_load_from_mem() {
+        let mem = make_memory();
+        {
+            let mut heap = BinaryHeap::from((mem.clone(), [0u32, 1u32, 2u32, 3u32, 4u32]));
+            heap.push(5);
+        }
+
+        let mut heap: BinaryHeap<Rc<RefCell<Vec<u8>>>, u32> = BinaryHeap::load(mem);
+
+        assert_eq!(heap.pop(), Some(5u32));
+        assert_eq!(heap.pop(), Some(4u32));
+        assert_eq!(heap.pop(), Some(3u32));
+        assert_eq!(heap.pop(), Some(2u32));
+        assert_eq!(heap.pop(), Some(1u32));
+        assert_eq!(heap.pop(), Some(0u32));
+
+        assert_eq!(heap.pop(), None);
     }
 }
