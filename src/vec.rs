@@ -23,7 +23,7 @@ const MAGIC: &[u8; 3] = b"VEC";
 /// size: u32
 ///
 /// Returns the pointer to the entry (read: not necessarily the value).
-pub struct StableVec<M, T> {
+pub struct Vec<M, T> {
     memory: M,
     max_value_size: u64,
     base: Address,
@@ -51,7 +51,7 @@ impl StableVecHeader {
     }
 }
 
-impl<M: Memory, T: BoundedStorable> StableVec<M, T> {
+impl<M: Memory, T: BoundedStorable> Vec<M, T> {
     const ENTRY_SIZE: usize = (T::MAX_SIZE + if T::FIXED_SIZE { 0 } else { 4 }) as usize;
 
     #[must_use]
@@ -253,7 +253,7 @@ impl<M: Memory, T: BoundedStorable> StableVec<M, T> {
     }
 }
 
-impl<M, T> StableVec<M, T> {
+impl<M, T> Vec<M, T> {
     pub fn len(&self) -> usize {
         self.len
     }
@@ -263,9 +263,9 @@ impl<M, T> StableVec<M, T> {
     }
 }
 
-impl<M: Memory, T: BoundedStorable> From<(M, &[T])> for StableVec<M, T> {
+impl<M: Memory, T: BoundedStorable> From<(M, &[T])> for Vec<M, T> {
     fn from(s: (M, &[T])) -> Self {
-        let mut v: StableVec<M, T> = StableVec::new(s.0);
+        let mut v: Vec<M, T> = Vec::new(s.0);
         for t in s.1 {
             v.push(t);
         }
@@ -273,10 +273,10 @@ impl<M: Memory, T: BoundedStorable> From<(M, &[T])> for StableVec<M, T> {
     }
 }
 
-impl<M: Memory, T: BoundedStorable, const N: usize> From<(M, [T; N])> for StableVec<M, T> {
+impl<M: Memory, T: BoundedStorable, const N: usize> From<(M, [T; N])> for Vec<M, T> {
     fn from(s: (M, [T; N])) -> Self {
         let slice: &[T] = &s.1;
-        StableVec::from((s.0, slice))
+        Vec::from((s.0, slice))
     }
 }
 
@@ -286,14 +286,14 @@ mod test {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
-        Rc::new(RefCell::new(Vec::new()))
+    fn make_memory() -> Rc<RefCell<std::vec::Vec<u8>>> {
+        Rc::new(RefCell::new(std::vec::Vec::new()))
     }
 
     #[test]
     pub fn test_insert() {
         let mem = make_memory();
-        let mut v = StableVec::new(mem);
+        let mut v = Vec::new(mem);
         v.insert(0, &0u32);
         v.insert(1, &1u32);
 
@@ -305,7 +305,7 @@ mod test {
     #[test]
     pub fn test_remove() {
         let mem = make_memory();
-        let mut v = StableVec::from((mem, [0u32, 1u32]));
+        let mut v = Vec::from((mem, [0u32, 1u32]));
 
         assert_eq!(v.len(), 2);
         assert_eq!(v.get(1), Some(1));
@@ -321,7 +321,7 @@ mod test {
     #[test]
     pub fn test_push_pop() {
         let mem = make_memory();
-        let mut v = StableVec::new(mem);
+        let mut v = Vec::new(mem);
         v.push(&0u32);
         v.push(&1u32);
 
@@ -334,7 +334,7 @@ mod test {
     #[test]
     pub fn test_clear() {
         let mem = make_memory();
-        let mut v = StableVec::from((mem, [0u32, 1u32]));
+        let mut v = Vec::from((mem, [0u32, 1u32]));
 
         v.clear();
 
@@ -348,10 +348,10 @@ mod test {
     pub fn test_load_from_mem() {
         let mem = make_memory();
         {
-            let _v = StableVec::from((mem.clone(), [0u32, 1u32, 2u32, 3u32, 4u32]));
+            let _v = Vec::from((mem.clone(), [0u32, 1u32, 2u32, 3u32, 4u32]));
         }
 
-        let mut v: StableVec<Rc<RefCell<Vec<u8>>>, u32> = StableVec::load(mem);
+        let mut v: Vec<Rc<RefCell<std::vec::Vec<u8>>>, u32> = Vec::load(mem);
 
         assert_eq!(v.pop(), Some(4u32));
         assert_eq!(v.pop(), Some(3u32));
