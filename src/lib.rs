@@ -7,6 +7,7 @@
 //! them to grow to GiBs in size without the need for `pre_upgrade`/`post_upgrade` hooks.
 extern crate core;
 
+pub mod binary_heap;
 pub mod btreemap;
 pub mod cell;
 pub mod file_mem;
