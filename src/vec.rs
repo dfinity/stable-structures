@@ -212,6 +212,10 @@ impl<M: Memory, T: BoundedStorable> StableVec<M, T> {
         }
     }
 
+    /// # Safety
+    ///
+    /// Calling this method with an out-of-bounds index is *[undefined behavior]*
+    /// even if the resulting reference is not used.
     pub unsafe fn get_unchecked(&self, index: usize) -> T {
         self.read_value(index)
     }
