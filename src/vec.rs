@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use crate::{
-    copy, read_struct, read_u32,
+    read_struct, read_u32,
     types::{Address, Bytes},
-    write_struct, write_u32, BoundedStorable, Memory,
+    write_struct, write_u32, BoundedStorable, Memory, WASM_PAGE_SIZE,
 };
 
 const LAYOUT_VERSION: u8 = 1;
@@ -117,12 +117,10 @@ impl<M: Memory, T: BoundedStorable> Vec<M, T> {
         self.save();
     }
 
-    #[inline]
     fn index_to_entry_addr(&self, index: usize) -> Address {
         self.base + Bytes::from((Self::ENTRY_SIZE * index) as u64)
     }
 
-    #[inline]
     fn read_value(&self, index: usize) -> T {
         let mut p = self.index_to_entry_addr(index);
         // ret = read_struct(ptr, &self.memory);
@@ -137,7 +135,6 @@ impl<M: Memory, T: BoundedStorable> Vec<M, T> {
         T::from_bytes(buf)
     }
 
-    #[inline]
     fn write_value(&mut self, index: usize, value: &T) {
         let value = value.to_bytes();
         let mut p = self.index_to_entry_addr(index);
@@ -146,52 +143,6 @@ impl<M: Memory, T: BoundedStorable> Vec<M, T> {
             p += Bytes::from(4u64);
         }
         self.memory.write(p.get(), &value);
-    }
-
-    pub fn insert(&mut self, index: usize, element: &T) {
-        let len = self.len();
-        assert!(index <= len);
-
-        // space for the new element
-        if len == self.capacity() {
-            self.reserve(1);
-        }
-
-        // Move all entries starting at index one to the right.
-        let src = self.index_to_entry_addr(index);
-        let dst = self.index_to_entry_addr(index + 1);
-        copy(
-            &self.memory,
-            src,
-            dst,
-            (len - index) as u64,
-            Self::ENTRY_SIZE,
-        );
-
-        self.write_value(index, element);
-
-        self.len += 1;
-        self.save();
-    }
-
-    pub fn remove(&mut self, index: usize) -> T {
-        let len = self.len();
-        assert!(index < len);
-
-        let ret = self.read_value(index);
-
-        // Shift everything down to fill in that spot.
-        copy::<M>(
-            &self.memory,
-            self.index_to_entry_addr(index + 1),
-            self.index_to_entry_addr(index),
-            (len - index - 1) as u64,
-            Self::ENTRY_SIZE,
-        );
-
-        self.len -= 1;
-        self.save();
-        ret
     }
 
     #[inline]
@@ -234,7 +185,7 @@ impl<M: Memory, T: BoundedStorable> Vec<M, T> {
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        let page_size = 64 * 1024;
+        let page_size = WASM_PAGE_SIZE;
         let round_up = |x| ((x + page_size - 1) & !(page_size - 1));
 
         // We need to reserve space for the u32 that indicates the size.
@@ -246,7 +197,7 @@ impl<M: Memory, T: BoundedStorable> Vec<M, T> {
 
     #[inline]
     pub fn capacity(&self) -> usize {
-        let page_size = 64 * 1024;
+        let page_size = WASM_PAGE_SIZE;
         let bytes = self.memory.size() * page_size;
         let free_bytes = bytes - StableVecHeader::size().get();
         (free_bytes / Self::ENTRY_SIZE as u64) as usize
@@ -288,34 +239,6 @@ mod test {
 
     fn make_memory() -> Rc<RefCell<std::vec::Vec<u8>>> {
         Rc::new(RefCell::new(std::vec::Vec::new()))
-    }
-
-    #[test]
-    pub fn test_insert() {
-        let mem = make_memory();
-        let mut v = Vec::new(mem);
-        v.insert(0, &0u32);
-        v.insert(1, &1u32);
-
-        assert_eq!(v.len(), 2);
-        assert_eq!(v.get(1), Some(1));
-        assert_eq!(v.get(0), Some(0));
-    }
-
-    #[test]
-    pub fn test_remove() {
-        let mem = make_memory();
-        let mut v = Vec::from((mem, [0u32, 1u32]));
-
-        assert_eq!(v.len(), 2);
-        assert_eq!(v.get(1), Some(1));
-        assert_eq!(v.get(0), Some(0));
-
-        assert_eq!(v.remove(0), 0);
-        assert_eq!(v.len(), 1);
-
-        assert_eq!(v.remove(0), 1);
-        assert_eq!(v.len(), 0);
     }
 
     #[test]

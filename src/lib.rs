@@ -29,7 +29,7 @@ pub use ic0_memory::Ic0StableMemory;
 use std::error;
 use std::fmt::{Display, Formatter};
 pub use storable::{BoundedStorable, Storable};
-use types::{Address, Bytes};
+use types::Address;
 pub use vec_mem::VectorMemory;
 
 #[cfg(target_arch = "wasm32")]
@@ -145,28 +145,6 @@ fn write<M: Memory>(memory: &M, offset: u64, bytes: &[u8]) {
             current_size + delta,
             delta
         );
-    }
-}
-
-fn copy<M: Memory>(memory: &M, src: Address, dest: Address, count: u64, chunk_size: usize) {
-    if dest <= src {
-        for i in 0..count {
-            let index = i * chunk_size as u64;
-            let src_addr = src + Bytes::from(index);
-            let dst_addr = dest + Bytes::from(index);
-            let mut tmp = vec![0; chunk_size];
-            memory.read(src_addr.get(), tmp.as_mut());
-            memory.write(dst_addr.get(), tmp.as_ref());
-        }
-    } else {
-        for i in 0..count {
-            let index = (count - i - 1) * chunk_size as u64;
-            let src_addr = src + Bytes::from(index);
-            let dst_addr = dest + Bytes::from(index);
-            let mut tmp = vec![0; chunk_size];
-            memory.read(src_addr.get(), tmp.as_mut());
-            memory.write(dst_addr.get(), tmp.as_ref());
-        }
     }
 }
 
