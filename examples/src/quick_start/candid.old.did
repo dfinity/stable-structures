@@ -1,0 +1,4 @@
+service : {
+    "get": (nat) -> (opt nat) query;
+    "set": (nat, nat) -> (opt nat);
+}
