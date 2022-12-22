@@ -4,7 +4,7 @@
 //! distinct ranges, dedicating each range to a stable structure. This approach has two problems:
 //!
 //! 1. The developer needs to put in advance an upper bound on the memory of each stable structure.
-//! 2. It wastes the canister's memory allocation. For example, if a canister create twos two stable
+//! 2. It wastes the canister's memory allocation. For example, if a canister creates two stable
 //! structures A and B, and gives each one of them a 1GiB region of memory, then writing to B will
 //! require growing > 1GiB of memory just to be able to write to it.
 //!
