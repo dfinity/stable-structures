@@ -14,7 +14,7 @@ use memory::Memory;
 // The state of the canister.
 #[derive(Serialize, Deserialize)]
 struct State {
-    // Data that lives in the heap.
+    // Data that lives on the heap.
     // This is an example for data that would need to be serialized/deserialized
     // on every upgrade for it to be persisted.
     data_on_the_heap: Vec<u8>,
@@ -44,12 +44,13 @@ fn stable_insert(key: u128, value: u128) -> Option<u128> {
         .unwrap()
 }
 
-// Inserts an entry into the map and returns the previous value of the key if it exists.
+// Sets the data that lives on the heap.
 #[update]
 fn set_heap_data(data: Vec<u8>) {
     STATE.with(|s| s.borrow_mut().data_on_the_heap = data);
 }
 
+// Retrieves the data that lives on the heap.
 #[query]
 fn get_heap_data() -> Vec<u8> {
     STATE.with(|s| s.borrow().data_on_the_heap.clone())
