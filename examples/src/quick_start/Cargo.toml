@@ -1,0 +1,17 @@
+[package]
+name = "quick_start"
+version = "0.2.0"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid = "0.7.4"
+# NOTE: A specific commit of ciborium is used that includes efficient serializion/deserialization of
+#       blobs. At the time of this writing, a new version including this commit hasn't yet been released.
+ciborium = { git = "https://github.com/enarx/ciborium", rev = "e719537c99b564c3674a56defe53713c702c6f46" }
+ic-cdk = "0.4"
+ic-cdk-macros = "0.4"
+ic-stable-structures = { path = "../../../" }
+serde = "1.0.132"

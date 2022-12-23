@@ -3,4 +3,5 @@ members = [
     "src/basic_example",
     "src/vecs_and_strings",
     "src/custom_types_example",
+    "src/quick_start",
 ]

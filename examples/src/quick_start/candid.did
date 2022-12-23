@@ -1,0 +1,7 @@
+service : {
+    "stable_get": (nat) -> (opt nat) query;
+    "stable_insert": (nat, nat) -> (opt nat);
+
+    "set_heap_data": (blob) -> ();
+    "get_heap_data": () -> (blob);
+}
