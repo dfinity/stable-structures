@@ -42,6 +42,7 @@ jobs:
 
   benchmark:
     runs-on: ubuntu-latest
+    needs: build
     strategy:
       matrix:
         rust: [ 1.63.0 ]
