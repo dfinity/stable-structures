@@ -19,6 +19,7 @@ pub mod storable;
 #[cfg(test)]
 mod tests;
 mod types;
+pub mod vec;
 pub mod vec_mem;
 pub mod writer;
 pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
@@ -95,8 +96,7 @@ impl Display for GrowFailed {
         write!(
             f,
             "Failed to grow memory: current size={}, delta={}",
-            self.current_size,
-            self.delta
+            self.current_size, self.delta
         )
     }
 }
