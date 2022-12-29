@@ -14,6 +14,7 @@ pub mod file_mem;
 mod ic0_memory; // Memory API for canisters.
 pub mod log;
 pub mod memory_manager;
+mod memory_stats;
 pub mod reader;
 pub mod storable;
 #[cfg(test)]
