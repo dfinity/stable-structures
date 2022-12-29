@@ -40,33 +40,7 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
-  benchmark:
-    runs-on: ubuntu-latest
-    needs: build
-    strategy:
-      matrix:
-        rust: [ 1.63.0 ]
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ matrix.build }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ matrix.build }}-cargo-
-
-      - name: Install Rust
-        run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
-
-      - name: Run benchmark
+      - name: Benchmark
         run: cargo bench
 
   examples:
