@@ -18,7 +18,7 @@ fn btree_insert_bench() {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("BTreeMap::insert", |b| b.iter(|| btree_insert_bench()));
+    c.bench_function("BTreeMap::insert", |b| b.iter(btree_insert_bench));
 }
 
 criterion_group!(benches, criterion_benchmark);
