@@ -1,22 +1,23 @@
 use crate::{Memory, WASM_PAGE_SIZE};
 use std::collections::BTreeMap;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct MemoryStats<M: Memory> {
     memory: M,
 
     // There are behind a RefCell because `read` and `write` don't take a mutable self.
-    read_pages: RefCell<BTreeMap<u64, u64>>,
-    dirty_pages: RefCell<BTreeMap<u64, u64>>,
+    pub read_pages: Rc<RefCell<BTreeMap<u64, u64>>>,
+    pub dirty_pages: Rc<RefCell<BTreeMap<u64, u64>>>,
 }
 
 impl<M: Memory> MemoryStats<M> {
     pub fn new(memory: M) -> Self {
         Self {
             memory,
-            read_pages: RefCell::new(BTreeMap::default()),
-            dirty_pages: RefCell::new(BTreeMap::default()),
+            read_pages: Rc::new(RefCell::new(BTreeMap::default())),
+            dirty_pages: Rc::new(RefCell::new(BTreeMap::default())),
         }
     }
 

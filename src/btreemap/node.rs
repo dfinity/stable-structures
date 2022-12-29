@@ -6,7 +6,7 @@ use crate::{
 
 /// The minimum degree to use in the btree.
 /// This constant is taken from Rust's std implementation of BTreeMap.
-pub const B: u64 = 6;
+pub const B: u64 = 300;
 /// The maximum number of entries per node.
 pub const CAPACITY: u64 = 2 * B - 1;
 const LAYOUT_VERSION: u8 = 1;

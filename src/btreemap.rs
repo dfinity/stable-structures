@@ -2223,4 +2223,35 @@ mod test {
         // Equal key size
         let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem, 4, 3);
     }
+
+    #[test]
+    fn btree_page_counts() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem.clone(), 90, 8);
+
+        let keys_to_keep = 1_000;
+
+        let mut keys = Vec::with_capacity(keys_to_keep);
+
+        use rand::Rng;
+        for _ in 0..1_000_000 {
+            let random_bytes = rand::thread_rng().gen::<[u8; 32]>().to_vec();
+            if keys.len() < keys_to_keep {
+                keys.push(random_bytes.clone());
+            }
+
+            btree.insert(random_bytes, vec![]).unwrap();
+        }
+
+        let mem = crate::memory_stats::MemoryStats::new(mem);
+        let mut btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem.clone(), 90, 8);
+
+        for key in keys.into_iter() {
+            btree.insert(key, vec![1]).unwrap();
+        }
+
+        println!("dirty pages: {:?}", mem.dirty_pages.borrow().len());
+        println!("read pages: {:?}", mem.read_pages.borrow().len());
+        println!("total memory pages: {:?}", mem.size());
+    }
 }

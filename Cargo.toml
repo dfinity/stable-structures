@@ -14,4 +14,8 @@ repository = "https://github.com/dfinity/stable-structures"
 [dev-dependencies]
 maplit = "1.0.2"
 proptest = "0.9.4"
+rand = "0.8.5"
 tempfile = "3.3.0"
+
+[profile.release]
+debug = 1
