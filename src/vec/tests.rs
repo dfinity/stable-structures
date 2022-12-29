@@ -14,7 +14,7 @@ impl<const N: u32> Storable for UnfixedU64<N> {
     }
 
     fn from_bytes(bytes: Vec<u8>) -> Self {
-        assert!(bytes.len() == 8 as usize);
+        assert!(bytes.len() == 8);
         Self(u64::from_bytes(bytes))
     }
 }

@@ -141,6 +141,13 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
         self.memory
     }
 
+    /// Returns true if the vector is empty.
+    ///
+    /// Complexity: O(1)
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns the number of items in the vector.
     ///
     /// Complexity: O(1)
