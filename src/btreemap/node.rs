@@ -1,8 +1,9 @@
 use crate::{
     read_struct, read_u32, read_u64,
     types::{Address, Bytes},
-    write, write_struct, write_u32, Memory,
+    write, write_struct, write_u32, Memory, VectorMemory,
 };
+use std::{cell::RefCell, rc::Rc};
 
 /// The minimum degree to use in the btree.
 /// This constant is taken from Rust's std implementation of BTreeMap.
@@ -56,31 +57,39 @@ impl Node {
         max_key_size: u32,
         max_value_size: u32,
     ) -> Self {
+        let mut offset = Address::from(0);
+
+        // Read the node's bytes from the underlying memory.
+        let node_size = Node::size(max_key_size, max_value_size);
+        let node_bytes: VectorMemory = Rc::new(RefCell::new(vec![0; node_size.get() as usize]));
+        memory.read(address.get(), &mut node_bytes.borrow_mut());
+
         // Load the header.
-        let header: NodeHeader = read_struct(address, memory);
+        let header: NodeHeader = read_struct(offset, &node_bytes);
+        offset += NodeHeader::size();
+
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
         // Load the entries.
-        let mut entries = vec![];
-        let mut offset = NodeHeader::size();
+        let mut entries = Vec::with_capacity(header.num_entries as usize);
         for _ in 0..header.num_entries {
             // Read the key's size.
-            let key_size = read_u32(memory, address + offset);
+            let key_size = read_u32(&node_bytes, offset);
             offset += U32_SIZE;
 
             // Read the key.
             let mut key = vec![0; key_size as usize];
-            memory.read((address + offset).get(), &mut key);
+            node_bytes.read(offset.get(), &mut key);
             offset += Bytes::from(max_key_size as u64);
 
             // Read the value's size.
-            let value_size = read_u32(memory, address + offset);
+            let value_size = read_u32(&node_bytes, offset);
             offset += U32_SIZE;
 
             // Read the value.
             let mut value = vec![0; value_size as usize];
-            memory.read((address + offset).get(), &mut value);
+            node_bytes.read(offset.get(), &mut value);
             offset += Bytes::from(max_value_size as u64);
 
             entries.push((key, value));
@@ -91,7 +100,7 @@ impl Node {
         if header.node_type == INTERNAL_NODE_TYPE {
             // The number of children is equal to the number of entries + 1.
             for _ in 0..header.num_entries + 1 {
-                let child = Address::from(read_u64(memory, address + offset));
+                let child = Address::from(read_u64(&node_bytes, offset));
                 offset += Address::size();
                 children.push(child);
             }
@@ -130,6 +139,9 @@ impl Node {
         // Assert entries are sorted in strictly increasing order.
         assert!(self.entries.windows(2).all(|e| e[0].0 < e[1].0));
 
+        let mut offset = Address::from(0);
+        let node_bytes: VectorMemory = Rc::new(RefCell::new(vec![]));
+
         let header = NodeHeader {
             magic: *MAGIC,
             version: LAYOUT_VERSION,
@@ -140,38 +152,39 @@ impl Node {
             num_entries: self.entries.len() as u16,
         };
 
-        write_struct(&header, self.address, memory);
-
-        let mut offset = NodeHeader::size();
+        // Write the header.
+        write_struct(&header, offset, &node_bytes);
+        offset += NodeHeader::size();
 
         // Write the entries.
         for (key, value) in self.entries.iter() {
             // Write the size of the key.
-            write_u32(memory, self.address + offset, key.len() as u32);
+            write_u32(&node_bytes, offset, key.len() as u32);
             offset += U32_SIZE;
 
             // Write the key.
-            write(memory, (self.address + offset).get(), key);
+            write(&node_bytes, offset.get(), key);
             offset += Bytes::from(self.max_key_size);
 
             // Write the size of the value.
-            write_u32(memory, self.address + offset, value.len() as u32);
+            write_u32(&node_bytes, offset, value.len() as u32);
             offset += U32_SIZE;
 
             // Write the value.
-            write(memory, (self.address + offset).get(), value);
+            write(&node_bytes, offset.get(), value);
             offset += Bytes::from(self.max_value_size);
         }
 
         // Write the children
         for child in self.children.iter() {
-            write(
-                memory,
-                (self.address + offset).get(),
-                &child.get().to_le_bytes(),
-            );
+            write(&node_bytes, offset.get(), &child.get().to_le_bytes());
             offset += Address::size();
         }
+
+        // Write the node's bytes into memory.
+        // The node's bytes are trimmed to not write unnecessary data.
+        let _ = node_bytes.borrow_mut().split_off(offset.get() as usize);
+        write(memory, self.address.get(), &node_bytes.borrow());
     }
 
     /// Returns the entry with the max key in the subtree.
