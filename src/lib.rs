@@ -20,6 +20,7 @@ pub mod storable;
 mod tests;
 mod types;
 pub mod vec;
+pub use vec::{Vec as StableVec, Vec};
 pub mod vec_mem;
 pub mod writer;
 pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
