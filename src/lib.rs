@@ -19,6 +19,8 @@ pub mod storable;
 #[cfg(test)]
 mod tests;
 mod types;
+pub mod vec;
+pub use vec::{Vec as StableVec, Vec};
 pub mod vec_mem;
 pub mod writer;
 pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
@@ -84,7 +86,7 @@ fn write_u64<M: Memory>(m: &M, addr: Address, val: u64) {
     write(m, addr.get(), &val.to_le_bytes());
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct GrowFailed {
     current_size: u64,
     delta: u64,

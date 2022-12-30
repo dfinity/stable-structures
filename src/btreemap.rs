@@ -67,7 +67,7 @@ impl<M: Memory + Clone, K: BoundedStorable, V: BoundedStorable> BTreeMap<M, K, V
     /// If the memory provided already contains a `BTreeMap`, then that
     /// map is loaded. Otherwise, a new `BTreeMap` instance is created.
     pub fn init(memory: M) -> Self {
-        Self::init_with_sizes(memory, K::max_size(), V::max_size())
+        Self::init_with_sizes(memory, K::MAX_SIZE, V::MAX_SIZE)
     }
 
     /// Creates a new instance a `BTreeMap`.
@@ -82,12 +82,12 @@ impl<M: Memory + Clone, K: BoundedStorable, V: BoundedStorable> BTreeMap<M, K, V
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
-        Self::new_with_sizes(memory, K::max_size(), V::max_size())
+        Self::new_with_sizes(memory, K::MAX_SIZE, V::MAX_SIZE)
     }
 
     /// Loads the map from memory.
     pub fn load(memory: M) -> Self {
-        Self::load_with_sizes(memory, K::max_size(), V::max_size())
+        Self::load_with_sizes(memory, K::MAX_SIZE, V::MAX_SIZE)
     }
 }
 
@@ -960,9 +960,8 @@ mod test {
 
     // Make `Vec<u8>` bounded so that it can be used as a key/value in the btree.
     impl BoundedStorable for Vec<u8> {
-        fn max_size() -> u32 {
-            10
-        }
+        const MAX_SIZE: u32 = 10;
+        const IS_FIXED_SIZE: bool = false;
     }
 
     #[test]
