@@ -64,7 +64,7 @@ struct HeaderV1 {
 pub enum InitError {
     /// The memory already contains another data structure.
     /// Use [Vec::new] to overwrite it.
-    BadMagic,
+    BadMagic([u8; 3]),
     /// The current version of [Vec] does not support the of the
     /// memory layout.
     IncompatibleVersion {
@@ -118,7 +118,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
         }
         let header = Self::read_header(&memory);
         if header.magic != MAGIC {
-            return Err(InitError::BadMagic);
+            return Err(InitError::BadMagic(header.magic));
         }
         if header.version != LAYOUT_VERSION {
             return Err(InitError::IncompatibleVersion {

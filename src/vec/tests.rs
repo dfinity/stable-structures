@@ -1,6 +1,7 @@
 use super::{InitError, Vec as StableVec};
 use crate::storable::{BoundedStorable, Storable};
 use crate::vec_mem::VectorMemory as M;
+use crate::{GrowFailed, Memory};
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
 use std::fmt::Debug;
@@ -110,5 +111,56 @@ fn test_init_type_compatibility() {
     assert_eq!(
         StableVec::<UnfixedU64<8>, M>::init(v.forget()).unwrap_err(),
         InitError::IncompatibleElementType
+    );
+}
+
+#[test]
+fn test_init_failures() {
+    struct EmptyMem;
+    impl Memory for EmptyMem {
+        fn size(&self) -> u64 {
+            0
+        }
+        fn grow(&self, _: u64) -> i64 {
+            -1
+        }
+        fn read(&self, _: u64, _: &mut [u8]) {
+            panic!("out of bounds")
+        }
+        fn write(&self, _: u64, _: &[u8]) {
+            panic!("out of bounds")
+        }
+    }
+
+    assert_eq!(
+        StableVec::<u64, EmptyMem>::new(EmptyMem).unwrap_err(),
+        GrowFailed {
+            current_size: 0,
+            delta: 1
+        }
+    );
+
+    assert_eq!(
+        StableVec::<u64, EmptyMem>::init(EmptyMem).unwrap_err(),
+        InitError::OutOfMemory,
+    );
+
+    let mem = M::default();
+    mem.grow(1);
+    mem.write(0, b"SIC\x01\x08\x00\x00\x00\x00\x00\x00\x00\x01");
+    assert_eq!(
+        StableVec::<u64, M>::init(mem).unwrap_err(),
+        InitError::BadMagic(*b"SIC"),
+    );
+
+    let mem = M::default();
+    mem.grow(1);
+    mem.write(0, b"SVC\x0f\x08\x00\x00\x00\x00\x00\x00\x00\x01");
+    assert_eq!(
+        StableVec::<u64, M>::init(mem).unwrap_err(),
+        InitError::IncompatibleVersion {
+            last_supported_version: 1,
+            decoded_version: 15
+        },
     );
 }

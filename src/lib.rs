@@ -86,7 +86,7 @@ fn write_u64<M: Memory>(m: &M, addr: Address, val: u64) {
     write(m, addr.get(), &val.to_le_bytes());
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct GrowFailed {
     current_size: u64,
     delta: u64,
