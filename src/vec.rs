@@ -67,10 +67,7 @@ pub enum InitError {
     BadMagic([u8; 3]),
     /// The current version of [Vec] does not support the of the
     /// memory layout.
-    IncompatibleVersion {
-        last_supported_version: u8,
-        decoded_version: u8,
-    },
+    IncompatibleVersion(u8),
     /// The vector type is not compatible with the current vector
     /// layout: MAX_SIZE and/or IS_FIXED_SIZE differ from the original
     /// initialization parameters.
@@ -78,6 +75,27 @@ pub enum InitError {
     /// Failed to allocate memory for the vector.
     OutOfMemory,
 }
+
+impl fmt::Display for InitError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BadMagic(magic) => {
+                write!(fmt, "bad magic number {:?}, expected {:?}", magic, MAGIC)
+            }
+            Self::IncompatibleVersion(version)
+            => write!(
+                fmt,
+                "unsupported layout version {}; supported version numbers are 1..={}",
+                version, LAYOUT_VERSION
+            ),
+            Self::IncompatibleElementType =>
+                write!(fmt, "either MAX_SIZE or IS_FIXED_SIZE of the element type do not match the persisted vector attributes"),
+            Self::OutOfMemory => write!(fmt, "failed to allocate memory for vector metadata"),
+        }
+    }
+}
+
+impl std::error::Error for InitError {}
 
 /// An implementation of growable arrays in stable memory.
 pub struct Vec<T: BoundedStorable, M: Memory> {
@@ -121,10 +139,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
             return Err(InitError::BadMagic(header.magic));
         }
         if header.version != LAYOUT_VERSION {
-            return Err(InitError::IncompatibleVersion {
-                last_supported_version: LAYOUT_VERSION,
-                decoded_version: header.version,
-            });
+            return Err(InitError::IncompatibleVersion(header.version));
         }
         if header.max_size != T::MAX_SIZE || header.is_fixed_size != T::IS_FIXED_SIZE {
             return Err(InitError::IncompatibleElementType);

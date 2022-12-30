@@ -158,9 +158,6 @@ fn test_init_failures() {
     mem.write(0, b"SVC\x0f\x08\x00\x00\x00\x00\x00\x00\x00\x01");
     assert_eq!(
         StableVec::<u64, M>::init(mem).unwrap_err(),
-        InitError::IncompatibleVersion {
-            last_supported_version: 1,
-            decoded_version: 15
-        },
+        InitError::IncompatibleVersion(15),
     );
 }
