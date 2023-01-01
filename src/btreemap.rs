@@ -5,7 +5,7 @@ mod node;
 use crate::{
     read_struct,
     types::{Address, Bytes, NULL},
-    write_struct, BoundedStorable, Memory, Storable,
+    write_struct, BoundedStorable, Memory,
 };
 use allocator::Allocator;
 pub use iter::Iter;
@@ -20,7 +20,7 @@ const MAGIC: &[u8; 3] = b"BTR";
 ///
 /// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
 /// by Cormen et al.
-pub struct BTreeMap<M: Memory, K: Storable, V: Storable> {
+pub struct BTreeMap<K: BoundedStorable, V: BoundedStorable, M: Memory> {
     // The address of the root node. If a root node doesn't exist, the address
     // is set to NULL.
     root_addr: Address,
@@ -36,8 +36,6 @@ pub struct BTreeMap<M: Memory, K: Storable, V: Storable> {
 
     // The number of elements in the map.
     length: u64,
-
-    memory: M,
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
@@ -61,7 +59,7 @@ impl BTreeHeader {
     }
 }
 
-impl<M: Memory + Clone, K: BoundedStorable, V: BoundedStorable> BTreeMap<M, K, V> {
+impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     /// Initializes a `BTreeMap`.
     ///
     /// If the memory provided already contains a `BTreeMap`, then that
@@ -91,7 +89,7 @@ impl<M: Memory + Clone, K: BoundedStorable, V: BoundedStorable> BTreeMap<M, K, V
     }
 }
 
-impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
+impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     /// Similar to `init` but with explicit max key/value sizes.
     pub fn init_with_sizes(memory: M, max_key_size: u32, max_value_size: u32) -> Self {
         if memory.size() == 0 {
@@ -119,7 +117,6 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
         let allocator_addr = Address::from(0) + BTreeHeader::size();
 
         let btree = Self {
-            memory: memory.clone(),
             root_addr: NULL,
             allocator: Allocator::new(
                 memory,
@@ -158,7 +155,6 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
 
         let allocator_addr = Address::from(0) + BTreeHeader::size();
         Self {
-            memory: memory.clone(),
             root_addr: header.root_addr,
             allocator: Allocator::load(memory, allocator_addr),
             max_key_size: header.max_key_size,
@@ -211,7 +207,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
             if let Ok(idx) = root.get_key_idx(&key) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value));
-                root.save(&self.memory);
+                root.save(self.memory());
                 return Ok(Some(V::from_bytes(previous_value)));
             }
 
@@ -255,7 +251,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                 // Overwrite it and return the previous value.
                 let (_, previous_value) = node.swap_entry(idx, (key, value));
 
-                node.save(&self.memory);
+                node.save(self.memory());
                 Some(previous_value)
             }
             Err(idx) => {
@@ -266,7 +262,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
                         node.entries.insert(idx, (key, value));
-                        node.save(&self.memory);
+                        node.save(self.memory());
 
                         // Update the length.
                         self.length += 1;
@@ -285,7 +281,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                             if let Ok(idx) = child.get_key_idx(&key) {
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) = child.swap_entry(idx, (key, value));
-                                child.save(&self.memory);
+                                child.save(self.memory());
                                 return Some(previous_value);
                             }
 
@@ -354,9 +350,9 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
         node.entries
             .insert(full_child_idx, (median_key, median_value));
 
-        sibling.save(&self.memory);
-        full_child.save(&self.memory);
-        node.save(&self.memory);
+        sibling.save(self.memory());
+        full_child.save(self.memory());
+        node.save(self.memory());
     }
 
     /// Returns the value associated with the given key if it exists.
@@ -400,9 +396,13 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
         self.length
     }
 
-    /// Returns a reference to the memory used by the map.
-    pub fn get_memory(&self) -> M {
-        self.memory.clone()
+    /// Returns the underlying memory.
+    pub fn forget(self) -> M {
+        self.allocator.forget()
+    }
+
+    fn memory(&self) -> &M {
+        self.allocator.memory()
     }
 
     /// Removes a key from the map, returning the previous value at the key if it exists.
@@ -447,7 +447,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                             self.allocator.deallocate(node.address);
                             self.root_addr = NULL;
                         } else {
-                            node.save(&self.memory);
+                            node.save(self.memory());
                         }
 
                         self.save();
@@ -486,14 +486,14 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
 
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = left_child.get_max(&self.memory);
+                            let predecessor = left_child.get_max(self.memory());
                             self.remove_helper(node.children[idx], &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
                             let (_, old_value) = node.swap_entry(idx, predecessor);
 
                             // Save the parent node.
-                            node.save(&self.memory);
+                            node.save(self.memory());
                             return Some(old_value);
                         }
 
@@ -522,14 +522,14 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
 
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let successor = right_child.get_min(&self.memory);
+                            let successor = right_child.get_min(self.memory());
                             self.remove_helper(node.children[idx + 1], &successor.0)?;
 
                             // Replace the `key` with its successor.
                             let (_, old_value) = node.swap_entry(idx, successor);
 
                             // Save the parent node.
-                            node.save(&self.memory);
+                            node.save(self.memory());
                             return Some(old_value);
                         }
 
@@ -574,8 +574,8 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                             self.save();
                         }
 
-                        node.save(&self.memory);
-                        new_child.save(&self.memory);
+                        node.save(self.memory());
+                        new_child.save(self.memory());
 
                         // Recursively delete the key.
                         self.remove_helper(new_child.address, key)
@@ -650,9 +650,9 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                                     assert_eq!(child.node_type, NodeType::Leaf);
                                 }
 
-                                left_sibling.save(&self.memory);
-                                child.save(&self.memory);
-                                node.save(&self.memory);
+                                left_sibling.save(self.memory());
+                                child.save(self.memory());
+                                node.save(self.memory());
                                 return self.remove_helper(child.address, key);
                             }
                         }
@@ -701,9 +701,9 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                                     }
                                 }
 
-                                right_sibling.save(&self.memory);
-                                child.save(&self.memory);
-                                node.save(&self.memory);
+                                right_sibling.save(self.memory());
+                                child.save(self.memory());
+                                node.save(self.memory());
                                 return self.remove_helper(child.address, key);
                             }
                         }
@@ -727,7 +727,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                                     self.save();
                                 }
                             } else {
-                                node.save(&self.memory);
+                                node.save(self.memory());
                             }
 
                             return self.remove_helper(left_sibling_address, key);
@@ -751,7 +751,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
                                     self.save();
                                 }
                             } else {
-                                node.save(&self.memory);
+                                node.save(self.memory());
                             }
 
                             return self.remove_helper(right_sibling_address, key);
@@ -765,7 +765,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
     }
 
     /// Returns an iterator over the entries of the map, sorted by key.
-    pub fn iter(&self) -> Iter<M, K, V> {
+    pub fn iter(&self) -> Iter<K, V, M> {
         Iter::new(self)
     }
 
@@ -773,7 +773,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
     /// If the optional `offset` is set, the iterator returned will start from the entry that
     /// contains this `offset` (while still iterating over all remaining entries that begin
     /// with the given `prefix`).
-    pub fn range(&self, prefix: Vec<u8>, offset: Option<Vec<u8>>) -> Iter<M, K, V> {
+    pub fn range(&self, prefix: Vec<u8>, offset: Option<Vec<u8>>) -> Iter<K, V, M> {
         if self.root_addr == NULL {
             // Map is empty.
             return Iter::null(self);
@@ -872,7 +872,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
         // Move the children (if any exist).
         lower.children.append(&mut higher.children);
 
-        lower.save(&self.memory);
+        lower.save(self.memory());
 
         self.allocator.deallocate(source_address);
         lower
@@ -892,7 +892,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
     fn load_node(&self, address: Address) -> Node {
         Node::load(
             address,
-            &self.memory,
+            self.memory(),
             self.max_key_size,
             self.max_value_size,
         )
@@ -910,7 +910,7 @@ impl<M: Memory + Clone, K: Storable, V: Storable> BTreeMap<M, K, V> {
             _buffer: [0; 24],
         };
 
-        write_struct(&header, Address::from(0), &self.memory);
+        write_struct(&header, Address::from(0), self.memory());
     }
 }
 
@@ -1333,7 +1333,7 @@ mod test {
         assert_eq!(btree.remove(&vec![5]), Some(vec![]));
 
         // Reload the btree to verify that we saved it correctly.
-        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
+        let btree = BTreeMap::<Vec<u8>, Vec<u8>, _>::load(mem);
 
         // The result should look like this:
         // [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
@@ -1538,7 +1538,7 @@ mod test {
         assert_eq!(btree.remove(&vec![3]), Some(vec![]));
 
         // Reload the btree to verify that we saved it correctly.
-        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
+        let btree = BTreeMap::<Vec<u8>, Vec<u8>, _>::load(mem);
 
         // The result should look like this:
         //
@@ -1613,7 +1613,7 @@ mod test {
         assert_eq!(btree.remove(&vec![10]), Some(vec![]));
 
         // Reload the btree to verify that we saved it correctly.
-        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
+        let btree = BTreeMap::<Vec<u8>, Vec<u8>, _>::load(mem);
 
         // The result should look like this:
         //
@@ -1715,7 +1715,7 @@ mod test {
 
         // Reload the btree. The element should still be there, and `len()`
         // should still be `1`.
-        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem.clone());
+        let btree = BTreeMap::<Vec<u8>, Vec<u8>, _>::load(mem.clone());
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
         assert_eq!(btree.len(), 1);
         assert!(!btree.is_empty());
@@ -1727,7 +1727,7 @@ mod test {
         assert!(btree.is_empty());
 
         // Reload. Btree should still be empty.
-        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::load(mem);
+        let btree = BTreeMap::<Vec<u8>, Vec<u8>, _>::load(mem);
         assert_eq!(btree.get(&vec![1, 2, 3]), None);
         assert_eq!(btree.len(), 0);
         assert!(btree.is_empty());
@@ -1773,7 +1773,7 @@ mod test {
     #[test]
     fn range_empty() {
         let mem = make_memory();
-        let btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::new(mem);
+        let btree = BTreeMap::<Vec<u8>, Vec<u8>, _>::new(mem);
 
         // Test prefixes that don't exist in the map.
         assert_eq!(btree.range(vec![0], None).collect::<Vec<_>>(), vec![]);
@@ -1992,7 +1992,7 @@ mod test {
     #[test]
     fn range_large() {
         let mem = make_memory();
-        let mut btree = BTreeMap::<_, Vec<u8>, Vec<u8>>::new(mem);
+        let mut btree = BTreeMap::<Vec<u8>, Vec<u8>, _>::new(mem);
 
         // Insert 1000 elements with prefix 0 and another 1000 elements with prefix 1.
         for prefix in 0..=1 {
@@ -2191,35 +2191,35 @@ mod test {
     #[should_panic(expected = "max_key_size must be <= 4")]
     fn rejects_larger_key_sizes() {
         let mem = make_memory();
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem, 5, 3);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 5, 3);
     }
 
     #[test]
     fn accepts_small_or_equal_key_sizes() {
         let mem = make_memory();
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
         // Smaller key size
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem.clone(), 3, 3);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 3, 3);
         // Equal key size
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem, 4, 3);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 4, 3);
     }
 
     #[test]
     #[should_panic(expected = "max_value_size must be <= 3")]
     fn rejects_larger_value_sizes() {
         let mem = make_memory();
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem, 4, 4);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 4, 4);
     }
 
     #[test]
     fn accepts_small_or_equal_value_sizes() {
         let mem = make_memory();
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
         // Smaller key size
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem.clone(), 4, 2);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 2);
         // Equal key size
-        let _btree: BTreeMap<_, Vec<u8>, Vec<u8>> = BTreeMap::init_with_sizes(mem, 4, 3);
+        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 4, 3);
     }
 }

@@ -228,6 +228,18 @@ impl<M: Memory> Allocator<M> {
     fn chunk_size(&self) -> Bytes {
         self.allocation_size + ChunkHeader::size()
     }
+
+    /// Destroys the allocator and returns the underlying memory.
+    #[inline]
+    pub fn forget(self) -> M {
+        self.memory
+    }
+
+    /// Returns a reference to the underlying memory.
+    #[inline]
+    pub fn memory(&self) -> &M {
+        &self.memory
+    }
 }
 
 #[derive(Debug)]
