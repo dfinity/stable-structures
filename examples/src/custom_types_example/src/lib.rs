@@ -44,7 +44,7 @@ thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 
-    static MAP: RefCell<StableBTreeMap<Memory, u64, UserProfile>> = RefCell::new(
+    static MAP: RefCell<StableBTreeMap<u64, UserProfile, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
         )
