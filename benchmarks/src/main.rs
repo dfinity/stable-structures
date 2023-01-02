@@ -1,15 +1,15 @@
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
 use tiny_rng::{Rand, Rng};
 
-/// Benchmarks inserting 1000 keys into a BTreeMap.
+/// Benchmarks inserting keys into a BTreeMap.
 #[ic_cdk_macros::query]
 pub fn btreemap_insert() -> u64 {
     let mut btree: BTreeMap<_, u64, ()> = BTreeMap::init(DefaultMemoryImpl::default());
 
-    // Generate 1000 keys
+    let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
-    let mut random_keys = Vec::with_capacity(1000);
-    for _ in 0..1_000 {
+    let mut random_keys = Vec::with_capacity(num_keys);
+    for _ in 0..num_keys {
         random_keys.push(rng.rand_u64());
     }
 
@@ -21,15 +21,15 @@ pub fn btreemap_insert() -> u64 {
     })
 }
 
-/// Benchmarks removing 1000 keys from a BTreeMap.
+/// Benchmarks removing keys from a BTreeMap.
 #[ic_cdk_macros::query]
 pub fn btreemap_remove() -> u64 {
     let mut btree: BTreeMap<_, u64, ()> = BTreeMap::init(DefaultMemoryImpl::default());
 
-    // Generate 1000 keys
+    let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
-    let mut random_keys = Vec::with_capacity(1000);
-    for _ in 0..1_000 {
+    let mut random_keys = Vec::with_capacity(num_keys);
+    for _ in 0..num_keys {
         random_keys.push(rng.rand_u64());
     }
 
