@@ -77,14 +77,13 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// The memory manager can return up to 255 unique instances of [`VirtualMemory`], and each can be
 /// used independently and can grow up to the bounds of the underlying memory.
 ///
-/// The memory manager divides the memory into "buckets" of 1024 pages. Each [`VirtualMemory`] is
-/// internally represented as a list of buckets. Buckets of different memories can be interleaved,
-/// but the [`VirtualMemory`] interface gives the illusion of a continuous address space.
+/// By default, the memory manager divides the memory into "buckets" of 1024 pages. Each
+/// [`VirtualMemory`] is internally represented as a list of buckets. Buckets of different memories
+/// can be interleaved, but the [`VirtualMemory`] interface gives the illusion of a continuous
+/// address space.
 ///
 /// Because a [`VirtualMemory`] is a list of buckets, this implies that internally it grows one
-/// bucket at time (1024 pages). This implication makes the memory manager ideal for a small number
-/// of memories storing large amounts of data, as opposed to a large number of memories storing
-/// small amounts of data.
+/// bucket at a time.
 ///
 /// The first page of the memory is reserved for the memory manager's own state. The layout for
 /// this state is as follows:
