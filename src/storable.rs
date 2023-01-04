@@ -37,12 +37,12 @@ pub trait BoundedStorable: Storable {
 
 /// Variable-size, but limited in capacity byte array.
 #[derive(Eq, Copy, Clone)]
-pub struct Bytes<const N: usize> {
+pub struct Blob<const N: usize> {
     storage: [u8; N],
     size: u32,
 }
 
-impl<const N: usize> Bytes<N> {
+impl<const N: usize> Blob<N> {
     /// Returns the contents of this array as a byte slice.
     pub fn as_slice(&self) -> &[u8] {
         &self.storage[0..self.len()]
@@ -59,7 +59,7 @@ impl<const N: usize> Bytes<N> {
     }
 }
 
-impl<const N: usize> Default for Bytes<N> {
+impl<const N: usize> Default for Blob<N> {
     fn default() -> Self {
         Self {
             storage: [0; N],
@@ -71,7 +71,7 @@ impl<const N: usize> Default for Bytes<N> {
 #[derive(Debug)]
 pub struct TryFromSliceError;
 
-impl<const N: usize> TryFrom<&[u8]> for Bytes<N> {
+impl<const N: usize> TryFrom<&[u8]> for Blob<N> {
     type Error = TryFromSliceError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
@@ -85,24 +85,24 @@ impl<const N: usize> TryFrom<&[u8]> for Bytes<N> {
     }
 }
 
-impl<const N: usize> PartialEq for Bytes<N> {
+impl<const N: usize> PartialEq for Blob<N> {
     fn eq(&self, other: &Self) -> bool {
         self.as_slice().eq(other.as_slice())
     }
 }
 
-impl<const N: usize> fmt::Debug for Bytes<N> {
+impl<const N: usize> fmt::Debug for Blob<N> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_slice().fmt(fmt)
     }
 }
 
-impl<const N: usize> BoundedStorable for Bytes<N> {
+impl<const N: usize> BoundedStorable for Blob<N> {
     const MAX_SIZE: u32 = N as u32;
     const IS_FIXED_SIZE: bool = false;
 }
 
-impl<const N: usize> Storable for Bytes<N> {
+impl<const N: usize> Storable for Blob<N> {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_slice())
     }

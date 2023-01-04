@@ -14,7 +14,7 @@ proptest! {
 
     #[test]
     fn tuple_variable_width_rountrip(x in any::<u64>(), v in pvec(any::<u8>(), 0..40)) {
-        let bytes = Bytes::<48>::try_from(&v[..]).unwrap();
+        let bytes = Blob::<48>::try_from(&v[..]).unwrap();
         let tuple = (x, bytes);
         prop_assert_eq!(tuple, Storable::from_bytes(tuple.to_bytes().to_vec()));
     }
