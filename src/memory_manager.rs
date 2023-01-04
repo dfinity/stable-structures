@@ -136,10 +136,10 @@ pub struct MemoryManager<M: Memory> {
 impl<M: Memory> MemoryManager<M> {
     /// Initializes a `MemoryManager` with the given memory.
     pub fn init(memory: M) -> Self {
-        Self::init_with_buckets(memory, BUCKET_SIZE_IN_PAGES as u16)
+        Self::init_with_bucket_size(memory, BUCKET_SIZE_IN_PAGES as u16)
     }
 
-    fn init_with_buckets(memory: M, bucket_size_in_pages: u16) -> Self {
+    pub fn init_with_bucket_size(memory: M, bucket_size_in_pages: u16) -> Self {
         Self {
             inner: Rc::new(RefCell::new(MemoryManagerInner::init(
                 memory,
