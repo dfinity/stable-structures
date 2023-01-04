@@ -795,7 +795,7 @@ mod test {
     #[test]
     fn write_and_read_random_bytes() {
         let mem = make_memory();
-        let mem_mgr = MemoryManager::init_with_buckets(mem, 1); // very small bucket size.
+        let mem_mgr = MemoryManager::init_with_bucket_size(mem, 1); // very small bucket size.
 
         let memories: Vec<_> = (0..MAX_NUM_MEMORIES)
             .map(|id| mem_mgr.get(MemoryId(id)))
