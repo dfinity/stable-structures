@@ -341,8 +341,10 @@ fn decode_size<A: BoundedStorable>(src: &[u8]) -> usize {
 
 fn encode_size<A: BoundedStorable>(dst: &mut [u8], n: usize) {
     if A::IS_FIXED_SIZE {
-        ()
-    } else if A::MAX_SIZE <= u8::MAX as u32 {
+        return;
+    }
+
+    if A::MAX_SIZE <= u8::MAX as u32 {
         dst[0] = n as u8;
     } else if A::MAX_SIZE <= u16::MAX as u32 {
         dst[0..1].copy_from_slice(&(n as u16).to_be_bytes());
