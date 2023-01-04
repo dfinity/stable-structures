@@ -231,7 +231,7 @@ impl<M: Memory> Allocator<M> {
 
     /// Destroys the allocator and returns the underlying memory.
     #[inline]
-    pub fn forget(self) -> M {
+    pub fn into_memory(self) -> M {
         self.memory
     }
 

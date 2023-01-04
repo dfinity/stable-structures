@@ -397,8 +397,8 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     }
 
     /// Returns the underlying memory.
-    pub fn forget(self) -> M {
-        self.allocator.forget()
+    pub fn into_memory(self) -> M {
+        self.allocator.into_memory()
     }
 
     fn memory(&self) -> &M {
