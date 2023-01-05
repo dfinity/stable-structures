@@ -139,7 +139,8 @@ impl<M: Memory> MemoryManager<M> {
         Self::init_with_buckets(memory, BUCKET_SIZE_IN_PAGES as u16)
     }
 
-    fn init_with_buckets(memory: M, bucket_size_in_pages: u16) -> Self {
+    /// Initializes a `MemoryManager` with the given memory and bucket size in pages.
+    pub fn init_with_buckets(memory: M, bucket_size_in_pages: u16) -> Self {
         Self {
             inner: Rc::new(RefCell::new(MemoryManagerInner::init(
                 memory,
