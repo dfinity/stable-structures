@@ -12,6 +12,14 @@ trap "dfx stop" ERR EXIT
 dfx start --background --clean
 dfx deploy --no-wallet benchmarks
 
-# Run the benchmarks
+# BTreeMap benchmarks
 dfx canister call benchmarks btreemap_insert --query
 dfx canister call benchmarks btreemap_remove --query
+
+# MemoryManager benchmarks
+dfx canister call benchmarks memory_manager_baseline --query
+dfx canister call benchmarks memory_manager_interleaved "(64:nat16)" --query
+dfx canister call benchmarks memory_manager_interleaved "(128:nat16)" --query
+dfx canister call benchmarks memory_manager_interleaved "(512:nat16)" --query
+dfx canister call benchmarks memory_manager_interleaved "(1024:nat16)" --query
+dfx canister call benchmarks memory_manager_interleaved "(2048:nat16)" --query

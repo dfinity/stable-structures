@@ -77,14 +77,13 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// The memory manager can return up to 255 unique instances of [`VirtualMemory`], and each can be
 /// used independently and can grow up to the bounds of the underlying memory.
 ///
-/// The memory manager divides the memory into "buckets" of 1024 pages. Each [`VirtualMemory`] is
-/// internally represented as a list of buckets. Buckets of different memories can be interleaved,
-/// but the [`VirtualMemory`] interface gives the illusion of a continuous address space.
+/// By default, the memory manager divides the memory into "buckets" of 1024 pages. Each
+/// [`VirtualMemory`] is internally represented as a list of buckets. Buckets of different memories
+/// can be interleaved, but the [`VirtualMemory`] interface gives the illusion of a continuous
+/// address space.
 ///
 /// Because a [`VirtualMemory`] is a list of buckets, this implies that internally it grows one
-/// bucket at time (1024 pages). This implication makes the memory manager ideal for a small number
-/// of memories storing large amounts of data, as opposed to a large number of memories storing
-/// small amounts of data.
+/// bucket at a time.
 ///
 /// The first page of the memory is reserved for the memory manager's own state. The layout for
 /// this state is as follows:
@@ -136,11 +135,11 @@ pub struct MemoryManager<M: Memory> {
 impl<M: Memory> MemoryManager<M> {
     /// Initializes a `MemoryManager` with the given memory.
     pub fn init(memory: M) -> Self {
-        Self::init_with_buckets(memory, BUCKET_SIZE_IN_PAGES as u16)
+        Self::init_with_bucket_size(memory, BUCKET_SIZE_IN_PAGES as u16)
     }
 
     /// Initializes a `MemoryManager` with the given memory and bucket size in pages.
-    pub fn init_with_buckets(memory: M, bucket_size_in_pages: u16) -> Self {
+    pub fn init_with_bucket_size(memory: M, bucket_size_in_pages: u16) -> Self {
         Self {
             inner: Rc::new(RefCell::new(MemoryManagerInner::init(
                 memory,
@@ -796,7 +795,7 @@ mod test {
     #[test]
     fn write_and_read_random_bytes() {
         let mem = make_memory();
-        let mem_mgr = MemoryManager::init_with_buckets(mem, 1); // very small bucket size.
+        let mem_mgr = MemoryManager::init_with_bucket_size(mem, 1); // very small bucket size.
 
         let memories: Vec<_> = (0..MAX_NUM_MEMORIES)
             .map(|id| mem_mgr.get(MemoryId(id)))
