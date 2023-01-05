@@ -32,7 +32,7 @@ pub trait BoundedStorable: Storable {
     ///
     /// Examples: little-/big-endian encoding of u16/u32/u64, tuples
     /// and arrays of fixed-size types.
-    const IS_FIXED_SIZE: bool = true;
+    const IS_FIXED_SIZE: bool;
 }
 
 /// Variable-size, but limited in capacity byte array.
