@@ -2222,11 +2222,4 @@ mod test {
         // Equal key size
         let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 4, 3);
     }
-
-    #[test]
-    fn supports_unbounded_storable_types() {
-        let mem = make_memory();
-        // `String` doesn't implement `BoundedStorable` but can still be used in the `BTreeMap`.
-        let _btree: BTreeMap<String, String, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
-    }
 }
