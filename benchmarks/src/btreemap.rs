@@ -5,7 +5,7 @@ use tiny_rng::{Rand, Rng};
 /// Benchmarks inserting keys into a BTreeMap.
 #[ic_cdk_macros::query]
 pub fn btreemap_insert() -> u64 {
-    let mut btree: BTreeMap<_, u64, ()> = BTreeMap::init(DefaultMemoryImpl::default());
+    let mut btree: BTreeMap<u64, (), _> = BTreeMap::init(DefaultMemoryImpl::default());
 
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
@@ -25,7 +25,7 @@ pub fn btreemap_insert() -> u64 {
 /// Benchmarks removing keys from a BTreeMap.
 #[ic_cdk_macros::query]
 pub fn btreemap_remove() -> u64 {
-    let mut btree: BTreeMap<_, u64, ()> = BTreeMap::init(DefaultMemoryImpl::default());
+    let mut btree: BTreeMap<u64, (), _> = BTreeMap::init(DefaultMemoryImpl::default());
 
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
