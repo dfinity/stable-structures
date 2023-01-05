@@ -57,10 +57,10 @@ const LAYOUT_VERSION: u8 = 1;
 const MAX_NUM_MEMORIES: u8 = 255;
 
 // The maximum number of buckets the memory manager can handle.
-// With a bucket size of 1024 pages this can support up to 2TiB of memory.
+// With a bucket size of 128 pages this can support up to 256GiB of memory.
 const MAX_NUM_BUCKETS: u64 = 32768;
 
-const BUCKET_SIZE_IN_PAGES: u64 = 1024;
+const BUCKET_SIZE_IN_PAGES: u64 = 128;
 
 // A value used internally to indicate that a bucket is unallocated.
 const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
@@ -77,7 +77,7 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// The memory manager can return up to 255 unique instances of [`VirtualMemory`], and each can be
 /// used independently and can grow up to the bounds of the underlying memory.
 ///
-/// By default, the memory manager divides the memory into "buckets" of 1024 pages. Each
+/// By default, the memory manager divides the memory into "buckets" of 128 pages. Each
 /// [`VirtualMemory`] is internally represented as a list of buckets. Buckets of different memories
 /// can be interleaved, but the [`VirtualMemory`] interface gives the illusion of a continuous
 /// address space.
