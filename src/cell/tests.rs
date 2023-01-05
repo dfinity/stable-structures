@@ -4,7 +4,7 @@ use crate::vec_mem::VectorMemory;
 use crate::{Memory, RestrictedMemory, WASM_PAGE_SIZE};
 
 fn reload<T: Default + Storable, M: Memory>(c: Cell<T, M>) -> Cell<T, M> {
-    Cell::init(c.forget(), T::default()).unwrap()
+    Cell::init(c.into_memory(), T::default()).unwrap()
 }
 
 #[test]
@@ -12,13 +12,13 @@ fn test_cell_init() {
     let mem = VectorMemory::default();
     let cell = Cell::init(mem, 1024u64).unwrap();
     assert_eq!(*cell.get(), 1024u64);
-    let mem = cell.forget();
+    let mem = cell.into_memory();
     assert_ne!(mem.size(), 0);
     let cell = Cell::init(mem, 0u64).unwrap();
     assert_eq!(1024u64, *cell.get());
 
     // Check that Cell::new overwrites the contents unconditionally.
-    let cell = Cell::new(cell.forget(), 2048u64).unwrap();
+    let cell = Cell::new(cell.into_memory(), 2048u64).unwrap();
     assert_eq!(2048u64, *cell.get());
 }
 
