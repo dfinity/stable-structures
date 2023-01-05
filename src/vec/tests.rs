@@ -72,7 +72,7 @@ proptest! {
             sv.push(&v).unwrap();
         }
         let vec = sv.to_vec();
-        prop_assert_eq!(StableVec::<u64, M>::init(sv.forget()).unwrap().to_vec(), vec);
+        prop_assert_eq!(StableVec::<u64, M>::init(sv.into_memory()).unwrap().to_vec(), vec);
     }
 }
 
@@ -103,13 +103,13 @@ fn test_init_type_compatibility() {
     let v = StableVec::<u64, M>::new(M::default()).unwrap();
 
     assert_eq!(
-        StableVec::<u32, M>::init(v.forget()).unwrap_err(),
+        StableVec::<u32, M>::init(v.into_memory()).unwrap_err(),
         InitError::IncompatibleElementType
     );
 
     let v = StableVec::<u64, M>::new(M::default()).unwrap();
     assert_eq!(
-        StableVec::<UnfixedU64<8>, M>::init(v.forget()).unwrap_err(),
+        StableVec::<UnfixedU64<8>, M>::init(v.into_memory()).unwrap_err(),
         InitError::IncompatibleElementType
     );
 }
