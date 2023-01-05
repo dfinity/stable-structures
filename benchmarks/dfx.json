@@ -1,0 +1,18 @@
+{
+  "dfx": "0.12.1",
+  "canisters": {
+    "benchmarks": {
+      "candid": "candid.did",
+      "package": "benchmarks",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "version": 1
+}
+
