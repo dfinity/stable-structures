@@ -2,7 +2,7 @@ use super::{
     node::{Node, NodeType},
     BTreeMap,
 };
-use crate::{types::NULL, Address, Memory, Storable};
+use crate::{types::NULL, Address, BoundedStorable, Memory};
 
 /// An indicator of the current position in the map.
 pub(crate) enum Cursor {
@@ -18,9 +18,9 @@ pub(crate) enum Index {
 
 /// An iterator over the entries of a [`BTreeMap`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct Iter<'a, M: Memory, K: Storable, V: Storable> {
+pub struct Iter<'a, K: BoundedStorable, V: BoundedStorable, M: Memory> {
     // A reference to the map being iterated on.
-    map: &'a BTreeMap<M, K, V>,
+    map: &'a BTreeMap<K, V, M>,
 
     // A stack of cursors indicating the current position in the tree.
     cursors: Vec<Cursor>,
@@ -34,8 +34,8 @@ pub struct Iter<'a, M: Memory, K: Storable, V: Storable> {
     offset: Option<Vec<u8>>,
 }
 
-impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
-    pub(crate) fn new(map: &'a BTreeMap<M, K, V>) -> Self {
+impl<'a, K: BoundedStorable, V: BoundedStorable, M: Memory> Iter<'a, K, V, M> {
+    pub(crate) fn new(map: &'a BTreeMap<K, V, M>) -> Self {
         Self {
             map,
             // Initialize the cursors with the address of the root of the map.
@@ -46,7 +46,7 @@ impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     }
 
     /// Returns an empty iterator.
-    pub(crate) fn null(map: &'a BTreeMap<M, K, V>) -> Self {
+    pub(crate) fn null(map: &'a BTreeMap<K, V, M>) -> Self {
         Self {
             map,
             cursors: vec![],
@@ -56,7 +56,7 @@ impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     }
 
     pub(crate) fn new_with_prefix(
-        map: &'a BTreeMap<M, K, V>,
+        map: &'a BTreeMap<K, V, M>,
         prefix: Vec<u8>,
         cursors: Vec<Cursor>,
     ) -> Self {
@@ -69,7 +69,7 @@ impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     }
 
     pub(crate) fn new_with_prefix_and_offset(
-        map: &'a BTreeMap<M, K, V>,
+        map: &'a BTreeMap<K, V, M>,
         prefix: Vec<u8>,
         offset: Vec<u8>,
         cursors: Vec<Cursor>,
@@ -83,7 +83,7 @@ impl<'a, M: Memory, K: Storable, V: Storable> Iter<'a, M, K, V> {
     }
 }
 
-impl<M: Memory + Clone, K: Storable, V: Storable> Iterator for Iter<'_, M, K, V> {
+impl<K: BoundedStorable, V: BoundedStorable, M: Memory> Iterator for Iter<'_, K, V, M> {
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {

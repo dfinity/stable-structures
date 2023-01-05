@@ -152,7 +152,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     }
 
     /// Returns the underlying memory instance.
-    pub fn forget(self) -> M {
+    pub fn into_memory(self) -> M {
         self.memory
     }
 

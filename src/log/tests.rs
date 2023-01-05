@@ -9,7 +9,7 @@ fn test_log_construct() {
     assert_eq!(log.len(), 0);
     assert_eq!(log.log_size_bytes(), 0);
     assert_eq!(log.index_size_bytes(), 40);
-    let (index_memory, data_memory) = log.forget();
+    let (index_memory, data_memory) = log.into_memories();
 
     let log = Log::init(index_memory, data_memory).expect("failed to init log");
     assert_eq!(log.len(), 0);
@@ -24,7 +24,7 @@ fn test_new_overwrites() {
 
     assert_eq!(log.len(), 1);
 
-    let (index_memory, data_memory) = log.forget();
+    let (index_memory, data_memory) = log.into_memories();
     let log = Log::new(index_memory, data_memory);
     assert_eq!(log.len(), 0);
 }
@@ -117,7 +117,7 @@ fn test_log_append_persistence() {
     let log = Log::new(VectorMemory::default(), VectorMemory::default());
     let idx = log.append(b"DEADBEEF").expect("failed to append entry");
 
-    let (index_memory, data_memory) = log.forget();
+    let (index_memory, data_memory) = log.into_memories();
 
     let log = Log::init(index_memory, data_memory).unwrap();
     assert_eq!(log.len(), 1);
@@ -175,6 +175,6 @@ fn test_index_grow() {
         log.append(b"log").expect("failed to append entry");
     }
     assert_eq!(log.index_size_bytes(), 65_544); // more than WASM_PAGE_SIZE
-    let (index_memory, _) = log.forget();
+    let (index_memory, _) = log.into_memories();
     assert_eq!(index_memory.size(), 2)
 }
