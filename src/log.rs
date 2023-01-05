@@ -242,7 +242,7 @@ impl<INDEX: Memory, DATA: Memory> Log<INDEX, DATA> {
     }
 
     /// Returns the underlying memory trait objects of the log.
-    pub fn forget(self) -> (INDEX, DATA) {
+    pub fn into_memories(self) -> (INDEX, DATA) {
         (self.index_memory, self.data_memory)
     }
 

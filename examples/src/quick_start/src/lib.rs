@@ -22,7 +22,7 @@ struct State {
     // An example `StableBTreeMap`. Data stored in `StableBTreeMap` doesn't need to
     // be serialized/deserialized in upgrades, so we tell serde to skip it.
     #[serde(skip, default = "init_stable_data")]
-    stable_data: StableBTreeMap<Memory, u128, u128>,
+    stable_data: StableBTreeMap<u128, u128, Memory>,
 }
 
 thread_local! {
@@ -95,7 +95,7 @@ fn post_upgrade() {
     });
 }
 
-fn init_stable_data() -> StableBTreeMap<Memory, u128, u128> {
+fn init_stable_data() -> StableBTreeMap<u128, u128, Memory> {
     StableBTreeMap::init(crate::memory::get_stable_btree_memory())
 }
 

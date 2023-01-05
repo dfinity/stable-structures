@@ -140,8 +140,8 @@ impl<T: Storable, M: Memory> Cell<T, M> {
         &self.value
     }
 
-    /// Forgets the value in this cell and returns the underlying memory.
-    pub fn forget(self) -> M {
+    /// Returns the underlying memory.
+    pub fn into_memory(self) -> M {
         self.memory
     }
 
