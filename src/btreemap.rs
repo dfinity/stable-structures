@@ -65,7 +65,21 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     /// If the memory provided already contains a `BTreeMap`, then that
     /// map is loaded. Otherwise, a new `BTreeMap` instance is created.
     pub fn init(memory: M) -> Self {
-        Self::init_with_sizes(memory, K::MAX_SIZE, V::MAX_SIZE)
+        if memory.size() == 0 {
+            // Memory is empty. Create a new map.
+            return BTreeMap::new(memory);
+        }
+
+        // Check if the magic in the memory corresponds to a BTreeMap.
+        let mut dst = vec![0; 3];
+        memory.read(0, &mut dst);
+        if dst != MAGIC {
+            // No BTreeMap found. Create a new instance.
+            BTreeMap::new(memory)
+        } else {
+            // The memory already contains a BTreeMap. Load it.
+            BTreeMap::load(memory)
+        }
     }
 
     /// Creates a new instance a `BTreeMap`.
@@ -80,37 +94,6 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
-        Self::new_with_sizes(memory, K::MAX_SIZE, V::MAX_SIZE)
-    }
-
-    /// Loads the map from memory.
-    pub fn load(memory: M) -> Self {
-        Self::load_with_sizes(memory, K::MAX_SIZE, V::MAX_SIZE)
-    }
-}
-
-impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
-    /// Similar to `init` but with explicit max key/value sizes.
-    pub fn init_with_sizes(memory: M, max_key_size: u32, max_value_size: u32) -> Self {
-        if memory.size() == 0 {
-            // Memory is empty. Create a new map.
-            return BTreeMap::new_with_sizes(memory, max_key_size, max_value_size);
-        }
-
-        // Check if the magic in the memory corresponds to a BTreeMap.
-        let mut dst = vec![0; 3];
-        memory.read(0, &mut dst);
-        if dst != MAGIC {
-            // No BTreeMap found. Create a new instance.
-            BTreeMap::new_with_sizes(memory, max_key_size, max_value_size)
-        } else {
-            // The memory already contains a BTreeMap. Load it.
-            BTreeMap::load_with_sizes(memory, max_key_size, max_value_size)
-        }
-    }
-
-    /// Similar to `new` but with explicit max key/value sizes.
-    pub fn new_with_sizes(memory: M, max_key_size: u32, max_value_size: u32) -> Self {
         // Because we assume that we have exclusive access to the memory,
         // we can store the `BTreeHeader` at address zero, and the allocator is
         // stored directly after the `BTreeHeader`.
@@ -118,13 +101,9 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
 
         let btree = Self {
             root_addr: NULL,
-            allocator: Allocator::new(
-                memory,
-                allocator_addr,
-                Node::size(max_key_size, max_value_size),
-            ),
-            max_key_size,
-            max_value_size,
+            allocator: Allocator::new(memory, allocator_addr, Node::size(K::MAX_SIZE, V::MAX_SIZE)),
+            max_key_size: K::MAX_SIZE,
+            max_value_size: V::MAX_SIZE,
             length: 0,
             _phantom: PhantomData,
         };
@@ -133,8 +112,8 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         btree
     }
 
-    /// Similar to `load` but with explicit max key/value sizes.
-    pub fn load_with_sizes(memory: M, max_key_size: u32, max_value_size: u32) -> Self {
+    /// Loads the map from memory.
+    pub fn load(memory: M) -> Self {
         // Read the header from memory.
         let header: BTreeHeader = read_struct(Address::from(0), &memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
@@ -142,13 +121,13 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         let expected_key_size = header.max_key_size;
         // TODO: add test case, and allow smaller values.
         assert!(
-            max_key_size <= expected_key_size,
+            K::MAX_SIZE <= expected_key_size,
             "max_key_size must be <= {}",
             expected_key_size
         );
         let expected_value_size = header.max_value_size;
         assert!(
-            max_value_size <= expected_value_size,
+            V::MAX_SIZE <= expected_value_size,
             "max_value_size must be <= {}",
             expected_value_size
         );
@@ -157,8 +136,8 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         Self {
             root_addr: header.root_addr,
             allocator: Allocator::load(memory, allocator_addr),
-            max_key_size: header.max_key_size,
-            max_value_size: header.max_value_size,
+            max_key_size: K::MAX_SIZE,
+            max_value_size: V::MAX_SIZE,
             length: header.length,
             _phantom: PhantomData,
         }
@@ -945,7 +924,7 @@ impl std::fmt::Display for InsertError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{btreemap::node::CAPACITY, storable::BoundedStorable};
+    use crate::{btreemap::node::CAPACITY, storable::Blob};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -2191,35 +2170,35 @@ mod test {
     #[should_panic(expected = "max_key_size must be <= 4")]
     fn rejects_larger_key_sizes() {
         let mem = make_memory();
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 5, 3);
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
+        let _btree: BTreeMap<Blob<5>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
     }
 
     #[test]
     fn accepts_small_or_equal_key_sizes() {
         let mem = make_memory();
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
         // Smaller key size
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 3, 3);
+        let btree: BTreeMap<Blob<3>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
         // Equal key size
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 4, 3);
+        let _btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
     }
 
     #[test]
     #[should_panic(expected = "max_value_size must be <= 3")]
     fn rejects_larger_value_sizes() {
         let mem = make_memory();
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 4, 4);
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
+        let _btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init(btree.into_memory());
     }
 
     #[test]
     fn accepts_small_or_equal_value_sizes() {
         let mem = make_memory();
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 3);
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
         // Smaller key size
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem.clone(), 4, 2);
+        let btree: BTreeMap<Blob<4>, Blob<2>, _> = BTreeMap::init(btree.into_memory());
         // Equal key size
-        let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_sizes(mem, 4, 3);
+        let _btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
     }
 }
