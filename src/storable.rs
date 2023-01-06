@@ -1,4 +1,5 @@
 use std::borrow::{Borrow, Cow};
+use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
@@ -85,9 +86,27 @@ impl<const N: usize> TryFrom<&[u8]> for Blob<N> {
     }
 }
 
+impl<const N: usize> AsRef<[u8]> for Blob<N> {
+    fn as_ref(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
 impl<const N: usize> PartialEq for Blob<N> {
     fn eq(&self, other: &Self) -> bool {
         self.as_slice().eq(other.as_slice())
+    }
+}
+
+impl<const N: usize> PartialOrd for Blob<N> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.as_slice().partial_cmp(other.as_slice())
+    }
+}
+
+impl<const N: usize> Ord for Blob<N> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_slice().cmp(other.as_slice())
     }
 }
 

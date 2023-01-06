@@ -12,6 +12,7 @@ pub use iter::Iter;
 use iter::{Cursor, Index};
 use node::{Entry, Node, NodeType, B};
 use std::marker::PhantomData;
+use std::ops::{Bound, RangeBounds};
 
 const LAYOUT_VERSION: u8 = 1;
 const MAGIC: &[u8; 3] = b"BTR";
@@ -20,7 +21,12 @@ const MAGIC: &[u8; 3] = b"BTR";
 ///
 /// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
 /// by Cormen et al.
-pub struct BTreeMap<K: BoundedStorable, V: BoundedStorable, M: Memory> {
+pub struct BTreeMap<K, V, M>
+where
+    K: BoundedStorable + Ord + Clone,
+    V: BoundedStorable,
+    M: Memory,
+{
     // The address of the root node. If a root node doesn't exist, the address
     // is set to NULL.
     root_addr: Address,
@@ -59,7 +65,12 @@ impl BTreeHeader {
     }
 }
 
-impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
+impl<K, V, M> BTreeMap<K, V, M>
+where
+    K: BoundedStorable + Ord + Clone,
+    V: BoundedStorable,
+    M: Memory,
+{
     /// Initializes a `BTreeMap`.
     ///
     /// If the memory provided already contains a `BTreeMap`, then that
@@ -101,7 +112,11 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
 
         let btree = Self {
             root_addr: NULL,
-            allocator: Allocator::new(memory, allocator_addr, Node::size(K::MAX_SIZE, V::MAX_SIZE)),
+            allocator: Allocator::new(
+                memory,
+                allocator_addr,
+                Node::<K>::size(K::MAX_SIZE, V::MAX_SIZE),
+            ),
             max_key_size: K::MAX_SIZE,
             max_value_size: V::MAX_SIZE,
             length: 0,
@@ -150,13 +165,13 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     /// The size of the key/value must be <= the max key/value sizes configured
     /// for the map. Otherwise, an `InsertError` is returned.
     pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, InsertError> {
-        let key = key.to_bytes();
+        let key_bytes = key.to_bytes();
         let value = value.to_bytes();
 
         // Verify the size of the key.
-        if key.len() > self.max_key_size as usize {
+        if key_bytes.len() > self.max_key_size as usize {
             return Err(InsertError::KeyTooLarge {
-                given: key.len(),
+                given: key_bytes.len(),
                 max: self.max_key_size as usize,
             });
         }
@@ -169,7 +184,6 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
             });
         }
 
-        let key = key.to_vec();
         let value = value.to_vec();
 
         let root = if self.root_addr == NULL {
@@ -219,12 +233,12 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     }
 
     // Inserts an entry into a node that is *not full*.
-    fn insert_nonfull(&mut self, mut node: Node, key: Vec<u8>, value: Vec<u8>) -> Option<Vec<u8>> {
+    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
 
         // Look for the key in the node.
-        match node.entries.binary_search_by(|e| e.0.cmp(&key)) {
+        match node.keys.binary_search(&key) {
             Ok(idx) => {
                 // The key is already in the node.
                 // Overwrite it and return the previous value.
@@ -240,7 +254,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                     NodeType::Leaf => {
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
-                        node.entries.insert(idx, (key, value));
+                        node.insert_entry(idx, (key, value));
                         node.save(self.memory());
 
                         // Update the length.
@@ -299,7 +313,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     //                                 / \
     //                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
     //
-    fn split_child(&mut self, node: &mut Node, full_child_idx: usize) {
+    fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
         // The node must not be full.
         assert!(!node.is_full());
 
@@ -312,7 +326,8 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         assert_eq!(sibling.node_type, full_child.node_type);
 
         // Move the values above the median into the new sibling.
-        sibling.entries = full_child.entries.split_off(B as usize);
+        sibling.keys = full_child.keys.split_off(B as usize);
+        sibling.encoded_values = full_child.encoded_values.split_off(B as usize);
 
         if full_child.node_type == NodeType::Internal {
             sibling.children = full_child.children.split_off(B as usize);
@@ -323,11 +338,9 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
 
         // Move the median entry into the node.
         let (median_key, median_value) = full_child
-            .entries
-            .pop()
+            .pop_entry()
             .expect("A full child cannot be empty");
-        node.entries
-            .insert(full_child_idx, (median_key, median_value));
+        node.insert_entry(full_child_idx, (median_key, median_value));
 
         sibling.save(self.memory());
         full_child.save(self.memory());
@@ -340,14 +353,13 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
             return None;
         }
 
-        self.get_helper(self.root_addr, &key.to_bytes())
-            .map(V::from_bytes)
+        self.get_helper(self.root_addr, key).map(V::from_bytes)
     }
 
-    fn get_helper(&self, node_addr: Address, key: &[u8]) -> Option<Vec<u8>> {
+    fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         let node = self.load_node(node_addr);
-        match node.entries.binary_search_by(|e| e.0.as_slice().cmp(key)) {
-            Ok(idx) => Some(node.entries[idx].1.clone()),
+        match node.keys.binary_search(key) {
+            Ok(idx) => Some(node.encoded_values[idx].clone()),
             Err(idx) => {
                 match node.node_type {
                     NodeType::Leaf => None, // Key not found.
@@ -390,12 +402,11 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
             return None;
         }
 
-        self.remove_helper(self.root_addr, &key.to_bytes())
-            .map(V::from_bytes)
+        self.remove_helper(self.root_addr, &key).map(V::from_bytes)
     }
 
     // A helper method for recursively removing a key from the B-tree.
-    fn remove_helper(&mut self, node_addr: Address, key: &[u8]) -> Option<Vec<u8>> {
+    fn remove_helper(&mut self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         let mut node = self.load_node(node_addr);
 
         if node.address != self.root_addr {
@@ -404,19 +415,19 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
             // in a node, which is `B - 1`, and that's because this strengthened
             // condition allows us to delete an entry in a single pass most of the
             // time without having to back up.
-            assert!(node.entries.len() >= B as usize);
+            assert!(node.keys.len() >= B as usize);
         }
 
         match node.node_type {
             NodeType::Leaf => {
-                match node.entries.binary_search_by(|e| e.0.as_slice().cmp(key)) {
+                match node.keys.binary_search(key) {
                     Ok(idx) => {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
-                        let value = node.entries.remove(idx).1;
+                        let value = node.remove_entry(idx).1;
                         self.length -= 1;
 
-                        if node.entries.is_empty() {
+                        if node.keys.is_empty() {
                             assert_eq!(
                                 node.address, self.root_addr,
                                 "Removal can only result in an empty leaf node if that node is the root"
@@ -436,13 +447,13 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                 }
             }
             NodeType::Internal => {
-                match node.entries.binary_search_by(|e| e.0.as_slice().cmp(key)) {
+                match node.keys.binary_search(key) {
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
                         // Check if the child that precedes `key` has at least `B` keys.
                         let left_child = self.load_node(node.children[idx]);
-                        if left_child.entries.len() >= B as usize {
+                        if left_child.keys.len() >= B as usize {
                             // Case 2.a: The node's left child has >= `B` keys.
                             //
                             //                       parent
@@ -478,7 +489,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
 
                         // Check if the child that succeeds `key` has at least `B` keys.
                         let right_child = self.load_node(node.children[idx + 1]);
-                        if right_child.entries.len() >= B as usize {
+                        if right_child.keys.len() >= B as usize {
                             // Case 2.b: The node's right child has >= `B` keys.
                             //
                             //                       parent
@@ -531,17 +542,16 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                         //
                         // If `parent` becomes empty (which can only happen if it's the root),
                         // then `parent` is deleted and `new_child` becomes the new root.
-                        assert_eq!(left_child.entries.len(), B as usize - 1);
-                        assert_eq!(right_child.entries.len(), B as usize - 1);
+                        assert_eq!(left_child.keys.len(), B as usize - 1);
+                        assert_eq!(right_child.keys.len(), B as usize - 1);
 
                         // Merge the right child into the left child.
-                        let new_child =
-                            self.merge(right_child, left_child, node.entries.remove(idx));
+                        let new_child = self.merge(right_child, left_child, node.remove_entry(idx));
 
                         // Remove the right child from the parent node.
                         node.children.remove(idx + 1);
 
-                        if node.entries.is_empty() {
+                        if node.keys.is_empty() {
                             // Can only happen if this node is root.
                             assert_eq!(node.address, self.root_addr);
                             assert_eq!(node.children, vec![new_child.address]);
@@ -566,7 +576,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                         // `idx`.
                         let mut child = self.load_node(node.children[idx]);
 
-                        if child.entries.len() >= B as usize {
+                        if child.keys.len() >= B as usize {
                             // The child has enough nodes. Recurse to delete the `key` from the
                             // `child`.
                             return self.remove_helper(node.children[idx], key);
@@ -586,7 +596,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                         };
 
                         if let Some(ref mut left_sibling) = left_sibling {
-                            if left_sibling.entries.len() >= B as usize {
+                            if left_sibling.keys.len() >= B as usize {
                                 // Case 3.a (left): The child has a left sibling with >= `B` keys.
                                 //
                                 //                            [d] (parent)
@@ -609,14 +619,14 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
 
                                 // Remove the last entry from the left sibling.
                                 let (left_sibling_key, left_sibling_value) =
-                                    left_sibling.entries.pop().unwrap();
+                                    left_sibling.pop_entry().unwrap();
 
                                 // Replace the parent's entry with the one from the left sibling.
                                 let (parent_key, parent_value) = node
                                     .swap_entry(idx - 1, (left_sibling_key, left_sibling_value));
 
                                 // Move the entry from the parent into the child.
-                                child.entries.insert(0, (parent_key, parent_value));
+                                child.insert_entry(0, (parent_key, parent_value));
 
                                 // Move the last child from left sibling into child.
                                 if let Some(last_child) = left_sibling.children.pop() {
@@ -637,7 +647,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                         }
 
                         if let Some(right_sibling) = &mut right_sibling {
-                            if right_sibling.entries.len() >= B as usize {
+                            if right_sibling.keys.len() >= B as usize {
                                 // Case 3.a (right): The child has a right sibling with >= `B` keys.
                                 //
                                 //                            [c] (parent)
@@ -660,14 +670,14 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
 
                                 // Remove the first entry from the right sibling.
                                 let (right_sibling_key, right_sibling_value) =
-                                    right_sibling.entries.remove(0);
+                                    right_sibling.remove_entry(0);
 
                                 // Replace the parent's entry with the one from the right sibling.
                                 let parent_entry =
                                     node.swap_entry(idx, (right_sibling_key, right_sibling_value));
 
                                 // Move the entry from the parent into the child.
-                                child.entries.push(parent_entry);
+                                child.push_entry(parent_entry);
 
                                 // Move the first child of right_sibling into `child`.
                                 match right_sibling.node_type {
@@ -693,11 +703,11 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                             // Merge child into left sibling if it exists.
 
                             let left_sibling_address = left_sibling.address;
-                            self.merge(child, left_sibling, node.entries.remove(idx - 1));
+                            self.merge(child, left_sibling, node.remove_entry(idx - 1));
                             // Removing child from parent.
                             node.children.remove(idx);
 
-                            if node.entries.is_empty() {
+                            if node.keys.is_empty() {
                                 self.allocator.deallocate(node.address);
 
                                 if node.address == self.root_addr {
@@ -716,12 +726,12 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                             // Merge child into right sibling.
 
                             let right_sibling_address = right_sibling.address;
-                            self.merge(child, right_sibling, node.entries.remove(idx));
+                            self.merge(child, right_sibling, node.remove_entry(idx));
 
                             // Removing child from parent.
                             node.children.remove(idx);
 
-                            if node.entries.is_empty() {
+                            if node.keys.is_empty() {
                                 self.allocator.deallocate(node.address);
 
                                 if node.address == self.root_addr {
@@ -748,66 +758,104 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         Iter::new(self)
     }
 
-    /// Returns an iterator over the entries in the map where keys begin with the given `prefix`.
-    /// If the optional `offset` is set, the iterator returned will start from the entry that
-    /// contains this `offset` (while still iterating over all remaining entries that begin
-    /// with the given `prefix`).
-    pub fn range(&self, prefix: Vec<u8>, offset: Option<Vec<u8>>) -> Iter<K, V, M> {
+    /// Returns an iterator over the entries in the map where keys
+    /// belong to the specified range.
+    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, V, M> {
         if self.root_addr == NULL {
             // Map is empty.
             return Iter::null(self);
         }
 
-        let mut node = self.load_node(self.root_addr);
+        let range = (
+            key_range.start_bound().cloned(),
+            key_range.end_bound().cloned(),
+        );
+
         let mut cursors = vec![];
-        loop {
-            // Look for the prefix in the node.
-            let mut pivot = prefix.clone();
-            if let Some(offset) = &offset {
-                pivot.extend_from_slice(offset);
+
+        match key_range.start_bound() {
+            Bound::Unbounded => {
+                cursors.push(Cursor::Address(self.root_addr));
+                Iter::new_in_range(self, range, cursors)
             }
-            match node.entries.binary_search_by(|e| e.0.cmp(&pivot)) {
-                Ok(idx) | Err(idx) => {
-                    // If `prefix` is a key in the node, then `idx` would return its
-                    // location. Otherwise, `idx` is the location of the next key in
-                    // lexicographical order.
+            Bound::Included(key) | Bound::Excluded(key) => {
+                let mut node = self.load_node(self.root_addr);
+                loop {
+                    match node.keys.binary_search(key) {
+                        Ok(idx) => {
+                            if let Bound::Included(_) = key_range.start_bound() {
+                                // We found the key exactly matching the left bound.
+                                // Here is where we'll start the iteration.
+                                cursors.push(Cursor::Node {
+                                    node,
+                                    next: Index::Entry(idx),
+                                });
+                                return Iter::new_in_range(self, range, cursors);
+                            } else {
+                                // We found the key that we must
+                                // exclude.  We add its right neighbor
+                                // to the stack and start iterating
+                                // from its right child.
+                                let right_child = match node.node_type {
+                                    NodeType::Internal => Some(node.children[idx + 1]),
+                                    NodeType::Leaf => None,
+                                };
 
-                    // Load the next child of the node to visit if it exists.
-                    // This is done first to avoid cloning the node.
-                    let child = match node.node_type {
-                        NodeType::Internal => {
-                            // Note that loading a child node cannot fail since
-                            // len(children) = len(entries) + 1
-                            Some(self.load_node(node.children[idx]))
-                        }
-                        NodeType::Leaf => None,
-                    };
-
-                    // If the prefix is found in the node, then add a cursor starting from its index.
-                    if idx < node.entries.len() && node.entries[idx].0.starts_with(&prefix) {
-                        cursors.push(Cursor::Node {
-                            node,
-                            next: Index::Entry(idx),
-                        });
-                    }
-
-                    match child {
-                        None => {
-                            // Leaf node. Return an iterator with the found cursors.
-                            match offset {
-                                Some(offset) => {
-                                    return Iter::new_with_prefix_and_offset(
-                                        self, prefix, offset, cursors,
-                                    );
+                                if idx + 1 != node.keys.len()
+                                    && key_range.contains(&node.keys[idx + 1])
+                                {
+                                    cursors.push(Cursor::Node {
+                                        node,
+                                        next: Index::Entry(idx + 1),
+                                    });
                                 }
-                                None => {
-                                    return Iter::new_with_prefix(self, prefix, cursors);
+                                if let Some(right_child) = right_child {
+                                    cursors.push(Cursor::Address(right_child));
                                 }
+                                return Iter::new_in_range(self, range, cursors);
                             }
                         }
-                        Some(child) => {
-                            // Iterate over the child node.
-                            node = child;
+                        Err(idx) => {
+                            // The `idx` variable points to the first
+                            // key that is greater than the left
+                            // bound.
+                            //
+                            // If the index points to a valid node, we
+                            // will visit its left subtree and then
+                            // return to this key.
+                            //
+                            // If the index points at the end of
+                            // array, we'll continue with the right
+                            // child of the last key.
+
+                            // Load the left child of the node to visit if it exists.
+                            // This is done first to avoid cloning the node.
+                            let child = match node.node_type {
+                                NodeType::Internal => {
+                                    // Note that loading a child node cannot fail since
+                                    // len(children) = len(entries) + 1
+                                    Some(self.load_node(node.children[idx]))
+                                }
+                                NodeType::Leaf => None,
+                            };
+
+                            if idx < node.keys.len() && key_range.contains(&node.keys[idx]) {
+                                cursors.push(Cursor::Node {
+                                    node,
+                                    next: Index::Entry(idx),
+                                });
+                            }
+
+                            match child {
+                                None => {
+                                    // Leaf node. Return an iterator with the found cursors.
+                                    return Iter::new_in_range(self, range, cursors);
+                                }
+                                Some(child) => {
+                                    // Iterate over the child node.
+                                    node = child;
+                                }
+                            }
                         }
                     }
                 }
@@ -827,24 +875,24 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
     // Output:
     //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     //   `source` is deallocated.
-    fn merge(&mut self, source: Node, into: Node, median: Entry) -> Node {
+    fn merge(&mut self, source: Node<K>, into: Node<K>, median: Entry<K>) -> Node<K> {
         assert_eq!(source.node_type, into.node_type);
-        assert!(!source.entries.is_empty());
-        assert!(!into.entries.is_empty());
+        assert!(!source.keys.is_empty());
+        assert!(!into.keys.is_empty());
 
         let into_address = into.address;
         let source_address = source.address;
 
         // Figure out which node contains lower values than the other.
-        let (mut lower, mut higher) = if source.entries[0].0 < into.entries[0].0 {
+        let (mut lower, mut higher) = if source.keys[0] < into.keys[0] {
             (source, into)
         } else {
             (into, source)
         };
 
-        lower.entries.push(median);
+        lower.push_entry(median);
 
-        lower.entries.append(&mut higher.entries);
+        lower.append_entries_from(&mut higher);
 
         lower.address = into_address;
 
@@ -857,10 +905,11 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         lower
     }
 
-    fn allocate_node(&mut self, node_type: NodeType) -> Node {
+    fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
         Node {
             address: self.allocator.allocate(),
-            entries: vec![],
+            keys: vec![],
+            encoded_values: vec![],
             children: vec![],
             node_type,
             max_key_size: self.max_key_size,
@@ -868,7 +917,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         }
     }
 
-    fn load_node(&self, address: Address) -> Node {
+    fn load_node(&self, address: Address) -> Node<K> {
         Node::load(
             address,
             self.memory(),
@@ -1008,14 +1057,14 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![6], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![6], vec![])]);
         assert_eq!(root.children.len(), 2);
 
         // The right child should now be full, with the median key being "12"
         let right_child = btree.load_node(root.children[1]);
         assert!(right_child.is_full());
-        let median_index = right_child.entries.len() / 2;
-        assert_eq!(right_child.entries[median_index].0, vec![12]);
+        let median_index = right_child.keys.len() / 2;
+        assert_eq!(right_child.keys[median_index], vec![12]);
 
         // Overwrite the median key.
         assert_eq!(btree.insert(vec![12], vec![1, 2, 3]), Ok(Some(vec![])));
@@ -1050,7 +1099,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Leaf);
         assert_eq!(btree.get(&vec![6]), Some(vec![4, 5, 6]));
-        assert_eq!(root.entries.len(), 11);
+        assert_eq!(root.keys.len(), 11);
     }
 
     #[test]
@@ -1161,13 +1210,13 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![6], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![6], vec![])]);
         assert_eq!(root.children.len(), 2);
 
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
-            child_0.entries,
+            child_0.entries(),
             vec![
                 (vec![1], vec![]),
                 (vec![2], vec![]),
@@ -1180,7 +1229,7 @@ mod test {
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
-            child_1.entries,
+            child_1.entries(),
             vec![
                 (vec![7], vec![]),
                 (vec![8], vec![]),
@@ -1210,13 +1259,13 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![6], vec![]), (vec![12], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![6], vec![]), (vec![12], vec![])]);
         assert_eq!(root.children.len(), 3);
 
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
-            child_0.entries,
+            child_0.entries(),
             vec![
                 (vec![1], vec![]),
                 (vec![2], vec![]),
@@ -1229,7 +1278,7 @@ mod test {
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
-            child_1.entries,
+            child_1.entries(),
             vec![
                 (vec![7], vec![]),
                 (vec![8], vec![]),
@@ -1242,7 +1291,7 @@ mod test {
         let child_2 = btree.load_node(root.children[2]);
         assert_eq!(child_2.node_type, NodeType::Leaf);
         assert_eq!(
-            child_2.entries,
+            child_2.entries(),
             vec![
                 (vec![13], vec![]),
                 (vec![14], vec![]),
@@ -1294,16 +1343,16 @@ mod test {
         // [0, 1, 2, 3, 4]   [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![e(5)]);
+        assert_eq!(root.entries(), vec![e(5)]);
         assert_eq!(root.children.len(), 2);
 
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
-        assert_eq!(child_0.entries, vec![e(0), e(1), e(2), e(3), e(4)]);
+        assert_eq!(child_0.entries(), vec![e(0), e(1), e(2), e(3), e(4)]);
 
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
-        assert_eq!(child_1.entries, vec![e(7), e(8), e(9), e(10), e(11)]);
+        assert_eq!(child_1.entries(), vec![e(7), e(8), e(9), e(10), e(11)]);
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1318,7 +1367,7 @@ mod test {
         // [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(
-            root.entries,
+            root.entries(),
             vec![e(0), e(1), e(2), e(3), e(4), e(7), e(8), e(9), e(10), e(11)]
         );
 
@@ -1355,16 +1404,16 @@ mod test {
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![e(7)]);
+        assert_eq!(root.entries(), vec![e(7)]);
         assert_eq!(root.children.len(), 2);
 
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
-        assert_eq!(child_0.entries, vec![e(1), e(2), e(3), e(4), e(5)]);
+        assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
 
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
-        assert_eq!(child_1.entries, vec![e(8), e(9), e(10), e(11), e(12)]);
+        assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
 
         // Remove node 7. Triggers case 2.c
         assert_eq!(btree.remove(&vec![7]), Some(vec![]));
@@ -1374,7 +1423,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Leaf);
         assert_eq!(
-            root.entries,
+            root.entries(),
             vec![
                 e(1),
                 e(2),
@@ -1416,16 +1465,16 @@ mod test {
         // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![7], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![7], vec![])]);
         assert_eq!(root.children.len(), 2);
 
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
-        assert_eq!(child_0.entries, vec![e(1), e(2), e(4), e(5), e(6)]);
+        assert_eq!(child_0.entries(), vec![e(1), e(2), e(4), e(5), e(6)]);
 
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
-        assert_eq!(child_1.entries, vec![e(8), e(9), e(10), e(11), e(12)]);
+        assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1456,16 +1505,16 @@ mod test {
         // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![5], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![5], vec![])]);
         assert_eq!(root.children.len(), 2);
 
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
-        assert_eq!(child_0.entries, vec![e(0), e(1), e(2), e(3), e(4)]);
+        assert_eq!(child_0.entries(), vec![e(0), e(1), e(2), e(3), e(4)]);
 
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
-        assert_eq!(child_1.entries, vec![e(6), e(7), e(9), e(10), e(11)]);
+        assert_eq!(child_1.entries(), vec![e(6), e(7), e(9), e(10), e(11)]);
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1499,16 +1548,16 @@ mod test {
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![7], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![7], vec![])]);
         assert_eq!(root.children.len(), 2);
 
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
-        assert_eq!(child_0.entries, vec![e(1), e(2), e(3), e(4), e(5)]);
+        assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
 
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
-        assert_eq!(child_1.entries, vec![e(8), e(9), e(10), e(11), e(12)]);
+        assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1525,7 +1574,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Leaf);
         assert_eq!(
-            root.entries,
+            root.entries(),
             vec![
                 e(1),
                 e(2),
@@ -1574,16 +1623,16 @@ mod test {
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![7], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![7], vec![])]);
         assert_eq!(root.children.len(), 2);
 
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
-        assert_eq!(child_0.entries, vec![e(1), e(2), e(3), e(4), e(5)]);
+        assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
 
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
-        assert_eq!(child_1.entries, vec![e(8), e(9), e(10), e(11), e(12)]);
+        assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1600,7 +1649,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Leaf);
         assert_eq!(
-            root.entries,
+            root.entries(),
             vec![e(1), e(2), e(3), e(4), e(5), e(7), e(8), e(9), e(11), e(12)]
         );
 
@@ -1755,11 +1804,8 @@ mod test {
         let btree = BTreeMap::<Vec<u8>, Vec<u8>, _>::new(mem);
 
         // Test prefixes that don't exist in the map.
-        assert_eq!(btree.range(vec![0], None).collect::<Vec<_>>(), vec![]);
-        assert_eq!(
-            btree.range(vec![1, 2, 3, 4], None).collect::<Vec<_>>(),
-            vec![]
-        );
+        assert_eq!(btree.range(vec![0]..).collect::<Vec<_>>(), vec![]);
+        assert_eq!(btree.range(vec![1, 2, 3, 4]..).collect::<Vec<_>>(), vec![]);
     }
 
     // Tests the case where the prefix is larger than all the entries in a leaf node.
@@ -1771,7 +1817,7 @@ mod test {
         btree.insert(vec![0], vec![]).unwrap();
 
         // Test a prefix that's larger than the value in the leaf node. Should be empty.
-        assert_eq!(btree.range(vec![1], None).collect::<Vec<_>>(), vec![]);
+        assert_eq!(btree.range(vec![1]..).collect::<Vec<_>>(), vec![]);
     }
 
     // Tests the case where the prefix is larger than all the entries in an internal node.
@@ -1791,7 +1837,7 @@ mod test {
 
         // Test a prefix that's larger than the value in the internal node.
         assert_eq!(
-            btree.range(vec![7], None).collect::<Vec<_>>(),
+            btree.range(vec![7]..vec![8]).collect::<Vec<_>>(),
             vec![(vec![7], vec![])]
         );
     }
@@ -1821,12 +1867,12 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![1, 2], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![1, 2], vec![])]);
         assert_eq!(root.children.len(), 2);
 
         // Tests a prefix that's smaller than the value in the internal node.
         assert_eq!(
-            btree.range(vec![0], None).collect::<Vec<_>>(),
+            btree.range(vec![0]..vec![1]).collect::<Vec<_>>(),
             vec![
                 (vec![0, 1], vec![]),
                 (vec![0, 2], vec![]),
@@ -1837,7 +1883,7 @@ mod test {
 
         // Tests a prefix that crosses several nodes.
         assert_eq!(
-            btree.range(vec![1], None).collect::<Vec<_>>(),
+            btree.range(vec![1]..vec![2]).collect::<Vec<_>>(),
             vec![
                 (vec![1, 1], vec![]),
                 (vec![1, 2], vec![]),
@@ -1848,7 +1894,7 @@ mod test {
 
         // Tests a prefix that's larger than the value in the internal node.
         assert_eq!(
-            btree.range(vec![2], None).collect::<Vec<_>>(),
+            btree.range(vec![2]..vec![3]).collect::<Vec<_>>(),
             vec![
                 (vec![2, 1], vec![]),
                 (vec![2, 2], vec![]),
@@ -1891,7 +1937,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
         assert_eq!(
-            root.entries,
+            root.entries(),
             vec![(vec![1, 4], vec![]), (vec![2, 3], vec![])]
         );
         assert_eq!(root.children.len(), 3);
@@ -1899,7 +1945,7 @@ mod test {
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
-            child_0.entries,
+            child_0.entries(),
             vec![
                 (vec![0, 1], vec![]),
                 (vec![0, 2], vec![]),
@@ -1912,7 +1958,7 @@ mod test {
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
-            child_1.entries,
+            child_1.entries(),
             vec![
                 (vec![1, 6], vec![]),
                 (vec![1, 8], vec![]),
@@ -1924,7 +1970,7 @@ mod test {
 
         let child_2 = btree.load_node(root.children[2]);
         assert_eq!(
-            child_2.entries,
+            child_2.entries(),
             vec![
                 (vec![2, 4], vec![]),
                 (vec![2, 5], vec![]),
@@ -1936,11 +1982,14 @@ mod test {
         );
 
         // Tests a prefix that doesn't exist, but is in the middle of the root node.
-        assert_eq!(btree.range(vec![1, 5], None).collect::<Vec<_>>(), vec![]);
+        assert_eq!(
+            btree.range(vec![1, 5]..vec![1, 6]).collect::<Vec<_>>(),
+            vec![]
+        );
 
         // Tests a prefix that crosses several nodes.
         assert_eq!(
-            btree.range(vec![1], None).collect::<Vec<_>>(),
+            btree.range(vec![1]..vec![2]).collect::<Vec<_>>(),
             vec![
                 (vec![1, 2], vec![]),
                 (vec![1, 4], vec![]),
@@ -1953,7 +2002,7 @@ mod test {
         // Tests a prefix that starts from a leaf node, then iterates through the root and right
         // sibling.
         assert_eq!(
-            btree.range(vec![2], None).collect::<Vec<_>>(),
+            btree.range(vec![2]..).collect::<Vec<_>>(),
             vec![
                 (vec![2, 1], vec![]),
                 (vec![2, 2], vec![]),
@@ -1995,7 +2044,7 @@ mod test {
         // Getting the range with a prefix should return all 1000 elements with that prefix.
         for prefix in 0..=1 {
             let mut i: u32 = 0;
-            for (key, _) in btree.range(vec![prefix], None) {
+            for (key, _) in btree.range(vec![prefix]..vec![prefix + 1]) {
                 assert_eq!(
                     key,
                     vec![vec![prefix], i.to_be_bytes().to_vec()]
@@ -2034,12 +2083,11 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
-        assert_eq!(root.entries, vec![(vec![1, 2], vec![])]);
+        assert_eq!(root.entries(), vec![(vec![1, 2], vec![])]);
         assert_eq!(root.children.len(), 2);
 
-        // Tests a offset that's smaller than the value in the internal node.
         assert_eq!(
-            btree.range(vec![0], Some(vec![0])).collect::<Vec<_>>(),
+            btree.range(vec![0]..vec![1]).collect::<Vec<_>>(),
             vec![
                 (vec![0, 1], vec![]),
                 (vec![0, 2], vec![]),
@@ -2050,15 +2098,12 @@ mod test {
 
         // Tests a offset that has a value somewhere in the range of values of an internal node.
         assert_eq!(
-            btree.range(vec![1], Some(vec![3])).collect::<Vec<_>>(),
+            btree.range(vec![1, 3]..vec![2]).collect::<Vec<_>>(),
             vec![(vec![1, 3], vec![]), (vec![1, 4], vec![]),]
         );
 
         // Tests a offset that's larger than the value in the internal node.
-        assert_eq!(
-            btree.range(vec![2], Some(vec![5])).collect::<Vec<_>>(),
-            vec![]
-        );
+        assert_eq!(btree.range(vec![2, 5]..).collect::<Vec<_>>(), vec![]);
     }
 
     #[test]
@@ -2094,7 +2139,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Internal);
         assert_eq!(
-            root.entries,
+            root.entries(),
             vec![(vec![1, 4], vec![]), (vec![2, 3], vec![])]
         );
         assert_eq!(root.children.len(), 3);
@@ -2102,7 +2147,7 @@ mod test {
         let child_0 = btree.load_node(root.children[0]);
         assert_eq!(child_0.node_type, NodeType::Leaf);
         assert_eq!(
-            child_0.entries,
+            child_0.entries(),
             vec![
                 (vec![0, 1], vec![]),
                 (vec![0, 2], vec![]),
@@ -2115,7 +2160,7 @@ mod test {
         let child_1 = btree.load_node(root.children[1]);
         assert_eq!(child_1.node_type, NodeType::Leaf);
         assert_eq!(
-            child_1.entries,
+            child_1.entries(),
             vec![
                 (vec![1, 6], vec![]),
                 (vec![1, 8], vec![]),
@@ -2127,7 +2172,7 @@ mod test {
 
         let child_2 = btree.load_node(root.children[2]);
         assert_eq!(
-            child_2.entries,
+            child_2.entries(),
             vec![
                 (vec![2, 4], vec![]),
                 (vec![2, 5], vec![]),
@@ -2140,7 +2185,7 @@ mod test {
 
         // Tests a offset that crosses several nodes.
         assert_eq!(
-            btree.range(vec![1], Some(vec![4])).collect::<Vec<_>>(),
+            btree.range(vec![1, 4]..vec![2]).collect::<Vec<_>>(),
             vec![
                 (vec![1, 4], vec![]),
                 (vec![1, 6], vec![]),
@@ -2152,7 +2197,7 @@ mod test {
         // Tests a offset that starts from a leaf node, then iterates through the root and right
         // sibling.
         assert_eq!(
-            btree.range(vec![2], Some(vec![2])).collect::<Vec<_>>(),
+            btree.range(vec![2, 2]..vec![3]).collect::<Vec<_>>(),
             vec![
                 (vec![2, 2], vec![]),
                 (vec![2, 3], vec![]),
@@ -2200,5 +2245,69 @@ mod test {
         let btree: BTreeMap<Blob<4>, Blob<2>, _> = BTreeMap::init(btree.into_memory());
         // Equal key size
         let _btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
+    }
+
+    #[test]
+    fn bruteforce_range_search() {
+        use super::BTreeMap as StableBTreeMap;
+        use std::collections::BTreeMap;
+
+        const NKEYS: u64 = 60;
+
+        let mut std_map = BTreeMap::new();
+        let mut stable_map = StableBTreeMap::new(make_memory());
+
+        for k in 0..NKEYS {
+            std_map.insert(k, k);
+            stable_map.insert(k, k).unwrap();
+        }
+
+        assert_eq!(
+            std_map.range(..).map(|(k, v)| (*k, *v)).collect::<Vec<_>>(),
+            stable_map.range(..).collect::<Vec<_>>()
+        );
+
+        for l in 0..=NKEYS {
+            assert_eq!(
+                std_map
+                    .range(l..)
+                    .map(|(k, v)| (*k, *v))
+                    .collect::<Vec<_>>(),
+                stable_map.range(l..).collect::<Vec<_>>()
+            );
+
+            assert_eq!(
+                std_map
+                    .range(..l)
+                    .map(|(k, v)| (*k, *v))
+                    .collect::<Vec<_>>(),
+                stable_map.range(..l).collect::<Vec<_>>()
+            );
+
+            assert_eq!(
+                std_map
+                    .range(..=l)
+                    .map(|(k, v)| (*k, *v))
+                    .collect::<Vec<_>>(),
+                stable_map.range(..=l).collect::<Vec<_>>()
+            );
+
+            for r in l + 1..=NKEYS {
+                for lbound in [Bound::Included(l), Bound::Excluded(l)] {
+                    for rbound in [Bound::Included(r), Bound::Excluded(r)] {
+                        let range = (lbound, rbound);
+                        assert_eq!(
+                            std_map
+                                .range(range)
+                                .map(|(k, v)| (*k, *v))
+                                .collect::<Vec<_>>(),
+                            stable_map.range(range).collect::<Vec<_>>(),
+                            "range: {:?}",
+                            range
+                        );
+                    }
+                }
+            }
+        }
     }
 }

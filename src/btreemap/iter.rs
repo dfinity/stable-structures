@@ -3,11 +3,12 @@ use super::{
     BTreeMap,
 };
 use crate::{types::NULL, Address, BoundedStorable, Memory};
+use std::ops::{Bound, RangeBounds};
 
 /// An indicator of the current position in the map.
-pub(crate) enum Cursor {
+pub(crate) enum Cursor<K: BoundedStorable + Ord + Clone> {
     Address(Address),
-    Node { node: Node, next: Index },
+    Node { node: Node<K>, next: Index },
 }
 
 /// An index into a node's child or entry.
@@ -18,30 +19,34 @@ pub(crate) enum Index {
 
 /// An iterator over the entries of a [`BTreeMap`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct Iter<'a, K: BoundedStorable, V: BoundedStorable, M: Memory> {
+pub struct Iter<'a, K, V, M>
+where
+    K: BoundedStorable + Ord + Clone,
+    V: BoundedStorable,
+    M: Memory,
+{
     // A reference to the map being iterated on.
     map: &'a BTreeMap<K, V, M>,
 
     // A stack of cursors indicating the current position in the tree.
-    cursors: Vec<Cursor>,
+    cursors: Vec<Cursor<K>>,
 
-    // An optional prefix that the keys of all the entries returned must have.
-    // Iteration stops as soon as it runs into a key that doesn't have this prefix.
-    prefix: Option<Vec<u8>>,
-
-    // An optional offset to begin iterating from in the keys with the same prefix.
-    // Used only in the case that prefix is also set.
-    offset: Option<Vec<u8>>,
+    // The range of keys we want to traverse.
+    range: (Bound<K>, Bound<K>),
 }
 
-impl<'a, K: BoundedStorable, V: BoundedStorable, M: Memory> Iter<'a, K, V, M> {
+impl<'a, K, V, M> Iter<'a, K, V, M>
+where
+    K: BoundedStorable + Ord + Clone,
+    V: BoundedStorable,
+    M: Memory,
+{
     pub(crate) fn new(map: &'a BTreeMap<K, V, M>) -> Self {
         Self {
             map,
             // Initialize the cursors with the address of the root of the map.
             cursors: vec![Cursor::Address(map.root_addr)],
-            prefix: None,
-            offset: None,
+            range: (Bound::Unbounded, Bound::Unbounded),
         }
     }
 
@@ -50,40 +55,29 @@ impl<'a, K: BoundedStorable, V: BoundedStorable, M: Memory> Iter<'a, K, V, M> {
         Self {
             map,
             cursors: vec![],
-            prefix: None,
-            offset: None,
+            range: (Bound::Unbounded, Bound::Unbounded),
         }
     }
 
-    pub(crate) fn new_with_prefix(
+    pub(crate) fn new_in_range(
         map: &'a BTreeMap<K, V, M>,
-        prefix: Vec<u8>,
-        cursors: Vec<Cursor>,
+        range: (Bound<K>, Bound<K>),
+        cursors: Vec<Cursor<K>>,
     ) -> Self {
         Self {
             map,
             cursors,
-            prefix: Some(prefix),
-            offset: None,
-        }
-    }
-
-    pub(crate) fn new_with_prefix_and_offset(
-        map: &'a BTreeMap<K, V, M>,
-        prefix: Vec<u8>,
-        offset: Vec<u8>,
-        cursors: Vec<Cursor>,
-    ) -> Self {
-        Self {
-            map,
-            cursors,
-            prefix: Some(prefix),
-            offset: Some(offset),
+            range,
         }
     }
 }
 
-impl<K: BoundedStorable, V: BoundedStorable, M: Memory> Iterator for Iter<'_, K, V, M> {
+impl<K, V, M> Iterator for Iter<'_, K, V, M>
+where
+    K: BoundedStorable + Ord + Clone,
+    V: BoundedStorable,
+    M: Memory,
+{
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -128,17 +122,15 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> Iterator for Iter<'_, K,
             }
 
             Some(Cursor::Node {
-                mut node,
+                node,
                 next: Index::Entry(entry_idx),
             }) => {
-                if entry_idx >= node.entries.len() {
+                if entry_idx >= node.keys.len() {
                     // No more entries to iterate on in this node.
                     return self.next();
                 }
 
-                // Take the entry from the node. It's swapped with an empty element to
-                // avoid cloning.
-                let entry = node.swap_entry(entry_idx, (vec![], vec![]));
+                let (key, encoded_value) = node.entry(entry_idx);
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
@@ -151,25 +143,14 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> Iterator for Iter<'_, K,
                     node,
                 });
 
-                // If there's a prefix, verify that the key has that given prefix.
-                // Otherwise iteration is stopped.
-                if let Some(prefix) = &self.prefix {
-                    if !entry.0.starts_with(prefix) {
-                        // Clear all cursors to avoid needless work in subsequent calls.
-                        self.cursors = vec![];
-                        return None;
-                    } else if let Some(offset) = &self.offset {
-                        let mut prefix_with_offset = prefix.clone();
-                        prefix_with_offset.extend_from_slice(offset);
-                        // Clear all cursors to avoid needless work in subsequent calls.
-                        if entry.0 < prefix_with_offset {
-                            self.cursors = vec![];
-                            return None;
-                        }
-                    }
+                // If the key does not belong to the range, iteration stops.
+                if !self.range.contains(&key) {
+                    // Clear all cursors to avoid needless work in subsequent calls.
+                    self.cursors = vec![];
+                    return None;
                 }
 
-                Some((K::from_bytes(entry.0), V::from_bytes(entry.1)))
+                Some((key, V::from_bytes(encoded_value)))
             }
             None => {
                 // The cursors are empty. Iteration is complete.
