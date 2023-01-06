@@ -402,7 +402,7 @@ where
             return None;
         }
 
-        self.remove_helper(self.root_addr, &key).map(V::from_bytes)
+        self.remove_helper(self.root_addr, key).map(V::from_bytes)
     }
 
     // A helper method for recursively removing a key from the B-tree.
