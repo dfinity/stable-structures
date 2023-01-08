@@ -3,6 +3,7 @@ use super::{
     BTreeMap,
 };
 use crate::{types::NULL, Address, BoundedStorable, Memory};
+use std::borrow::Cow;
 
 /// An indicator of the current position in the map.
 pub(crate) enum Cursor {
@@ -169,7 +170,10 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> Iterator for Iter<'_, K,
                     }
                 }
 
-                Some((K::from_bytes(entry.0), V::from_bytes(entry.1)))
+                Some((
+                    K::from_bytes(Cow::Owned(entry.0)),
+                    V::from_bytes(Cow::Owned(entry.1)),
+                ))
             }
             None => {
                 // The cursors are empty. Iteration is complete.

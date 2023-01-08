@@ -1,7 +1,7 @@
 //! A serializable value stored in the stable memory.
 use crate::storable::Storable;
 use crate::{Memory, WASM_PAGE_SIZE};
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 
 #[cfg(test)]
 mod tests;
@@ -113,7 +113,7 @@ impl<T: Storable, M: Memory> Cell<T, M> {
     fn read_value(memory: &M, len: u32) -> T {
         let mut buf = vec![0; len as usize];
         memory.read(HEADER_V1_SIZE, &mut buf);
-        T::from_bytes(buf)
+        T::from_bytes(Cow::Owned(buf))
     }
 
     /// Reads the header from the specified memory.

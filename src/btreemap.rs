@@ -11,6 +11,7 @@ use allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
 use node::{Entry, Node, NodeType, B};
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 const LAYOUT_VERSION: u8 = 1;
@@ -187,7 +188,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value));
                 root.save(self.memory());
-                return Ok(Some(V::from_bytes(previous_value)));
+                return Ok(Some(V::from_bytes(Cow::Owned(previous_value))));
             }
 
             // If the root is full, we need to introduce a new node as the root.
@@ -215,7 +216,10 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
             }
         };
 
-        Ok(self.insert_nonfull(root, key, value).map(V::from_bytes))
+        Ok(self
+            .insert_nonfull(root, key, value)
+            .map(Cow::Owned)
+            .map(V::from_bytes))
     }
 
     // Inserts an entry into a node that is *not full*.
@@ -341,6 +345,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         }
 
         self.get_helper(self.root_addr, &key.to_bytes())
+            .map(Cow::Owned)
             .map(V::from_bytes)
     }
 
@@ -391,6 +396,7 @@ impl<K: BoundedStorable, V: BoundedStorable, M: Memory> BTreeMap<K, V, M> {
         }
 
         self.remove_helper(self.root_addr, &key.to_bytes())
+            .map(Cow::Owned)
             .map(V::from_bytes)
     }
 
