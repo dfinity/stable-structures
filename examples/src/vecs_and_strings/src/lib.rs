@@ -21,7 +21,7 @@ impl Storable for UserName {
         self.0.to_bytes()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
         Self(String::from_bytes(bytes))
     }
 }
@@ -39,7 +39,7 @@ impl Storable for UserData {
         self.0.to_bytes()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
         Self(<Vec<u8>>::from_bytes(bytes))
     }
 }
