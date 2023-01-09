@@ -28,8 +28,8 @@ impl Storable for UserProfile {
         Cow::Owned(Encode!(self).unwrap())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        Decode!(&bytes, Self).unwrap()
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
     }
 }
 
