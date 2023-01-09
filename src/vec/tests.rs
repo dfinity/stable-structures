@@ -4,6 +4,7 @@ use crate::vec_mem::VectorMemory as M;
 use crate::{GrowFailed, Memory};
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
+use std::borrow::Cow;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,7 +15,7 @@ impl<const N: u32> Storable for UnfixedU64<N> {
         self.0.to_bytes()
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert!(bytes.len() == 8);
         Self(u64::from_bytes(bytes))
     }

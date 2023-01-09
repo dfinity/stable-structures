@@ -4,7 +4,7 @@ use crate::{
     types::{Address, Bytes},
     write, write_struct, write_u32, Memory,
 };
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 
 /// The minimum degree to use in the btree.
 /// This constant is taken from Rust's std implementation of BTreeMap.
@@ -88,7 +88,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory.read((address + offset).get(), &mut value);
             offset += Bytes::from(max_value_size as u64);
 
-            keys.push(K::from_bytes(key));
+            keys.push(K::from_bytes(Cow::Owned(key)));
             encoded_values.push(value);
         }
 

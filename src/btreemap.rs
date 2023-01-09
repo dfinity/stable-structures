@@ -11,6 +11,7 @@ use allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
 use node::{Entry, Node, NodeType, B};
+use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -201,7 +202,7 @@ where
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value));
                 root.save(self.memory());
-                return Ok(Some(V::from_bytes(previous_value)));
+                return Ok(Some(V::from_bytes(Cow::Owned(previous_value))));
             }
 
             // If the root is full, we need to introduce a new node as the root.
@@ -229,7 +230,10 @@ where
             }
         };
 
-        Ok(self.insert_nonfull(root, key, value).map(V::from_bytes))
+        Ok(self
+            .insert_nonfull(root, key, value)
+            .map(Cow::Owned)
+            .map(V::from_bytes))
     }
 
     // Inserts an entry into a node that is *not full*.
@@ -353,7 +357,9 @@ where
             return None;
         }
 
-        self.get_helper(self.root_addr, key).map(V::from_bytes)
+        self.get_helper(self.root_addr, key)
+            .map(Cow::Owned)
+            .map(V::from_bytes)
     }
 
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
@@ -402,7 +408,9 @@ where
             return None;
         }
 
-        self.remove_helper(self.root_addr, key).map(V::from_bytes)
+        self.remove_helper(self.root_addr, key)
+            .map(Cow::Owned)
+            .map(V::from_bytes)
     }
 
     // A helper method for recursively removing a key from the B-tree.

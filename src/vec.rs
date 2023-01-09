@@ -37,7 +37,7 @@ use crate::{
     read_u32, read_u64, safe_write, write_u32, write_u64, Address, BoundedStorable, GrowFailed,
     Memory,
 };
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::fmt;
 use std::marker::PhantomData;
 
@@ -231,7 +231,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
         let (data_offset, data_size) = self.read_entry_size(offset);
         let mut data = vec![0; data_size];
         self.memory.read(data_offset, &mut data[..]);
-        T::from_bytes(data)
+        T::from_bytes(Cow::Owned(data))
     }
 
     /// Sets the vector's length.

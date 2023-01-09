@@ -54,7 +54,9 @@
 //! ----------------------------------------
 //! Unallocated space
 //! ```
-use crate::{read_u64, safe_write, write_u64, Address, GrowFailed, Memory};
+use crate::{read_u64, safe_write, write_u64, Address, GrowFailed, Memory, Storable};
+use std::borrow::Cow;
+use std::marker::PhantomData;
 
 #[cfg(test)]
 mod tests;
@@ -96,7 +98,6 @@ pub enum InitError {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum WriteError {
-    IndexFull { max_entries: u32 },
     GrowFailed { current_size: u64, delta: u64 },
 }
 
@@ -118,17 +119,19 @@ impl From<GrowFailed> for WriteError {
 pub struct NoSuchEntry;
 
 /// Append-only list of variable-size entries stored in stable memory.
-pub struct Log<INDEX: Memory, DATA: Memory> {
+pub struct Log<T: Storable, INDEX: Memory, DATA: Memory> {
     index_memory: INDEX,
     data_memory: DATA,
+    _marker: PhantomData<T>,
 }
 
-impl<INDEX: Memory, DATA: Memory> Log<INDEX, DATA> {
+impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     /// Creates a new empty growable stable log backed by the memory trait objects, overwriting the previous contents.
     pub fn new(index_memory: INDEX, data_memory: DATA) -> Self {
         let log = Self {
             index_memory,
             data_memory,
+            _marker: PhantomData,
         };
         Self::write_header(
             &log.index_memory,
@@ -190,6 +193,7 @@ impl<INDEX: Memory, DATA: Memory> Log<INDEX, DATA> {
         Ok(Self {
             index_memory,
             data_memory,
+            _marker: PhantomData,
         })
     }
 
@@ -282,9 +286,10 @@ impl<INDEX: Memory, DATA: Memory> Log<INDEX, DATA> {
 
     /// Returns the entry at the specified index.
     /// Returns None if the entry does not exist.
-    pub fn get(&self, idx: usize) -> Option<Vec<u8>> {
+    pub fn get(&self, idx: usize) -> Option<T> {
         let mut buf = vec![];
-        self.read_entry(idx, &mut buf).ok().map(|_| buf)
+        self.read_entry(idx, &mut buf).ok()?;
+        Some(T::from_bytes(Cow::Owned(buf)))
     }
 
     /// Reads the contents of the entry with the specified index into
@@ -305,7 +310,7 @@ impl<INDEX: Memory, DATA: Memory> Log<INDEX, DATA> {
     /// If successful, returns the index of the entry.
     ///
     /// POST-CONDITION: Ok(idx) = log.append(E) ⇒ log.get(idx) = Some(E)
-    pub fn append(&self, bytes: &[u8]) -> Result<usize, WriteError> {
+    pub fn append(&self, item: &T) -> Result<usize, WriteError> {
         let idx = self.len() as u64;
         let data_offset = if idx == 0 {
             0
@@ -313,6 +318,7 @@ impl<INDEX: Memory, DATA: Memory> Log<INDEX, DATA> {
             read_u64(&self.index_memory, self.index_entry_offset(idx - 1))
         };
 
+        let bytes = item.to_bytes();
         let new_offset = data_offset
             .checked_add(bytes.len() as u64)
             .expect("address overflow");
@@ -324,7 +330,7 @@ impl<INDEX: Memory, DATA: Memory> Log<INDEX, DATA> {
         debug_assert!(new_offset >= data_offset);
 
         // NB. we attempt to write the data first so we won't need to undo changes to the index if the write fails.
-        safe_write(&self.data_memory, entry_offset, bytes)?;
+        safe_write(&self.data_memory, entry_offset, &bytes[..])?;
 
         // NB. append to index first as it might need to grow the index memory.
         safe_write(
@@ -339,7 +345,7 @@ impl<INDEX: Memory, DATA: Memory> Log<INDEX, DATA> {
             idx as u64 + 1,
         );
 
-        debug_assert_eq!(self.get(idx as usize), Some(bytes.to_vec()));
+        debug_assert_eq!(self.get(idx as usize).unwrap().to_bytes(), bytes);
 
         Ok(idx as usize)
     }

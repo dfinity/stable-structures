@@ -3,6 +3,7 @@ use super::{
     BTreeMap,
 };
 use crate::{types::NULL, Address, BoundedStorable, Memory};
+use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
 /// An indicator of the current position in the map.
@@ -150,7 +151,7 @@ where
                     return None;
                 }
 
-                Some((key, V::from_bytes(encoded_value)))
+                Some((key, V::from_bytes(Cow::Owned(encoded_value))))
             }
             None => {
                 // The cursors are empty. Iteration is complete.

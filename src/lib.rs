@@ -9,10 +9,12 @@ extern crate core;
 
 pub mod btreemap;
 pub mod cell;
+pub use cell::{Cell as StableCell, Cell};
 pub mod file_mem;
 #[cfg(target_arch = "wasm32")]
 mod ic0_memory; // Memory API for canisters.
 pub mod log;
+pub use log::{Log as StableLog, Log};
 pub mod memory_manager;
 pub mod reader;
 pub mod storable;

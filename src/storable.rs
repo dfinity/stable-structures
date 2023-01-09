@@ -14,11 +14,7 @@ pub trait Storable {
     fn to_bytes(&self) -> Cow<[u8]>;
 
     /// Converts bytes into an element.
-    ///
-    /// NOTE: The bytes are passed as a `Vec<u8>` as opposed to `&[u8]` because
-    /// in the vast majority of cases, the caller will no longer need the bytes,
-    /// and passing a `Vec<u8>` prevents unnecessary cloning.
-    fn from_bytes(bytes: Vec<u8>) -> Self;
+    fn from_bytes(bytes: Cow<[u8]>) -> Self;
 }
 
 /// A trait indicating that a `Storable` element is bounded in size.
@@ -126,8 +122,8 @@ impl<const N: usize> Storable for Blob<N> {
         Cow::Borrowed(self.as_slice())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::try_from(&bytes[..]).unwrap()
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::try_from(bytes.borrow()).unwrap()
     }
 }
 
@@ -148,7 +144,7 @@ impl Storable for () {
         Cow::Borrowed(&[])
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert!(bytes.is_empty());
     }
 }
@@ -163,8 +159,8 @@ impl Storable for Vec<u8> {
         Cow::Borrowed(self)
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        bytes
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        bytes.to_vec()
     }
 }
 
@@ -173,8 +169,8 @@ impl Storable for String {
         Cow::Borrowed(self.as_bytes())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        String::from_utf8(bytes).unwrap()
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        String::from_utf8(bytes.to_vec()).unwrap()
     }
 }
 
@@ -183,8 +179,8 @@ impl Storable for u128 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_be_bytes(bytes.try_into().unwrap())
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 }
 
@@ -198,8 +194,8 @@ impl Storable for u64 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_be_bytes(bytes.try_into().unwrap())
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 }
 
@@ -213,8 +209,8 @@ impl Storable for u32 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_be_bytes(bytes.try_into().unwrap())
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 }
 
@@ -228,8 +224,8 @@ impl Storable for u16 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_be_bytes(bytes.try_into().unwrap())
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 }
 
@@ -243,8 +239,8 @@ impl Storable for u8 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self::from_be_bytes(bytes.try_into().unwrap())
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 }
 
@@ -258,7 +254,7 @@ impl<const N: usize> Storable for [u8; N] {
         Cow::Borrowed(&self[..])
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert_eq!(bytes.len(), N);
         let mut arr = [0; N];
         arr[0..N].copy_from_slice(&bytes);
@@ -307,7 +303,7 @@ where
         Cow::Owned(bytes)
     }
 
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert_eq!(bytes.len(), Self::MAX_SIZE as usize);
 
         // Rust doesn't allow us to access A::MAX_SIZE here but type
@@ -325,8 +321,8 @@ where
             &bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
         );
 
-        let a = A::from_bytes(bytes[0..a_len].to_vec());
-        let b = B::from_bytes(bytes[a_max_size..a_max_size + b_len].to_vec());
+        let a = A::from_bytes(Cow::Borrowed(&bytes[0..a_len]));
+        let b = B::from_bytes(Cow::Borrowed(&bytes[a_max_size..a_max_size + b_len]));
 
         (a, b)
     }
