@@ -55,6 +55,7 @@
 //! Unallocated space
 //! ```
 use crate::{read_u64, safe_write, write_u64, Address, GrowFailed, Memory, Storable};
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 #[cfg(test)]
@@ -288,7 +289,7 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     pub fn get(&self, idx: usize) -> Option<T> {
         let mut buf = vec![];
         self.read_entry(idx, &mut buf).ok()?;
-        Some(T::from_bytes(buf))
+        Some(T::from_bytes(Cow::Owned(buf)))
     }
 
     /// Reads the contents of the entry with the specified index into
