@@ -69,15 +69,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut keys = Vec::with_capacity(header.num_entries as usize);
         let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
+        let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
         for _ in 0..header.num_entries {
             // Read the key's size.
             let key_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
 
             // Read the key.
-            let mut key = vec![0; key_size as usize];
-            memory.read((address + offset).get(), &mut key);
+            buf.resize(key_size as usize, 0);
+            memory.read((address + offset).get(), &mut buf);
             offset += Bytes::from(max_key_size as u64);
+            let key = K::from_bytes(Cow::Borrowed(&buf));
 
             // Read the value's size.
             let value_size = read_u32(memory, address + offset);
@@ -88,7 +90,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory.read((address + offset).get(), &mut value);
             offset += Bytes::from(max_value_size as u64);
 
-            keys.push(K::from_bytes(Cow::Owned(key)));
+            keys.push(key);
             encoded_values.push(value);
         }
 
