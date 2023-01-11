@@ -13,6 +13,7 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 const MAX_USER_NAME_SIZE: u32 = 10;
 const MAX_USER_DATA_SIZE: u32 = 100;
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 struct UserName(String);
 
 impl Storable for UserName {
