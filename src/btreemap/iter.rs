@@ -178,7 +178,7 @@ mod test {
         let mut btree = BTreeMap::new(mem);
 
         for i in 0..CAPACITY as u8 {
-            btree.insert(i, i + 1).unwrap();
+            btree.insert(i, i + 1);
         }
 
         let mut i = 0;
@@ -198,7 +198,7 @@ mod test {
 
         // Insert the elements in reverse order.
         for i in (0..100u64).rev() {
-            btree.insert(i, i + 1).unwrap();
+            btree.insert(i, i + 1);
         }
 
         // Iteration should be in ascending order.
