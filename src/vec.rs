@@ -33,6 +33,7 @@
 //! the `SLOT_SIZE` is `BoundedStorable::MAX_SIZE` plus the number of
 //! bytes required to represent integers up to
 //! `BoundedStorable::MAX_SIZE`.
+use crate::storable::bytes_to_store_size;
 use crate::{
     read_u32, read_u64, safe_write, write_u32, write_u64, Address, BoundedStorable, GrowFailed,
     Memory,
@@ -225,13 +226,27 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
         Some(value)
     }
 
+    pub fn iter(&self) -> Iter<'_, T, M> {
+        Iter {
+            vec: self,
+            buf: vec![],
+            pos: 0,
+        }
+    }
+
     /// Reads the item at the specified index without any bound checks.
     fn read_entry(&self, index: usize) -> T {
+        let mut data = std::vec::Vec::new();
+        self.read_entry_to(index, &mut data);
+        T::from_bytes(Cow::Owned(data))
+    }
+
+    /// Reads the item at the specified index without any bound checks.
+    fn read_entry_to(&self, index: usize, buf: &mut std::vec::Vec<u8>) {
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index as u64;
         let (data_offset, data_size) = self.read_entry_size(offset);
-        let mut data = vec![0; data_size];
-        self.memory.read(data_offset, &mut data[..]);
-        T::from_bytes(Cow::Owned(data))
+        buf.resize(data_size, 0);
+        self.memory.read(data_offset, &mut buf[..]);
     }
 
     /// Sets the vector's length.
@@ -310,12 +325,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     }
 
     fn to_vec(&self) -> std::vec::Vec<T> {
-        let n = self.len();
-        let mut v = std::vec::Vec::with_capacity(n);
-        for i in 0..n {
-            v.push(self.read_entry(i))
-        }
-        v
+        self.iter().collect()
     }
 }
 
@@ -325,15 +335,47 @@ impl<T: BoundedStorable + fmt::Debug, M: Memory> fmt::Debug for Vec<T, M> {
     }
 }
 
-/// Returns the size of the entry required to hold an item of type T.
 fn slot_size<T: BoundedStorable>() -> u32 {
-    if T::IS_FIXED_SIZE {
-        T::MAX_SIZE
-    } else if T::MAX_SIZE < u8::MAX as u32 {
-        T::MAX_SIZE + 1
-    } else if T::MAX_SIZE < u16::MAX as u32 {
-        T::MAX_SIZE + 2
-    } else {
-        T::MAX_SIZE + 4
+    T::MAX_SIZE + bytes_to_store_size::<T>()
+}
+
+pub struct Iter<'a, T, M>
+where
+    T: BoundedStorable,
+    M: Memory,
+{
+    vec: &'a Vec<T, M>,
+    buf: std::vec::Vec<u8>,
+    pos: usize,
+}
+
+impl<T, M> Iterator for Iter<'_, T, M>
+where
+    T: BoundedStorable,
+    M: Memory,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        if self.vec.len() <= self.pos {
+            return None;
+        }
+
+        self.vec.read_entry_to(self.pos, &mut self.buf);
+        self.pos = self.pos.saturating_add(1);
+        Some(T::from_bytes(Cow::Borrowed(&self.buf)))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.vec.len().saturating_sub(self.pos), None)
+    }
+
+    fn count(self) -> usize {
+        self.vec.len().saturating_sub(self.pos)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<T> {
+        self.pos = self.pos.saturating_add(n);
+        self.next()
     }
 }

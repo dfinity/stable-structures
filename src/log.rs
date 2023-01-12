@@ -292,6 +292,15 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
         Some(T::from_bytes(Cow::Owned(buf)))
     }
 
+    /// Returns an iterator over log entries.
+    pub fn iter(&self) -> Iter<'_, T, INDEX, DATA> {
+        Iter {
+            log: self,
+            buf: vec![],
+            pos: 0,
+        }
+    }
+
     /// Reads the contents of the entry with the specified index into
     /// a byte vector.
     ///
@@ -378,5 +387,48 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
             HEADER_OFFSET + std::mem::size_of::<u64>() as u64 // skip over u64 storing the number of entries
                 + idx * (std::mem::size_of::<u64>() as u64), // memory addresses for idx many entries
         )
+    }
+}
+
+pub struct Iter<'a, T, I, D>
+where
+    T: Storable,
+    I: Memory,
+    D: Memory,
+{
+    log: &'a Log<T, I, D>,
+    buf: Vec<u8>,
+    pos: usize,
+}
+
+impl<T, I, D> Iterator for Iter<'_, T, I, D>
+where
+    T: Storable,
+    I: Memory,
+    D: Memory,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        match self.log.read_entry(self.pos, &mut self.buf) {
+            Ok(()) => {
+                self.pos = self.pos.saturating_add(1);
+                Some(T::from_bytes(Cow::Borrowed(&self.buf)))
+            }
+            Err(NoSuchEntry) => None,
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.log.len().saturating_sub(self.pos), None)
+    }
+
+    fn count(self) -> usize {
+        self.log.len().saturating_sub(self.pos)
+    }
+
+    fn nth(&mut self, n: usize) -> Option<T> {
+        self.pos = self.pos.saturating_add(n);
+        self.next()
     }
 }

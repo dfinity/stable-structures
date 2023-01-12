@@ -192,3 +192,37 @@ fn test_index_grow() {
     let (index_memory, _) = log.into_memories();
     assert_eq!(index_memory.size(), 2)
 }
+
+#[test]
+fn test_iter() {
+    let log = Log::<String, _, _>::new(VectorMemory::default(), VectorMemory::default());
+    assert_eq!(log.iter().next(), None);
+    log.append(&"apple".to_string()).unwrap();
+    log.append(&"banana".to_string()).unwrap();
+    log.append(&"cider".to_string()).unwrap();
+
+    let mut iter = log.iter();
+    assert_eq!(iter.size_hint(), (3, None));
+    assert_eq!(iter.next(), Some("apple".to_string()));
+    assert_eq!(iter.size_hint(), (2, None));
+    assert_eq!(iter.next(), Some("banana".to_string()));
+    assert_eq!(iter.size_hint(), (1, None));
+    assert_eq!(iter.next(), Some("cider".to_string()));
+    assert_eq!(iter.size_hint(), (0, None));
+    assert_eq!(iter.next(), None);
+
+    assert_eq!(log.iter().nth(0), Some("apple".to_string()));
+    assert_eq!(log.iter().nth(1), Some("banana".to_string()));
+    assert_eq!(log.iter().nth(2), Some("cider".to_string()));
+    assert_eq!(log.iter().nth(3), None);
+    assert_eq!(log.iter().nth(4), None);
+    assert_eq!(log.iter().nth(usize::MAX), None);
+
+    assert_eq!(log.iter().count(), 3);
+    assert_eq!(log.iter().skip(0).count(), 3);
+    assert_eq!(log.iter().skip(1).count(), 2);
+    assert_eq!(log.iter().skip(2).count(), 1);
+    assert_eq!(log.iter().skip(3).count(), 0);
+    assert_eq!(log.iter().skip(4).count(), 0);
+    assert_eq!(log.iter().skip(usize::MAX).count(), 0);
+}

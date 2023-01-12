@@ -368,7 +368,7 @@ fn encode_size<A: BoundedStorable>(dst: &mut [u8], n: usize) {
     }
 }
 
-const fn bytes_to_store_size<A: BoundedStorable>() -> u32 {
+pub(crate) const fn bytes_to_store_size<A: BoundedStorable>() -> u32 {
     if A::IS_FIXED_SIZE {
         0
     } else if A::MAX_SIZE <= u8::MAX as u32 {

@@ -162,3 +162,37 @@ fn test_init_failures() {
         InitError::IncompatibleVersion(15),
     );
 }
+
+#[test]
+fn test_iter() {
+    let sv = StableVec::<u64, M>::new(M::default()).unwrap();
+    assert_eq!(sv.iter().next(), None);
+    sv.push(&1).unwrap();
+    sv.push(&2).unwrap();
+    sv.push(&3).unwrap();
+
+    let mut iter = sv.iter();
+    assert_eq!(iter.size_hint(), (3, None));
+    assert_eq!(iter.next(), Some(1));
+    assert_eq!(iter.size_hint(), (2, None));
+    assert_eq!(iter.next(), Some(2));
+    assert_eq!(iter.size_hint(), (1, None));
+    assert_eq!(iter.next(), Some(3));
+    assert_eq!(iter.size_hint(), (0, None));
+    assert_eq!(iter.next(), None);
+
+    assert_eq!(sv.iter().nth(0), Some(1));
+    assert_eq!(sv.iter().nth(1), Some(2));
+    assert_eq!(sv.iter().nth(2), Some(3));
+    assert_eq!(sv.iter().nth(3), None);
+    assert_eq!(sv.iter().nth(4), None);
+    assert_eq!(sv.iter().nth(usize::MAX), None);
+
+    assert_eq!(sv.iter().count(), 3);
+    assert_eq!(sv.iter().skip(0).count(), 3);
+    assert_eq!(sv.iter().skip(1).count(), 2);
+    assert_eq!(sv.iter().skip(2).count(), 1);
+    assert_eq!(sv.iter().skip(3).count(), 0);
+    assert_eq!(sv.iter().skip(4).count(), 0);
+    assert_eq!(sv.iter().skip(usize::MAX).count(), 0);
+}
