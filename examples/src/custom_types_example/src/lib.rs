@@ -59,5 +59,5 @@ fn get(key: u64) -> Option<UserProfile> {
 
 #[ic_cdk_macros::update]
 fn insert(key: u64, value: UserProfile) -> Option<UserProfile> {
-    MAP.with(|p| p.borrow_mut().insert(key, value)).unwrap()
+    MAP.with(|p| p.borrow_mut().insert(key, value))
 }

@@ -41,7 +41,6 @@ fn stable_get(key: u128) -> Option<u128> {
 fn stable_insert(key: u128, value: u128) -> Option<u128> {
     STATE
         .with(|s| s.borrow_mut().stable_data.insert(key, value))
-        .unwrap()
 }
 
 // Sets the data that lives on the heap.
