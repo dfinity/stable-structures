@@ -193,6 +193,7 @@ fn test_index_grow() {
     assert_eq!(index_memory.size(), 2)
 }
 
+#[allow(clippy::iter_nth_zero)]
 #[test]
 fn test_iter() {
     let log = Log::<String, _, _>::new(VectorMemory::default(), VectorMemory::default());

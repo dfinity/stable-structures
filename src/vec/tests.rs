@@ -163,6 +163,7 @@ fn test_init_failures() {
     );
 }
 
+#[allow(clippy::iter_nth_zero)]
 #[test]
 fn test_iter() {
     let sv = StableVec::<u64, M>::new(M::default()).unwrap();
