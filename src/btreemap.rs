@@ -229,8 +229,7 @@ where
             }
         };
 
-        self
-            .insert_nonfull(root, key, value)
+        self.insert_nonfull(root, key, value)
             .map(Cow::Owned)
             .map(V::from_bytes)
     }
@@ -2325,7 +2324,7 @@ mod test {
         struct K;
         impl crate::Storable for K {
             fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Borrowed(&[1,2,3,4])
+                Cow::Borrowed(&[1, 2, 3, 4])
             }
 
             fn from_bytes(_: Cow<[u8]>) -> Self {
@@ -2351,7 +2350,7 @@ mod test {
         struct V;
         impl crate::Storable for V {
             fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Borrowed(&[1,2,3,4])
+                Cow::Borrowed(&[1, 2, 3, 4])
             }
 
             fn from_bytes(_: Cow<[u8]>) -> Self {
