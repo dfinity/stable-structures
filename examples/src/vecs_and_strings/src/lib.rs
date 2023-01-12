@@ -74,6 +74,5 @@ fn get(key: String) -> Option<Vec<u8>> {
 #[ic_cdk_macros::update]
 fn insert(key: String, value: Vec<u8>) -> Option<Vec<u8>> {
     MAP.with(|p| p.borrow_mut().insert(UserName(key), UserData(value)))
-        .unwrap()
         .map(|v| v.0)
 }
