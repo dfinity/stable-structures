@@ -27,5 +27,5 @@ fn get(key: u128) -> Option<u128> {
 // Inserts an entry into the map and returns the previous value of the key if it exists.
 #[ic_cdk_macros::update]
 fn insert(key: u128, value: u128) -> Option<u128> {
-    MAP.with(|p| p.borrow_mut().insert(key, value)).unwrap()
+    MAP.with(|p| p.borrow_mut().insert(key, value))
 }
