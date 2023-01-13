@@ -45,7 +45,7 @@ pub struct Allocator<M: Memory> {
     memory: M,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 struct AllocatorHeader {
     magic: [u8; 3],
     version: u8,
@@ -243,7 +243,7 @@ impl<M: Memory> Allocator<M> {
 }
 
 #[derive(Debug)]
-#[repr(packed)]
+#[repr(C, packed)]
 struct ChunkHeader {
     magic: [u8; 3],
     version: u8,

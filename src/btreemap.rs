@@ -48,7 +48,7 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 struct BTreeHeader {
     magic: [u8; 3],
     version: u8,
