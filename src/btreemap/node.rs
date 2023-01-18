@@ -314,7 +314,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 }
 
 // A transient data structure for reading/writing metadata into/from stable memory.
-#[repr(packed)]
+#[repr(C, packed)]
 struct NodeHeader {
     magic: [u8; 3],
     version: u8,

@@ -157,7 +157,7 @@ impl<M: Memory> MemoryManager<M> {
     }
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 struct Header {
     magic: [u8; 3],
 
