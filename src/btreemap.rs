@@ -16,9 +16,9 @@
 //! Root node address           ↕ 8 bytes
 //! ----------------------------------------
 //! Length (number of elements) ↕ 8 bytes
-//! ----------------------------------------
+//! ---------------------------------------- <- Address 28 (PACKED_HEADER_SIZE)
 //! Reserved space              ↕ 24 bytes
-//! ---------------------------------------- <- Address 52
+//! ---------------------------------------- <- Address 52 (ALLOCATOR_OFFSET)
 //! Allocator
 //! ----------------------------------------
 //! ... free memory for nodes
@@ -39,10 +39,12 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
-const LAYOUT_VERSION: u8 = 1;
 const MAGIC: &[u8; 3] = b"BTR";
+const LAYOUT_VERSION: u8 = 1;
+/// The sum of all the header fields, i.e. size of a packed header.
+const PACKED_HEADER_SIZE: usize = 28;
 /// The offset where the allocator begins.
-const ALLOCATOR_OFFSET: u64 = 52;
+const ALLOCATOR_OFFSET: usize = 52;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -74,7 +76,7 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
-// The total (packed) header size must fit before the allocator.
+/// The packed header size must be <= ALLOCATOR_OFFSET.
 struct BTreeHeaderV1 {
     magic: [u8; 3],
     version: u8,
@@ -82,6 +84,7 @@ struct BTreeHeaderV1 {
     max_value_size: u32,
     root_addr: Address,
     length: u64,
+    // Reserved bytes for future extensions
 }
 
 impl<K, V, M> BTreeMap<K, V, M>
@@ -128,7 +131,7 @@ where
             root_addr: NULL,
             allocator: Allocator::new(
                 memory,
-                Address::from(ALLOCATOR_OFFSET),
+                Address::from(ALLOCATOR_OFFSET as u64),
                 Node::<K>::size(K::MAX_SIZE, V::MAX_SIZE),
             ),
             max_key_size: K::MAX_SIZE,
@@ -161,7 +164,7 @@ where
             expected_value_size
         );
 
-        let allocator_addr = Address::from(ALLOCATOR_OFFSET);
+        let allocator_addr = Address::from(ALLOCATOR_OFFSET as u64);
         Self {
             root_addr: header.root_addr,
             allocator: Allocator::load(memory, allocator_addr),
@@ -174,12 +177,8 @@ where
 
     /// Reads the header from the specified memory.
     fn read_header(memory: &M) -> BTreeHeaderV1 {
-        // The total (packed) header size must fit before the allocator.
-        // Due to the padding, at some point the size of BTreeHeaderV1
-        // might get bigger, so this assert should be fixed.
-        debug_assert!(core::mem::size_of::<BTreeHeaderV1>() <= ALLOCATOR_OFFSET as usize);
         // Read the header
-        let mut buf = [0; core::mem::size_of::<BTreeHeaderV1>()];
+        let mut buf = [0; PACKED_HEADER_SIZE];
         memory.read(0, &mut buf);
         // Deserialize the fields
         BTreeHeaderV1 {
@@ -981,12 +980,8 @@ where
 
     /// Write the layout header to the memory.
     fn write_header(header: &BTreeHeaderV1, memory: &M) {
-        // The total (packed) header size must fit before the allocator.
-        // Due to the padding, at some point the size of BTreeHeaderV1
-        // might get bigger, so this assert should be fixed.
-        assert!(core::mem::size_of::<BTreeHeaderV1>() <= ALLOCATOR_OFFSET as usize);
         // Serialize the header
-        let mut buf = [0; core::mem::size_of::<BTreeHeaderV1>()];
+        let mut buf = [0; PACKED_HEADER_SIZE];
         buf[0..3].copy_from_slice(&header.magic);
         buf[3] = header.version;
         buf[4..8].copy_from_slice(&header.max_key_size.to_le_bytes());
@@ -2419,22 +2414,38 @@ mod test {
         btree.insert((), V);
     }
 
+    // To generate the memory dump file for the current version:
+    //   cargo test create_btreemap_dump_file -- --include-ignored
     #[test]
-    fn binary_compatible_with_legacy_format() {
+    #[ignore]
+    fn create_btreemap_dump_file() {
         let mem = make_memory();
         let mut btree = BTreeMap::init(mem.clone());
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
 
-        let btreemap_legacy = include_bytes!("btreemap/btreemap_legacy.bin");
-        assert_eq!(*mem.as_ref().borrow(), btreemap_legacy);
+        use std::io::prelude::*;
+        let mut file =
+            std::fs::File::create(format!("dumps/btreemap_v{LAYOUT_VERSION}.dump")).unwrap();
+        file.write_all(&mem.borrow()).unwrap();
+    }
+
+    #[test]
+    fn produces_layout_identical_to_layout_version_1_with_packed_headers() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::init(mem.clone());
+        assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
+        assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
+
+        let btreemap_v1 = include_bytes!("../dumps/btreemap_v1_packed_headers.dump");
+        assert_eq!(*mem.borrow(), btreemap_v1);
     }
 
     #[test]
     #[allow(unaligned_references)]
-    fn read_write_header_and_read_write_struct_produce_the_same_result() {
+    fn read_write_header_is_identical_to_read_write_struct() {
         #[repr(C, packed)]
-        struct BTreeHeaderLegacy {
+        struct BTreePackedHeader {
             magic: [u8; 3],
             version: u8,
             max_key_size: u32,
@@ -2443,7 +2454,7 @@ mod test {
             length: u64,
             _buffer: [u8; 24],
         }
-        let legacy_header = BTreeHeaderLegacy {
+        let packed_header = BTreePackedHeader {
             magic: *MAGIC,
             version: LAYOUT_VERSION,
             root_addr: Address::from(0xDEADBEEF),
@@ -2453,8 +2464,8 @@ mod test {
             _buffer: [0; 24],
         };
 
-        let legacy_mem = make_memory();
-        crate::write_struct(&legacy_header, Address::from(0), &legacy_mem);
+        let packed_mem = make_memory();
+        crate::write_struct(&packed_header, Address::from(0), &packed_mem);
 
         let v1_header = BTreeHeaderV1 {
             magic: *MAGIC,
@@ -2468,15 +2479,15 @@ mod test {
         let v1_mem = make_memory();
         BTreeMap::<Vec<_>, Vec<_>, RefCell<Vec<_>>>::write_header(&v1_header, &v1_mem);
 
-        assert_eq!(legacy_mem, v1_mem);
+        assert_eq!(packed_mem, v1_mem);
 
-        let legacy_header: BTreeHeaderLegacy = crate::read_struct(Address::from(0), &v1_mem);
+        let packed_header: BTreePackedHeader = crate::read_struct(Address::from(0), &v1_mem);
         let v1_header = BTreeMap::<Vec<_>, Vec<_>, RefCell<Vec<_>>>::read_header(&v1_mem);
-        assert_eq!(legacy_header.magic, v1_header.magic);
-        assert_eq!(legacy_header.version, v1_header.version);
-        assert_eq!(legacy_header.max_key_size, v1_header.max_key_size);
-        assert_eq!(legacy_header.max_value_size, v1_header.max_value_size);
-        assert_eq!(legacy_header.root_addr, v1_header.root_addr);
-        assert_eq!(legacy_header.length, v1_header.length);
+        assert_eq!(packed_header.magic, v1_header.magic);
+        assert_eq!(packed_header.version, v1_header.version);
+        assert_eq!(packed_header.max_key_size, v1_header.max_key_size);
+        assert_eq!(packed_header.max_value_size, v1_header.max_value_size);
+        assert_eq!(packed_header.root_addr, v1_header.root_addr);
+        assert_eq!(packed_header.length, v1_header.length);
     }
 }
