@@ -813,4 +813,43 @@ mod test {
             }
         });
     }
+
+    // To generate the memory dump file for the current version:
+    //   cargo test create_memory_manager_dump_file -- --include-ignored
+    #[test]
+    #[ignore]
+    fn create_memory_manager_dump_file() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init_with_bucket_size(mem.clone(), 1);
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+
+        assert_eq!(memory_0.grow(1), 0);
+        assert_eq!(memory_1.grow(1), 0);
+
+        memory_0.write(0, &[1, 2, 3]);
+        memory_1.write(0, &[4, 5, 6]);
+
+        use std::io::prelude::*;
+        let mut file =
+            std::fs::File::create(format!("dumps/memory_manager_v{LAYOUT_VERSION}.dump")).unwrap();
+        file.write_all(&mem.borrow()).unwrap();
+    }
+
+    #[test]
+    fn produces_layout_identical_to_layout_version_1_with_packed_headers() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init_with_bucket_size(mem.clone(), 1);
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+
+        assert_eq!(memory_0.grow(1), 0);
+        assert_eq!(memory_1.grow(1), 0);
+
+        memory_0.write(0, &[1, 2, 3]);
+        memory_1.write(0, &[4, 5, 6]);
+
+        let btreemap_v1 = include_bytes!("../dumps/memory_manager_v1_packed_headers.dump");
+        assert_eq!(*mem.borrow(), btreemap_v1);
+    }
 }
