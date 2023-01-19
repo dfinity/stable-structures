@@ -5,19 +5,19 @@
 //!
 //! ```text
 //! ---------------------------------------- <- Address 0
-//! Magic "BTR"            ↕ 3 bytes
+//! Magic "BTR"                 ↕ 3 bytes
 //! ----------------------------------------
-//! Layout version         ↕ 1 byte
+//! Layout version              ↕ 1 byte
 //! ----------------------------------------
-//! Max key size           ↕ 4 bytes
+//! Max key size                ↕ 4 bytes
 //! ----------------------------------------
-//! Max value size         ↕ 4 bytes
+//! Max value size              ↕ 4 bytes
 //! ----------------------------------------
-//! Root node address      ↕ 8 bytes
+//! Root node address           ↕ 8 bytes
 //! ----------------------------------------
-//! Length (number of elements)        ↕ 8 bytes
+//! Length (number of elements) ↕ 8 bytes
 //! ----------------------------------------
-//! Reserved space         ↕ 24 bytes
+//! Reserved space              ↕ 24 bytes
 //! ---------------------------------------- <- Address 52
 //! Allocator
 //! ----------------------------------------
@@ -974,11 +974,11 @@ where
             length: self.length,
         };
 
-        Self::write_header(&header, self.memory()).unwrap();
+        Self::write_header(&header, self.memory());
     }
 
     /// Write the layout header to the memory.
-    fn write_header(header: &BTreeHeaderV1, memory: &M) -> Result<(), crate::GrowFailed> {
+    fn write_header(header: &BTreeHeaderV1, memory: &M) {
         // Serialize the header
         let mut buf = [0; core::mem::size_of::<BTreeHeaderV1>()];
         buf[0..3].copy_from_slice(&header.magic);
@@ -988,7 +988,7 @@ where
         buf[12..20].copy_from_slice(&header.root_addr.get().to_le_bytes());
         buf[20..28].copy_from_slice(&header.length.to_le_bytes());
         // Write the header
-        crate::write(memory, 0, &buf)
+        crate::write(memory, 0, &buf);
     }
 }
 
@@ -2460,7 +2460,7 @@ mod test {
         };
 
         let v1_mem = make_memory();
-        BTreeMap::<Vec<_>, Vec<_>, RefCell<Vec<_>>>::write_header(&v1_header, &v1_mem).unwrap();
+        BTreeMap::<Vec<_>, Vec<_>, RefCell<Vec<_>>>::write_header(&v1_header, &v1_mem);
 
         assert_eq!(legacy_mem, v1_mem);
 
