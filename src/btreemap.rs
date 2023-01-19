@@ -74,7 +74,7 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
-// The total header size must be <= ALLOCATOR_OFFSET
+// The total (packed) header size must fit before the allocator.
 struct BTreeHeaderV1 {
     magic: [u8; 3],
     version: u8,
@@ -174,8 +174,10 @@ where
 
     /// Reads the header from the specified memory.
     fn read_header(memory: &M) -> BTreeHeaderV1 {
-        // The header must fit before the allocator
-        debug_assert!(core::mem::size_of::<BTreeHeaderV1>() < ALLOCATOR_OFFSET as usize);
+        // The total (packed) header size must fit before the allocator.
+        // Due to the padding, at some point the size of BTreeHeaderV1
+        // might get bigger, so this assert should be fixed.
+        debug_assert!(core::mem::size_of::<BTreeHeaderV1>() <= ALLOCATOR_OFFSET as usize);
         // Read the header
         let mut buf = [0; core::mem::size_of::<BTreeHeaderV1>()];
         memory.read(0, &mut buf);
@@ -979,6 +981,10 @@ where
 
     /// Write the layout header to the memory.
     fn write_header(header: &BTreeHeaderV1, memory: &M) {
+        // The total (packed) header size must fit before the allocator.
+        // Due to the padding, at some point the size of BTreeHeaderV1
+        // might get bigger, so this assert should be fixed.
+        assert!(core::mem::size_of::<BTreeHeaderV1>() <= ALLOCATOR_OFFSET as usize);
         // Serialize the header
         let mut buf = [0; core::mem::size_of::<BTreeHeaderV1>()];
         buf[0..3].copy_from_slice(&header.magic);
