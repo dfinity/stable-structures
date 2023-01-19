@@ -988,7 +988,7 @@ where
         buf[12..20].copy_from_slice(&header.root_addr.get().to_le_bytes());
         buf[20..28].copy_from_slice(&header.length.to_le_bytes());
         // Write the header
-        crate::safe_write(memory, 0, &buf)
+        crate::write(memory, 0, &buf)
     }
 }
 
