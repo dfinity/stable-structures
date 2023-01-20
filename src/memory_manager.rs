@@ -243,6 +243,13 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         mem_mgr.save_header();
 
+        // Mark all memory sizes as zeros.
+        crate::write(
+            &mem_mgr.memory,
+            MEMORY_SIZES_OFFSET as u64,
+            &[0; MEMORY_SIZES_SIZE],
+        );
+
         // Mark all the buckets as unallocated.
         write(
             &mem_mgr.memory,
@@ -317,7 +324,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         };
 
         Self::write_header(&header, &self.memory);
-        Self::write_memory_sizes_in_pages(&self.memory_sizes_in_pages, &self.memory);
     }
 
     /// Write the layout header to the memory.
@@ -330,18 +336,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         buf[6..8].copy_from_slice(&header.bucket_size_in_pages.to_le_bytes());
         // Write the header
         crate::write(memory, 0, &buf);
-    }
-
-    /// Write the memory sizes to the memory.
-    fn write_memory_sizes_in_pages(memory_sizes_in_pages: &[u64; MAX_NUM_MEMORIES], memory: &M) {
-        let buf: [u8; MEMORY_SIZES_SIZE] = memory_sizes_in_pages
-            .iter()
-            .flat_map(|s| s.to_le_bytes())
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-        // Write the header
-        crate::write(memory, MEMORY_SIZES_OFFSET as u64, &buf);
     }
 
     // Returns the size of a memory (in pages).
@@ -394,11 +388,21 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         // Update the memory with the new size.
-        self.memory_sizes_in_pages[id.0 as usize] = new_size;
+        self.set_memory_size_in_pages(id, new_size);
 
         // Update the header and return the old size.
         self.save_header();
         old_size as i64
+    }
+
+    /// Set memory size in pages for a specified memory id and write it to memory.
+    fn set_memory_size_in_pages(&mut self, id: MemoryId, new_size: u64) {
+        self.memory_sizes_in_pages[id.0 as usize] = new_size;
+        crate::write(
+            &self.memory,
+            (MEMORY_SIZES_OFFSET + id.0 as usize * core::mem::size_of::<u64>()) as u64,
+            &self.memory_sizes_in_pages[id.0 as usize].to_le_bytes(),
+        );
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8]) {
