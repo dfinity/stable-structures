@@ -41,20 +41,29 @@
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 use crate::{
-    read_struct,
     types::{Address, Bytes},
-    write, write_struct, Memory, WASM_PAGE_SIZE,
+    write, Memory, WASM_PAGE_SIZE,
 };
 use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+// The maximum number of memories that can be created. Must be <= u8::MAX
+const MAX_NUM_MEMORIES: usize = 255;
+// A value used internally to indicate that a bucket is unallocated.
+const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES as u8;
+
 const MAGIC: &[u8; 3] = b"MGR";
 const LAYOUT_VERSION: u8 = 1;
-
-// The maximum number of memories that can be created.
-const MAX_NUM_MEMORIES: u8 = 255;
+/// The sum of all the header fields, i.e. size of a packed header.
+const PACKED_HEADER_SIZE: usize = 8;
+/// The offset where memory sizes begin.
+const MEMORY_SIZES_OFFSET: usize = 40;
+/// The size of the memory sizes.
+const MEMORY_SIZES_SIZE: usize = MAX_NUM_MEMORIES * core::mem::size_of::<u64>();
+/// The offset where memory sizes begin.
+const BUCKET_ALLOCATIONS_OFFSET: usize = MEMORY_SIZES_OFFSET + MEMORY_SIZES_SIZE;
 
 // The maximum number of buckets the memory manager can handle.
 // With a bucket size of 128 pages this can support up to 256GiB of memory.
@@ -62,15 +71,9 @@ const MAX_NUM_BUCKETS: u64 = 32768;
 
 const BUCKET_SIZE_IN_PAGES: u64 = 128;
 
-// A value used internally to indicate that a bucket is unallocated.
-const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
-
 // The offset where buckets are in memory.
 const BUCKETS_OFFSET_IN_PAGES: u64 = 1;
 const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
-
-// Reserved bytes in the header for future extensions.
-const HEADER_RESERVED_BYTES: usize = 32;
 
 /// A memory manager simulates multiple memories within a single memory.
 ///
@@ -99,9 +102,9 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// Number of allocated buckets           ↕ 2 bytes
 /// --------------------------------------------------
 /// Bucket size (in pages) = N            ↕ 2 bytes
-/// --------------------------------------------------
+/// -------------------------------------------------- <- Address 8 (PACKED_HEADER_SIZE)
 /// Reserved space                        ↕ 32 bytes
-/// --------------------------------------------------
+/// -------------------------------------------------- <- Address 40 (MEMORY_SIZES_OFFSET)
 /// Size of memory 0 (in pages)           ↕ 8 bytes
 /// --------------------------------------------------
 /// Size of memory 1 (in pages)           ↕ 8 bytes
@@ -109,7 +112,7 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// ...
 /// --------------------------------------------------
 /// Size of memory 254 (in pages)         ↕ 8 bytes
-/// -------------------------------------------------- <- Bucket allocations
+/// -------------------------------------------------- <- Address 2080 (BUCKET_ALLOCATIONS_OFFSET)
 /// Bucket 1                              ↕ 1 byte        (1 byte indicating which memory owns it)
 /// --------------------------------------------------
 /// Bucket 2                              ↕ 1 byte
@@ -157,8 +160,7 @@ impl<M: Memory> MemoryManager<M> {
     }
 }
 
-#[repr(C, packed)]
-struct Header {
+struct HeaderV1 {
     magic: [u8; 3],
 
     version: u8,
@@ -168,18 +170,7 @@ struct Header {
 
     // The size of a bucket in Wasm pages.
     bucket_size_in_pages: u16,
-
     // Reserved bytes for future extensions
-    _reserved: [u8; HEADER_RESERVED_BYTES],
-
-    // The size of each individual memory that can be created by the memory manager.
-    memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
-}
-
-impl Header {
-    fn size() -> Bytes {
-        Bytes::new(core::mem::size_of::<Self>() as u64)
-    }
 }
 
 #[derive(Clone)]
@@ -216,7 +207,7 @@ struct MemoryManagerInner<M: Memory> {
     bucket_size_in_pages: u16,
 
     // An array storing the size (in pages) of each of the managed memories.
-    memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
+    memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES],
 
     // A map mapping each managed memory to the bucket ids that are allocated to it.
     memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
@@ -245,7 +236,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mem_mgr = Self {
             memory,
             allocated_buckets: 0,
-            memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
+            memory_sizes_in_pages: [0; MAX_NUM_MEMORIES],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
         };
@@ -264,7 +255,8 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     fn load(memory: M) -> Self {
         // Read the header from memory.
-        let header: Header = read_struct(Address::from(0), &memory);
+        let header = Self::read_header(&memory);
+        let memory_sizes_in_pages = Self::read_memory_sizes_in_pages(&memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
@@ -285,22 +277,71 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory,
             allocated_buckets: header.num_allocated_buckets,
             bucket_size_in_pages: header.bucket_size_in_pages,
-            memory_sizes_in_pages: header.memory_sizes_in_pages,
+            memory_sizes_in_pages,
             memory_buckets,
         }
     }
 
+    /// Reads the header from the specified memory.
+    fn read_header(memory: &M) -> HeaderV1 {
+        // Read the header
+        let mut buf = [0; PACKED_HEADER_SIZE];
+        memory.read(0, &mut buf);
+        // Deserialize the fields
+        HeaderV1 {
+            magic: buf[0..3].try_into().unwrap(),
+            version: buf[3],
+            num_allocated_buckets: u16::from_le_bytes(buf[4..6].try_into().unwrap()),
+            bucket_size_in_pages: u16::from_le_bytes(buf[6..8].try_into().unwrap()),
+        }
+    }
+
+    /// Reads the memory sizes from the specified memory.
+    fn read_memory_sizes_in_pages(memory: &M) -> [u64; MAX_NUM_MEMORIES] {
+        let mut buf = [0; MEMORY_SIZES_SIZE];
+        memory.read(MEMORY_SIZES_OFFSET as u64, &mut buf);
+        buf[..]
+            .chunks(core::mem::size_of::<u64>())
+            .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
+    }
+
     fn save_header(&self) {
-        let header = Header {
+        let header = HeaderV1 {
             magic: *MAGIC,
             version: LAYOUT_VERSION,
             num_allocated_buckets: self.allocated_buckets,
             bucket_size_in_pages: self.bucket_size_in_pages,
-            _reserved: [0; HEADER_RESERVED_BYTES],
-            memory_sizes_in_pages: self.memory_sizes_in_pages,
         };
 
-        write_struct(&header, Address::from(0), &self.memory);
+        Self::write_header(&header, &self.memory);
+        Self::write_memory_sizes_in_pages(&self.memory_sizes_in_pages, &self.memory);
+    }
+
+    /// Write the layout header to the memory.
+    fn write_header(header: &HeaderV1, memory: &M) {
+        // Serialize the header
+        let mut buf = [0; PACKED_HEADER_SIZE];
+        buf[0..3].copy_from_slice(&header.magic);
+        buf[3] = header.version;
+        buf[4..6].copy_from_slice(&header.num_allocated_buckets.to_le_bytes());
+        buf[6..8].copy_from_slice(&header.bucket_size_in_pages.to_le_bytes());
+        // Write the header
+        crate::write(memory, 0, &buf);
+    }
+
+    /// Write the memory sizes to the memory.
+    fn write_memory_sizes_in_pages(memory_sizes_in_pages: &[u64; MAX_NUM_MEMORIES], memory: &M) {
+        let buf: [u8; MEMORY_SIZES_SIZE] = memory_sizes_in_pages
+            .iter()
+            .flat_map(|s| s.to_le_bytes())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+        // Write the header
+        crate::write(memory, MEMORY_SIZES_OFFSET as u64, &buf);
     }
 
     // Returns the size of a memory (in pages).
@@ -523,7 +564,7 @@ impl MemoryId {
 struct BucketId(u16);
 
 fn bucket_allocations_address(id: BucketId) -> Address {
-    Address::from(0) + Header::size() + Bytes::from(id.0)
+    Address::from(BUCKET_ALLOCATIONS_OFFSET as u64) + Bytes::from(id.0)
 }
 
 #[cfg(test)]
@@ -793,7 +834,7 @@ mod test {
         let mem = make_memory();
         let mem_mgr = MemoryManager::init_with_bucket_size(mem, 1); // very small bucket size.
 
-        let memories: Vec<_> = (0..MAX_NUM_MEMORIES)
+        let memories: Vec<_> = (0..MAX_NUM_MEMORIES as u8)
             .map(|id| mem_mgr.get(MemoryId(id)))
             .collect();
 
