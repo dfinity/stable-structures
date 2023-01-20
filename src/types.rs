@@ -2,7 +2,6 @@ use core::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 pub const NULL: Address = Address(0);
 
-#[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq)]
 pub struct Address(u64);
 
@@ -45,7 +44,6 @@ impl AddAssign<Bytes> for Address {
     }
 }
 
-#[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct Bytes(u64);
 
