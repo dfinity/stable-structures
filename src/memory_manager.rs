@@ -162,12 +162,9 @@ impl<M: Memory> MemoryManager<M> {
 
 struct HeaderV1 {
     magic: [u8; 3],
-
     version: u8,
-
     // The number of buckets allocated by the memory manager.
     num_allocated_buckets: u16,
-
     // The size of a bucket in Wasm pages.
     bucket_size_in_pages: u16,
     // Reserved bytes for future extensions
@@ -896,5 +893,55 @@ mod test {
 
         let btreemap_v1 = include_bytes!("../dumps/memory_manager_v1_packed_headers.dump");
         assert_eq!(*mem.borrow(), btreemap_v1);
+    }
+
+    #[test]
+    #[allow(unaligned_references)]
+    fn read_write_header_is_identical_to_read_write_struct() {
+        #[repr(C, packed)]
+        struct PackedHeader {
+            magic: [u8; 3],
+            version: u8,
+            // The number of buckets allocated by the memory manager.
+            num_allocated_buckets: u16,
+            // The size of a bucket in Wasm pages.
+            bucket_size_in_pages: u16,
+            // Reserved bytes for future extensions
+        }
+
+        let packed_header = PackedHeader {
+            magic: *MAGIC,
+            version: LAYOUT_VERSION,
+            num_allocated_buckets: 0xDEAD,
+            bucket_size_in_pages: 0xBEEF,
+        };
+
+        let packed_mem = make_memory();
+        crate::write_struct(&packed_header, Address::from(0), &packed_mem);
+
+        let v1_header = HeaderV1 {
+            magic: *MAGIC,
+            version: LAYOUT_VERSION,
+            num_allocated_buckets: 0xDEAD,
+            bucket_size_in_pages: 0xBEEF,
+        };
+
+        let v1_mem = make_memory();
+        MemoryManagerInner::<RefCell<Vec<_>>>::write_header(&v1_header, &v1_mem);
+
+        assert_eq!(packed_mem, v1_mem);
+
+        let packed_header: PackedHeader = crate::read_struct(Address::from(0), &v1_mem);
+        let v1_header = MemoryManagerInner::<RefCell<Vec<_>>>::read_header(&v1_mem);
+        assert_eq!(packed_header.magic, v1_header.magic);
+        assert_eq!(packed_header.version, v1_header.version);
+        assert_eq!(
+            packed_header.num_allocated_buckets,
+            v1_header.num_allocated_buckets
+        );
+        assert_eq!(
+            packed_header.bucket_size_in_pages,
+            v1_header.bucket_size_in_pages
+        );
     }
 }
