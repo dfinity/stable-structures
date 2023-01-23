@@ -237,11 +237,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             MemoryManagerInner::new(memory, bucket_size_in_pages)
         } else {
             // The memory already contains a memory manager. Load it.
-            let mem_mgr = MemoryManagerInner::load(memory);
-
-            // Assert that the bucket size passed is the same as the one previously stored.
-            assert_eq!(mem_mgr.bucket_size_in_pages, bucket_size_in_pages);
-            mem_mgr
+            MemoryManagerInner::load(memory)
         }
     }
 
