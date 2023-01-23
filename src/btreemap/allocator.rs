@@ -166,6 +166,7 @@ impl<M: Memory> Allocator<M> {
         chunk.save(chunk_addr, &self.memory);
 
         // Update the head of the free list.
+        #[allow(unaligned_references)]
         if chunk.next != NULL {
             // The next chunk becomes the new head of the list.
             self.free_list_head = chunk.next;
@@ -242,7 +243,6 @@ impl<M: Memory> Allocator<M> {
     }
 }
 
-#[derive(Debug)]
 #[repr(C, packed)]
 struct ChunkHeader {
     magic: [u8; 3],
@@ -313,7 +313,10 @@ mod test {
 
         // Load the first memory chunk.
         let chunk = ChunkHeader::load(allocator.free_list_head, &mem);
-        assert_eq!(chunk.next, NULL);
+        #[allow(unaligned_references)]
+        {
+            assert_eq!(chunk.next, NULL);
+        }
     }
 
     #[test]
