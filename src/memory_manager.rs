@@ -813,4 +813,44 @@ mod test {
             }
         });
     }
+
+    #[test]
+    fn init_with_non_default_bucket_size() {
+        // Choose a bucket size that's different from the default bucket size.
+        let bucket_size = 256;
+        assert_ne!(bucket_size, BUCKET_SIZE_IN_PAGES as u16);
+
+        // Initialize the memory manager.
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init_with_bucket_size(mem.clone(), bucket_size);
+
+        // Do some writes.
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+        memory_0.grow(300);
+        memory_1.grow(100);
+        memory_0.write(0, &[1; 1000]);
+        memory_1.write(0, &[2; 1000]);
+
+        // Reinitializes the memory manager using the `init` method, without specifying
+        // the bucket size.
+        let mem_mgr = MemoryManager::init(mem);
+
+        // Assert the bucket size is correct.
+        assert_eq!(mem_mgr.inner.borrow().bucket_size_in_pages, bucket_size);
+
+        // Assert that the data written is correct.
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+
+        assert_eq!(memory_0.size(), 300);
+        assert_eq!(memory_1.size(), 100);
+
+        let mut buf = vec![0; 1000];
+        memory_0.read(0, &mut buf);
+        assert_eq!(buf, vec![1; 1000]);
+
+        memory_1.read(0, &mut buf);
+        assert_eq!(buf, vec![2; 1000]);
+    }
 }
