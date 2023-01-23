@@ -131,11 +131,11 @@ fn test_log_append_persistence() {
     let log = Log::<Vec<u8>, _, _>::init(index_memory, data_memory).unwrap();
     assert_eq!(log.len(), 1);
     assert_eq!(log.get(idx).unwrap(), b"DEADBEEF".to_vec());
-    assert_eq!(log.log_size_bytes(), b"DEADBEEF".len());
+    assert_eq!(log.log_size_bytes(), b"DEADBEEF".len() as u64);
     assert_eq!(log.index_size_bytes(), 48); // header (32) + num entries (8) + 1 index entry (8)
     assert_eq!(log.data_size_bytes(), 40); // header (32) + 1 entry (8)
     assert_eq!(log.get(5), None);
-    assert_eq!(log.get(usize::MAX), None);
+    assert_eq!(log.get(u64::MAX), None);
 }
 
 #[test]
