@@ -167,8 +167,8 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     /// Returns the number of items in the vector.
     ///
     /// Complexity: O(1)
-    pub fn len(&self) -> usize {
-        read_u64(&self.memory, Address::from(LEN_OFFSET)) as usize
+    pub fn len(&self) -> u64 {
+        read_u64(&self.memory, Address::from(LEN_OFFSET))
     }
 
     /// Sets the item at the specified index to the specified value.
@@ -176,13 +176,13 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     /// Complexity: O(T::MAX_SIZE)
     ///
     /// PRECONDITION: index < self.len()
-    pub fn set(&self, index: usize, item: &T) {
+    pub fn set(&self, index: u64, item: &T) {
         assert!(index < self.len());
 
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index as u64;
         let bytes = item.to_bytes();
         let data_offset = self
-            .write_entry_size(offset, bytes.len())
+            .write_entry_size(offset, bytes.len() as u32)
             .expect("unreachable: cannot fail to write to pre-allocated area");
         self.memory.write(data_offset, bytes.borrow());
     }
@@ -190,7 +190,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     /// Returns the item at the specified index.
     ///
     /// Complexity: O(T::MAX_SIZE)
-    pub fn get(&self, index: usize) -> Option<T> {
+    pub fn get(&self, index: u64) -> Option<T> {
         if index < self.len() {
             Some(self.read_entry(index))
         } else {
@@ -205,11 +205,11 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
         let index = self.len() as u64;
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes();
-        let data_offset = self.write_entry_size(offset, bytes.len())?;
+        let data_offset = self.write_entry_size(offset, bytes.len() as u32)?;
         safe_write(&self.memory, data_offset, bytes.borrow())?;
         // NB. We update the size only after we ensure that the data
         // write succeeded.
-        self.set_len((index + 1) as usize);
+        self.set_len(index + 1);
         Ok(())
     }
 
@@ -235,14 +235,14 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     }
 
     /// Reads the item at the specified index without any bound checks.
-    fn read_entry(&self, index: usize) -> T {
+    fn read_entry(&self, index: u64) -> T {
         let mut data = std::vec::Vec::new();
         self.read_entry_to(index, &mut data);
         T::from_bytes(Cow::Owned(data))
     }
 
     /// Reads the item at the specified index without any bound checks.
-    fn read_entry_to(&self, index: usize, buf: &mut std::vec::Vec<u8>) {
+    fn read_entry_to(&self, index: u64, buf: &mut std::vec::Vec<u8>) {
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index as u64;
         let (data_offset, data_size) = self.read_entry_size(offset);
         buf.resize(data_size, 0);
@@ -250,13 +250,13 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     }
 
     /// Sets the vector's length.
-    fn set_len(&self, new_len: usize) {
-        write_u64(&self.memory, Address::from(LEN_OFFSET), new_len as u64);
+    fn set_len(&self, new_len: u64) {
+        write_u64(&self.memory, Address::from(LEN_OFFSET), new_len);
     }
 
     /// Writes the size of the item at the specified offset.
-    fn write_entry_size(&self, offset: u64, size: usize) -> Result<u64, GrowFailed> {
-        debug_assert!(size <= T::MAX_SIZE as usize);
+    fn write_entry_size(&self, offset: u64, size: u32) -> Result<u64, GrowFailed> {
+        debug_assert!(size <= T::MAX_SIZE);
 
         if T::IS_FIXED_SIZE {
             Ok(offset)
@@ -267,7 +267,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
             safe_write(&self.memory, offset, &(size as u16).to_le_bytes())?;
             Ok(offset + 2)
         } else {
-            safe_write(&self.memory, offset, &(size as u32).to_le_bytes())?;
+            safe_write(&self.memory, offset, &size.to_le_bytes())?;
             Ok(offset + 4)
         }
     }
@@ -346,7 +346,7 @@ where
 {
     vec: &'a Vec<T, M>,
     buf: std::vec::Vec<u8>,
-    pos: usize,
+    pos: u64,
 }
 
 impl<T, M> Iterator for Iter<'_, T, M>
@@ -367,15 +367,22 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.vec.len().saturating_sub(self.pos), None)
+        (self.vec.len().saturating_sub(self.pos) as usize, None)
     }
 
     fn count(self) -> usize {
-        self.vec.len().saturating_sub(self.pos)
+        let n = self.vec.len().saturating_sub(self.pos);
+        if n > usize::MAX as u64 {
+            panic!(
+                "The number of items in the vec {} does not fit into usize",
+                n
+            );
+        }
+        n as usize
     }
 
     fn nth(&mut self, n: usize) -> Option<T> {
-        self.pos = self.pos.saturating_add(n);
+        self.pos = self.pos.saturating_add(n as u64);
         self.next()
     }
 }

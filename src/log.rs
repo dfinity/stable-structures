@@ -256,18 +256,18 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     }
 
     /// Returns the number of index memory bytes in use.
-    pub fn index_size_bytes(&self) -> usize {
+    pub fn index_size_bytes(&self) -> u64 {
         let num_entries = read_u64(&self.index_memory, Address::from(HEADER_OFFSET));
-        self.index_entry_offset(num_entries).get() as usize
+        self.index_entry_offset(num_entries).get()
     }
 
     /// Returns the number of data memory bytes in use.
-    pub fn data_size_bytes(&self) -> usize {
-        self.log_size_bytes() + HEADER_OFFSET as usize
+    pub fn data_size_bytes(&self) -> u64 {
+        self.log_size_bytes() + HEADER_OFFSET
     }
 
     /// Returns the total size of all logged entries in bytes.
-    pub fn log_size_bytes(&self) -> usize {
+    pub fn log_size_bytes(&self) -> u64 {
         let num_entries = self.len();
         if num_entries == 0 {
             0
@@ -275,18 +275,18 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
             read_u64(
                 &self.index_memory,
                 self.index_entry_offset((num_entries - 1) as u64),
-            ) as usize
+            )
         }
     }
 
     /// Returns the number of entries in the log.
-    pub fn len(&self) -> usize {
-        read_u64(&self.index_memory, Address::from(HEADER_OFFSET)) as usize
+    pub fn len(&self) -> u64 {
+        read_u64(&self.index_memory, Address::from(HEADER_OFFSET))
     }
 
     /// Returns the entry at the specified index.
     /// Returns None if the entry does not exist.
-    pub fn get(&self, idx: usize) -> Option<T> {
+    pub fn get(&self, idx: u64) -> Option<T> {
         let mut buf = vec![];
         self.read_entry(idx, &mut buf).ok()?;
         Some(T::from_bytes(Cow::Owned(buf)))
@@ -308,10 +308,10 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     ///
     /// NOTE: this function returns a Result to make the compiler emit a warning if the caller
     /// ignores the result.
-    pub fn read_entry(&self, idx: usize, buf: &mut Vec<u8>) -> Result<(), NoSuchEntry> {
+    pub fn read_entry(&self, idx: u64, buf: &mut Vec<u8>) -> Result<(), NoSuchEntry> {
         let (offset, len) = self.entry_meta(idx).ok_or(NoSuchEntry)?;
         buf.resize(len, 0);
-        self.data_memory.read((HEADER_OFFSET + offset) as u64, buf);
+        self.data_memory.read(HEADER_OFFSET + offset, buf);
         Ok(())
     }
 
@@ -319,7 +319,7 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     /// If successful, returns the index of the entry.
     ///
     /// POST-CONDITION: Ok(idx) = log.append(E) ⇒ log.get(idx) = Some(E)
-    pub fn append(&self, item: &T) -> Result<usize, WriteError> {
+    pub fn append(&self, item: &T) -> Result<u64, WriteError> {
         let idx = self.len() as u64;
         let data_offset = if idx == 0 {
             0
@@ -354,18 +354,17 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
             idx as u64 + 1,
         );
 
-        debug_assert_eq!(self.get(idx as usize).unwrap().to_bytes(), bytes);
+        debug_assert_eq!(self.get(idx).unwrap().to_bytes(), bytes);
 
-        Ok(idx as usize)
+        Ok(idx)
     }
 
     /// Returns the offset and the length of the specified entry.
-    fn entry_meta(&self, idx: usize) -> Option<(u64, usize)> {
+    fn entry_meta(&self, idx: u64) -> Option<(u64, usize)> {
         if self.len() <= idx {
             return None;
         }
 
-        let idx = idx as u64;
         if idx == 0 {
             Some((
                 0,
@@ -398,7 +397,7 @@ where
 {
     log: &'a Log<T, I, D>,
     buf: Vec<u8>,
-    pos: usize,
+    pos: u64,
 }
 
 impl<T, I, D> Iterator for Iter<'_, T, I, D>
@@ -420,15 +419,22 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.log.len().saturating_sub(self.pos), None)
+        (self.log.len().saturating_sub(self.pos) as usize, None)
     }
 
     fn count(self) -> usize {
-        self.log.len().saturating_sub(self.pos)
+        let n = self.log.len().saturating_sub(self.pos);
+        if n > usize::MAX as u64 {
+            panic!(
+                "The number of items in the log {} does not fit into usize",
+                n
+            );
+        }
+        n as usize
     }
 
     fn nth(&mut self, n: usize) -> Option<T> {
-        self.pos = self.pos.saturating_add(n);
+        self.pos = self.pos.saturating_add(n as u64);
         self.next()
     }
 }

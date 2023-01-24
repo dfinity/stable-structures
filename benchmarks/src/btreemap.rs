@@ -17,7 +17,7 @@ pub fn btreemap_insert() -> u64 {
     count_instructions(|| {
         // Insert the keys in to the btree.
         for k in random_keys.into_iter() {
-            btree.insert(k, ()).unwrap();
+            btree.insert(k, ());
         }
     })
 }
@@ -35,7 +35,7 @@ pub fn btreemap_remove() -> u64 {
     }
 
     for k in random_keys.clone().into_iter() {
-        btree.insert(k, ()).unwrap();
+        btree.insert(k, ());
     }
 
     count_instructions(|| {
