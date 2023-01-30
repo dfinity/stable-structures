@@ -357,7 +357,7 @@ dependencies = [
 
 [[package]]
 name = "ic-stable-structures"
-version = "0.4.1"
+version = "0.5.0"
 
 [[package]]
 name = "ic0"
