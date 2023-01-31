@@ -4,7 +4,9 @@
     "benchmarks": {
       "candid": "candid.did",
       "package": "benchmarks",
-      "type": "rust"
+      "type": "custom",
+      "build": "bash build.sh",
+      "wasm": "./target/wasm32-unknown-unknown/release/benchmarks.wasm.gz"
     }
   },
   "defaults": {

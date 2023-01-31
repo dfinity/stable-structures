@@ -32,13 +32,13 @@ pub fn memory_manager_baseline() -> u64 {
 /// The virtual memories of the `MemoryManager` are written in small chunks so that they are
 /// interleaved in the underlying stable memory.
 #[ic_cdk_macros::query]
-pub fn memory_manager_interleaved(bucket_size: u16) -> u64 {
+pub fn memory_manager_overhead() -> u64 {
     // A buffer of 100MiB.
     let num_chunks = 100;
     let buf_size = num_chunks * MB;
     let mut buf = vec![0; buf_size];
 
-    let mem_mgr = MemoryManager::init_with_bucket_size(DefaultMemoryImpl::default(), bucket_size);
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     let num_memories = 5;
     crate::count_instructions(|| {
         for i in 0..num_memories {
