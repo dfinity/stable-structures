@@ -232,13 +232,10 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
 
         // Check that the index entries are non-decreasing.
         let mut prev_entry = read_u64(memory, Address::from(HEADER_OFFSET + 8));
-        for i in 1..(num_entries as u64) {
+        for i in 1..num_entries {
             let entry = read_u64(memory, Address::from(HEADER_OFFSET + 8 + i * 8));
             if entry < prev_entry {
-                return Err(format!(
-                    "invalid entry I[{}]: {} < {}",
-                    i, entry, prev_entry
-                ));
+                return Err(format!("invalid entry I[{i}]: {entry} < {prev_entry}"));
             }
             prev_entry = entry;
         }
@@ -272,10 +269,7 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
         if num_entries == 0 {
             0
         } else {
-            read_u64(
-                &self.index_memory,
-                self.index_entry_offset((num_entries - 1) as u64),
-            )
+            read_u64(&self.index_memory, self.index_entry_offset(num_entries - 1))
         }
     }
 
@@ -320,7 +314,7 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     ///
     /// POST-CONDITION: Ok(idx) = log.append(E) ⇒ log.get(idx) = Some(E)
     pub fn append(&self, item: &T) -> Result<u64, WriteError> {
-        let idx = self.len() as u64;
+        let idx = self.len();
         let data_offset = if idx == 0 {
             0
         } else {
@@ -348,11 +342,7 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
             &new_offset.to_le_bytes(),
         )?;
         // update number of entries
-        write_u64(
-            &self.index_memory,
-            Address::from(HEADER_OFFSET),
-            idx as u64 + 1,
-        );
+        write_u64(&self.index_memory, Address::from(HEADER_OFFSET), idx + 1);
 
         debug_assert_eq!(self.get(idx).unwrap().to_bytes(), bytes);
 
@@ -425,10 +415,7 @@ where
     fn count(self) -> usize {
         let n = self.log.len().saturating_sub(self.pos);
         if n > usize::MAX as u64 {
-            panic!(
-                "The number of items in the log {} does not fit into usize",
-                n
-            );
+            panic!("The number of items in the log {n} does not fit into usize");
         }
         n as usize
     }

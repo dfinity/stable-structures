@@ -348,7 +348,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             let additional_pages_needed = pages_needed - self.memory.size();
             let prev_pages = self.memory.grow(additional_pages_needed);
             if prev_pages == -1 {
-                panic!("{:?}: grow failed", id);
+                panic!("{id:?}: grow failed");
             }
         }
 
@@ -362,7 +362,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8]) {
         if (offset + src.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
-            panic!("{:?}: write out of bounds", id);
+            panic!("{id:?}: write out of bounds");
         }
 
         let mut bytes_written = 0;
@@ -378,7 +378,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     fn read(&self, id: MemoryId, offset: u64, dst: &mut [u8]) {
         if (offset + dst.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
-            panic!("{:?}: read out of bounds", id);
+            panic!("{id:?}: read out of bounds");
         }
 
         let mut bytes_read = 0;

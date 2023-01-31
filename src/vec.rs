@@ -81,13 +81,12 @@ impl fmt::Display for InitError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::BadMagic(magic) => {
-                write!(fmt, "bad magic number {:?}, expected {:?}", magic, MAGIC)
+                write!(fmt, "bad magic number {magic:?}, expected {MAGIC:?}")
             }
             Self::IncompatibleVersion(version)
             => write!(
                 fmt,
-                "unsupported layout version {}; supported version numbers are 1..={}",
-                version, LAYOUT_VERSION
+                "unsupported layout version {version}; supported version numbers are 1..={LAYOUT_VERSION}"
             ),
             Self::IncompatibleElementType =>
                 write!(fmt, "either MAX_SIZE or IS_FIXED_SIZE of the element type do not match the persisted vector attributes"),
@@ -179,7 +178,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     pub fn set(&self, index: u64, item: &T) {
         assert!(index < self.len());
 
-        let offset = DATA_OFFSET + slot_size::<T>() as u64 * index as u64;
+        let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes();
         let data_offset = self
             .write_entry_size(offset, bytes.len() as u32)
@@ -202,7 +201,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     ///
     /// Complexity: O(T::MAX_SIZE)
     pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
-        let index = self.len() as u64;
+        let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes();
         let data_offset = self.write_entry_size(offset, bytes.len() as u32)?;
@@ -243,7 +242,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
 
     /// Reads the item at the specified index without any bound checks.
     fn read_entry_to(&self, index: u64, buf: &mut std::vec::Vec<u8>) {
-        let offset = DATA_OFFSET + slot_size::<T>() as u64 * index as u64;
+        let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let (data_offset, data_size) = self.read_entry_size(offset);
         buf.resize(data_size, 0);
         self.memory.read(data_offset, &mut buf[..]);
@@ -373,10 +372,7 @@ where
     fn count(self) -> usize {
         let n = self.vec.len().saturating_sub(self.pos);
         if n > usize::MAX as u64 {
-            panic!(
-                "The number of items in the vec {} does not fit into usize",
-                n
-            );
+            panic!("The number of items in the vec {n} does not fit into usize");
         }
         n as usize
     }

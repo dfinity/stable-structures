@@ -20,8 +20,7 @@ impl Memory for RefCell<Vec<u8>> {
                 if n > MAX_PAGES {
                     return -1;
                 }
-                self.borrow_mut()
-                    .resize((n * WASM_PAGE_SIZE as u64) as usize, 0);
+                self.borrow_mut().resize((n * WASM_PAGE_SIZE) as usize, 0);
                 size as i64
             }
             None => -1,
