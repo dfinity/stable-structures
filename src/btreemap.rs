@@ -154,14 +154,12 @@ where
         // TODO: add test case, and allow smaller values.
         assert!(
             K::MAX_SIZE <= expected_key_size,
-            "max_key_size must be <= {}",
-            expected_key_size
+            "max_key_size must be <= {expected_key_size}"
         );
         let expected_value_size = header.max_value_size;
         assert!(
             V::MAX_SIZE <= expected_value_size,
-            "max_value_size must be <= {}",
-            expected_value_size
+            "max_value_size must be <= {expected_value_size}"
         );
 
         let allocator_addr = Address::from(ALLOCATOR_OFFSET as u64);
@@ -1006,15 +1004,13 @@ impl std::fmt::Display for InsertError {
             Self::KeyTooLarge { given, max } => {
                 write!(
                     f,
-                    "InsertError::KeyTooLarge Expected key to be <= {} bytes but received key with {} bytes.",
-                    max, given
+                    "InsertError::KeyTooLarge Expected key to be <= {max} bytes but received key with {given} bytes."
                 )
             }
             Self::ValueTooLarge { given, max } => {
                 write!(
                     f,
-                    "InsertError::ValueTooLarge Expected value to be <= {} bytes but received value with {} bytes.",
-                    max, given
+                    "InsertError::ValueTooLarge Expected value to be <= {max} bytes but received value with {given} bytes."
                 )
             }
         }
@@ -2353,8 +2349,7 @@ mod test {
                                 .map(|(k, v)| (*k, *v))
                                 .collect::<Vec<_>>(),
                             stable_map.range(range).collect::<Vec<_>>(),
-                            "range: {:?}",
-                            range
+                            "range: {range:?}"
                         );
                     }
                 }
