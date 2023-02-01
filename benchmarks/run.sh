@@ -12,14 +12,40 @@ trap "dfx stop" ERR EXIT
 dfx start --background --clean
 dfx deploy --no-wallet benchmarks
 
-# BTreeMap benchmarks
-dfx canister call benchmarks btreemap_insert --query
-dfx canister call benchmarks btreemap_remove --query
-
 # MemoryManager benchmarks
 dfx canister call benchmarks memory_manager_baseline --query
-dfx canister call benchmarks memory_manager_interleaved "(64:nat16)" --query
-dfx canister call benchmarks memory_manager_interleaved "(128:nat16)" --query
-dfx canister call benchmarks memory_manager_interleaved "(512:nat16)" --query
-dfx canister call benchmarks memory_manager_interleaved "(1024:nat16)" --query
-dfx canister call benchmarks memory_manager_interleaved "(2048:nat16)" --query
+dfx canister call benchmarks memory_manager_overhead --query
+
+# BTreeMap benchmarks
+dfx canister call benchmarks btreemap_insert_blob_4_1024 --query
+dfx canister call benchmarks btreemap_insert_blob_8_1024 --query
+dfx canister call benchmarks btreemap_insert_blob_16_1024 --query
+dfx canister call benchmarks btreemap_insert_blob_32_1024 --query
+dfx canister call benchmarks btreemap_insert_blob_64_1024 --query
+dfx canister call benchmarks btreemap_insert_blob_128_1024 --query
+
+# These tests are called as update calls as they exceed the instruction limit
+# for query calls.
+dfx canister call benchmarks btreemap_insert_blob_256_1024
+dfx canister call benchmarks btreemap_insert_blob_512_1024
+
+dfx canister call benchmarks btreemap_get_blob_4_1024 --query
+dfx canister call benchmarks btreemap_get_blob_8_1024 --query
+dfx canister call benchmarks btreemap_get_blob_16_1024 --query
+dfx canister call benchmarks btreemap_get_blob_32_1024 --query
+dfx canister call benchmarks btreemap_get_blob_64_1024 --query
+dfx canister call benchmarks btreemap_get_blob_128_1024 --query
+# These tests go over the instruction limit, so we can't run them currently.
+#dfx canister call benchmarks btreemap_get_blob_256_1024
+#dfx canister call benchmarks btreemap_get_blob_512_1024
+
+dfx canister call benchmarks btreemap_remove_blob_4_1024
+dfx canister call benchmarks btreemap_remove_blob_8_1024
+dfx canister call benchmarks btreemap_remove_blob_16_1024
+dfx canister call benchmarks btreemap_remove_blob_32_1024
+dfx canister call benchmarks btreemap_remove_blob_64_1024
+dfx canister call benchmarks btreemap_remove_blob_128_1024
+dfx canister call benchmarks btreemap_remove_blob_256_1024
+
+# This test goes over the instructions limit, so we can't run it currently.
+#dfx canister call benchmarks btreemap_remove_blob_512_1024
