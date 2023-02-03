@@ -16,7 +16,6 @@ proptest! {
         prop_assert_eq!(map.first_key_value(), None);
         prop_assert_eq!(map.last_key_value(), None);
 
-
         for (n, key) in keys.iter().enumerate() {
             map.insert(*key, *key);
 
