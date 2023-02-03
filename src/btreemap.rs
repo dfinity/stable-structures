@@ -197,6 +197,9 @@ where
     ///   key.to_bytes().len() <= Key::MAX_SIZE
     ///   value.to_bytes().len() <= Value::MAX_SIZE
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        #[cfg(feature = "profile")]
+        let _p = profiler::profile("btreemap_insert");
+
         let key_bytes = key.to_bytes();
         let value_bytes = value.to_bytes();
 
@@ -381,6 +384,9 @@ where
 
     /// Returns the value associated with the given key if it exists.
     pub fn get(&self, key: &K) -> Option<V> {
+        #[cfg(feature = "profile")]
+        let _p = profiler::profile("btreemap_get");
+
         if self.root_addr == NULL {
             return None;
         }
@@ -432,6 +438,9 @@ where
 
     /// Removes a key from the map, returning the previous value at the key if it exists.
     pub fn remove(&mut self, key: &K) -> Option<V> {
+        #[cfg(feature = "profile")]
+        let _p = profiler::profile("btreemap_remove");
+
         if self.root_addr == NULL {
             return None;
         }

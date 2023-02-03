@@ -60,6 +60,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_key_size: u32,
         max_value_size: u32,
     ) -> Self {
+        #[cfg(feature = "profile")]
+        let _p = profiler::profile("node_load");
+
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
@@ -76,22 +79,32 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += U32_SIZE;
 
             // Read the key.
-            buf.resize(key_size as usize, 0);
-            memory.read((address + offset).get(), &mut buf);
-            offset += Bytes::from(max_key_size as u64);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
+            {
+                #[cfg(feature = "profile")]
+                let _p = profiler::profile("load_keys");
+
+                buf.resize(key_size as usize, 0);
+                memory.read((address + offset).get(), &mut buf);
+                offset += Bytes::from(max_key_size as u64);
+                let key = K::from_bytes(Cow::Borrowed(&buf));
+                keys.push(key);
+            }
 
             // Read the value's size.
-            let value_size = read_u32(memory, address + offset);
-            offset += U32_SIZE;
+            {
+                #[cfg(feature = "profile")]
+                let _p = profiler::profile("load_values");
 
-            // Read the value.
-            let mut value = vec![0; value_size as usize];
-            memory.read((address + offset).get(), &mut value);
-            offset += Bytes::from(max_value_size as u64);
+                let value_size = read_u32(memory, address + offset);
+                offset += U32_SIZE;
 
-            keys.push(key);
-            encoded_values.push(value);
+                // Read the value.
+                let mut value = vec![0; value_size as usize];
+                memory.read((address + offset).get(), &mut value);
+                offset += Bytes::from(max_value_size as u64);
+
+                encoded_values.push(value);
+            }
         }
 
         // Load children if this is an internal node.
@@ -124,6 +137,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Saves the node to memory.
     pub fn save<M: Memory>(&self, memory: &M) {
+        #[cfg(feature = "profile")]
+        let _p = profiler::profile("node_save");
+
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());

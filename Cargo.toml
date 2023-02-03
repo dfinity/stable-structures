@@ -11,7 +11,14 @@ keywords = ["internet-computer", "dfinity", "stable-structures"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 repository = "https://github.com/dfinity/stable-structures"
 
+[dependencies]
+# An optional dependency to be included iff the "profile" feature is enabled.
+profiler = { path = "./profiler", optional = true }
+
 [dev-dependencies]
 maplit = "1.0.2"
 proptest = "0.9.4"
 tempfile = "3.3.0"
+
+[features]
+profile = ["profiler"]
