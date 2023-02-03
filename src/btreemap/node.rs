@@ -191,7 +191,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Returns the entry with the max key in the subtree.
-    pub fn get_max<M: Memory>(&self, memory: &M) -> (K, Vec<u8>) {
+    pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
         match self.node_type {
             NodeType::Leaf => (
                 self.keys.last().expect("A node can never be empty").clone(),

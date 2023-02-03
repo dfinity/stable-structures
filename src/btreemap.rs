@@ -39,6 +39,9 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
+#[cfg(test)]
+mod proptests;
+
 const MAGIC: &[u8; 3] = b"BTR";
 const LAYOUT_VERSION: u8 = 1;
 /// The sum of all the header fields, i.e. size of a packed header.
@@ -424,6 +427,34 @@ where
     /// Returns the underlying memory.
     pub fn into_memory(self) -> M {
         self.allocator.into_memory()
+    }
+
+    /// Removes all elements from the map.
+    pub fn clear(self) -> Self {
+        let mem = self.allocator.into_memory();
+        Self::new(mem)
+    }
+
+    /// Returns the first key-value pair in the map. The key in this
+    /// pair is the minimum key in the map.
+    pub fn first_key_value(&self) -> Option<(K, V)> {
+        if self.root_addr == NULL {
+            return None;
+        }
+        let root = self.load_node(self.root_addr);
+        let (k, encoded_v) = root.get_min(self.memory());
+        Some((k, V::from_bytes(Cow::Owned(encoded_v))))
+    }
+
+    /// Returns the last key-value pair in the map. The key in this
+    /// pair is the maximum key in the map.
+    pub fn last_key_value(&self) -> Option<(K, V)> {
+        if self.root_addr == NULL {
+            return None;
+        }
+        let root = self.load_node(self.root_addr);
+        let (k, encoded_v) = root.get_max(self.memory());
+        Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
     fn memory(&self) -> &M {
