@@ -49,3 +49,15 @@ dfx canister call benchmarks btreemap_remove_blob_256_1024
 
 # This test goes over the instructions limit, so we can't run it currently.
 #dfx canister call benchmarks btreemap_remove_blob_512_1024
+
+dfx canister call benchmarks vec_insert_blob_4
+dfx canister call benchmarks vec_insert_blob_8
+dfx canister call benchmarks vec_insert_blob_16
+dfx canister call benchmarks vec_insert_blob_32
+dfx canister call benchmarks vec_insert_blob_128
+
+dfx canister call benchmarks vec_get_blob_4 --query
+dfx canister call benchmarks vec_get_blob_8 --query
+dfx canister call benchmarks vec_get_blob_16 --query
+dfx canister call benchmarks vec_get_blob_32 --query
+dfx canister call benchmarks vec_get_blob_128 --query
