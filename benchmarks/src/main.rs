@@ -1,5 +1,6 @@
 mod btreemap;
 mod memory_manager;
+mod vec;
 
 /// Returns the number of instructions consumed by the given function.
 pub(crate) fn count_instructions<R>(f: impl FnOnce() -> R) -> u64 {
