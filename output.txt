@@ -1,0 +1,268 @@
+
+running 104 tests
+test btreemap::allocator::test::allocate ... ignored
+test btreemap::allocator::test::allocate_deallocate_2 ... ignored
+test btreemap::allocator::test::allocate_large ... ignored
+test btreemap::allocator::test::allocate_then_deallocate ... ignored
+test btreemap::allocator::test::deallocate_free_chunk - should panic ... ignored
+test btreemap::allocator::test::new_and_load ... ignored
+test btreemap::iter::test::iterate_children ... ignored
+test btreemap::iter::test::iterate_leaf ... ignored
+test btreemap::proptests::map_min_max ... ignored
+test btreemap::test::accepts_small_or_equal_key_sizes ... ignored
+test btreemap::test::accepts_small_or_equal_value_sizes ... ignored
+test btreemap::test::allocations ... ignored
+test btreemap::test::allocations_2 ... ignored
+test btreemap::test::bruteforce_range_search ... ignored
+test btreemap::test::contains_key ... ignored
+test btreemap::test::create_btreemap_dump_file ... ignored
+test btreemap::test::init_preserves_data ... ignored
+test btreemap::test::insert_get ... ignored
+test btreemap::test::insert_get_multiple ... ignored
+test btreemap::test::insert_overwrite_key_in_full_root_node ... ignored
+test btreemap::test::insert_overwrite_median_key_in_full_child_node ... ignored
+test btreemap::test::insert_overwrites_previous_value ... ignored
+test btreemap::test::insert_same_key_multiple ... ignored
+test btreemap::test::insert_split_multiple_nodes ... ignored
+test btreemap::test::insert_split_node ... ignored
+test btreemap::test::len ... ignored
+test btreemap::test::many_insertions ... ignored
+test btreemap::test::many_insertions_2 ... ignored
+test btreemap::test::overwrite_test ... ignored
+test btreemap::test::panics_if_key_is_too_large - should panic ... ignored
+test btreemap::test::panics_if_value_is_too_large - should panic ... ignored
+test btreemap::test::produces_layout_identical_to_layout_version_1_with_packed_headers ... ignored
+test btreemap::test::range_empty ... ignored
+test btreemap::test::range_internal_prefix_greater_than_all_entries ... ignored
+test btreemap::test::range_large ... ignored
+test btreemap::test::range_leaf_prefix_greater_than_all_entries ... ignored
+test btreemap::test::range_various_prefixes ... ignored
+test btreemap::test::range_various_prefixes_2 ... ignored
+test btreemap::test::range_various_prefixes_with_offset ... ignored
+test btreemap::test::range_various_prefixes_with_offset_2 ... ignored
+test btreemap::test::read_write_header_is_identical_to_read_write_struct ... ignored
+test btreemap::test::rejects_larger_key_sizes - should panic ... ignored
+test btreemap::test::rejects_larger_value_sizes - should panic ... ignored
+test btreemap::test::reloading ... ignored
+test btreemap::test::remove_case_2a_and_2c ... ignored
+test btreemap::test::remove_case_2b ... ignored
+test btreemap::test::remove_case_3a_left ... ignored
+test btreemap::test::remove_case_3a_right ... ignored
+test btreemap::test::remove_case_3b_merge_into_left ... ignored
+test btreemap::test::remove_case_3b_merge_into_right ... ignored
+test btreemap::test::remove_simple ... ignored
+test cell::tests::test_cell_grow_and_shrink ... ignored
+test cell::tests::test_cell_init ... ignored
+test cell::tests::test_cell_init_empty ... ignored
+test cell::tests::test_out_of_space ... ignored
+test file_mem::test::write_and_read_random_bytes ... ignored
+test log::tests::test_append_data_out_of_memory ... ignored
+test log::tests::test_append_index_out_of_memory ... ignored
+test log::tests::test_index_grow ... ignored
+test log::tests::test_iter ... ignored
+test log::tests::test_log_append ... ignored
+test log::tests::test_log_append_persistence ... ignored
+test log::tests::test_log_construct ... ignored
+test log::tests::test_log_init_empty ... ignored
+test log::tests::test_log_init_with_different_data_magic ... ignored
+test log::tests::test_log_init_with_different_index_magic ... ignored
+test log::tests::test_log_load_bad_data_version ... ignored
+test log::tests::test_log_load_bad_index_version ... ignored
+test log::tests::test_new_overwrites ... ignored
+test memory_manager::test::can_allocate_and_use_memory ... ignored
+test memory_manager::test::can_allocate_and_use_multiple_memories ... ignored
+test memory_manager::test::can_be_reinitialized_from_memory ... ignored
+test memory_manager::test::can_get_memory ... ignored
+test memory_manager::test::can_write_across_bucket_boundaries ... ignored
+test memory_manager::test::can_write_across_bucket_boundaries_with_interleaving_memories ... ignored
+test memory_manager::test::does_not_grow_memory_unnecessarily ... ignored
+test memory_manager::test::growing_beyond_capacity_fails ... ignored
+test memory_manager::test::growing_same_memory_multiple_times_doesnt_increase_underlying_allocation ... ignored
+test memory_manager::test::init_with_non_default_bucket_size ... ignored
+test memory_manager::test::reading_out_of_bounds_should_panic - should panic ... ignored
+test memory_manager::test::reading_zero_bytes_from_empty_memory_should_not_panic ... ignored
+test memory_manager::test::write_and_read_random_bytes ... ignored
+test memory_manager::test::writing_out_of_bounds_should_panic - should panic ... ignored
+test memory_manager::test::writing_zero_bytes_to_empty_memory_should_not_panic ... ignored
+test reader::tests::should_read_multiple_slices ... ignored
+test reader::tests::should_read_single_slice ... ignored
+test reader::tests::should_read_to_end ... ignored
+test storable::tests::tuple_roundtrip ... ignored
+test storable::tests::tuple_variable_width_u16_roundtrip ... ignored
+test storable::tests::tuple_variable_width_u8_roundtrip ... ignored
+test tests::test_restricted_memory_growth ... ignored
+test tests::test_restricted_memory_rw ... ignored
+test vec::tests::init_after_new ... ignored
+test vec::tests::push_pop_model_u64 ... ignored
+test vec::tests::push_pop_model_unfixed_255 ... ignored
+test vec::tests::push_pop_model_unfixed_65000 ... ignored
+test vec::tests::push_pop_model_unfixed_68000 ... ignored
+test vec::tests::test_init_failures ... ignored
+test vec::tests::test_init_type_compatibility ... ignored
+test vec::tests::test_iter ... ignored
+test writer::tests::should_only_request_min_number_of_pages_required ... ignored
+test writer::tests::should_return_err_on_memory_bounds ... ignored
+test writer::tests::should_write_many_slices ... ignored
+test writer::tests::should_write_single_slice ... ignored
+
+test result: ok. 0 passed; 0 failed; 104 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+~/dev/dfinity/stable-structures/benchmark-canisters ~/dev/dfinity/stable-structures/benchmark-canisters
+memory_manager_baseline time:   [1176.6 M Instructions 1176.6 M Instructions 1176.6 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+memory_manager_overhead time:   [1181.9 M Instructions 1181.9 M Instructions 1181.9 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_insert_blob_4_1024
+                        time:   [1436.1 M Instructions 1436.1 M Instructions 1436.1 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_insert_blob_8_1024
+                        time:   [1611.0 M Instructions 1611.0 M Instructions 1611.0 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_insert_blob_16_1024
+                        time:   [1742.6 M Instructions 1742.6 M Instructions 1742.6 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_insert_blob_32_1024
+                        time:   [1791.2 M Instructions 1791.2 M Instructions 1791.2 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_insert_blob_64_1024
+                        time:   [2050.3 M Instructions 2050.3 M Instructions 2050.3 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_insert_blob_128_1024
+                        time:   [2315.5 M Instructions 2315.5 M Instructions 2315.5 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_insert_blob_256_1024
+                        time:   [2840.8 M Instructions 2840.8 M Instructions 2840.8 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_insert_blob_512_1024
+                        time:   [3969.1 M Instructions 3969.1 M Instructions 3969.1 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_get_blob_4_1024
+                        time:   [1302.8 M Instructions 1302.8 M Instructions 1302.8 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_get_blob_8_1024
+                        time:   [1347.1 M Instructions 1347.1 M Instructions 1347.1 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_get_blob_16_1024
+                        time:   [1480.7 M Instructions 1480.7 M Instructions 1480.7 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_get_blob_32_1024
+                        time:   [1512.1 M Instructions 1512.1 M Instructions 1512.1 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_get_blob_64_1024
+                        time:   [1748.3 M Instructions 1748.3 M Instructions 1748.3 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_get_blob_128_1024
+                        time:   [1967.9 M Instructions 1967.9 M Instructions 1967.9 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_remove_blob_4_1024
+                        time:   [2381.1 M Instructions 2381.1 M Instructions 2381.1 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_remove_blob_8_1024
+                        time:   [2662.6 M Instructions 2662.6 M Instructions 2662.6 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_remove_blob_16_1024
+                        time:   [2956.2 M Instructions 2956.2 M Instructions 2956.2 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_remove_blob_32_1024
+                        time:   [3074.2 M Instructions 3074.2 M Instructions 3074.2 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_remove_blob_64_1024
+                        time:   [3524.7 M Instructions 3524.7 M Instructions 3524.7 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_remove_blob_128_1024
+                        time:   [4017.7 M Instructions 4017.7 M Instructions 4017.7 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_remove_blob_256_1024
+                        time:   [5059.3 M Instructions 5059.3 M Instructions 5059.3 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+btreemap_remove_blob_512_1024
+                        time:   [3463.7 M Instructions 3463.7 M Instructions 3463.7 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_insert_blob_4       time:   [5102.5 K Instructions 5102.5 K Instructions 5102.5 K Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_insert_blob_8       time:   [5131.1 K Instructions 5131.1 K Instructions 5131.1 K Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_insert_blob_16      time:   [5101.7 K Instructions 5101.7 K Instructions 5101.7 K Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_insert_blob_32      time:   [5310.1 K Instructions 5310.1 K Instructions 5310.1 K Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_insert_blob_128     time:   [6030.1 K Instructions 6030.1 K Instructions 6030.1 K Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_get_blob_4          time:   [11.671 M Instructions 11.671 M Instructions 11.671 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_get_blob_8          time:   [13.232 M Instructions 13.232 M Instructions 13.232 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_get_blob_16         time:   [16.150 M Instructions 16.150 M Instructions 16.150 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_get_blob_32         time:   [16.812 M Instructions 16.812 M Instructions 16.812 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
+vec_get_blob_128        time:   [26.654 M Instructions 26.654 M Instructions 26.654 M Instructions]
+                        change: [+0.0000% +0.0000% +0.0000%] (p = NaN > 0.05)
+                        No change in performance detected.
+
