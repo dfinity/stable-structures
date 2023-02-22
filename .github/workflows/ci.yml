@@ -59,9 +59,9 @@ jobs:
             #gh-pages-branch: "main"
             #benchmark-data-dir-path: "docs/bench"
           # Show alert with commit comment on detecting possible performance regression
-          alert-threshold: '20%'
-          comment-on-alert: true
+          comment-always: true
           fail-on-alert: false
+          save-data-file: true
 
       - name: Clippy
         run: cargo clippy --tests --benches -- -D clippy::all
