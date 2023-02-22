@@ -40,6 +40,51 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
+  benchmark:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [ 1.67.0 ]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
+
+      - name: Install Rust
+        run: |
+          rustup update ${{ matrix.rust }} --no-self-update
+          rustup default ${{ matrix.rust }}
+          rustup target add wasm32-unknown-unknown
+
+      - name: Install DFX
+        run: |
+          wget --output-document install-dfx.sh "https://internetcomputer.org/install.sh"
+          DFX_VERSION=${DFX_VERSION:=0.11.2} bash install-dfx.sh < <(yes Y)
+          rm install-dfx.sh
+          dfx cache install
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Run benchmarks
+        run: cargo bench | tee output.txt
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Rust Benchmark
+          tool: 'cargo'
+          output-file-path: output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          # Show alert with commit comment on detecting possible performance regression
+          alert-threshold: '20%'
+          comment-on-alert: true
+          fail-on-alert: false
+
   examples:
     runs-on: ubuntu-20.04
 
