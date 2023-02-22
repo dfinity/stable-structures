@@ -33,8 +33,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run benchmarks
-        run: pwd
-        run: cargo bench --bench benches -- --output-format bencher | tee output.txt
+        run: pwd && cargo bench --bench benches -- --output-format bencher | tee output.txt
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
