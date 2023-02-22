@@ -41,7 +41,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run benchmarks
-        run: pwd && find . && cargo bench --bench benches -- --output-format bencher | tee output.txt
+        run: |
+          TMP_FILE=$(mktemp)
+          cargo bench --bench benches -- --output-format bencher | tee ${TMP_FILE}
+          cat ${TMP_FILE} | grep "^test " > output.txt
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
