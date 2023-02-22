@@ -54,7 +54,7 @@ jobs:
           tool: 'cargo'
           output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+          auto-push: false
           external-data-json-path: ./cache/benchmark-data.json
             #gh-pages-branch: "main"
             #benchmark-data-dir-path: "docs/bench"
