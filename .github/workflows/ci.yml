@@ -45,6 +45,7 @@ jobs:
           TMP_FILE=$(mktemp)
           cargo bench --bench benches -- --output-format bencher | tee ${TMP_FILE}
           cat ${TMP_FILE} | grep "^test " > output.txt
+          sed -i "s/Instructions/ns/g" output.txt
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
