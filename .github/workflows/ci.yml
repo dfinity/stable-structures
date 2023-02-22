@@ -55,8 +55,9 @@ jobs:
           output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
-          gh-pages-branch: "main"
-          benchmark-data-dir-path: "docs/bench"
+          external-data-json-path: ./cache/benchmark-data.json
+            #gh-pages-branch: "main"
+            #benchmark-data-dir-path: "docs/bench"
           # Show alert with commit comment on detecting possible performance regression
           alert-threshold: '20%'
           comment-on-alert: true
