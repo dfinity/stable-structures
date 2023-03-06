@@ -938,12 +938,9 @@ where
             return Iter::null(self);
         }
 
-        let mut cursors = vec![];
-        // If we recurse into a subtree and find no nodes matching the upper bound there, we shall
-        // return to this node.
-        let mut fallback_cursor = None;
-
         let dummy_bounds = (Bound::Unbounded, Bound::Unbounded);
+        // INVARIANT: all cursors point to keys >= bound.
+        let mut cursors = vec![];
 
         let mut node = self.load_node(self.root_addr);
         loop {
@@ -952,19 +949,37 @@ where
                     match node.node_type {
                         NodeType::Leaf => {
                             if idx == 0 {
-                                debug_assert!(&node.keys[idx] >= bound);
-                                // If there is a fallback cursor, jump to it.
-                                // Otherwise, we must be looking at the smallest key in the map, so we
-                                // return an empty iterator.
-                                match fallback_cursor {
-                                    Some(cursor) => {
-                                        cursors.pop();
-                                        cursors.push(cursor);
-                                        return Iter::new_in_range(self, dummy_bounds, cursors);
+                                // We descended into a leaf but didn't manage to find a node
+                                // less than the upper bound. Thus we unwind the cursor stack
+                                // until we hit a cursor pointing to an element other than the
+                                // first key in the tablet and shift the position backward.
+                                // If there is no such cursor, the bound must be <= min element.
+                                while let Some(cursor) = cursors.pop() {
+                                    match cursor {
+                                        Cursor::Node {
+                                            node,
+                                            next: Index::Entry(n),
+                                        } => {
+                                            if n == 0 {
+                                                debug_assert!(&node.keys[n] >= bound);
+                                                continue;
+                                            } else {
+                                                debug_assert!(&node.keys[n - 1] < bound);
+                                                cursors.push(Cursor::Node {
+                                                    node,
+                                                    next: Index::Entry(n - 1),
+                                                });
+                                                break;
+                                            }
+                                        }
+                                        _ => panic!("BUG: unexpected cursor shape"),
                                     }
-                                    None => return Iter::null(self),
                                 }
+                                // If the cursors are empty, the iterator will be empty.
+                                return Iter::new_in_range(self, dummy_bounds, cursors);
                             }
+                            debug_assert!(&node.keys[idx - 1] < bound);
+
                             cursors.push(Cursor::Node {
                                 node,
                                 next: Index::Entry(idx - 1),
@@ -973,34 +988,14 @@ where
                         }
                         NodeType::Internal => {
                             let child = self.load_node(node.children[idx]);
-                            if idx == 0 {
-                                cursors.push(Cursor::Node {
-                                    node,
-                                    next: Index::Entry(idx),
-                                });
-                                node = child;
-                                continue;
-                            }
-                            if idx == node.keys.len() {
-                                fallback_cursor = Some(Cursor::Node {
-                                    node,
-                                    next: Index::Entry(idx - 1),
-                                });
-                                node = child;
-                                continue;
-                            }
-
-                            // TODO: remove the clone!
-                            fallback_cursor = Some(Cursor::Node {
-                                node: node.clone(),
-                                next: Index::Entry(idx - 1),
-                            });
-
+                            // We push the node even if idx == node.keys.len()
+                            // If we find the position in the child, the iterator will skip this
+                            // cursor. But if the all keys in the child are greater than or equal to
+                            // the bound, we will be able to use this cursor as a fallback.
                             cursors.push(Cursor::Node {
                                 node,
                                 next: Index::Entry(idx),
                             });
-
                             node = child;
                         }
                     }

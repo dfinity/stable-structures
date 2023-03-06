@@ -39,7 +39,7 @@ pub type Entry<K> = (K, Vec<u8>);
 ///     - value (`max_value_size` bytes)
 ///
 /// Each node can contain up to `CAPACITY + 1` children, each child is 8 bytes.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Node<K: Storable + Ord + Clone> {
     pub address: Address,
     pub keys: Vec<K>,
