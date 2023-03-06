@@ -204,6 +204,21 @@ impl BoundedStorable for u64 {
     const IS_FIXED_SIZE: bool = true;
 }
 
+impl Storable for f64 {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(self.to_be_bytes().to_vec())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
+    }
+}
+
+impl BoundedStorable for f64 {
+    const MAX_SIZE: u32 = 8;
+    const IS_FIXED_SIZE: bool = true;
+}
+
 impl Storable for u32 {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(self.to_be_bytes().to_vec())
@@ -215,6 +230,21 @@ impl Storable for u32 {
 }
 
 impl BoundedStorable for u32 {
+    const MAX_SIZE: u32 = 4;
+    const IS_FIXED_SIZE: bool = true;
+}
+
+impl Storable for f32 {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(self.to_be_bytes().to_vec())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
+    }
+}
+
+impl BoundedStorable for f32 {
     const MAX_SIZE: u32 = 4;
     const IS_FIXED_SIZE: bool = true;
 }
