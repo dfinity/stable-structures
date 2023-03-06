@@ -942,17 +942,8 @@ where
         loop {
             match node.keys.binary_search(bound) {
                 Ok(idx) | Err(idx) => {
-                    let child = match node.node_type {
-                        NodeType::Internal => {
-                            // Note that loading a child node cannot fail since
-                            // len(children) = len(entries) + 1
-                            Some(self.load_node(node.children[idx]))
-                        }
-                        NodeType::Leaf => None,
-                    };
-
-                    match child {
-                        None => {
+                    match node.node_type {
+                        NodeType::Leaf => {
                             if idx > 0 {
                                 cursors.push(Cursor::Node {
                                     node,
@@ -970,14 +961,16 @@ where
                                 return Iter::null(self);
                             }
                         }
-                        Some(child) => {
+                        NodeType::Internal => {
+                            let child = self.load_node(node.children[idx]);
+
                             if idx < node.keys.len() {
                                 cursors.push(Cursor::Node {
                                     node,
                                     next: Index::Entry(idx),
                                 });
                             }
-                            // Iterate over the child node.
+
                             node = child;
                         }
                     }
