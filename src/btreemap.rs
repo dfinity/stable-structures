@@ -930,7 +930,8 @@ where
         }
     }
 
-    /// Returns an interator pointing to the first element below the specified key.
+    /// Returns an interator pointing to the first element below the given bound.
+    /// Returns an empty iterator if there are no keys below the given bound.
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
         if self.root_addr == NULL {
             // Map is empty.
@@ -2442,10 +2443,17 @@ mod test {
         let mut stable_map = super::BTreeMap::new(make_memory());
         for k in 0..1000u64 {
             stable_map.insert(k, ());
-            println!("Getting a upper bound for {}", k + 1);
-            assert_eq!(Some((k, ())), stable_map.iter_upper_bound(&(k + 1)).next());
-            println!("Getting a upper bound for {}", 0);
-            assert_eq!(None, stable_map.iter_upper_bound(&0).next());
+            assert_eq!(
+                Some((k, ())),
+                stable_map.iter_upper_bound(&(k + 1)).next(),
+                "failed to get an upper bound for key {}",
+                k + 1
+            );
+            assert_eq!(
+                None,
+                stable_map.iter_upper_bound(&0).next(),
+                "key 0 must not have an upper bound"
+            );
         }
     }
 
