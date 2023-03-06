@@ -939,38 +939,67 @@ where
         }
 
         let mut cursors = vec![];
+        // If we recurse into a subtree and find no nodes matching the upper bound there, we shall
+        // return to this node.
+        let mut fallback_cursor = None;
+
+        let dummy_bounds = (Bound::Unbounded, Bound::Unbounded);
+
         let mut node = self.load_node(self.root_addr);
         loop {
             match node.keys.binary_search(bound) {
                 Ok(idx) | Err(idx) => {
                     match node.node_type {
                         NodeType::Leaf => {
-                            if idx > 0 {
-                                cursors.push(Cursor::Node {
-                                    node,
-                                    next: Index::Entry(idx - 1),
-                                });
-                                // Leaf node. Return an iterator with the found cursors.
-                                return Iter::new_in_range(
-                                    self,
-                                    (Bound::Unbounded, Bound::Unbounded),
-                                    cursors,
-                                );
-                            } else {
-                                // The upper bound is less than or equal to the first key in the map.
-                                // We return an empty iterator.
-                                return Iter::null(self);
+                            if idx == 0 {
+                                debug_assert!(&node.keys[idx] >= bound);
+                                // If there is a fallback cursor, jump to it.
+                                // Otherwise, we must be looking at the smallest key in the map, so we
+                                // return an empty iterator.
+                                match fallback_cursor {
+                                    Some(cursor) => {
+                                        cursors.pop();
+                                        cursors.push(cursor);
+                                        return Iter::new_in_range(self, dummy_bounds, cursors);
+                                    }
+                                    None => return Iter::null(self),
+                                }
                             }
+                            cursors.push(Cursor::Node {
+                                node,
+                                next: Index::Entry(idx - 1),
+                            });
+                            return Iter::new_in_range(self, dummy_bounds, cursors);
                         }
                         NodeType::Internal => {
                             let child = self.load_node(node.children[idx]);
-
-                            if idx < node.keys.len() {
+                            if idx == 0 {
                                 cursors.push(Cursor::Node {
                                     node,
                                     next: Index::Entry(idx),
                                 });
+                                node = child;
+                                continue;
                             }
+                            if idx == node.keys.len() {
+                                fallback_cursor = Some(Cursor::Node {
+                                    node,
+                                    next: Index::Entry(idx - 1),
+                                });
+                                node = child;
+                                continue;
+                            }
+
+                            // TODO: remove the clone!
+                            fallback_cursor = Some(Cursor::Node {
+                                node: node.clone(),
+                                next: Index::Entry(idx - 1),
+                            });
+
+                            cursors.push(Cursor::Node {
+                                node,
+                                next: Index::Entry(idx),
+                            });
 
                             node = child;
                         }
@@ -2441,14 +2470,16 @@ mod test {
     #[test]
     fn test_iter_upper_bound() {
         let mut stable_map = super::BTreeMap::new(make_memory());
-        for k in 0..1000u64 {
+        for k in 0..100u64 {
             stable_map.insert(k, ());
-            assert_eq!(
-                Some((k, ())),
-                stable_map.iter_upper_bound(&(k + 1)).next(),
-                "failed to get an upper bound for key {}",
-                k + 1
-            );
+            for i in 0..=k {
+                assert_eq!(
+                    Some((i, ())),
+                    stable_map.iter_upper_bound(&(i + 1)).next(),
+                    "failed to get an upper bound for key {}",
+                    i + 1
+                );
+            }
             assert_eq!(
                 None,
                 stable_map.iter_upper_bound(&0).next(),
