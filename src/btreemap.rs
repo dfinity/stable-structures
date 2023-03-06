@@ -958,17 +958,17 @@ where
                                     node,
                                     next: Index::Entry(idx - 1),
                                 });
+                                // Leaf node. Return an iterator with the found cursors.
+                                return Iter::new_in_range(
+                                    self,
+                                    (Bound::Unbounded, Bound::Unbounded),
+                                    cursors,
+                                );
                             } else {
                                 // The upper bound is less than or equal to the first key in the map.
                                 // We return an empty iterator.
                                 return Iter::null(self);
                             }
-                            // Leaf node. Return an iterator with the found cursors.
-                            return Iter::new_in_range(
-                                self,
-                                (Bound::Unbounded, Bound::Unbounded),
-                                cursors,
-                            );
                         }
                         Some(child) => {
                             if idx < node.keys.len() {
