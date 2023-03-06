@@ -949,12 +949,11 @@ where
                     match node.node_type {
                         NodeType::Leaf => {
                             if idx == 0 {
-                                // We descended into a leaf but didn't manage to find a node
-                                // less than the upper bound. Thus we unwind the cursor stack
-                                // until we hit a cursor pointing to an element other than the
-                                // first key in the tablet, and we shift the position backward.
-                                // If there is no such cursor, the bound must be <= min element, so
-                                // we return an empty iterator.
+                                // We descended into a leaf but didn't find a node less than
+                                // the upper bound. Thus we unwind the cursor stack until we
+                                // hit a cursor pointing to an element other than the first key,
+                                // and we shift the position backward. If there is no such cursor,
+                                // the bound must be <= min element, so we return an empty iterator.
                                 while let Some(cursor) = cursors.pop() {
                                     match cursor {
                                         Cursor::Node {
