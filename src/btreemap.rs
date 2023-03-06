@@ -930,6 +930,62 @@ where
         }
     }
 
+    /// Returns an interator pointing to the first element below the specified key.
+    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
+        if self.root_addr == NULL {
+            // Map is empty.
+            return Iter::null(self);
+        }
+
+        let mut cursors = vec![];
+        let mut node = self.load_node(self.root_addr);
+        loop {
+            match node.keys.binary_search(bound) {
+                Ok(idx) | Err(idx) => {
+                    let child = match node.node_type {
+                        NodeType::Internal => {
+                            // Note that loading a child node cannot fail since
+                            // len(children) = len(entries) + 1
+                            Some(self.load_node(node.children[idx]))
+                        }
+                        NodeType::Leaf => None,
+                    };
+
+                    match child {
+                        None => {
+                            if idx > 0 {
+                                cursors.push(Cursor::Node {
+                                    node,
+                                    next: Index::Entry(idx - 1),
+                                });
+                            } else {
+                                // The upper bound is less than or equal to the first key in the map.
+                                // We return an empty iterator.
+                                return Iter::null(self);
+                            }
+                            // Leaf node. Return an iterator with the found cursors.
+                            return Iter::new_in_range(
+                                self,
+                                (Bound::Unbounded, Bound::Unbounded),
+                                cursors,
+                            );
+                        }
+                        Some(child) => {
+                            if idx < node.keys.len() {
+                                cursors.push(Cursor::Node {
+                                    node,
+                                    next: Index::Entry(idx),
+                                });
+                            }
+                            // Iterate over the child node.
+                            node = child;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Merges one node (`source`) into another (`into`), along with a median entry.
     //
     // Example (values are not included for brevity):
@@ -2385,6 +2441,18 @@ mod test {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_iter_upper_bound() {
+        let mut stable_map = super::BTreeMap::new(make_memory());
+        for k in 0..1000u64 {
+            stable_map.insert(k, ());
+            println!("Getting a upper bound for {}", k + 1);
+            assert_eq!(Some((k, ())), stable_map.iter_upper_bound(&(k + 1)).next());
+            println!("Getting a upper bound for {}", 0);
+            assert_eq!(None, stable_map.iter_upper_bound(&0).next());
         }
     }
 
