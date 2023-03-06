@@ -930,7 +930,7 @@ where
         }
     }
 
-    /// Returns an interator pointing to the first element below the given bound.
+    /// Returns an iterator pointing to the first element below the given bound.
     /// Returns an empty iterator if there are no keys below the given bound.
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
         if self.root_addr == NULL {
@@ -939,7 +939,7 @@ where
         }
 
         let dummy_bounds = (Bound::Unbounded, Bound::Unbounded);
-        // INVARIANT: all cursors point to keys >= bound.
+        // INVARIANT: all cursors point to keys greater than or equal to bound.
         let mut cursors = vec![];
 
         let mut node = self.load_node(self.root_addr);
@@ -952,8 +952,9 @@ where
                                 // We descended into a leaf but didn't manage to find a node
                                 // less than the upper bound. Thus we unwind the cursor stack
                                 // until we hit a cursor pointing to an element other than the
-                                // first key in the tablet and shift the position backward.
-                                // If there is no such cursor, the bound must be <= min element.
+                                // first key in the tablet, and we shift the position backward.
+                                // If there is no such cursor, the bound must be <= min element, so
+                                // we return an empty iterator.
                                 while let Some(cursor) = cursors.pop() {
                                     match cursor {
                                         Cursor::Node {
