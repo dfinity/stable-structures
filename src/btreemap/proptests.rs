@@ -26,4 +26,15 @@ proptest! {
             prop_assert_eq!(map.last_key_value(), Some((*max, *max)))
         }
     }
+
+    #[test]
+    fn map_upper_bound_iter(keys in pvec(0u64..u64::MAX -1 , 10..100)) {
+        let mut map = StableBTreeMap::<u64, (), _>::new(make_memory());
+
+        for k in keys.iter() {
+            map.insert(*k, ());
+
+            prop_assert_eq!(Some((*k, ())), map.iter_upper_bound(&(k + 1)).next());
+        }
+    }
 }
