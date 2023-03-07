@@ -21,11 +21,11 @@ Before contributing, consider the following:
 
 - If you want to report an issue, click **Issues**.
 
-- If you have more general questions related to Candid and its use, post a message to the [community forum](https://forum.dfinity.org/) or submit a [support request](mailto://support@dfinity.org).
+- If you have more general questions related to stable structures and their use, post a message to the [community forum](https://forum.dfinity.org/).
 
 - If you are reporting a bug, provide as much information about the problem as possible.
 
-- If you want to contribute directly to this repository, typical fixes might include any of the following:
+- You may also contribute directly to this repository. Typical contributions include:
 
     - Fixes to resolve bugs or documentation errors
     - Code improvements
