@@ -43,6 +43,9 @@ pub type DefaultMemoryImpl = VectorMemory;
 
 const WASM_PAGE_SIZE: u64 = 65536;
 
+/// The maximum number of stable memory pages a canister can address.
+pub const MAX_PAGES: u64 = u64::MAX / WASM_PAGE_SIZE;
+
 pub trait Memory {
     /// Returns the current size of the stable memory in WebAssembly
     /// pages. (One WebAssembly page is 64Ki bytes.)
@@ -181,7 +184,7 @@ pub struct RestrictedMemory<M: Memory> {
 
 impl<M: Memory> RestrictedMemory<M> {
     pub fn new(memory: M, page_range: core::ops::Range<u64>) -> Self {
-        assert!(page_range.end < u64::MAX / WASM_PAGE_SIZE);
+        assert!(page_range.end <= MAX_PAGES);
         Self { memory, page_range }
     }
 }
