@@ -21,3 +21,4 @@ tempfile = "3.3.0"
 [[bench]]
 name = "benches"
 harness = false
+path = "benches/benches.rs"
