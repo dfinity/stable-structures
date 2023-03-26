@@ -2,6 +2,7 @@ use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
+use candid::{Principal};
 
 #[cfg(test)]
 mod tests;
@@ -294,6 +295,39 @@ impl<const N: usize> Storable for [u8; N] {
 
 impl<const N: usize> BoundedStorable for [u8; N] {
     const MAX_SIZE: u32 = N as u32;
+    const IS_FIXED_SIZE: bool = true;
+}
+
+impl Storable for Principal {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(self.as_slice().to_vec())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_slice(bytes.as_ref())
+    }
+}
+
+impl BoundedStorable for Principal {
+    const MAX_SIZE: u32 = 30;
+    const IS_FIXED_SIZE: bool = false;
+}
+
+impl Storable for bool {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Borrowed(if *self { &[1] } else { &[0] })
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        match bytes.get(0) {
+            Some(0) | None => false,
+            _  => true,
+        }
+    }
+}
+
+impl BoundedStorable for bool {
+    const MAX_SIZE: u32 = 1;
     const IS_FIXED_SIZE: bool = true;
 }
 

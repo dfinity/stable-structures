@@ -18,6 +18,9 @@ maplit = "1.0.2"
 proptest = "1"
 tempfile = "3.3.0"
 
+[dependencies]
+candid = "0.8.4"
+
 [[bench]]
 name = "benches"
 harness = false
