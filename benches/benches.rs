@@ -175,11 +175,12 @@ fn execution_instructions(arguments: ExecutionArguments) -> u64 {
         .args(args)
         .output()
         .unwrap();
-    assert!(output.status.success());
-    let output = String::from_utf8(output.stdout).unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(output.status.success(), "{stdout}\n{stderr}");
 
     // Convert result formatted as "(1_000_000 : nat64)" to u64.
-    let result = output
+    let result = stdout
         .trim()
         .strip_prefix('(')
         .unwrap()
@@ -241,6 +242,9 @@ pub fn criterion_benchmark(c: &mut Criterion<Instructions>) {
         "btreemap_insert_blob_512_1024",
         false,
     );
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_u64", true);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_blob_8", true);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_u64", true);
 
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_4_1024", true);
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_1024", true);
@@ -248,6 +252,9 @@ pub fn criterion_benchmark(c: &mut Criterion<Instructions>) {
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_32_1024", true);
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_64_1024", true);
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_128_1024", true);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_u64", true);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_blob_8", true);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_u64", true);
     // These tests go over the instruction limit, so we can't run them currently.
     // bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_256_1024", true);
     // bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_512_1024", true);
@@ -291,6 +298,9 @@ pub fn criterion_benchmark(c: &mut Criterion<Instructions>) {
         "btreemap_remove_blob_512_1024",
         false,
     );
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_u64", false);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_blob_8", false);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_u64", false);
 
     // Vec benchmarks
     bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_4", false);
@@ -298,12 +308,14 @@ pub fn criterion_benchmark(c: &mut Criterion<Instructions>) {
     bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_16", false);
     bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_32", false);
     bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_128", false);
+    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_u64", false);
 
     bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_4", true);
     bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_8", true);
     bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_16", true);
     bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_32", true);
     bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_128", true);
+    bench_function(c, *BENCHMARK_CANISTER, "vec_get_u64", true);
 }
 
 fn benches() {
