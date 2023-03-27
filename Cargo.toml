@@ -22,3 +22,8 @@ tempfile = "3.3.0"
 name = "benches"
 harness = false
 path = "benches/benches.rs"
+
+[workspace]
+members = [
+	"benchmark-canisters"
+]
