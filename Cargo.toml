@@ -25,3 +25,8 @@ candid = { version = "0.8.4", optional = true}
 name = "benches"
 harness = false
 path = "benches/benches.rs"
+
+[workspace]
+members = [
+	"benchmark-canisters"
+]
