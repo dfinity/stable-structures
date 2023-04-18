@@ -298,6 +298,7 @@ impl<const N: usize> BoundedStorable for [u8; N] {
     const IS_FIXED_SIZE: bool = true;
 }
 
+#[cfg(feature = "candid")]
 impl Storable for Principal {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(self.as_slice().to_vec())
@@ -308,8 +309,9 @@ impl Storable for Principal {
     }
 }
 
+#[cfg(feature = "candid")]
 impl BoundedStorable for Principal {
-    const MAX_SIZE: u32 = 30;
+    const MAX_SIZE: u32 = 29;
     const IS_FIXED_SIZE: bool = false;
 }
 

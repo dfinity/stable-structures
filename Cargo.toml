@@ -19,7 +19,7 @@ proptest = "1"
 tempfile = "3.3.0"
 
 [dependencies]
-candid = "0.8.4"
+candid = { version = "0.8.4", optional = true}
 
 [[bench]]
 name = "benches"
