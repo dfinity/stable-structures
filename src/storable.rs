@@ -2,7 +2,8 @@ use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
-use candid::{Principal};
+#[cfg(feature = "candid")]
+use candid::Principal;
 
 #[cfg(test)]
 mod tests;
