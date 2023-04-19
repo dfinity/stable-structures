@@ -1,9 +1,9 @@
+#[cfg(feature = "candid")]
+use candid::Principal;
 use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
-#[cfg(feature = "candid")]
-use candid::Principal;
 
 #[cfg(test)]
 mod tests;
@@ -324,7 +324,7 @@ impl Storable for bool {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         match bytes.get(0) {
             Some(0) | None => false,
-            _  => true,
+            _ => true,
         }
     }
 }
