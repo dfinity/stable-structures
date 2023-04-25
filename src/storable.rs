@@ -1,5 +1,5 @@
 use std::borrow::{Borrow, Cow};
-use std::cmp::Ordering;
+use std::cmp::{Ordering, Reverse};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
@@ -295,6 +295,21 @@ impl<const N: usize> Storable for [u8; N] {
 impl<const N: usize> BoundedStorable for [u8; N] {
     const MAX_SIZE: u32 = N as u32;
     const IS_FIXED_SIZE: bool = true;
+}
+
+impl<T: Storable> Storable for Reverse<T> {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        self.0.to_bytes()
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self(T::from_bytes(bytes))
+    }
+}
+
+impl<T: BoundedStorable> BoundedStorable for Reverse<T> {
+    const MAX_SIZE: u32 = T::MAX_SIZE;
+    const IS_FIXED_SIZE: bool = T::IS_FIXED_SIZE;
 }
 
 impl<A, B> Storable for (A, B)
