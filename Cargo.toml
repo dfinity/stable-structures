@@ -25,5 +25,5 @@ path = "benches/benches.rs"
 
 [workspace]
 members = [
-	"benchmark-canisters"
+  "benchmark-canisters"
 ]
