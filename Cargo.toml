@@ -1,6 +1,6 @@
 [package]
 name = "ic-stable-structures"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 description = "A collection of data structures for fearless canister upgrades."
 homepage = "https://docs.rs/ic-stable-structures"
@@ -25,5 +25,5 @@ path = "benches/benches.rs"
 
 [workspace]
 members = [
-	"benchmark-canisters"
+  "benchmark-canisters"
 ]
