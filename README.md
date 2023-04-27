@@ -9,12 +9,13 @@
 
 A collection of scalable data structures for the [Internet Computer](https://internetcomputer.org) that persist across upgrades.
 
-Stable stuctures are designed to directly use stable memory as the backing store, allowing
-them to grow to GiBs in size without the need for `pre_upgrade`/`post_upgrade` hooks.
+Stable structures are designed to use stable memory as the backing store, allowing them to grow to gigabytes in size without the need for `pre_upgrade`/`post_upgrade` hooks.
 
 ## Background
 
-The conventional approach to canister state persistence is to serialize the entire state to stable memory in the pre_upgrade hook and decode it back in the post_upgrade hook. This approach is easy to implement and works well for relatively small datasets. Unfortunately, it does not scale well and can render a canister non-upgradable.
+The conventional approach to canister state persistence is to serialize the entire state to stable memory in the `pre_upgrade` hook and decode it back in the `post_upgrade` hook.
+This approach is easy to implement and works well for relatively small datasets.
+Unfortunately, it does not scale well and can render a canister non-upgradable.
 
 This library aims to simplify managing data structures directly in stable memory. For more information
 about the philosophy behind the library, see [Roman's tutorial on stable structures](https://mmapped.blog/posts/14-stable-structures.html).
@@ -50,8 +51,9 @@ The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which map
 when used in a canister and to a [VectorMemory] otherwise.
 
 
-Note that **each stable structure needs a separate memory.** For example, this fails
-when run in a canister:
+Note that **stable structures cannot share memories.**
+Each memory must belong to only one stable structure.
+For example, this fails when run in a canister:
 
 
 ```no_run
