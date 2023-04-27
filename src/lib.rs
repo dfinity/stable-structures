@@ -1,12 +1,4 @@
-//! # Stable Structures for the Internet Computer
-//!
-//! This library is a collection of data structures for developing canisters on the
-//! [Internet Computer](https://internetcomputer.org/).
-//!
-//! The data stuctures are designed to directly use stable memory as the backing store, allowing
-//! them to grow to GiBs in size without the need for `pre_upgrade`/`post_upgrade` hooks.
-extern crate core;
-
+#![doc = include_str!("../README.md")]
 pub mod btreemap;
 pub mod cell;
 pub use cell::{Cell as StableCell, Cell};
@@ -99,8 +91,7 @@ impl Display for GrowFailed {
         write!(
             f,
             "Failed to grow memory: current size={}, delta={}",
-            self.current_size,
-            self.delta
+            self.current_size, self.delta
         )
     }
 }

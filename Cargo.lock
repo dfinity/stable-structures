@@ -529,6 +529,8 @@ name = "ic-stable-structures"
 version = "0.5.3"
 dependencies = [
  "criterion",
+ "ic-cdk",
+ "ic-cdk-macros",
  "lazy_static",
  "maplit",
  "proptest",
