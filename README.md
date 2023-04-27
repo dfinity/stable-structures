@@ -17,8 +17,8 @@ The conventional approach to canister state persistence is to serialize the enti
 This approach is easy to implement and works well for relatively small datasets.
 Unfortunately, it does not scale well and can render a canister non-upgradable.
 
-This library aims to simplify managing data structures directly in stable memory. For more information
-about the philosophy behind the library, see [Roman's tutorial on stable structures](https://mmapped.blog/posts/14-stable-structures.html).
+This library aims to simplify managing data structures directly in stable memory.
+For more information about the philosophy behind the library, see [Roman's tutorial on stable structures](https://mmapped.blog/posts/14-stable-structures.html).
 
 ## Available Data Structures
 
@@ -30,8 +30,8 @@ about the philosophy behind the library, see [Roman's tutorial on stable structu
 ## How it Works
 
 Stable structures are able to work directly in stable memory because each data structure manages
-its own memory. When initializing a stable structure, a memory is provided that the data structure
-can use to store its data.
+its own memory.
+When initializing a stable structure, a memory is provided that the data structure can use to store its data.
 
 Here's a basic example:
 
@@ -44,11 +44,10 @@ assert_eq!(map.get(&1), Some(2));
 ```
 
 Memories are abstracted with the [Memory] trait, and stable structures can work with any storage
-backend that implements this trait. This includes stable memory, a vector
-([VectorMemory]), or even a flat file ([FileMemory]).
+backend that implements this trait.
+This includes stable memory, a vector ([VectorMemory]), or even a flat file ([FileMemory]).
 
-The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which maps to stable memory
-when used in a canister and to a [VectorMemory] otherwise.
+The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which maps to stable memory when used in a canister and to a [VectorMemory] otherwise.
 
 
 Note that **stable structures cannot share memories.**
@@ -66,12 +65,10 @@ map_2.insert(1, 3);
 assert_eq!(map_1.get(&1), Some(2)); // This assertion fails.
 ```
 
-It fails because both `map_1` and `map_2` are using the same stable memory under the hood, and
-so changes in `map_1` end up changing or corrupting `map_2`.
+It fails because both `map_1` and `map_2` are using the same stable memory under the hood, and so changes in `map_1` end up changing or corrupting `map_2`.
 
-To address this issue, we make use of the [MemoryManager](memory_manager::MemoryManager), which
-takes a single memory and creates up to 255 virtual memories for our disposal. Here's the above
-failing example, but fixed by using the [MemoryManager](memory_manager::MemoryManager):
+To address this issue, we make use of the [MemoryManager](memory_manager::MemoryManager), which takes a single memory and creates up to 255 virtual memories for our disposal.
+Here's the above failing example, but fixed by using the [MemoryManager](memory_manager::MemoryManager):
 
 ```rust
 use ic_stable_structures::{
