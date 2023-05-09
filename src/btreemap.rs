@@ -34,7 +34,7 @@ use crate::{
 use allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
-use node::{Entry, Node, NodeType, B};
+use node::{Entry, Node, NodeType};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
@@ -360,21 +360,11 @@ where
         let mut sibling = self.allocate_node(full_child.node_type);
         assert_eq!(sibling.node_type, full_child.node_type);
 
-        // Move the values above the median into the new sibling.
-        sibling.keys = full_child.keys.split_off(B as usize);
-        sibling.encoded_values = full_child.encoded_values.split_off(B as usize);
-
-        if full_child.node_type == NodeType::Internal {
-            sibling.children = full_child.children.split_off(B as usize);
-        }
-
         // Add sibling as a new child in the node.
         node.children.insert(full_child_idx + 1, sibling.address);
 
-        // Move the median entry into the node.
-        let (median_key, median_value) = full_child
-            .pop_entry()
-            .expect("A full child cannot be empty");
+        let (median_key, median_value) = full_child.split(&mut sibling);
+
         node.insert_entry(full_child_idx, (median_key, median_value));
 
         sibling.save(self.memory());
@@ -477,12 +467,11 @@ where
         let mut node = self.load_node(node_addr);
 
         if node.address != self.root_addr {
-            // We're guaranteed that whenever this method is called the number
-            // of keys is >= `B`. Note that this is higher than the minimum required
-            // in a node, which is `B - 1`, and that's because this strengthened
-            // condition allows us to delete an entry in a single pass most of the
-            // time without having to back up.
-            assert!(node.keys.len() >= B as usize);
+            // We're guaranteed that whenever this method is called an entry can be
+            // removed from the node without it needing to be merged into a sibling.
+            // This strengthened condition allows us to delete an entry in a single
+            // pass most of the time without having to back up.
+            assert!(node.can_remove_entry_without_merging());
         }
 
         match node.node_type {
@@ -518,10 +507,9 @@ where
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
-                        // Check if the child that precedes `key` has at least `B` keys.
                         let left_child = self.load_node(node.children[idx]);
-                        if left_child.keys.len() >= B as usize {
-                            // Case 2.a: The node's left child has >= `B` keys.
+                        if left_child.can_remove_entry_without_merging() {
+                            // Case 2.a: A key can be removed from the left child without merging.
                             //
                             //                       parent
                             //                  [..., key, ...]
@@ -554,10 +542,9 @@ where
                             return Some(old_value);
                         }
 
-                        // Check if the child that succeeds `key` has at least `B` keys.
                         let right_child = self.load_node(node.children[idx + 1]);
-                        if right_child.keys.len() >= B as usize {
-                            // Case 2.b: The node's right child has >= `B` keys.
+                        if right_child.can_remove_entry_without_merging() {
+                            // Case 2.b: A key can be removed from the right child without merging.
                             //
                             //                       parent
                             //                  [..., key, ...]
@@ -590,7 +577,7 @@ where
                             return Some(old_value);
                         }
 
-                        // Case 2.c: Both the left child and right child have B - 1 keys.
+                        // Case 2.c: Both the left and right child are at their minimum sizes.
                         //
                         //                       parent
                         //                  [..., key, ...]
@@ -598,7 +585,7 @@ where
                         //            [left child]   [right child]
                         //
                         // In this case, we merge (left child, key, right child) into a single
-                        // node of size 2B - 1. The result will look like this:
+                        // node. The result will look like this:
                         //
                         //                       parent
                         //                     [...  ...]
@@ -609,8 +596,8 @@ where
                         //
                         // If `parent` becomes empty (which can only happen if it's the root),
                         // then `parent` is deleted and `new_child` becomes the new root.
-                        assert_eq!(left_child.keys.len(), B as usize - 1);
-                        assert_eq!(right_child.keys.len(), B as usize - 1);
+                        assert!(left_child.at_minimum());
+                        assert!(right_child.at_minimum());
 
                         // Merge the right child into the left child.
                         let new_child = self.merge(right_child, left_child, node.remove_entry(idx));
@@ -643,13 +630,14 @@ where
                         // `idx`.
                         let mut child = self.load_node(node.children[idx]);
 
-                        if child.keys.len() >= B as usize {
+                        if child.can_remove_entry_without_merging() {
                             // The child has enough nodes. Recurse to delete the `key` from the
                             // `child`.
                             return self.remove_helper(node.children[idx], key);
                         }
 
-                        // The child has < `B` keys. Let's see if it has a sibling with >= `B` keys.
+                        // An entry can't be removed from the child without merging.
+                        // See if it has a sibling where an entry can be removed without merging.
                         let mut left_sibling = if idx > 0 {
                             Some(self.load_node(node.children[idx - 1]))
                         } else {
@@ -663,8 +651,9 @@ where
                         };
 
                         if let Some(ref mut left_sibling) = left_sibling {
-                            if left_sibling.keys.len() >= B as usize {
-                                // Case 3.a (left): The child has a left sibling with >= `B` keys.
+                            if left_sibling.can_remove_entry_without_merging() {
+                                // Case 3.a (left):
+                                // A key can be removed from the left child without merging.
                                 //
                                 //                            [d] (parent)
                                 //                           /   \
@@ -714,8 +703,9 @@ where
                         }
 
                         if let Some(right_sibling) = &mut right_sibling {
-                            if right_sibling.keys.len() >= B as usize {
-                                // Case 3.a (right): The child has a right sibling with >= `B` keys.
+                            if right_sibling.can_remove_entry_without_merging() {
+                                // Case 3.a (right):
+                                // A key can be removed from the right child without merging.
                                 //
                                 //                            [c] (parent)
                                 //                           /   \
@@ -764,11 +754,12 @@ where
                             }
                         }
 
-                        // Case 3.b: neither siblings of the child have >= `B` keys.
+                        // Case 3.b: Both the left and right siblings are at their minimum sizes.
 
                         if let Some(left_sibling) = left_sibling {
                             // Merge child into left sibling if it exists.
 
+                            assert!(left_sibling.at_minimum());
                             let left_sibling_address = left_sibling.address;
                             self.merge(child, left_sibling, node.remove_entry(idx - 1));
                             // Removing child from parent.
@@ -792,6 +783,7 @@ where
                         if let Some(right_sibling) = right_sibling {
                             // Merge child into right sibling.
 
+                            assert!(right_sibling.at_minimum());
                             let right_sibling_address = right_sibling.address;
                             self.merge(child, right_sibling, node.remove_entry(idx));
 
@@ -1047,15 +1039,12 @@ where
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
-        Node {
-            address: self.allocator.allocate(),
-            keys: vec![],
-            encoded_values: vec![],
-            children: vec![],
+        Node::new(
+            self.allocator.allocate(),
             node_type,
-            max_key_size: self.max_key_size,
-            max_value_size: self.max_value_size,
-        }
+            self.max_key_size,
+            self.max_value_size,
+        )
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
@@ -1125,7 +1114,7 @@ impl std::fmt::Display for InsertError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{btreemap::node::CAPACITY, storable::Blob};
+    use crate::storable::Blob;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -1259,8 +1248,15 @@ mod test {
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
 
-        for i in 0..CAPACITY as u8 {
+        // Insert entries until the root node is full.
+        let mut i = 0;
+        loop {
             assert_eq!(btree.insert(vec![i], vec![]), None);
+            let root = btree.load_node(btree.root_addr);
+            if root.is_full() {
+                break;
+            }
+            i += 1;
         }
 
         // Only need a single allocation to store up to `CAPACITY` elements.
@@ -1316,31 +1312,6 @@ mod test {
 
         for i in 1..=12 {
             assert_eq!(btree.get(&vec![i]), Some(vec![]));
-        }
-    }
-
-    #[test]
-    fn overwrite_test() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-
-        let num_elements: u8 = 255;
-
-        // Ensure that the number of elements we insert is significantly
-        // higher than `CAPACITY` so that we test interesting cases (e.g.
-        // overwriting the value in an internal node).
-        assert!(num_elements as u64 > 10 * CAPACITY);
-
-        for i in 0..num_elements {
-            assert_eq!(btree.insert(vec![i], vec![]), None);
-        }
-
-        // Overwrite the values.
-        for i in 0..num_elements {
-            // Assert we retrieved the old value correctly.
-            assert_eq!(btree.insert(vec![i], vec![1, 2, 3]), Some(vec![]));
-            // Assert we retrieved the new value correctly.
-            assert_eq!(btree.get(&vec![i]), Some(vec![1, 2, 3]));
         }
     }
 

@@ -6,11 +6,11 @@ use crate::{
 };
 use std::borrow::{Borrow, Cow};
 
-/// The minimum degree to use in the btree.
-/// This constant is taken from Rust's std implementation of BTreeMap.
-pub const B: u64 = 6;
-/// The maximum number of entries per node.
-pub const CAPACITY: u64 = 2 * B - 1;
+// The minimum degree to use in the btree.
+// This constant is taken from Rust's std implementation of BTreeMap.
+const B: usize = 6;
+// The maximum number of entries per node.
+const CAPACITY: usize = 2 * B - 1;
 const LAYOUT_VERSION: u8 = 1;
 const MAGIC: &[u8; 3] = b"BTN";
 const LEAF_NODE_TYPE: u8 = 0;
@@ -48,11 +48,29 @@ pub struct Node<K: Storable + Ord + Clone> {
     /// child of this key and children[I + 1] points to the right child.
     pub children: Vec<Address>,
     pub node_type: NodeType,
-    pub max_key_size: u32,
-    pub max_value_size: u32,
+    max_key_size: u32,
+    max_value_size: u32,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
+    /// Creates a new node at the given address.
+    pub fn new(
+        address: Address,
+        node_type: NodeType,
+        max_key_size: u32,
+        max_value_size: u32,
+    ) -> Node<K> {
+        Node {
+            address,
+            keys: vec![],
+            encoded_values: vec![],
+            children: vec![],
+            node_type,
+            max_key_size,
+            max_value_size,
+        }
+    }
+
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(
         address: Address,
@@ -234,7 +252,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns true if the node cannot store anymore entries, false otherwise.
     pub fn is_full(&self) -> bool {
-        self.keys.len() >= CAPACITY as usize
+        self.keys.len() >= CAPACITY
     }
 
     /// Swaps the entry at index `idx` with the given entry, returning the old entry.
@@ -308,8 +326,35 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let child_size = Address::size();
 
         node_header_size
-            + Bytes::from(CAPACITY) * entry_size
-            + Bytes::from(CAPACITY + 1) * child_size
+            + Bytes::from(CAPACITY as u64) * entry_size
+            + Bytes::from((CAPACITY + 1) as u64) * child_size
+    }
+
+    /// Returns true if the node is at the minimum required size, false otherwise.
+    pub fn at_minimum(&self) -> bool {
+        self.keys.len() < B
+    }
+
+    /// Returns true if an entry can be removed without having to merge it into another node
+    /// (i.e. without going below the minimum size of a node).
+    pub fn can_remove_entry_without_merging(&self) -> bool {
+        !self.at_minimum()
+    }
+
+    /// Moves elements from own node to a sibling node and returns the median element.
+    pub fn split(&mut self, sibling: &mut Node<K>) -> Entry<K> {
+        debug_assert!(self.is_full());
+
+        // Move the entries and children above the median into the new sibling.
+        sibling.keys = self.keys.split_off(B);
+        sibling.encoded_values = self.encoded_values.split_off(B);
+        if self.node_type == NodeType::Internal {
+            sibling.children = self.children.split_off(B);
+        }
+
+        // Return the median entry.
+        self.pop_entry()
+            .expect("An initially full node cannot be empty")
     }
 }
 
