@@ -2575,11 +2575,11 @@ mod test {
 
         let packed_header: BTreePackedHeader = crate::read_struct(Address::from(0), &v1_mem);
         let v1_header = BTreeMap::<Vec<_>, Vec<_>, RefCell<Vec<_>>>::read_header(&v1_mem);
-        assert_eq!(packed_header.magic, v1_header.magic);
-        assert_eq!(packed_header.version, v1_header.version);
-        assert_eq!(packed_header.max_key_size, v1_header.max_key_size);
-        assert_eq!(packed_header.max_value_size, v1_header.max_value_size);
-        assert_eq!(packed_header.root_addr, v1_header.root_addr);
-        assert_eq!(packed_header.length, v1_header.length);
+        assert!(packed_header.magic == v1_header.magic);
+        assert!(packed_header.version == v1_header.version);
+        assert!(packed_header.max_key_size == v1_header.max_key_size);
+        assert!(packed_header.max_value_size == v1_header.max_value_size);
+        assert!(packed_header.root_addr == v1_header.root_addr);
+        assert!(packed_header.length == v1_header.length);
     }
 }
