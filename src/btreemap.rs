@@ -230,7 +230,7 @@ where
             let mut root = self.load_node(self.root_addr);
 
             // Check if the key already exists in the root.
-            if let Ok(idx) = root.get_key_idx(&key) {
+            if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value));
                 root.save(self.memory());
@@ -273,7 +273,7 @@ where
         assert!(!node.is_full());
 
         // Look for the key in the node.
-        match node.keys.binary_search(&key) {
+        match node.search(&key) {
             Ok(idx) => {
                 // The key is already in the node.
                 // Overwrite it and return the previous value.
@@ -306,7 +306,7 @@ where
 
                         if child.is_full() {
                             // Check if the key already exists in the child.
-                            if let Ok(idx) = child.get_key_idx(&key) {
+                            if let Ok(idx) = child.search(&key) {
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) = child.swap_entry(idx, (key, value));
                                 child.save(self.memory());
@@ -318,7 +318,7 @@ where
 
                             // The children have now changed. Search again for
                             // the child where we need to store the entry in.
-                            let idx = node.get_key_idx(&key).unwrap_or_else(|idx| idx);
+                            let idx = node.search(&key).unwrap_or_else(|idx| idx);
                             child = self.load_node(node.children[idx]);
                         }
 
@@ -385,8 +385,8 @@ where
 
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         let node = self.load_node(node_addr);
-        match node.keys.binary_search(key) {
-            Ok(idx) => Some(node.encoded_values[idx].clone()),
+        match node.search(key) {
+            Ok(idx) => Some(node.value(idx).clone()),
             Err(idx) => {
                 match node.node_type {
                     NodeType::Leaf => None, // Key not found.
@@ -476,14 +476,14 @@ where
 
         match node.node_type {
             NodeType::Leaf => {
-                match node.keys.binary_search(key) {
+                match node.search(key) {
                     Ok(idx) => {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
                         let value = node.remove_entry(idx).1;
                         self.length -= 1;
 
-                        if node.keys.is_empty() {
+                        if node.entries_len() == 0 {
                             assert_eq!(
                                 node.address, self.root_addr,
                                 "Removal can only result in an empty leaf node if that node is the root"
@@ -503,7 +503,7 @@ where
                 }
             }
             NodeType::Internal => {
-                match node.keys.binary_search(key) {
+                match node.search(key) {
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
@@ -605,7 +605,7 @@ where
                         // Remove the right child from the parent node.
                         node.children.remove(idx + 1);
 
-                        if node.keys.is_empty() {
+                        if node.entries_len() == 0 {
                             // Can only happen if this node is root.
                             assert_eq!(node.address, self.root_addr);
                             assert_eq!(node.children, vec![new_child.address]);
@@ -765,7 +765,7 @@ where
                             // Removing child from parent.
                             node.children.remove(idx);
 
-                            if node.keys.is_empty() {
+                            if node.entries_len() == 0 {
                                 self.allocator.deallocate(node.address);
 
                                 if node.address == self.root_addr {
@@ -790,7 +790,7 @@ where
                             // Removing child from parent.
                             node.children.remove(idx);
 
-                            if node.keys.is_empty() {
+                            if node.entries_len() == 0 {
                                 self.allocator.deallocate(node.address);
 
                                 if node.address == self.root_addr {
@@ -840,7 +840,7 @@ where
             Bound::Included(key) | Bound::Excluded(key) => {
                 let mut node = self.load_node(self.root_addr);
                 loop {
-                    match node.keys.binary_search(key) {
+                    match node.search(key) {
                         Ok(idx) => {
                             if let Bound::Included(_) = key_range.start_bound() {
                                 // We found the key exactly matching the left bound.
@@ -860,8 +860,8 @@ where
                                     NodeType::Leaf => None,
                                 };
 
-                                if idx + 1 != node.keys.len()
-                                    && key_range.contains(&node.keys[idx + 1])
+                                if idx + 1 != node.entries_len()
+                                    && key_range.contains(&node.key(idx + 1))
                                 {
                                     cursors.push(Cursor::Node {
                                         node,
@@ -898,7 +898,7 @@ where
                                 NodeType::Leaf => None,
                             };
 
-                            if idx < node.keys.len() && key_range.contains(&node.keys[idx]) {
+                            if idx < node.entries_len() && key_range.contains(&node.key(idx)) {
                                 cursors.push(Cursor::Node {
                                     node,
                                     next: Index::Entry(idx),
@@ -936,7 +936,7 @@ where
 
         let mut node = self.load_node(self.root_addr);
         loop {
-            match node.keys.binary_search(bound) {
+            match node.search(bound) {
                 Ok(idx) | Err(idx) => {
                     match node.node_type {
                         NodeType::Leaf => {
@@ -953,10 +953,10 @@ where
                                             next: Index::Entry(n),
                                         } => {
                                             if n == 0 {
-                                                debug_assert!(&node.keys[n] >= bound);
+                                                debug_assert!(node.key(n) >= bound);
                                                 continue;
                                             } else {
-                                                debug_assert!(&node.keys[n - 1] < bound);
+                                                debug_assert!(node.key(n - 1) < bound);
                                                 cursors.push(Cursor::Node {
                                                     node,
                                                     next: Index::Entry(n - 1),
@@ -970,7 +970,7 @@ where
                                 // If the cursors are empty, the iterator will be empty.
                                 return Iter::new_in_range(self, dummy_bounds, cursors);
                             }
-                            debug_assert!(&node.keys[idx - 1] < bound);
+                            debug_assert!(node.key(idx - 1) < bound);
 
                             cursors.push(Cursor::Node {
                                 node,
@@ -980,7 +980,7 @@ where
                         }
                         NodeType::Internal => {
                             let child = self.load_node(node.children[idx]);
-                            // We push the node even if idx == node.keys.len()
+                            // We push the node even if idx == node.entries_len()
                             // If we find the position in the child, the iterator will skip this
                             // cursor. But if the all keys in the child are greater than or equal to
                             // the bound, we will be able to use this cursor as a fallback.
@@ -1010,14 +1010,14 @@ where
     //   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, into: Node<K>, median: Entry<K>) -> Node<K> {
         assert_eq!(source.node_type, into.node_type);
-        assert!(!source.keys.is_empty());
-        assert!(!into.keys.is_empty());
+        assert!(source.entries_len() > 0);
+        assert!(into.entries_len() > 0);
 
         let into_address = into.address;
         let source_address = source.address;
 
         // Figure out which node contains lower values than the other.
-        let (mut lower, mut higher) = if source.keys[0] < into.keys[0] {
+        let (mut lower, mut higher) = if source.key(0) < into.key(0) {
             (source, into)
         } else {
             (into, source)
@@ -1204,8 +1204,8 @@ mod test {
         // The right child should now be full, with the median key being "12"
         let right_child = btree.load_node(root.children[1]);
         assert!(right_child.is_full());
-        let median_index = right_child.keys.len() / 2;
-        assert_eq!(right_child.keys[median_index], vec![12]);
+        let median_index = right_child.entries_len() / 2;
+        assert_eq!(right_child.key(median_index), &vec![12]);
 
         // Overwrite the median key.
         assert_eq!(btree.insert(vec![12], vec![1, 2, 3]), Some(vec![]));
@@ -1240,7 +1240,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type, NodeType::Leaf);
         assert_eq!(btree.get(&vec![6]), Some(vec![4, 5, 6]));
-        assert_eq!(root.keys.len(), 11);
+        assert_eq!(root.entries_len(), 11);
     }
 
     #[test]

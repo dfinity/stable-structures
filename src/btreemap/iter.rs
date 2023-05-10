@@ -126,7 +126,7 @@ where
                 node,
                 next: Index::Entry(entry_idx),
             }) => {
-                if entry_idx >= node.keys.len() {
+                if entry_idx >= node.entries_len() {
                     // No more entries to iterate on in this node.
                     return self.next();
                 }

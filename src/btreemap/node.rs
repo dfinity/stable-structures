@@ -42,8 +42,8 @@ pub type Entry<K> = (K, Vec<u8>);
 #[derive(Debug, PartialEq, Eq)]
 pub struct Node<K: Storable + Ord + Clone> {
     pub address: Address,
-    pub keys: Vec<K>,
-    pub encoded_values: Vec<Vec<u8>>,
+    keys: Vec<K>,
+    encoded_values: Vec<Vec<u8>>,
     /// For the key at position I, children[I] points to the left
     /// child of this key and children[I + 1] points to the right child.
     pub children: Vec<Address>,
@@ -267,6 +267,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
         (self.keys[idx].clone(), self.encoded_values[idx].clone())
     }
 
+    /// Returns a reference to the encoded value at the specified index.
+    pub fn value(&self, idx: usize) -> &Vec<u8> {
+        &self.encoded_values[idx]
+    }
+
+    /// Returns a reference to the key at the specified index.
+    pub fn key(&self, idx: usize) -> &K {
+        &self.keys[idx]
+    }
+
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
         self.keys.insert(idx, key);
@@ -304,13 +314,18 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .collect()
     }
 
+    /// Returns the number of entries in the node.
+    pub fn entries_len(&self) -> usize {
+        self.keys.len()
+    }
+
     /// Searches for the key in the node's entries.
     ///
     /// If the key is found then `Result::Ok` is returned, containing the index
     /// of the matching key. If the value is not found then `Result::Err` is
     /// returned, containing the index where a matching key could be inserted
     /// while maintaining sorted order.
-    pub fn get_key_idx(&mut self, key: &K) -> Result<usize, usize> {
+    pub fn search(&self, key: &K) -> Result<usize, usize> {
         self.keys.binary_search(key)
     }
 
