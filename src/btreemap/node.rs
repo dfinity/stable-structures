@@ -41,13 +41,13 @@ pub type Entry<K> = (K, Vec<u8>);
 /// Each node can contain up to `CAPACITY + 1` children, each child is 8 bytes.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Node<K: Storable + Ord + Clone> {
-    pub address: Address,
+    address: Address,
     keys: Vec<K>,
     encoded_values: Vec<Vec<u8>>,
-    /// For the key at position I, children[I] points to the left
-    /// child of this key and children[I + 1] points to the right child.
-    pub children: Vec<Address>,
-    pub node_type: NodeType,
+    // For the key at position I, children[I] points to the left
+    // child of this key and children[I + 1] points to the right child.
+    children: Vec<Address>,
+    node_type: NodeType,
     max_key_size: u32,
     max_value_size: u32,
 }
@@ -202,6 +202,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
     }
 
+    /// Returns the address of the node.
+    pub fn address(&self) -> Address {
+        self.address
+    }
+
+    /// Sets the address of the node.
+    pub fn set_address(&mut self, address: Address) {
+        self.address = address;
+    }
+
+    pub fn node_type(&self) -> NodeType {
+        self.node_type
+    }
+
     pub fn iter_entries(&self) -> impl Iterator<Item = (&K, &[u8])> {
         self.keys
             .iter()
@@ -277,6 +291,36 @@ impl<K: Storable + Ord + Clone> Node<K> {
         &self.keys[idx]
     }
 
+    /// Returns the child's address at the given index.
+    pub fn child(&self, idx: usize) -> Address {
+        self.children[idx]
+    }
+
+    /// Inserts the given child at the given index.
+    pub fn insert_child(&mut self, idx: usize, address: Address) {
+        self.children.insert(idx, address)
+    }
+
+    /// Pushes the child to the far right of the node.
+    pub fn push_child(&mut self, address: Address) {
+        self.children.push(address)
+    }
+
+    /// Removes the child at the given index.
+    pub fn remove_child(&mut self, idx: usize) -> Address {
+        self.children.remove(idx)
+    }
+
+    /// Returns the number of children in the node.
+    pub fn children_len(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Pops the right-most child of the node.
+    pub fn pop_child(&mut self) -> Option<Address> {
+        self.children.pop()
+    }
+
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
         self.keys.insert(idx, key);
@@ -305,6 +349,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn append_entries_from(&mut self, other: &mut Node<K>) {
         self.keys.append(&mut other.keys);
         self.encoded_values.append(&mut other.encoded_values);
+    }
+
+    /// Moves children from the `other` node to the back of this node.
+    pub fn append_children_from(&mut self, other: &mut Node<K>) {
+        self.children.append(&mut other.children);
     }
 
     #[allow(dead_code)]
