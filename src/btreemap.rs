@@ -861,7 +861,7 @@ where
                                 };
 
                                 if idx + 1 != node.entries_len()
-                                    && key_range.contains(&node.key(idx + 1))
+                                    && key_range.contains(node.key(idx + 1))
                                 {
                                     cursors.push(Cursor::Node {
                                         node,
@@ -898,7 +898,7 @@ where
                                 NodeType::Leaf => None,
                             };
 
-                            if idx < node.entries_len() && key_range.contains(&node.key(idx)) {
+                            if idx < node.entries_len() && key_range.contains(node.key(idx)) {
                                 cursors.push(Cursor::Node {
                                     node,
                                     next: Index::Entry(idx),
