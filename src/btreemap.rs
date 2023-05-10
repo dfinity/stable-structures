@@ -2534,7 +2534,6 @@ mod test {
     }
 
     #[test]
-    #[allow(unaligned_references)]
     fn read_write_header_is_identical_to_read_write_struct() {
         #[repr(C, packed)]
         struct BTreePackedHeader {
