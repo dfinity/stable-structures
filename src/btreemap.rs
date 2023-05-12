@@ -760,8 +760,8 @@ where
                             // Merge child into left sibling if it exists.
 
                             assert!(left_sibling.at_minimum());
-                            let left_sibling_address = left_sibling.address();
-                            let left_sibling = self.merge(child, left_sibling, node.remove_entry(idx - 1));
+                            let left_sibling =
+                                self.merge(child, left_sibling, node.remove_entry(idx - 1));
                             // Removing child from parent.
                             node.remove_child(idx);
 
@@ -770,7 +770,7 @@ where
 
                                 if node.address() == self.root_addr {
                                     // Update the root.
-                                    self.root_addr = left_sibling_address;
+                                    self.root_addr = left_sibling.address();
                                     self.save();
                                 }
                             } else {
@@ -784,8 +784,8 @@ where
                             // Merge child into right sibling.
 
                             assert!(right_sibling.at_minimum());
-                            let right_sibling_address = right_sibling.address();
-                            let right_sibling = self.merge(child, right_sibling, node.remove_entry(idx));
+                            let right_sibling =
+                                self.merge(child, right_sibling, node.remove_entry(idx));
 
                             // Removing child from parent.
                             node.remove_child(idx);
@@ -795,7 +795,7 @@ where
 
                                 if node.address() == self.root_addr {
                                     // Update the root.
-                                    self.root_addr = right_sibling_address;
+                                    self.root_addr = right_sibling.address();
                                     self.save();
                                 }
                             } else {
