@@ -181,22 +181,9 @@ pub fn criterion_benchmark(c: &mut Criterion<Instructions>) {
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_16_1024");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_32_1024");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_64_1024");
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_insert_blob_128_1024",
-    );
-
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_insert_blob_256_1024",
-    );
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_insert_blob_512_1024",
-    );
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_128_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_256_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_512_1024");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_u64");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_blob_8");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_u64");
