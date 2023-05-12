@@ -1,40 +1,40 @@
 use crate::{count_instructions, Random};
-use ic_cdk_macros::{query, update};
+use ic_cdk_macros::query;
 use ic_stable_structures::storable::Blob;
 use ic_stable_structures::{BoundedStorable, DefaultMemoryImpl, StableVec};
 use tiny_rng::{Rand, Rng};
 
-#[update]
+#[query]
 pub fn vec_insert_blob_4() -> u64 {
     vec_insert_blob::<4>()
 }
 
-#[update]
+#[query]
 pub fn vec_insert_blob_8() -> u64 {
     vec_insert_blob::<8>()
 }
 
-#[update]
+#[query]
 pub fn vec_insert_blob_16() -> u64 {
     vec_insert_blob::<16>()
 }
 
-#[update]
+#[query]
 pub fn vec_insert_blob_32() -> u64 {
     vec_insert_blob::<32>()
 }
 
-#[update]
+#[query]
 pub fn vec_insert_blob_64() -> u64 {
     vec_insert_blob::<64>()
 }
 
-#[update]
+#[query]
 pub fn vec_insert_blob_128() -> u64 {
     vec_insert_blob::<128>()
 }
 
-#[update]
+#[query]
 pub fn vec_insert_u64() -> u64 {
     vec_insert::<u64>()
 }
