@@ -86,69 +86,44 @@ fn dfx_project_dir() -> PathBuf {
         .join("benchmark-canisters")
 }
 
-struct DfxStarted;
-
-impl DfxStarted {
-    fn new() -> Self {
-        assert!(Command::new("dfx")
-            .args(["start", "--background", "--clean"])
-            .current_dir(dfx_project_dir())
-            .status()
-            .unwrap()
-            .success());
-        Self
-    }
+fn benches_dir() -> PathBuf {
+    PathBuf::new()
+        .join(env::var("CARGO_MANIFEST_DIR").unwrap())
+        .join("benches")
 }
 
-impl Drop for DfxStarted {
-    fn drop(&mut self) {
-        assert!(Command::new("dfx")
-            .arg("stop")
-            .current_dir(dfx_project_dir())
-            .status()
-            .unwrap()
-            .success());
-    }
-}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+struct Canister(&'static str);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct DeployedCanister(&'static str);
-
-impl DeployedCanister {
+impl Canister {
     fn new(name: &'static str) -> Self {
-        assert!(Command::new("dfx")
-            .args(["deploy", "--no-wallet", name])
+        assert!(Command::new("cargo")
+            .args(["build", "--release", "--target", "wasm32-unknown-unknown"])
             .current_dir(dfx_project_dir())
             .status()
             .unwrap()
             .success());
         Self(name)
     }
-
-    fn name(&self) -> &'static str {
-        self.0
-    }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 struct ExecutionArguments {
-    canister: DeployedCanister,
+    canister: Canister,
     method: String,
-    is_query: bool,
 }
 
 impl ExecutionArguments {
-    fn new(canister: DeployedCanister, method: &str, is_query: bool) -> Self {
+    fn new(canister: Canister, method: &str) -> Self {
         Self {
             canister,
             method: method.to_string(),
-            is_query,
         }
     }
 }
 
 lazy_static::lazy_static! {
-    static ref BENCHMARK_CANISTER: DeployedCanister = DeployedCanister::new("benchmarks");
+    static ref BENCHMARK_CANISTER: Canister = Canister::new("benchmarks");
     static ref CACHED_RESULTS: Mutex<HashMap<ExecutionArguments, u64>> = Mutex::new(HashMap::new());
 }
 
@@ -160,19 +135,9 @@ fn execution_instructions(arguments: ExecutionArguments) -> u64 {
         return result;
     }
 
-    let mut args = vec![
-        "canister",
-        "call",
-        arguments.canister.name(),
-        &arguments.method,
-    ];
-    if arguments.is_query {
-        args.push("--query");
-    };
-
-    let output = Command::new("dfx")
-        .current_dir(dfx_project_dir())
-        .args(args)
+    let output = Command::new("bash")
+        .current_dir(benches_dir())
+        .args(vec!["run-benchmark.sh", &arguments.method])
         .output()
         .unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
@@ -195,127 +160,85 @@ fn execution_instructions(arguments: ExecutionArguments) -> u64 {
     result
 }
 
-fn bench_function(
-    c: &mut Criterion<Instructions>,
-    canister: DeployedCanister,
-    method: &str,
-    is_query: bool,
-) {
+fn bench_function(c: &mut Criterion<Instructions>, canister: Canister, method: &str) {
     c.bench_function(method, |b| {
         b.iter_custom(|iters| {
             // Each run will have the same result, so just do it once and
             // multiply by the number of iterations.
-            iters * execution_instructions(ExecutionArguments::new(canister, method, is_query))
+            iters * execution_instructions(ExecutionArguments::new(canister, method))
         })
     });
 }
 
 pub fn criterion_benchmark(c: &mut Criterion<Instructions>) {
     // MemoryManager benchmarks
-    bench_function(c, *BENCHMARK_CANISTER, "memory_manager_baseline", true);
-    bench_function(c, *BENCHMARK_CANISTER, "memory_manager_overhead", true);
+    bench_function(c, *BENCHMARK_CANISTER, "memory_manager_baseline");
+    bench_function(c, *BENCHMARK_CANISTER, "memory_manager_overhead");
 
     // BTree benchmarks
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_4_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_16_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_32_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_64_1024", true);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_4_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_16_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_32_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_64_1024");
     bench_function(
         c,
         *BENCHMARK_CANISTER,
         "btreemap_insert_blob_128_1024",
-        true,
     );
 
-    // These tests are called as update calls as they exceed the instruction
-    // limit for query calls.
     bench_function(
         c,
         *BENCHMARK_CANISTER,
         "btreemap_insert_blob_256_1024",
-        false,
     );
     bench_function(
         c,
         *BENCHMARK_CANISTER,
         "btreemap_insert_blob_512_1024",
-        false,
     );
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_u64", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_blob_8", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_u64", true);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_blob_8");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_u64");
 
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_4_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_16_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_32_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_64_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_128_1024", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_u64", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_blob_8", true);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_u64", true);
-    // These tests go over the instruction limit, so we can't run them currently.
-    // bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_256_1024", true);
-    // bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_512_1024", true);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_4_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_16_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_32_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_64_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_128_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_blob_8");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_256_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_512_1024");
 
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_4_1024", false);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_1024", false);
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_remove_blob_16_1024",
-        false,
-    );
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_remove_blob_32_1024",
-        false,
-    );
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_remove_blob_64_1024",
-        false,
-    );
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_remove_blob_128_1024",
-        false,
-    );
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_remove_blob_256_1024",
-        false,
-    );
-    // This test goes over the instructions limit, so we can't run it currently.
-    bench_function(
-        c,
-        *BENCHMARK_CANISTER,
-        "btreemap_remove_blob_512_1024",
-        false,
-    );
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_u64", false);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_blob_8", false);
-    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_u64", false);
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_4_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_16_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_32_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_64_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_128_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_256_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_512_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_blob_8");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_u64");
 
     // Vec benchmarks
-    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_4", false);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_8", false);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_16", false);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_32", false);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_128", false);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_u64", false);
+    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_4");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_8");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_16");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_32");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_128");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_insert_u64");
 
-    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_4", true);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_8", true);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_16", true);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_32", true);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_128", true);
-    bench_function(c, *BENCHMARK_CANISTER, "vec_get_u64", true);
+    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_4");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_8");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_16");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_32");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_get_blob_128");
+    bench_function(c, *BENCHMARK_CANISTER, "vec_get_u64");
 }
 
 fn benches() {
@@ -333,6 +256,5 @@ fn benches() {
 }
 
 fn main() {
-    let _dfx_started = DfxStarted::new();
     benches();
 }
