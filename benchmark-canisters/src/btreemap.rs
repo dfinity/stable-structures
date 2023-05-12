@@ -1,5 +1,5 @@
 use crate::{count_instructions, Random};
-use ic_cdk_macros::{query, update};
+use ic_cdk_macros::query;
 use ic_stable_structures::{storable::Blob, BTreeMap, BoundedStorable, DefaultMemoryImpl};
 use tiny_rng::{Rand, Rng};
 
@@ -33,52 +33,52 @@ pub fn btreemap_insert_blob_128_1024() -> u64 {
     insert_blob_helper::<128, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_256_1024() -> u64 {
     insert_blob_helper::<256, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_512_1024() -> u64 {
     insert_blob_helper::<512, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_1024_4() -> u64 {
     insert_blob_helper::<1024, 4>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_1024_8() -> u64 {
     insert_blob_helper::<1024, 8>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_1024_16() -> u64 {
     insert_blob_helper::<1024, 16>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_1024_32() -> u64 {
     insert_blob_helper::<1024, 32>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_1024_64() -> u64 {
     insert_blob_helper::<1024, 64>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_1024_128() -> u64 {
     insert_blob_helper::<1024, 128>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_1024_256() -> u64 {
     insert_blob_helper::<1024, 256>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_insert_blob_1024_512() -> u64 {
     insert_blob_helper::<1024, 512>()
 }
@@ -99,57 +99,57 @@ pub fn btreemap_insert_blob_8_u64() -> u64 {
 }
 
 /// Benchmarks removing keys from a BTreeMap.
-#[update]
+#[query]
 pub fn btreemap_remove_blob_4_1024() -> u64 {
     remove_blob_helper::<4, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_blob_8_1024() -> u64 {
     remove_blob_helper::<8, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_blob_16_1024() -> u64 {
     remove_blob_helper::<16, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_blob_32_1024() -> u64 {
     remove_blob_helper::<32, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_blob_64_1024() -> u64 {
     remove_blob_helper::<64, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_blob_128_1024() -> u64 {
     remove_blob_helper::<128, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_blob_256_1024() -> u64 {
     remove_blob_helper::<256, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_blob_512_1024() -> u64 {
     get_blob_helper::<512, 1024>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_u64_u64() -> u64 {
     remove_helper::<u64, u64>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_u64_blob_8() -> u64 {
     remove_helper::<u64, Blob<8>>()
 }
 
-#[update]
+#[query]
 pub fn btreemap_remove_blob_8_u64() -> u64 {
     remove_helper::<Blob<8>, u64>()
 }
