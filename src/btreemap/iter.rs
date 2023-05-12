@@ -88,7 +88,7 @@ where
                     // Load the node at the given address, and add it to the cursors.
                     let node = self.map.load_node(address);
                     self.cursors.push(Cursor::Node {
-                        next: match node.node_type {
+                        next: match node.node_type() {
                             // Iterate on internal nodes starting from the first child.
                             NodeType::Internal => Index::Child(0),
                             // Iterate on leaf nodes starting from the first entry.
@@ -104,10 +104,7 @@ where
                 node,
                 next: Index::Child(child_idx),
             }) => {
-                let child_address = *node
-                    .children
-                    .get(child_idx)
-                    .expect("Iterating over children went out of bounds.");
+                let child_address = node.child(child_idx);
 
                 // After iterating on the child, iterate on the next _entry_ in this node.
                 // The entry immediately after the child has the same index as the child's.
@@ -135,7 +132,7 @@ where
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
-                    next: match node.node_type {
+                    next: match node.node_type() {
                         // If this is an internal node, add the next child to the cursors.
                         NodeType::Internal => Index::Child(entry_idx + 1),
                         // If this is a leaf node, add the next entry to the cursors.
