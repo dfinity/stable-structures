@@ -136,7 +136,7 @@ pub fn btreemap_remove_blob_256_1024() -> u64 {
 
 #[query]
 pub fn btreemap_remove_blob_512_1024() -> u64 {
-    get_blob_helper::<512, 1024>()
+    remove_blob_helper::<512, 1024>()
 }
 
 #[query]

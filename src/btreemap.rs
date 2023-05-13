@@ -457,15 +457,14 @@ where
             return None;
         }
 
-        self.remove_helper(self.root_addr, key)
+        let root_node = self.load_node(self.root_addr);
+        self.remove_helper(root_node, key)
             .map(Cow::Owned)
             .map(V::from_bytes)
     }
 
     // A helper method for recursively removing a key from the B-tree.
-    fn remove_helper(&mut self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let mut node = self.load_node(node_addr);
-
+    fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
         if node.address() != self.root_addr {
             // We're guaranteed that whenever this method is called an entry can be
             // removed from the node without it needing to be merged into a sibling.
@@ -532,7 +531,7 @@ where
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
                             let predecessor = left_child.get_max(self.memory());
-                            self.remove_helper(node.child(idx), &predecessor.0)?;
+                            self.remove_helper(left_child, &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
                             let (_, old_value) = node.swap_entry(idx, predecessor);
@@ -567,7 +566,7 @@ where
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
                             let successor = right_child.get_min(self.memory());
-                            self.remove_helper(node.child(idx + 1), &successor.0)?;
+                            self.remove_helper(right_child, &successor.0)?;
 
                             // Replace the `key` with its successor.
                             let (_, old_value) = node.swap_entry(idx, successor);
@@ -622,7 +621,7 @@ where
                         new_child.save(self.memory());
 
                         // Recursively delete the key.
-                        self.remove_helper(new_child.address(), key)
+                        self.remove_helper(new_child, key)
                     }
                     Err(idx) => {
                         // Case 3: The node is an internal node and the key does NOT exist in it.
@@ -634,7 +633,7 @@ where
                         if child.can_remove_entry_without_merging() {
                             // The child has enough nodes. Recurse to delete the `key` from the
                             // `child`.
-                            return self.remove_helper(node.child(idx), key);
+                            return self.remove_helper(child, key);
                         }
 
                         // An entry can't be removed from the child without merging.
@@ -699,7 +698,7 @@ where
                                 left_sibling.save(self.memory());
                                 child.save(self.memory());
                                 node.save(self.memory());
-                                return self.remove_helper(child.address(), key);
+                                return self.remove_helper(child, key);
                             }
                         }
 
@@ -751,7 +750,7 @@ where
                                 right_sibling.save(self.memory());
                                 child.save(self.memory());
                                 node.save(self.memory());
-                                return self.remove_helper(child.address(), key);
+                                return self.remove_helper(child, key);
                             }
                         }
 
@@ -761,8 +760,8 @@ where
                             // Merge child into left sibling if it exists.
 
                             assert!(left_sibling.at_minimum());
-                            let left_sibling_address = left_sibling.address();
-                            self.merge(child, left_sibling, node.remove_entry(idx - 1));
+                            let left_sibling =
+                                self.merge(child, left_sibling, node.remove_entry(idx - 1));
                             // Removing child from parent.
                             node.remove_child(idx);
 
@@ -771,22 +770,22 @@ where
 
                                 if node.address() == self.root_addr {
                                     // Update the root.
-                                    self.root_addr = left_sibling_address;
+                                    self.root_addr = left_sibling.address();
                                     self.save();
                                 }
                             } else {
                                 node.save(self.memory());
                             }
 
-                            return self.remove_helper(left_sibling_address, key);
+                            return self.remove_helper(left_sibling, key);
                         }
 
                         if let Some(right_sibling) = right_sibling {
                             // Merge child into right sibling.
 
                             assert!(right_sibling.at_minimum());
-                            let right_sibling_address = right_sibling.address();
-                            self.merge(child, right_sibling, node.remove_entry(idx));
+                            let right_sibling =
+                                self.merge(child, right_sibling, node.remove_entry(idx));
 
                             // Removing child from parent.
                             node.remove_child(idx);
@@ -796,14 +795,14 @@ where
 
                                 if node.address() == self.root_addr {
                                     // Update the root.
-                                    self.root_addr = right_sibling_address;
+                                    self.root_addr = right_sibling.address();
                                     self.save();
                                 }
                             } else {
                                 node.save(self.memory());
                             }
 
-                            return self.remove_helper(right_sibling_address, key);
+                            return self.remove_helper(right_sibling, key);
                         }
 
                         unreachable!("At least one of the siblings must exist.");
