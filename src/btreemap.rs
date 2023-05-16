@@ -1821,28 +1821,28 @@ mod test {
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem.clone());
 
-        for j in (0..=1).rev() {
-            for i in (0..=5).rev() {
+        for j in (0..=10).rev() {
+            for i in (0..=255).rev() {
                 assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
             }
         }
 
-        for j in 0..=1 {
-            for i in 0..=5 {
+        for j in 0..=10 {
+            for i in 0..=255 {
                 assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
             }
         }
 
         let mut btree = BTreeMap::load(mem);
 
-        for j in (0..=1).rev() {
-            for i in (0..=5).rev() {
+        for j in (0..=10).rev() {
+            for i in (0..=255).rev() {
                 assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
             }
         }
 
-        for j in 0..=1 {
-            for i in 0..=5 {
+        for j in 0..=10 {
+            for i in 0..=255 {
                 assert_eq!(btree.get(&vec![i, j]), None);
             }
         }
