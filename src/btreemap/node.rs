@@ -149,7 +149,6 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
     /// Saves the node to memory.
     // TODO: don't pass memory
     pub fn save(&self, memory: &M) {
-        println!("saving");
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());
@@ -179,8 +178,6 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
         let mut offset = NodeHeader::size();
 
-        println!("values: {:?}", self.encoded_values);
-
         // Load the values.
         let encoded_values: Vec<_> = (0..self.keys.len()).map(|i| Value::Loaded(self.value(i))).collect();
 
@@ -207,12 +204,6 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
             let value = self.value(idx);
             write_u32(memory, self.address + offset, value.len() as u32);
             offset += U32_SIZE;
-            println!(
-                "writing key {:?} and value: {:?}, value idx: {}",
-                key.to_bytes().to_vec(),
-                value,
-                (self.address + offset).get()
-            );
             write(memory, (self.address + offset).get(), &value);
             offset += Bytes::from(self.max_value_size);
         }
@@ -367,7 +358,6 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
-        println!("inserting {:?} at idx {:?}", key.to_bytes(), idx);
         self.keys.insert(idx, key);
         self.encoded_values
             .borrow_mut()
@@ -409,7 +399,6 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
     /// Moves entries from the `other` node to the back of this node.
     pub fn append_entries_from(&mut self, other: &mut Node<K, M>) {
-        println!("appending entries");
         self.keys.append(&mut other.keys);
         self.encoded_values
             .borrow_mut()
@@ -482,7 +471,6 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
     /// Moves elements from own node to a sibling node and returns the median element.
     pub fn split(&mut self, sibling: &mut Node<K, M>) -> Entry<K> {
-        println!("splitting");
         debug_assert!(self.is_full());
 
         // Move the entries and children above the median into the new sibling.

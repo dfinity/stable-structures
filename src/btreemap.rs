@@ -682,7 +682,6 @@ where
                                     .swap_entry(idx - 1, (left_sibling_key, left_sibling_value));
 
                                 // Move the entry from the parent into the child.
-                                println!("moving entry from parent into child");
                                 child.insert_entry(0, (parent_key, parent_value));
 
                                 // Move the last child from left sibling into child.
@@ -699,7 +698,6 @@ where
                                 left_sibling.save(self.memory());
                                 child.save(self.memory());
                                 node.save(self.memory());
-                                println!("REMOVE HELPER");
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -1011,7 +1009,6 @@ where
     //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     //   `source` is deallocated.
     fn merge(&mut self, source: Node<K, M>, into: Node<K, M>, median: Entry<K>) -> Node<K, M> {
-        println!("merging");
         assert_eq!(source.node_type(), into.node_type());
         assert!(source.entries_len() > 0);
         assert!(into.entries_len() > 0);
@@ -1826,14 +1823,13 @@ mod test {
 
         for j in (0..=1).rev() {
             for i in (0..=5).rev() {
-                println!("INSERT");
                 assert_eq!(btree.insert(vec![i, j], vec![i, j]), None);
             }
         }
 
         for j in 0..=1 {
             for i in 0..=5 {
-//                assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
+                assert_eq!(btree.get(&vec![i, j]), Some(vec![i, j]));
             }
         }
 
@@ -1841,7 +1837,6 @@ mod test {
 
         for j in (0..=1).rev() {
             for i in (0..=5).rev() {
-                println!("REMOVE");
                 assert_eq!(btree.remove(&vec![i, j]), Some(vec![i, j]));
             }
         }
