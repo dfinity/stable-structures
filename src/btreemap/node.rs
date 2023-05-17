@@ -29,7 +29,7 @@ pub type Entry<K> = (K, Vec<u8>);
 
 #[derive(Debug)]
 enum Value {
-    Ref(Address, u32),
+    Ref(Address),
     Loaded(Vec<u8>),
 }
 
@@ -103,17 +103,13 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
             // Read the key.
             buf.resize(key_size as usize, 0);
             memory.read((address + offset).get(), &mut buf);
-            offset += Bytes::from(max_key_size as u64);
+            offset += Bytes::from(max_key_size);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             keys.push(key);
 
-            // Read the value's size.
-            let value_size = read_u32(memory, address + offset);
-            offset += U32_SIZE;
-
-            // Note the value.
-            encoded_values.push(Value::Ref(address + offset, value_size));
-            offset += Bytes::from(max_value_size as u64);
+            // Values are loaded lazily. Store a reference and skip loading it.
+            encoded_values.push(Value::Ref(address + offset));
+            offset += U32_SIZE + Bytes::from(max_value_size);
         }
 
         // Load children if this is an internal node.
@@ -315,21 +311,27 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
     /// Returns a reference to the encoded value at the specified index.
     pub fn value(&self, idx: usize) -> Ref<[u8]> {
+        // Load and cache the value from the underlying memory if needed.
         {
             let mut values = self.encoded_values.borrow_mut();
 
-            if let Value::Ref(address, len) = values[idx] {
-                let mut value = vec![0; len as usize];
-                self.memory.read(address.get(), &mut value);
+            if let Value::Ref(address) = values[idx] {
+                // Value isn't load it yet.
+                let value_len = read_u32(&self.memory, address) as usize;
+                let mut value = vec![0; value_len];
+                self.memory.read((address + U32_SIZE).get(), &mut value);
+
+                // Cache the value internally.
                 values[idx] = Value::Loaded(value);
             }
         }
 
+        // Return a reference to the value.
         Ref::map(self.encoded_values.borrow(), |values| {
             if let Value::Loaded(v) = &values[idx] {
                 &v[..]
             } else {
-                panic!();
+                unreachable!("Value must've been loaded already.");
             }
         })
     }
@@ -394,20 +396,16 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
     /// Removes an entry from the back of the node.
     pub fn pop_entry(&mut self) -> Option<Entry<K>> {
-        let key = self.keys.pop()?;
-        let val = self.encoded_values.borrow_mut().pop()?;
+        let len = self.entries_len();
+        if len == 0 {
+            return None;
+        }
 
-        let val = match val {
-            Value::Loaded(v) => v,
-            Value::Ref(address, len) => {
-                let start = address.get();
-                let mut value = vec![0; len as usize];
-                self.memory.read(start, &mut value);
-                value
-            }
-        };
+        let key = self.keys.pop().expect("node must not be empty");
+        let last_value = self.value(len - 1).to_vec();
+        self.encoded_values.borrow_mut().pop().expect("node must not be empty");
 
-        Some((key, val))
+        Some((key, last_value))
     }
 
     /// Moves entries from the `other` node to the back of this node.
@@ -428,15 +426,7 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
         self.keys
             .iter()
             .cloned()
-            .zip(self.encoded_values.borrow().iter().map(|v| match v {
-                Value::Loaded(v) => v.clone(),
-                Value::Ref(address, len) => {
-                    let start = address.get();
-                    let mut value = vec![0; *len as usize];
-                    self.memory.read(start, &mut value);
-                    value
-                }
-            }))
+            .zip((0..self.keys.len()).map(|idx| self.value(idx).to_vec()))
             .collect()
     }
 
