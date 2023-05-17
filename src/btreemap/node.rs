@@ -27,8 +27,7 @@ pub enum NodeType {
 
 pub type Entry<K> = (K, Vec<u8>);
 
-#[derive(Debug, PartialEq, Eq)] // TODO: these equals are wrong. Do we need partialeq and eq on the
-                                // node?
+#[derive(Debug)]
 enum Value {
     Ref(Address, u32),
     Loaded(Vec<u8>),
@@ -47,7 +46,7 @@ enum Value {
 ///     - value (`max_value_size` bytes)
 ///
 /// Each node can contain up to `CAPACITY + 1` children, each child is 8 bytes.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Node<K: Storable + Ord + Clone, M: Memory + Clone> {
     address: Address,
     keys: Vec<K>,
