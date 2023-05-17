@@ -5,7 +5,7 @@ use crate::{
     write, write_struct, write_u32, Memory,
 };
 use std::borrow::{Borrow, Cow};
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
@@ -179,9 +179,9 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
         let mut offset = NodeHeader::size();
 
         // Load the values.
-        let encoded_values: Vec<_> = (0..self.keys.len()).map(|i| Value::Loaded(self.value(i))).collect();
-
-        *self.encoded_values.borrow_mut() = encoded_values;
+        for i in 0..self.keys.len() {
+            self.value(i);
+        }
 
         // Write the entries.
         for idx in 0..self.keys.len() {
@@ -249,10 +249,13 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
     /// Returns the entry with the max key in the subtree.
     pub fn get_max(&self) -> Entry<K> {
         match self.node_type {
-            NodeType::Leaf => (
-                self.keys.last().expect("A node can never be empty").clone(),
-                self.value(self.encoded_values.borrow().len() - 1).to_vec(),
-            ),
+            NodeType::Leaf => {
+                let last_idx = self.encoded_values.borrow().len() - 1;
+                (
+                    self.keys.last().expect("A node can never be empty").clone(),
+                    self.value(last_idx).to_vec(),
+                )
+            }
             NodeType::Internal => {
                 let last_child = Self::load(
                     *self
@@ -309,16 +312,24 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
     }
 
     /// Returns a reference to the encoded value at the specified index.
-    pub fn value(&self, idx: usize) -> Vec<u8> {
-        match &self.encoded_values.borrow()[idx] {
-            Value::Loaded(v) => v.clone(),
-            Value::Ref(address, len) => {
-                let start = address.get();
-                let mut value = vec![0; *len as usize];
-                self.memory.read(start, &mut value);
-                value
+    pub fn value(&self, idx: usize) -> Ref<[u8]> {
+        {
+            let mut values = self.encoded_values.borrow_mut();
+
+            if let Value::Ref(address, len) = values[idx] {
+                let mut value = vec![0; len as usize];
+                self.memory.read(address.get(), &mut value);
+                values[idx] = Value::Loaded(value);
             }
         }
+
+        Ref::map(self.encoded_values.borrow(), |values| {
+            if let Value::Loaded(v) = &values[idx] {
+                &v[..]
+            } else {
+                panic!();
+            }
+        })
     }
 
     /// Returns a reference to the key at the specified index.
