@@ -167,15 +167,14 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
         let mut offset = NodeHeader::size();
 
-        // Load the values.
+        // Load all the values. This is necessary so that we don't overwrite referenced
+        // values when writing the entries to the node.
         for i in 0..self.keys.len() {
             self.value(i);
         }
 
         // Write the entries.
-        for idx in 0..self.keys.len() {
-            let key = &self.keys[idx];
-
+        for (idx, key) in self.keys.iter().enumerate() {
             // Write the size of the key.
             let key_bytes = key.to_bytes();
             write_u32(&self.memory, self.address + offset, key_bytes.len() as u32);
@@ -190,13 +189,11 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
             offset += Bytes::from(self.max_key_size);
 
             // Write the size of the value.
-            //write_u32(memory, self.address + offset, value.len() as u32);
-            //offset += U32_SIZE;
-
-            // Write the value.
             let value = self.value(idx);
             write_u32(&self.memory, self.address + offset, value.len() as u32);
             offset += U32_SIZE;
+
+            // Write the value.
             write(&self.memory, (self.address + offset).get(), &value);
             offset += Bytes::from(self.max_value_size);
         }
@@ -225,19 +222,6 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
     pub fn node_type(&self) -> NodeType {
         self.node_type
     }
-
-    /*pub fn iter_entries(&self) -> impl Iterator<Item = (&K, &[u8])> {
-        self.keys
-            .iter()
-            .zip(self.encoded_values.borrow().iter().map(|v| match v {
-                Value::ByVal(v) => &v[..],
-                Value::ByRef(address, len) => {
-                    let start = address.get() as usize;
-                    let end = start + *len as usize;
-                    &self.node_bytes[start..end]
-                }
-            }))
-    }*/
 
     /// Returns the entry with the max key in the subtree.
     pub fn get_max(&self) -> Entry<K> {
