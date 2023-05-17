@@ -27,12 +27,6 @@ pub enum NodeType {
 
 pub type Entry<K> = (K, Vec<u8>);
 
-#[derive(Debug)]
-enum Value {
-    Ref(Address),
-    Loaded(Vec<u8>),
-}
-
 /// A node of a B-Tree.
 ///
 /// The node is stored in stable memory with the following layout:
@@ -50,7 +44,8 @@ enum Value {
 pub struct Node<K: Storable + Ord + Clone, M: Memory + Clone> {
     address: Address,
     keys: Vec<K>,
-    // Refcell added for interior immutability.
+    // Values are stored in a Refcell as they are loaded lazily.
+    // A RefCell allows loading the value and caching it without requiring exterior mutability.
     encoded_values: RefCell<Vec<Value>>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
@@ -108,7 +103,7 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
             keys.push(key);
 
             // Values are loaded lazily. Store a reference and skip loading it.
-            encoded_values.push(Value::Ref(address + offset));
+            encoded_values.push(Value::ByRef(address + offset));
             offset += U32_SIZE + Bytes::from(max_value_size);
         }
 
@@ -156,7 +151,7 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
         assert!(!self.keys.is_empty() || !self.children.is_empty());
 
         // Assert entries are sorted in strictly increasing order.
-        //assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
+        assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
 
         let header = NodeHeader {
             magic: *MAGIC,
@@ -235,8 +230,8 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
         self.keys
             .iter()
             .zip(self.encoded_values.borrow().iter().map(|v| match v {
-                Value::Loaded(v) => &v[..],
-                Value::Ref(address, len) => {
+                Value::ByVal(v) => &v[..],
+                Value::ByRef(address, len) => {
                     let start = address.get() as usize;
                     let end = start + *len as usize;
                     &self.node_bytes[start..end]
@@ -297,7 +292,7 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
     /// Swaps the entry at index `idx` with the given entry, returning the old entry.
     pub fn swap_entry(&mut self, idx: usize, mut entry: Entry<K>) -> Entry<K> {
         core::mem::swap(&mut self.keys[idx], &mut entry.0);
-        let new_value = Value::Loaded(entry.1);
+        let new_value = Value::ByVal(entry.1);
         let old_value = self.value(idx).to_vec();
         self.encoded_values.borrow_mut()[idx] = new_value;
         entry.1 = old_value;
@@ -315,20 +310,20 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
         {
             let mut values = self.encoded_values.borrow_mut();
 
-            if let Value::Ref(address) = values[idx] {
+            if let Value::ByRef(address) = values[idx] {
                 // Value isn't load it yet.
                 let value_len = read_u32(&self.memory, address) as usize;
                 let mut value = vec![0; value_len];
                 self.memory.read((address + U32_SIZE).get(), &mut value);
 
                 // Cache the value internally.
-                values[idx] = Value::Loaded(value);
+                values[idx] = Value::ByVal(value);
             }
         }
 
         // Return a reference to the value.
         Ref::map(self.encoded_values.borrow(), |values| {
-            if let Value::Loaded(v) = &values[idx] {
+            if let Value::ByVal(v) = &values[idx] {
                 &v[..]
             } else {
                 unreachable!("Value must've been loaded already.");
@@ -376,7 +371,7 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
         self.keys.insert(idx, key);
         self.encoded_values
             .borrow_mut()
-            .insert(idx, Value::Loaded(encoded_value));
+            .insert(idx, Value::ByVal(encoded_value));
     }
 
     /// Removes the entry at the specified index.
@@ -391,7 +386,7 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
         self.keys.push(key);
         self.encoded_values
             .borrow_mut()
-            .push(Value::Loaded(encoded_value));
+            .push(Value::ByVal(encoded_value));
     }
 
     /// Removes an entry from the back of the node.
@@ -403,7 +398,10 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
         let key = self.keys.pop().expect("node must not be empty");
         let last_value = self.value(len - 1).to_vec();
-        self.encoded_values.borrow_mut().pop().expect("node must not be empty");
+        self.encoded_values
+            .borrow_mut()
+            .pop()
+            .expect("node must not be empty");
 
         Some((key, last_value))
     }
@@ -502,4 +500,14 @@ impl NodeHeader {
     fn size() -> Bytes {
         Bytes::from(core::mem::size_of::<Self>() as u64)
     }
+}
+
+// The value in a K/V pair.
+#[derive(Debug)]
+enum Value {
+    // The value's encoded bytes.
+    ByVal(Vec<u8>),
+
+    // The value's address in the underlying memory.
+    ByRef(Address),
 }
