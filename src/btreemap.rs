@@ -57,7 +57,7 @@ pub struct BTreeMap<K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
     V: BoundedStorable,
-    M: Memory + Clone,
+    M: Memory,
 {
     // The address of the root node. If a root node doesn't exist, the address
     // is set to NULL.
@@ -135,7 +135,7 @@ where
             allocator: Allocator::new(
                 memory,
                 Address::from(ALLOCATOR_OFFSET as u64),
-                Node::<K, M>::size(K::MAX_SIZE, V::MAX_SIZE),
+                Node::<K>::size(K::MAX_SIZE, V::MAX_SIZE),
             ),
             max_key_size: K::MAX_SIZE,
             max_value_size: V::MAX_SIZE,
@@ -232,8 +232,8 @@ where
             // Check if the key already exists in the root.
             if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
-                let (_, previous_value) = root.swap_entry(idx, (key, value));
-                root.save();
+                let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
+                root.save(self.memory());
                 return Some(V::from_bytes(Cow::Owned(previous_value)));
             }
 
@@ -268,7 +268,7 @@ where
     }
 
     // Inserts an entry into a node that is *not full*.
-    fn insert_nonfull(&mut self, mut node: Node<K, M>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
+    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
 
@@ -277,9 +277,9 @@ where
             Ok(idx) => {
                 // The key is already in the node.
                 // Overwrite it and return the previous value.
-                let (_, previous_value) = node.swap_entry(idx, (key, value));
+                let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
 
-                node.save();
+                node.save(self.memory());
                 Some(previous_value)
             }
             Err(idx) => {
@@ -290,7 +290,7 @@ where
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
                         node.insert_entry(idx, (key, value));
-                        node.save();
+                        node.save(self.memory());
 
                         // Update the length.
                         self.length += 1;
@@ -308,8 +308,9 @@ where
                             // Check if the key already exists in the child.
                             if let Ok(idx) = child.search(&key) {
                                 // The key exists. Overwrite it and return the previous value.
-                                let (_, previous_value) = child.swap_entry(idx, (key, value));
-                                child.save();
+                                let (_, previous_value) =
+                                    child.swap_entry(idx, (key, value), self.memory());
+                                child.save(self.memory());
                                 return Some(previous_value);
                             }
 
@@ -348,7 +349,7 @@ where
     //                                 / \
     //                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
     //
-    fn split_child(&mut self, node: &mut Node<K, M>, full_child_idx: usize) {
+    fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
         // The node must not be full.
         assert!(!node.is_full());
 
@@ -363,13 +364,13 @@ where
         // Add sibling as a new child in the node.
         node.insert_child(full_child_idx + 1, sibling.address());
 
-        let (median_key, median_value) = full_child.split(&mut sibling);
+        let (median_key, median_value) = full_child.split(&mut sibling, self.memory());
 
         node.insert_entry(full_child_idx, (median_key, median_value));
 
-        sibling.save();
-        full_child.save();
-        node.save();
+        sibling.save(self.memory());
+        full_child.save(self.memory());
+        node.save(self.memory());
     }
 
     /// Returns the value associated with the given key if it exists.
@@ -386,7 +387,7 @@ where
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         let node = self.load_node(node_addr);
         match node.search(key) {
-            Ok(idx) => Some(node.value(idx).to_vec()),
+            Ok(idx) => Some(node.value(idx, self.memory()).to_vec()),
             Err(idx) => {
                 match node.node_type() {
                     NodeType::Leaf => None, // Key not found.
@@ -432,7 +433,7 @@ where
             return None;
         }
         let root = self.load_node(self.root_addr);
-        let (k, encoded_v) = root.get_min();
+        let (k, encoded_v) = root.get_min(self.memory());
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -443,7 +444,7 @@ where
             return None;
         }
         let root = self.load_node(self.root_addr);
-        let (k, encoded_v) = root.get_max();
+        let (k, encoded_v) = root.get_max(self.memory());
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -464,7 +465,7 @@ where
     }
 
     // A helper method for recursively removing a key from the B-tree.
-    fn remove_helper(&mut self, mut node: Node<K, M>, key: &K) -> Option<Vec<u8>> {
+    fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
         if node.address() != self.root_addr {
             // We're guaranteed that whenever this method is called an entry can be
             // removed from the node without it needing to be merged into a sibling.
@@ -479,7 +480,7 @@ where
                     Ok(idx) => {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
-                        let value = node.remove_entry(idx).1;
+                        let value = node.remove_entry(idx, self.memory()).1;
                         self.length -= 1;
 
                         if node.entries_len() == 0 {
@@ -492,7 +493,7 @@ where
                             self.allocator.deallocate(node.address());
                             self.root_addr = NULL;
                         } else {
-                            node.save();
+                            node.save(self.memory());
                         }
 
                         self.save();
@@ -530,14 +531,14 @@ where
 
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = left_child.get_max();
+                            let predecessor = left_child.get_max(self.memory());
                             self.remove_helper(left_child, &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
-                            let (_, old_value) = node.swap_entry(idx, predecessor);
+                            let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
 
                             // Save the parent node.
-                            node.save();
+                            node.save(self.memory());
                             return Some(old_value);
                         }
 
@@ -565,14 +566,14 @@ where
 
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let successor = right_child.get_min();
+                            let successor = right_child.get_min(self.memory());
                             self.remove_helper(right_child, &successor.0)?;
 
                             // Replace the `key` with its successor.
-                            let (_, old_value) = node.swap_entry(idx, successor);
+                            let (_, old_value) = node.swap_entry(idx, successor, self.memory());
 
                             // Save the parent node.
-                            node.save();
+                            node.save(self.memory());
                             return Some(old_value);
                         }
 
@@ -599,7 +600,11 @@ where
                         assert!(right_child.at_minimum());
 
                         // Merge the right child into the left child.
-                        let new_child = self.merge(right_child, left_child, node.remove_entry(idx));
+                        let new_child = self.merge(
+                            right_child,
+                            left_child,
+                            node.remove_entry(idx, self.memory()),
+                        );
 
                         // Remove the right child from the parent node.
                         node.remove_child(idx + 1);
@@ -617,8 +622,8 @@ where
                             self.save();
                         }
 
-                        node.save();
-                        new_child.save();
+                        node.save(self.memory());
+                        new_child.save(self.memory());
 
                         // Recursively delete the key.
                         self.remove_helper(new_child, key)
@@ -675,11 +680,14 @@ where
 
                                 // Remove the last entry from the left sibling.
                                 let (left_sibling_key, left_sibling_value) =
-                                    left_sibling.pop_entry().unwrap();
+                                    left_sibling.pop_entry(self.memory()).unwrap();
 
                                 // Replace the parent's entry with the one from the left sibling.
-                                let (parent_key, parent_value) = node
-                                    .swap_entry(idx - 1, (left_sibling_key, left_sibling_value));
+                                let (parent_key, parent_value) = node.swap_entry(
+                                    idx - 1,
+                                    (left_sibling_key, left_sibling_value),
+                                    self.memory(),
+                                );
 
                                 // Move the entry from the parent into the child.
                                 child.insert_entry(0, (parent_key, parent_value));
@@ -695,9 +703,9 @@ where
                                     assert_eq!(child.node_type(), NodeType::Leaf);
                                 }
 
-                                left_sibling.save();
-                                child.save();
-                                node.save();
+                                left_sibling.save(self.memory());
+                                child.save(self.memory());
+                                node.save(self.memory());
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -727,11 +735,14 @@ where
 
                                 // Remove the first entry from the right sibling.
                                 let (right_sibling_key, right_sibling_value) =
-                                    right_sibling.remove_entry(0);
+                                    right_sibling.remove_entry(0, self.memory());
 
                                 // Replace the parent's entry with the one from the right sibling.
-                                let parent_entry =
-                                    node.swap_entry(idx, (right_sibling_key, right_sibling_value));
+                                let parent_entry = node.swap_entry(
+                                    idx,
+                                    (right_sibling_key, right_sibling_value),
+                                    self.memory(),
+                                );
 
                                 // Move the entry from the parent into the child.
                                 child.push_entry(parent_entry);
@@ -747,9 +758,9 @@ where
                                     }
                                 }
 
-                                right_sibling.save();
-                                child.save();
-                                node.save();
+                                right_sibling.save(self.memory());
+                                child.save(self.memory());
+                                node.save(self.memory());
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -760,8 +771,11 @@ where
                             // Merge child into left sibling if it exists.
 
                             assert!(left_sibling.at_minimum());
-                            let left_sibling =
-                                self.merge(child, left_sibling, node.remove_entry(idx - 1));
+                            let left_sibling = self.merge(
+                                child,
+                                left_sibling,
+                                node.remove_entry(idx - 1, self.memory()),
+                            );
                             // Removing child from parent.
                             node.remove_child(idx);
 
@@ -774,7 +788,7 @@ where
                                     self.save();
                                 }
                             } else {
-                                node.save();
+                                node.save(self.memory());
                             }
 
                             return self.remove_helper(left_sibling, key);
@@ -784,8 +798,11 @@ where
                             // Merge child into right sibling.
 
                             assert!(right_sibling.at_minimum());
-                            let right_sibling =
-                                self.merge(child, right_sibling, node.remove_entry(idx));
+                            let right_sibling = self.merge(
+                                child,
+                                right_sibling,
+                                node.remove_entry(idx, self.memory()),
+                            );
 
                             // Removing child from parent.
                             node.remove_child(idx);
@@ -799,7 +816,7 @@ where
                                     self.save();
                                 }
                             } else {
-                                node.save();
+                                node.save(self.memory());
                             }
 
                             return self.remove_helper(right_sibling, key);
@@ -1008,7 +1025,7 @@ where
     // Output:
     //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     //   `source` is deallocated.
-    fn merge(&mut self, source: Node<K, M>, into: Node<K, M>, median: Entry<K>) -> Node<K, M> {
+    fn merge(&mut self, source: Node<K>, into: Node<K>, median: Entry<K>) -> Node<K> {
         assert_eq!(source.node_type(), into.node_type());
         assert!(source.entries_len() > 0);
         assert!(into.entries_len() > 0);
@@ -1032,23 +1049,22 @@ where
 
         lower.set_address(into_address);
 
-        lower.save();
+        lower.save(self.memory());
 
         self.allocator.deallocate(source_address);
         lower
     }
 
-    fn allocate_node(&mut self, node_type: NodeType) -> Node<K, M> {
+    fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
         Node::new(
             self.allocator.allocate(),
             node_type,
             self.max_key_size,
             self.max_value_size,
-            self.memory(),
         )
     }
 
-    fn load_node(&self, address: Address) -> Node<K, M> {
+    fn load_node(&self, address: Address) -> Node<K> {
         Node::load(
             address,
             self.memory(),
@@ -1199,7 +1215,7 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![6], vec![])]);
+        assert_eq!(root.entries(btree.memory()), vec![(vec![6], vec![])]);
         assert_eq!(root.children_len(), 2);
 
         // The right child should now be full, with the median key being "12"
@@ -1334,13 +1350,13 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![6], vec![])]);
+        assert_eq!(root.entries(btree.memory()), vec![(vec![6], vec![])]);
         assert_eq!(root.children_len(), 2);
 
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_0.entries(),
+            child_0.entries(btree.memory()),
             vec![
                 (vec![1], vec![]),
                 (vec![2], vec![]),
@@ -1353,7 +1369,7 @@ mod test {
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_1.entries(),
+            child_1.entries(btree.memory()),
             vec![
                 (vec![7], vec![]),
                 (vec![8], vec![]),
@@ -1383,13 +1399,16 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![6], vec![]), (vec![12], vec![])]);
+        assert_eq!(
+            root.entries(btree.memory()),
+            vec![(vec![6], vec![]), (vec![12], vec![])]
+        );
         assert_eq!(root.children_len(), 3);
 
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_0.entries(),
+            child_0.entries(btree.memory()),
             vec![
                 (vec![1], vec![]),
                 (vec![2], vec![]),
@@ -1402,7 +1421,7 @@ mod test {
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_1.entries(),
+            child_1.entries(btree.memory()),
             vec![
                 (vec![7], vec![]),
                 (vec![8], vec![]),
@@ -1415,7 +1434,7 @@ mod test {
         let child_2 = btree.load_node(root.child(2));
         assert_eq!(child_2.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_2.entries(),
+            child_2.entries(btree.memory()),
             vec![
                 (vec![13], vec![]),
                 (vec![14], vec![]),
@@ -1467,16 +1486,22 @@ mod test {
         // [0, 1, 2, 3, 4]   [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![e(5)]);
+        assert_eq!(root.entries(btree.memory()), vec![e(5)]);
         assert_eq!(root.children_len(), 2);
 
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(child_0.entries(), vec![e(0), e(1), e(2), e(3), e(4)]);
+        assert_eq!(
+            child_0.entries(btree.memory()),
+            vec![e(0), e(1), e(2), e(3), e(4)]
+        );
 
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(child_1.entries(), vec![e(7), e(8), e(9), e(10), e(11)]);
+        assert_eq!(
+            child_1.entries(btree.memory()),
+            vec![e(7), e(8), e(9), e(10), e(11)]
+        );
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1491,7 +1516,7 @@ mod test {
         // [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(
-            root.entries(),
+            root.entries(btree.memory()),
             vec![e(0), e(1), e(2), e(3), e(4), e(7), e(8), e(9), e(10), e(11)]
         );
 
@@ -1528,16 +1553,22 @@ mod test {
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![e(7)]);
+        assert_eq!(root.entries(btree.memory()), vec![e(7)]);
         assert_eq!(root.children_len(), 2);
 
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
+        assert_eq!(
+            child_0.entries(btree.memory()),
+            vec![e(1), e(2), e(3), e(4), e(5)]
+        );
 
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
+        assert_eq!(
+            child_1.entries(btree.memory()),
+            vec![e(8), e(9), e(10), e(11), e(12)]
+        );
 
         // Remove node 7. Triggers case 2.c
         assert_eq!(btree.remove(&vec![7]), Some(vec![]));
@@ -1547,7 +1578,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
-            root.entries(),
+            root.entries(btree.memory()),
             vec![
                 e(1),
                 e(2),
@@ -1589,16 +1620,22 @@ mod test {
         // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![7], vec![])]);
+        assert_eq!(root.entries(btree.memory()), vec![(vec![7], vec![])]);
         assert_eq!(root.children_len(), 2);
 
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(child_0.entries(), vec![e(1), e(2), e(4), e(5), e(6)]);
+        assert_eq!(
+            child_0.entries(btree.memory()),
+            vec![e(1), e(2), e(4), e(5), e(6)]
+        );
 
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
+        assert_eq!(
+            child_1.entries(btree.memory()),
+            vec![e(8), e(9), e(10), e(11), e(12)]
+        );
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1629,16 +1666,22 @@ mod test {
         // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![5], vec![])]);
+        assert_eq!(root.entries(btree.memory()), vec![(vec![5], vec![])]);
         assert_eq!(root.children_len(), 2);
 
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(child_0.entries(), vec![e(0), e(1), e(2), e(3), e(4)]);
+        assert_eq!(
+            child_0.entries(btree.memory()),
+            vec![e(0), e(1), e(2), e(3), e(4)]
+        );
 
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(child_1.entries(), vec![e(6), e(7), e(9), e(10), e(11)]);
+        assert_eq!(
+            child_1.entries(btree.memory()),
+            vec![e(6), e(7), e(9), e(10), e(11)]
+        );
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1672,16 +1715,22 @@ mod test {
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![7], vec![])]);
+        assert_eq!(root.entries(btree.memory()), vec![(vec![7], vec![])]);
         assert_eq!(root.children_len(), 2);
 
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
+        assert_eq!(
+            child_0.entries(btree.memory()),
+            vec![e(1), e(2), e(3), e(4), e(5)]
+        );
 
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
+        assert_eq!(
+            child_1.entries(btree.memory()),
+            vec![e(8), e(9), e(10), e(11), e(12)]
+        );
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1698,7 +1747,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
-            root.entries(),
+            root.entries(btree.memory()),
             vec![
                 e(1),
                 e(2),
@@ -1747,16 +1796,22 @@ mod test {
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![7], vec![])]);
+        assert_eq!(root.entries(btree.memory()), vec![(vec![7], vec![])]);
         assert_eq!(root.children_len(), 2);
 
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
+        assert_eq!(
+            child_0.entries(btree.memory()),
+            vec![e(1), e(2), e(3), e(4), e(5)]
+        );
 
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
+        assert_eq!(
+            child_1.entries(btree.memory()),
+            vec![e(8), e(9), e(10), e(11), e(12)]
+        );
 
         // There are three allocated nodes.
         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
@@ -1773,7 +1828,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
-            root.entries(),
+            root.entries(btree.memory()),
             vec![e(1), e(2), e(3), e(4), e(5), e(7), e(8), e(9), e(11), e(12)]
         );
 
@@ -1991,7 +2046,7 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![1, 2], vec![])]);
+        assert_eq!(root.entries(btree.memory()), vec![(vec![1, 2], vec![])]);
         assert_eq!(root.children_len(), 2);
 
         // Tests a prefix that's smaller than the value in the internal node.
@@ -2061,7 +2116,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(
-            root.entries(),
+            root.entries(btree.memory()),
             vec![(vec![1, 4], vec![]), (vec![2, 3], vec![])]
         );
         assert_eq!(root.children_len(), 3);
@@ -2069,7 +2124,7 @@ mod test {
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_0.entries(),
+            child_0.entries(btree.memory()),
             vec![
                 (vec![0, 1], vec![]),
                 (vec![0, 2], vec![]),
@@ -2082,7 +2137,7 @@ mod test {
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_1.entries(),
+            child_1.entries(btree.memory()),
             vec![
                 (vec![1, 6], vec![]),
                 (vec![1, 8], vec![]),
@@ -2094,7 +2149,7 @@ mod test {
 
         let child_2 = btree.load_node(root.child(2));
         assert_eq!(
-            child_2.entries(),
+            child_2.entries(btree.memory()),
             vec![
                 (vec![2, 4], vec![]),
                 (vec![2, 5], vec![]),
@@ -2207,7 +2262,7 @@ mod test {
 
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(), vec![(vec![1, 2], vec![])]);
+        assert_eq!(root.entries(btree.memory()), vec![(vec![1, 2], vec![])]);
         assert_eq!(root.children_len(), 2);
 
         assert_eq!(
@@ -2263,7 +2318,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(
-            root.entries(),
+            root.entries(btree.memory()),
             vec![(vec![1, 4], vec![]), (vec![2, 3], vec![])]
         );
         assert_eq!(root.children_len(), 3);
@@ -2271,7 +2326,7 @@ mod test {
         let child_0 = btree.load_node(root.child(0));
         assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_0.entries(),
+            child_0.entries(btree.memory()),
             vec![
                 (vec![0, 1], vec![]),
                 (vec![0, 2], vec![]),
@@ -2284,7 +2339,7 @@ mod test {
         let child_1 = btree.load_node(root.child(1));
         assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(
-            child_1.entries(),
+            child_1.entries(btree.memory()),
             vec![
                 (vec![1, 6], vec![]),
                 (vec![1, 8], vec![]),
@@ -2296,7 +2351,7 @@ mod test {
 
         let child_2 = btree.load_node(root.child(2));
         assert_eq!(
-            child_2.entries(),
+            child_2.entries(btree.memory()),
             vec![
                 (vec![2, 4], vec![]),
                 (vec![2, 5], vec![]),

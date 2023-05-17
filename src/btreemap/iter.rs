@@ -7,9 +7,9 @@ use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
 /// An indicator of the current position in the map.
-pub(crate) enum Cursor<K: BoundedStorable + Ord + Clone, M: Memory + Clone> {
+pub(crate) enum Cursor<K: BoundedStorable + Ord + Clone> {
     Address(Address),
-    Node { node: Node<K, M>, next: Index },
+    Node { node: Node<K>, next: Index },
 }
 
 /// An index into a node's child or entry.
@@ -24,13 +24,13 @@ pub struct Iter<'a, K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
     V: BoundedStorable,
-    M: Memory + Clone,
+    M: Memory,
 {
     // A reference to the map being iterated on.
     map: &'a BTreeMap<K, V, M>,
 
     // A stack of cursors indicating the current position in the tree.
-    cursors: Vec<Cursor<K, M>>,
+    cursors: Vec<Cursor<K>>,
 
     // The range of keys we want to traverse.
     range: (Bound<K>, Bound<K>),
@@ -63,7 +63,7 @@ where
     pub(crate) fn new_in_range(
         map: &'a BTreeMap<K, V, M>,
         range: (Bound<K>, Bound<K>),
-        cursors: Vec<Cursor<K, M>>,
+        cursors: Vec<Cursor<K>>,
     ) -> Self {
         Self {
             map,
@@ -128,7 +128,7 @@ where
                     return self.next();
                 }
 
-                let (key, encoded_value) = node.entry(entry_idx);
+                let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
