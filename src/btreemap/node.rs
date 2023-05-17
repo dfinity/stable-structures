@@ -147,8 +147,7 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
     }
 
     /// Saves the node to memory.
-    // TODO: don't pass memory
-    pub fn save(&self, memory: &M) {
+    pub fn save(&self) {
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());
@@ -174,7 +173,7 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
             num_entries: self.keys.len() as u16,
         };
 
-        write_struct(&header, self.address, memory);
+        write_struct(&header, self.address, &self.memory);
 
         let mut offset = NodeHeader::size();
 
@@ -189,11 +188,15 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
             // Write the size of the key.
             let key_bytes = key.to_bytes();
-            write_u32(memory, self.address + offset, key_bytes.len() as u32);
+            write_u32(&self.memory, self.address + offset, key_bytes.len() as u32);
             offset += U32_SIZE;
 
             // Write the key.
-            write(memory, (self.address + offset).get(), key_bytes.borrow());
+            write(
+                &self.memory,
+                (self.address + offset).get(),
+                key_bytes.borrow(),
+            );
             offset += Bytes::from(self.max_key_size);
 
             // Write the size of the value.
@@ -202,16 +205,16 @@ impl<K: Storable + Ord + Clone, M: Memory + Clone> Node<K, M> {
 
             // Write the value.
             let value = self.value(idx);
-            write_u32(memory, self.address + offset, value.len() as u32);
+            write_u32(&self.memory, self.address + offset, value.len() as u32);
             offset += U32_SIZE;
-            write(memory, (self.address + offset).get(), &value);
+            write(&self.memory, (self.address + offset).get(), &value);
             offset += Bytes::from(self.max_value_size);
         }
 
         // Write the children
         for child in self.children.iter() {
             write(
-                memory,
+                &self.memory,
                 (self.address + offset).get(),
                 &child.get().to_le_bytes(),
             );
