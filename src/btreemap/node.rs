@@ -91,7 +91,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
         let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
-
         for _ in 0..header.num_entries {
             // Read the key's size.
             let key_size = read_u32(memory, address + offset);
@@ -274,15 +273,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn swap_entry<M: Memory>(
         &mut self,
         idx: usize,
-        mut entry: Entry<K>,
+        (mut key, value): Entry<K>,
         memory: &M,
     ) -> Entry<K> {
-        core::mem::swap(&mut self.keys[idx], &mut entry.0);
-        let new_value = Value::ByVal(entry.1);
+        core::mem::swap(&mut self.keys[idx], &mut key);
         let old_value = self.value(idx, memory).to_vec();
-        self.encoded_values.borrow_mut()[idx] = new_value;
-        entry.1 = old_value;
-        entry
+        self.encoded_values.borrow_mut()[idx] = Value::ByVal(value);
+        (key, old_value)
     }
 
     /// Returns a copy of the entry at the specified index.
@@ -312,7 +309,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             if let Value::ByVal(v) = &values[idx] {
                 &v[..]
             } else {
-                unreachable!("Value must've been loaded already.");
+                unreachable!("value must have been loaded already.");
             }
         })
     }

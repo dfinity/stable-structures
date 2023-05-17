@@ -94,7 +94,7 @@ impl<K, V, M> BTreeMap<K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
     V: BoundedStorable,
-    M: Memory + Clone,
+    M: Memory,
 {
     /// Initializes a `BTreeMap`.
     ///

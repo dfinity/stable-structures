@@ -143,7 +143,6 @@ fn execution_instructions(arguments: ExecutionArguments) -> u64 {
     let stdout = String::from_utf8(output.stdout).unwrap();
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(output.status.success(), "{stdout}\n{stderr}");
-    println!("{stdout}\n{stderr}");
 
     // Convert result formatted as "(1_000_000 : nat64)" to u64.
     let result = stdout

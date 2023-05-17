@@ -40,7 +40,7 @@ impl<'a, K, V, M> Iter<'a, K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
     V: BoundedStorable,
-    M: Memory + Clone,
+    M: Memory,
 {
     pub(crate) fn new(map: &'a BTreeMap<K, V, M>) -> Self {
         Self {
@@ -77,7 +77,7 @@ impl<K, V, M> Iterator for Iter<'_, K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
     V: BoundedStorable,
-    M: Memory + Clone,
+    M: Memory,
 {
     type Item = (K, V);
 
