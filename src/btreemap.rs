@@ -1025,34 +1025,12 @@ where
     // Output:
     //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     //   `source` is deallocated.
-    fn merge(&mut self, source: Node<K>, into: Node<K>, median: Entry<K>) -> Node<K> {
-        assert_eq!(source.node_type(), into.node_type());
-        assert!(source.entries_len() > 0);
-        assert!(into.entries_len() > 0);
-
-        let into_address = into.address();
+    fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         let source_address = source.address();
-
-        // Figure out which node contains lower values than the other.
-        let (mut lower, mut higher) = if source.key(0) < into.key(0) {
-            (source, into)
-        } else {
-            (into, source)
-        };
-
-        lower.push_entry(median);
-
-        lower.append_entries_from(&mut higher);
-
-        // Move the children (if any exist).
-        lower.append_children_from(&mut higher);
-
-        lower.set_address(into_address);
-
-        lower.save(self.memory());
-
+        into.merge(source, median, self.memory());
+        into.save(self.memory());
         self.allocator.deallocate(source_address);
-        lower
+        into
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {

@@ -104,7 +104,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys.push(key);
 
             // Values are loaded lazily. Store a reference and skip loading it.
-            encoded_values.push(Value::ByRef(address + offset));
+            encoded_values.push(Value::ByRef(offset));
             offset += U32_SIZE + Bytes::from(max_value_size);
         }
 
@@ -210,11 +210,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.address
     }
 
-    /// Sets the address of the node.
-    pub fn set_address(&mut self, address: Address) {
-        self.address = address;
-    }
-
     pub fn node_type(&self) -> NodeType {
         self.node_type
     }
@@ -293,11 +288,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
         {
             let mut values = self.encoded_values.borrow_mut();
 
-            if let Value::ByRef(address) = values[idx] {
-                // Value isn't load it yet.
-                let value_len = read_u32(memory, address) as usize;
+            if let Value::ByRef(offset) = values[idx] {
+                // Value isn't loaded yet.
+                let value_address = self.address + offset;
+                let value_len = read_u32(memory, value_address) as usize;
                 let mut value = vec![0; value_len];
-                memory.read((address + U32_SIZE).get(), &mut value);
+                memory.read((value_address + U32_SIZE).get(), &mut value);
 
                 // Cache the value internally.
                 values[idx] = Value::ByVal(value);
@@ -389,17 +385,68 @@ impl<K: Storable + Ord + Clone> Node<K> {
         Some((key, last_value))
     }
 
-    /// Moves entries from the `other` node to the back of this node.
-    pub fn append_entries_from(&mut self, other: &mut Node<K>) {
-        self.keys.append(&mut other.keys);
-        self.encoded_values
-            .borrow_mut()
-            .append(&mut other.encoded_values.borrow_mut());
+    /// Merges the entries and children of the `source` node into self, along with the median entry.
+    ///
+    /// PRECONDITION:
+    ///   * `self` is not empty.
+    ///   * `source` is not empty.
+    ///   * `self` and `source` are of the same node type.
+    ///
+    /// POSTCONDITION:
+    ///   * `source` is empty (no entries and no children).
+    ///   * all the entries of `source`, as well as the median, are merged into `self`, in sorted
+    ///      order.
+    pub fn merge<M: Memory>(&mut self, mut source: Node<K>, median: Entry<K>, memory: &M) {
+        // Load all the values from the source node first, as they will be moved out.
+        for i in 0..source.entries_len() {
+            source.value(i, memory);
+        }
+
+        // Depending on which node
+        if source.key(0) > self.key(0) {
+            Self::append(self, &mut source, median);
+        } else {
+            Self::append(&mut source, self, median);
+
+            self.keys = source.keys;
+            self.encoded_values = source.encoded_values;
+            self.children = source.children;
+        }
     }
 
-    /// Moves children from the `other` node to the back of this node.
-    pub fn append_children_from(&mut self, other: &mut Node<K>) {
-        self.children.append(&mut other.children);
+    // Appends the entries and children of node `b` into `a`, along with the median entry.
+    //
+    // PRECONDITION:
+    //   * `a` is not empty.
+    //   * `b` is not empty.
+    //   * `a` and `b` are of the same node type.
+    //   * keys of `a` < median < keys of `b`
+    //
+    // POSTCONDITION:
+    //   * `b` is empty.
+    fn append(a: &mut Node<K>, b: &mut Node<K>, median: Entry<K>) {
+        // Assert preconditions.
+        let a_len = a.entries_len();
+        assert_eq!(a.node_type(), b.node_type());
+        assert!(b.entries_len() > 0);
+        assert!(a_len > 0);
+        assert!(a.key(a_len - 1) < &median.0);
+        assert!(&median.0 < b.key(0));
+
+        a.push_entry(median);
+
+        a.keys.append(&mut b.keys);
+        a.encoded_values
+            .borrow_mut()
+            .append(&mut b.encoded_values.borrow_mut());
+
+        // Move the children (if any exist).
+        a.children.append(&mut b.children);
+
+        // Assert postconditions.
+        assert_eq!(b.keys.len(), 0);
+        assert_eq!(b.encoded_values.borrow().len(), 0);
+        assert_eq!(b.children.len(), 0);
     }
 
     #[allow(dead_code)]
@@ -457,6 +504,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn split<M: Memory>(&mut self, sibling: &mut Node<K>, memory: &M) -> Entry<K> {
         debug_assert!(self.is_full());
 
+        // Load the values that will be moved out of the node and into the new sibling.
+        for idx in B..self.entries_len() {
+            self.value(idx, memory);
+        }
+
         // Move the entries and children above the median into the new sibling.
         sibling.keys = self.keys.split_off(B);
         *sibling.encoded_values.borrow_mut() = self.encoded_values.borrow_mut().split_off(B);
@@ -491,6 +543,6 @@ enum Value {
     // The value's encoded bytes.
     ByVal(Vec<u8>),
 
-    // The value's address in the underlying memory.
-    ByRef(Address),
+    // The value's offset in the node.
+    ByRef(Bytes),
 }
