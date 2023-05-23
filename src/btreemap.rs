@@ -2552,7 +2552,7 @@ mod test {
 
         use std::io::prelude::*;
         let mut file =
-            std::fs::File::create(format!("dumps/btreemap_v{LAYOUT_VERSION}.dump")).unwrap();
+            std::fs::File::create(format!("dumps/btreemap_v{LAYOUT_VERSION}_packed_headers.dump")).unwrap();
         file.write_all(&mem.borrow()).unwrap();
     }
 
