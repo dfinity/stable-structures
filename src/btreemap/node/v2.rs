@@ -31,7 +31,7 @@
 
 use super::*;
 
-// header + cell array size + extra bytes
+// header + order array size + extra bytes
 const ENTRIES_OFFSET: Bytes = Bytes::new(7 + 2 * CAPACITY as u64);
 const ORDER_ARRAY_OFFSET: Bytes = Bytes::new(7 + CAPACITY as u64);
 
@@ -43,7 +43,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_key_size: u32,
         max_value_size: u32,
     ) -> Self {
-        // Load the cell array.
+        // Load the order array.
+        // NOTE: Loading it as an array is faster than loading a vec.
         let order_array: [u8; CAPACITY] = read_struct(address + ORDER_ARRAY_OFFSET, memory);
 
         // Load the entries.
@@ -69,12 +70,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Get the offset of the children. This line is a bit of a hack.
-        let children_address = address
-                    + NodeHeader::size()
-                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
-                    + Bytes::new(
-                        (CAPACITY as u32 * (max_key_size + 2 + max_value_size + 4)
-                    ) as u64);
+        let children_address =
+            address + ENTRIES_OFFSET + Bytes::new(entry_size) * (CAPACITY as u64);
 
         let mut offset = Bytes::new(0);
 
@@ -173,7 +170,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Address::size();
         }
 
-        // Write the cell array.
+        // Write the order array.
         order_array.resize(CAPACITY, 0);
         let order_array: [u8; CAPACITY] = order_array.try_into().unwrap();
         write_struct(&order_array, self.address + ORDER_ARRAY_OFFSET, memory);
