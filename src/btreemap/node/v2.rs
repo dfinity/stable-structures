@@ -106,29 +106,25 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&mut self, memory: &M) {
-        let mut free_slots = self.get_free_slots();
+        let mut free_entry_indices = self.get_free_entry_indices();
 
         let mut order_array = vec![];
 
         // Write the entries.
         for (idx, key) in self.keys.iter().enumerate() {
             // TODO: borrow outside?
-            if let Value::ByRef(slot_idx) = self.encoded_values.borrow()[idx] {
-                // Value hasn't been touched. Add idx to cell array and skip writing the keys and
-                // values.
-                order_array.push(slot_idx);
+            if let Value::ByRef(entry_idx) = self.encoded_values.borrow()[idx] {
+                // Entry hasn't been touched. Add its entry index to the order array and skip it.
+                order_array.push(entry_idx);
                 continue;
             }
 
-            // This is a new entry. Insert it at the next available free slot.
-
-            let free_slot_idx = free_slots.pop().unwrap();
-
-            order_array.push(free_slot_idx);
+            // This is a new entry. Insert it at the next available free entry index.
+            let entry_idx = free_entry_indices.pop().unwrap();
 
             let mut address = self.address
                 + Self::get_entry_offset(
-                    free_slot_idx,
+                    entry_idx,
                     self.max_key_size,
                     self.max_value_size,
                     self.version,
@@ -136,7 +132,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the size of the key.
             let key_bytes = key.to_bytes();
-            // TODO: asset key size.
             write_u16(memory, address, key_bytes.len() as u16);
             address += U16_SIZE;
 
@@ -152,6 +147,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
             // Write the value.
             write(memory, address.get(), &value);
             address += Bytes::from(self.max_value_size);
+
+            order_array.push(entry_idx);
         }
 
         // Get the offset of the children. This line is a bit of a hack.
@@ -191,19 +188,21 @@ impl<K: Storable + Ord + Clone> Node<K> {
         write_struct(&header, self.address, memory);
     }
 
-    fn get_free_slots(&self) -> Vec<u8> {
-        // Assume all slots are free.
-        let mut order_array = vec![true; CAPACITY];
+    // Returns a list of unused slot indices.
+    fn get_free_entry_indices(&self) -> Vec<u8> {
+        // Assume all entry indices are free.
+        let mut free_entry_indices = vec![true; CAPACITY];
 
-        // Iterate over the values, seeing which slots are used.
+        // Iterate over the entries, seeing which indices are used.
         for val in self.encoded_values.borrow().iter() {
             if let Value::ByRef(idx) = val {
-                // Mark the element as not free.
-                order_array[*idx as usize] = false;
+                // Mark the entry index as used.
+                free_entry_indices[*idx as usize] = false;
             }
         }
 
-        order_array
+        // Map the boolean array into a list of free entry indices.
+        free_entry_indices
             .into_iter()
             .enumerate()
             .filter_map(|(idx, is_free)| if is_free { Some(idx as u8) } else { None })
