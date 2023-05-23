@@ -1,7 +1,39 @@
+//! V2 of a B-Tree node.
+//!
+//! The node is stored in stable memory with the following layout:
+//!
+//!
+//! ```text
+//! --------------------------------------------------------------- <- Address 0
+//! NodeHeader                            ↕ 7 bytes
+//! ---------------------------------------------------------------
+//! Reserved Space                        ↕ `CAPACITY` bytes
+//! ---------------------------------------------------------------
+//! Order Array                           ↕ `CAPACITY` bytes
+//! --------------------------------------------------------------- <- Entries
+//! Key 1's size (u16)                    ↕ 2 bytes
+//! ---------------------------------------------------------------
+//! Key 1's serialized bytes              ↕ `Key::MAX_SIZE bytes`
+//! ---------------------------------------------------------------
+//! Value 1's size (u32)                  ↕ 4 bytes
+//! ---------------------------------------------------------------
+//! Value 1's serialized bytes            ↕ `Value::MAX_SIZE bytes`
+//! ---------------------------------------------------------------
+//! ... (more entries - up to `CAPACITY` entries)
+//! --------------------------------------------------------------- <- Children
+//! Child 1's address                     ↕ 8 bytes
+//! ---------------------------------------------------------------
+//! Child 2's address                     ↕ 8 bytes
+//! ---------------------------------------------------------------
+//! ... (more children - up to `CAPACITY + 1` children)
+//! ---------------------------------------------------------------
+//! ```
+
 use super::*;
 
 // header + cell array size + extra bytes
 const ENTRIES_OFFSET: Bytes = Bytes::new(7 + 2 * CAPACITY as u64);
+const ORDER_ARRAY_OFFSET: Bytes = Bytes::new(7 + CAPACITY as u64);
 
 impl<K: Storable + Ord + Clone> Node<K> {
     pub(super) fn load_v2<M: Memory>(
@@ -12,19 +44,18 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_value_size: u32,
     ) -> Self {
         // Load the cell array.
-        let cell_array: [u8; CAPACITY] = read_struct(address + NodeHeader::size(), memory);
+        let order_array: [u8; CAPACITY] = read_struct(address + ORDER_ARRAY_OFFSET, memory);
 
         // Load the entries.
         let encoded_values: Vec<_> = (0..header.num_entries as usize)
-            .map(|i| Value::ByRef(cell_array[i]))
+            .map(|i| Value::ByRef(order_array[i]))
             .collect();
         let mut keys = Vec::with_capacity(header.num_entries as usize);
         let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
-        let entries_offset = NodeHeader::size() + Bytes::new(2 * CAPACITY as u64);
         let entry_size = (max_key_size + 2 + max_value_size + 4) as u64;
         for i in 0..header.num_entries as usize {
-            let idx = cell_array[i];
-            let mut offset = entries_offset + Bytes::new(idx as u64 * entry_size);
+            let idx = order_array[i];
+            let mut offset = ENTRIES_OFFSET + Bytes::new(idx as u64 * entry_size);
 
             // Read the key's size.
             let key_size = read_u16(memory, address + offset);
@@ -80,7 +111,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub(super) fn save_v2<M: Memory>(&mut self, memory: &M) {
         let mut free_slots = self.get_free_slots();
 
-        let mut cell_array = vec![];
+        let mut order_array = vec![];
 
         // Write the entries.
         for (idx, key) in self.keys.iter().enumerate() {
@@ -88,7 +119,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             if let Value::ByRef(slot_idx) = self.encoded_values.borrow()[idx] {
                 // Value hasn't been touched. Add idx to cell array and skip writing the keys and
                 // values.
-                cell_array.push(slot_idx);
+                order_array.push(slot_idx);
                 continue;
             }
 
@@ -96,7 +127,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             let free_slot_idx = free_slots.pop().unwrap();
 
-            cell_array.push(free_slot_idx);
+            order_array.push(free_slot_idx);
 
             let mut address = self.address
                 + Self::get_entry_offset(
@@ -143,9 +174,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the cell array.
-        cell_array.resize(CAPACITY, 0);
-        let cell_array: [u8; CAPACITY] = cell_array.try_into().unwrap();
-        write_struct(&cell_array, self.address + NodeHeader::size(), memory);
+        order_array.resize(CAPACITY, 0);
+        let order_array: [u8; CAPACITY] = order_array.try_into().unwrap();
+        write_struct(&order_array, self.address + ORDER_ARRAY_OFFSET, memory);
 
         // Update the version (is this necessary?)
         self.version = 2;
@@ -165,17 +196,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     fn get_free_slots(&self) -> Vec<u8> {
         // Assume all slots are free.
-        let mut cell_array = vec![true; CAPACITY];
+        let mut order_array = vec![true; CAPACITY];
 
         // Iterate over the values, seeing which slots are used.
         for val in self.encoded_values.borrow().iter() {
             if let Value::ByRef(idx) = val {
                 // Mark the element as not free.
-                cell_array[*idx as usize] = false;
+                order_array[*idx as usize] = false;
             }
         }
 
-        cell_array
+        order_array
             .into_iter()
             .enumerate()
             .filter_map(|(idx, is_free)| if is_free { Some(idx as u8) } else { None })

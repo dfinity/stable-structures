@@ -120,7 +120,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Assert entries are sorted in strictly increasing order.
         assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
 
-        // TODO: save v1 as well if key size is too big.
+        // When possible, nodes are migrated to version 2 as it's more performant.
         if self.max_key_size > u16::MAX as u32 {
             self.save_v1(memory);
         } else {
