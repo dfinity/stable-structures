@@ -402,12 +402,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
             source.value(i, memory);
         }
 
-        // Depending on which node
         if source.key(0) > self.key(0) {
+            // The source node has keys that are greater than self.
+            // Append the source node into self.
             Self::append(self, &mut source, median);
         } else {
+            // self has keys that are greater than the source node.
+            // Append self into the source node (which more efficient).
             Self::append(&mut source, self, median);
 
+            // Move the entries and children into self.
             self.keys = source.keys;
             self.encoded_values = source.encoded_values;
             self.children = source.children;
