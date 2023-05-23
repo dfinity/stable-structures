@@ -1,5 +1,8 @@
 use super::*;
 
+// header + cell array size + extra bytes
+const ENTRIES_OFFSET: Bytes = Bytes::new(7 + 2 * CAPACITY as u64);
+
 impl<K: Storable + Ord + Clone> Node<K> {
     pub(super) fn load_v2<M: Memory>(
         address: Address,
@@ -97,7 +100,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             let mut address = self.address
                 + Self::get_entry_offset(
-                    free_slot_idx as usize,
+                    free_slot_idx,
                     self.max_key_size,
                     self.max_value_size,
                     self.version,
@@ -126,7 +129,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Get the offset of the children. This line is a bit of a hack.
         let address = self.address
             + Self::get_entry_offset(
-                CAPACITY,
+                CAPACITY as u8,
                 self.max_key_size,
                 self.max_value_size,
                 self.version,
@@ -180,30 +183,27 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     pub(super) fn value_offset_v2(&self, idx: u8) -> Bytes {
-        NodeHeader::size()
-                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
-                    + Bytes::new(
-                        (idx as u32 * (self.max_key_size + 2 + self.max_value_size + 4)
-                            + (2 + self.max_key_size)) as u64,
-                    )
+        ENTRIES_OFFSET
+            + Bytes::new(
+                (idx as u32 * (self.max_key_size + 2 + self.max_value_size + 4)
+                    + (2 + self.max_key_size)) as u64,
+            )
     }
 
-    // FIXME: remove logic here that's specific to v1
-    fn get_entry_offset(idx: usize, max_key_size: u32, max_value_size: u32, version: u8) -> Bytes {
+    fn get_entry_offset(idx: u8, max_key_size: u32, max_value_size: u32, version: u8) -> Bytes {
         match version {
             1 => {
-                NodeHeader::size()
-                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
-                    + Bytes::new(
-                        (idx as u32 * (max_key_size + 2 + max_value_size + 4)
-                    ) as u64)
+                // FIXME: this is broken. add test to uncover this case.
+                todo!()
+                /*NodeHeader::size()
+                + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
+                + Bytes::new(
+                    (idx as u32 * (max_key_size + 2 + max_value_size + 4)
+                ) as u64)*/
             }
             2 => {
-                NodeHeader::size()
-                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
-                    + Bytes::new(
-                        (idx as u32 * (max_key_size + 2 + max_value_size + 4)
-                    ) as u64)
+                ENTRIES_OFFSET
+                    + Bytes::from(idx) * Bytes::from(max_key_size + 2 + max_value_size + 4)
             }
             _ => unreachable!(),
         }
