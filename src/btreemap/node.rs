@@ -213,7 +213,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             if let Value::ByRef(offset) = values[idx] {
                 // Value isn't loaded yet.
-                let value_address = self.value_address(offset);
+                let value_address = self.address + self.value_offset(offset);
                 let value_len = read_u32(memory, value_address) as usize;
                 let mut value = vec![0; value_len];
                 memory.read((value_address + U32_SIZE).get(), &mut value);
@@ -233,25 +233,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
         })
     }
 
-    fn value_address(&self, idx: u8) -> Address {
+    fn value_offset(&self, idx: u8) -> Bytes {
         match self.version {
-            1 => {
-                self.address
-                    + NodeHeader::size()
-                    + Bytes::new(
-                        (idx as u32 * (self.max_key_size + 4 + self.max_value_size + 4)
-                            + (4 + self.max_key_size)) as u64,
-                    )
-            }
-            2 => {
-                self.address
-                    + NodeHeader::size()
-                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
-                    + Bytes::new(
-                        (idx as u32 * (self.max_key_size + 2 + self.max_value_size + 4)
-                            + (2 + self.max_key_size)) as u64,
-                    )
-            }
+            1 => self.value_offset_v1(idx),
+            2 => self.value_offset_v2(idx),
             _ => unreachable!(),
         }
     }

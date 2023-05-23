@@ -59,7 +59,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
     }
 
-    pub fn save_v1<M: Memory>(&mut self, memory: &M) {
+    pub(super) fn save_v1<M: Memory>(&mut self, memory: &M) {
         let header = NodeHeader {
             magic: *MAGIC,
             version: LAYOUT_VERSION_1,
@@ -110,5 +110,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
             );
             offset += Address::size();
         }
+    }
+
+    pub(super) fn value_offset_v1(&self, idx: u8) -> Bytes {
+        NodeHeader::size()
+            + Bytes::new(
+                (idx as u32 * (self.max_key_size + 4 + self.max_value_size + 4)
+                    + (4 + self.max_key_size)) as u64,
+            )
     }
 }

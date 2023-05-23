@@ -74,7 +74,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Saves the node to memory.
-    pub fn save_v2<M: Memory>(&mut self, memory: &M) {
+    pub(super) fn save_v2<M: Memory>(&mut self, memory: &M) {
         let mut free_slots = self.get_free_slots();
 
         let mut cell_array = vec![];
@@ -177,6 +177,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .enumerate()
             .filter_map(|(idx, is_free)| if is_free { Some(idx as u8) } else { None })
             .collect()
+    }
+
+    pub(super) fn value_offset_v2(&self, idx: u8) -> Bytes {
+        NodeHeader::size()
+                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
+                    + Bytes::new(
+                        (idx as u32 * (self.max_key_size + 2 + self.max_value_size + 4)
+                            + (2 + self.max_key_size)) as u64,
+                    )
     }
 
     // FIXME: remove logic here that's specific to v1
