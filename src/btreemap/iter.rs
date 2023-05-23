@@ -88,7 +88,7 @@ where
                     // Load the node at the given address, and add it to the cursors.
                     let node = self.map.load_node(address);
                     self.cursors.push(Cursor::Node {
-                        next: match node.node_type {
+                        next: match node.node_type() {
                             // Iterate on internal nodes starting from the first child.
                             NodeType::Internal => Index::Child(0),
                             // Iterate on leaf nodes starting from the first entry.
@@ -104,10 +104,7 @@ where
                 node,
                 next: Index::Child(child_idx),
             }) => {
-                let child_address = *node
-                    .children
-                    .get(child_idx)
-                    .expect("Iterating over children went out of bounds.");
+                let child_address = node.child(child_idx);
 
                 // After iterating on the child, iterate on the next _entry_ in this node.
                 // The entry immediately after the child has the same index as the child's.
@@ -126,7 +123,7 @@ where
                 node,
                 next: Index::Entry(entry_idx),
             }) => {
-                if entry_idx >= node.keys.len() {
+                if entry_idx >= node.entries_len() {
                     // No more entries to iterate on in this node.
                     return self.next();
                 }
@@ -135,7 +132,7 @@ where
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
-                    next: match node.node_type {
+                    next: match node.node_type() {
                         // If this is an internal node, add the next child to the cursors.
                         NodeType::Internal => Index::Child(entry_idx + 1),
                         // If this is a leaf node, add the next entry to the cursors.
@@ -164,7 +161,6 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::btreemap::node::CAPACITY;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -177,7 +173,7 @@ mod test {
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
 
-        for i in 0..CAPACITY as u8 {
+        for i in 0..10u8 {
             btree.insert(i, i + 1);
         }
 
@@ -188,7 +184,7 @@ mod test {
             i += 1;
         }
 
-        assert_eq!(i, CAPACITY as u8);
+        assert_eq!(i, 10u8);
     }
 
     #[test]

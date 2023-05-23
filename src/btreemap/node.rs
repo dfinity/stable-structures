@@ -6,11 +6,11 @@ use crate::{
 };
 use std::borrow::{Borrow, Cow};
 
-/// The minimum degree to use in the btree.
-/// This constant is taken from Rust's std implementation of BTreeMap.
-pub const B: u64 = 6;
-/// The maximum number of entries per node.
-pub const CAPACITY: u64 = 2 * B - 1;
+// The minimum degree to use in the btree.
+// This constant is taken from Rust's std implementation of BTreeMap.
+const B: usize = 6;
+// The maximum number of entries per node.
+const CAPACITY: usize = 2 * B - 1;
 const LAYOUT_VERSION: u8 = 1;
 const MAGIC: &[u8; 3] = b"BTN";
 const LEAF_NODE_TYPE: u8 = 0;
@@ -41,18 +41,36 @@ pub type Entry<K> = (K, Vec<u8>);
 /// Each node can contain up to `CAPACITY + 1` children, each child is 8 bytes.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Node<K: Storable + Ord + Clone> {
-    pub address: Address,
-    pub keys: Vec<K>,
-    pub encoded_values: Vec<Vec<u8>>,
-    /// For the key at position I, children[I] points to the left
-    /// child of this key and children[I + 1] points to the right child.
-    pub children: Vec<Address>,
-    pub node_type: NodeType,
-    pub max_key_size: u32,
-    pub max_value_size: u32,
+    address: Address,
+    keys: Vec<K>,
+    encoded_values: Vec<Vec<u8>>,
+    // For the key at position I, children[I] points to the left
+    // child of this key and children[I + 1] points to the right child.
+    children: Vec<Address>,
+    node_type: NodeType,
+    max_key_size: u32,
+    max_value_size: u32,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
+    /// Creates a new node at the given address.
+    pub fn new(
+        address: Address,
+        node_type: NodeType,
+        max_key_size: u32,
+        max_value_size: u32,
+    ) -> Node<K> {
+        Node {
+            address,
+            keys: vec![],
+            encoded_values: vec![],
+            children: vec![],
+            node_type,
+            max_key_size,
+            max_value_size,
+        }
+    }
+
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(
         address: Address,
@@ -184,6 +202,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
     }
 
+    /// Returns the address of the node.
+    pub fn address(&self) -> Address {
+        self.address
+    }
+
+    /// Sets the address of the node.
+    pub fn set_address(&mut self, address: Address) {
+        self.address = address;
+    }
+
+    pub fn node_type(&self) -> NodeType {
+        self.node_type
+    }
+
     pub fn iter_entries(&self) -> impl Iterator<Item = (&K, &[u8])> {
         self.keys
             .iter()
@@ -234,7 +266,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns true if the node cannot store anymore entries, false otherwise.
     pub fn is_full(&self) -> bool {
-        self.keys.len() >= CAPACITY as usize
+        self.keys.len() >= CAPACITY
     }
 
     /// Swaps the entry at index `idx` with the given entry, returning the old entry.
@@ -247,6 +279,46 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Returns a copy of the entry at the specified index.
     pub fn entry(&self, idx: usize) -> Entry<K> {
         (self.keys[idx].clone(), self.encoded_values[idx].clone())
+    }
+
+    /// Returns a reference to the encoded value at the specified index.
+    pub fn value(&self, idx: usize) -> &Vec<u8> {
+        &self.encoded_values[idx]
+    }
+
+    /// Returns a reference to the key at the specified index.
+    pub fn key(&self, idx: usize) -> &K {
+        &self.keys[idx]
+    }
+
+    /// Returns the child's address at the given index.
+    pub fn child(&self, idx: usize) -> Address {
+        self.children[idx]
+    }
+
+    /// Inserts the given child at the given index.
+    pub fn insert_child(&mut self, idx: usize, address: Address) {
+        self.children.insert(idx, address)
+    }
+
+    /// Pushes the child to the far right of the node.
+    pub fn push_child(&mut self, address: Address) {
+        self.children.push(address)
+    }
+
+    /// Removes the child at the given index.
+    pub fn remove_child(&mut self, idx: usize) -> Address {
+        self.children.remove(idx)
+    }
+
+    /// Returns the number of children in the node.
+    pub fn children_len(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Pops the right-most child of the node.
+    pub fn pop_child(&mut self) -> Option<Address> {
+        self.children.pop()
     }
 
     /// Inserts a new entry at the specified index.
@@ -279,11 +351,21 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.encoded_values.append(&mut other.encoded_values);
     }
 
+    /// Moves children from the `other` node to the back of this node.
+    pub fn append_children_from(&mut self, other: &mut Node<K>) {
+        self.children.append(&mut other.children);
+    }
+
     #[allow(dead_code)]
     pub fn entries(&self) -> Vec<Entry<K>> {
         self.iter_entries()
             .map(|(k, v)| (k.clone(), v.to_vec()))
             .collect()
+    }
+
+    /// Returns the number of entries in the node.
+    pub fn entries_len(&self) -> usize {
+        self.keys.len()
     }
 
     /// Searches for the key in the node's entries.
@@ -292,7 +374,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// of the matching key. If the value is not found then `Result::Err` is
     /// returned, containing the index where a matching key could be inserted
     /// while maintaining sorted order.
-    pub fn get_key_idx(&mut self, key: &K) -> Result<usize, usize> {
+    pub fn search(&self, key: &K) -> Result<usize, usize> {
         self.keys.binary_search(key)
     }
 
@@ -308,8 +390,35 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let child_size = Address::size();
 
         node_header_size
-            + Bytes::from(CAPACITY) * entry_size
-            + Bytes::from(CAPACITY + 1) * child_size
+            + Bytes::from(CAPACITY as u64) * entry_size
+            + Bytes::from((CAPACITY + 1) as u64) * child_size
+    }
+
+    /// Returns true if the node is at the minimum required size, false otherwise.
+    pub fn at_minimum(&self) -> bool {
+        self.keys.len() < B
+    }
+
+    /// Returns true if an entry can be removed without having to merge it into another node
+    /// (i.e. without going below the minimum size of a node).
+    pub fn can_remove_entry_without_merging(&self) -> bool {
+        !self.at_minimum()
+    }
+
+    /// Moves elements from own node to a sibling node and returns the median element.
+    pub fn split(&mut self, sibling: &mut Node<K>) -> Entry<K> {
+        debug_assert!(self.is_full());
+
+        // Move the entries and children above the median into the new sibling.
+        sibling.keys = self.keys.split_off(B);
+        sibling.encoded_values = self.encoded_values.split_off(B);
+        if self.node_type == NodeType::Internal {
+            sibling.children = self.children.split_off(B);
+        }
+
+        // Return the median entry.
+        self.pop_entry()
+            .expect("An initially full node cannot be empty")
     }
 }
 

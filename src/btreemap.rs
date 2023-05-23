@@ -34,7 +34,7 @@ use crate::{
 use allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
-use node::{Entry, Node, NodeType, B};
+use node::{Entry, Node, NodeType};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
@@ -222,7 +222,7 @@ where
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.
             let node = self.allocate_node(NodeType::Leaf);
-            self.root_addr = node.address;
+            self.root_addr = node.address();
             self.save();
             node
         } else {
@@ -230,7 +230,7 @@ where
             let mut root = self.load_node(self.root_addr);
 
             // Check if the key already exists in the root.
-            if let Ok(idx) = root.get_key_idx(&key) {
+            if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value));
                 root.save(self.memory());
@@ -247,10 +247,10 @@ where
                 let mut new_root = self.allocate_node(NodeType::Internal);
 
                 // The new root has the old root as its only child.
-                new_root.children.push(self.root_addr);
+                new_root.push_child(self.root_addr);
 
                 // Update the root address.
-                self.root_addr = new_root.address;
+                self.root_addr = new_root.address();
                 self.save();
 
                 // Split the old (full) root.
@@ -273,7 +273,7 @@ where
         assert!(!node.is_full());
 
         // Look for the key in the node.
-        match node.keys.binary_search(&key) {
+        match node.search(&key) {
             Ok(idx) => {
                 // The key is already in the node.
                 // Overwrite it and return the previous value.
@@ -285,7 +285,7 @@ where
             Err(idx) => {
                 // The key isn't in the node. `idx` is where that key should be inserted.
 
-                match node.node_type {
+                match node.node_type() {
                     NodeType::Leaf => {
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
@@ -302,11 +302,11 @@ where
                     NodeType::Internal => {
                         // The node is an internal node.
                         // Load the child that we should add the entry to.
-                        let mut child = self.load_node(node.children[idx]);
+                        let mut child = self.load_node(node.child(idx));
 
                         if child.is_full() {
                             // Check if the key already exists in the child.
-                            if let Ok(idx) = child.get_key_idx(&key) {
+                            if let Ok(idx) = child.search(&key) {
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) = child.swap_entry(idx, (key, value));
                                 child.save(self.memory());
@@ -318,8 +318,8 @@ where
 
                             // The children have now changed. Search again for
                             // the child where we need to store the entry in.
-                            let idx = node.get_key_idx(&key).unwrap_or_else(|idx| idx);
-                            child = self.load_node(node.children[idx]);
+                            let idx = node.search(&key).unwrap_or_else(|idx| idx);
+                            child = self.load_node(node.child(idx));
                         }
 
                         // The child should now be not full.
@@ -353,28 +353,18 @@ where
         assert!(!node.is_full());
 
         // The node's child must be full.
-        let mut full_child = self.load_node(node.children[full_child_idx]);
+        let mut full_child = self.load_node(node.child(full_child_idx));
         assert!(full_child.is_full());
 
         // Create a sibling to this full child (which has to be the same type).
-        let mut sibling = self.allocate_node(full_child.node_type);
-        assert_eq!(sibling.node_type, full_child.node_type);
-
-        // Move the values above the median into the new sibling.
-        sibling.keys = full_child.keys.split_off(B as usize);
-        sibling.encoded_values = full_child.encoded_values.split_off(B as usize);
-
-        if full_child.node_type == NodeType::Internal {
-            sibling.children = full_child.children.split_off(B as usize);
-        }
+        let mut sibling = self.allocate_node(full_child.node_type());
+        assert_eq!(sibling.node_type(), full_child.node_type());
 
         // Add sibling as a new child in the node.
-        node.children.insert(full_child_idx + 1, sibling.address);
+        node.insert_child(full_child_idx + 1, sibling.address());
 
-        // Move the median entry into the node.
-        let (median_key, median_value) = full_child
-            .pop_entry()
-            .expect("A full child cannot be empty");
+        let (median_key, median_value) = full_child.split(&mut sibling);
+
         node.insert_entry(full_child_idx, (median_key, median_value));
 
         sibling.save(self.memory());
@@ -395,14 +385,14 @@ where
 
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         let node = self.load_node(node_addr);
-        match node.keys.binary_search(key) {
-            Ok(idx) => Some(node.encoded_values[idx].clone()),
+        match node.search(key) {
+            Ok(idx) => Some(node.value(idx).clone()),
             Err(idx) => {
-                match node.node_type {
+                match node.node_type() {
                     NodeType::Leaf => None, // Key not found.
                     NodeType::Internal => {
                         // The key isn't in the node. Look for the key in the child.
-                        self.get_helper(node.children[idx], key)
+                        self.get_helper(node.child(idx), key)
                     }
                 }
             }
@@ -467,41 +457,39 @@ where
             return None;
         }
 
-        self.remove_helper(self.root_addr, key)
+        let root_node = self.load_node(self.root_addr);
+        self.remove_helper(root_node, key)
             .map(Cow::Owned)
             .map(V::from_bytes)
     }
 
     // A helper method for recursively removing a key from the B-tree.
-    fn remove_helper(&mut self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let mut node = self.load_node(node_addr);
-
-        if node.address != self.root_addr {
-            // We're guaranteed that whenever this method is called the number
-            // of keys is >= `B`. Note that this is higher than the minimum required
-            // in a node, which is `B - 1`, and that's because this strengthened
-            // condition allows us to delete an entry in a single pass most of the
-            // time without having to back up.
-            assert!(node.keys.len() >= B as usize);
+    fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
+        if node.address() != self.root_addr {
+            // We're guaranteed that whenever this method is called an entry can be
+            // removed from the node without it needing to be merged into a sibling.
+            // This strengthened condition allows us to delete an entry in a single
+            // pass most of the time without having to back up.
+            assert!(node.can_remove_entry_without_merging());
         }
 
-        match node.node_type {
+        match node.node_type() {
             NodeType::Leaf => {
-                match node.keys.binary_search(key) {
+                match node.search(key) {
                     Ok(idx) => {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
                         let value = node.remove_entry(idx).1;
                         self.length -= 1;
 
-                        if node.keys.is_empty() {
+                        if node.entries_len() == 0 {
                             assert_eq!(
-                                node.address, self.root_addr,
+                                node.address(), self.root_addr,
                                 "Removal can only result in an empty leaf node if that node is the root"
                             );
 
                             // Deallocate the empty node.
-                            self.allocator.deallocate(node.address);
+                            self.allocator.deallocate(node.address());
                             self.root_addr = NULL;
                         } else {
                             node.save(self.memory());
@@ -514,14 +502,13 @@ where
                 }
             }
             NodeType::Internal => {
-                match node.keys.binary_search(key) {
+                match node.search(key) {
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
-                        // Check if the child that precedes `key` has at least `B` keys.
-                        let left_child = self.load_node(node.children[idx]);
-                        if left_child.keys.len() >= B as usize {
-                            // Case 2.a: The node's left child has >= `B` keys.
+                        let left_child = self.load_node(node.child(idx));
+                        if left_child.can_remove_entry_without_merging() {
+                            // Case 2.a: A key can be removed from the left child without merging.
                             //
                             //                       parent
                             //                  [..., key, ...]
@@ -544,7 +531,7 @@ where
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
                             let predecessor = left_child.get_max(self.memory());
-                            self.remove_helper(node.children[idx], &predecessor.0)?;
+                            self.remove_helper(left_child, &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
                             let (_, old_value) = node.swap_entry(idx, predecessor);
@@ -554,10 +541,9 @@ where
                             return Some(old_value);
                         }
 
-                        // Check if the child that succeeds `key` has at least `B` keys.
-                        let right_child = self.load_node(node.children[idx + 1]);
-                        if right_child.keys.len() >= B as usize {
-                            // Case 2.b: The node's right child has >= `B` keys.
+                        let right_child = self.load_node(node.child(idx + 1));
+                        if right_child.can_remove_entry_without_merging() {
+                            // Case 2.b: A key can be removed from the right child without merging.
                             //
                             //                       parent
                             //                  [..., key, ...]
@@ -580,7 +566,7 @@ where
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
                             let successor = right_child.get_min(self.memory());
-                            self.remove_helper(node.children[idx + 1], &successor.0)?;
+                            self.remove_helper(right_child, &successor.0)?;
 
                             // Replace the `key` with its successor.
                             let (_, old_value) = node.swap_entry(idx, successor);
@@ -590,7 +576,7 @@ where
                             return Some(old_value);
                         }
 
-                        // Case 2.c: Both the left child and right child have B - 1 keys.
+                        // Case 2.c: Both the left and right child are at their minimum sizes.
                         //
                         //                       parent
                         //                  [..., key, ...]
@@ -598,7 +584,7 @@ where
                         //            [left child]   [right child]
                         //
                         // In this case, we merge (left child, key, right child) into a single
-                        // node of size 2B - 1. The result will look like this:
+                        // node. The result will look like this:
                         //
                         //                       parent
                         //                     [...  ...]
@@ -609,24 +595,25 @@ where
                         //
                         // If `parent` becomes empty (which can only happen if it's the root),
                         // then `parent` is deleted and `new_child` becomes the new root.
-                        assert_eq!(left_child.keys.len(), B as usize - 1);
-                        assert_eq!(right_child.keys.len(), B as usize - 1);
+                        assert!(left_child.at_minimum());
+                        assert!(right_child.at_minimum());
 
                         // Merge the right child into the left child.
                         let new_child = self.merge(right_child, left_child, node.remove_entry(idx));
 
                         // Remove the right child from the parent node.
-                        node.children.remove(idx + 1);
+                        node.remove_child(idx + 1);
 
-                        if node.keys.is_empty() {
+                        if node.entries_len() == 0 {
                             // Can only happen if this node is root.
-                            assert_eq!(node.address, self.root_addr);
-                            assert_eq!(node.children, vec![new_child.address]);
+                            assert_eq!(node.address(), self.root_addr);
+                            assert_eq!(node.child(0), new_child.address());
+                            assert_eq!(node.children_len(), 1);
 
-                            self.root_addr = new_child.address;
+                            self.root_addr = new_child.address();
 
                             // Deallocate the root node.
-                            self.allocator.deallocate(node.address);
+                            self.allocator.deallocate(node.address());
                             self.save();
                         }
 
@@ -634,37 +621,39 @@ where
                         new_child.save(self.memory());
 
                         // Recursively delete the key.
-                        self.remove_helper(new_child.address, key)
+                        self.remove_helper(new_child, key)
                     }
                     Err(idx) => {
                         // Case 3: The node is an internal node and the key does NOT exist in it.
 
                         // If the key does exist in the tree, it will exist in the subtree at index
                         // `idx`.
-                        let mut child = self.load_node(node.children[idx]);
+                        let mut child = self.load_node(node.child(idx));
 
-                        if child.keys.len() >= B as usize {
+                        if child.can_remove_entry_without_merging() {
                             // The child has enough nodes. Recurse to delete the `key` from the
                             // `child`.
-                            return self.remove_helper(node.children[idx], key);
+                            return self.remove_helper(child, key);
                         }
 
-                        // The child has < `B` keys. Let's see if it has a sibling with >= `B` keys.
+                        // An entry can't be removed from the child without merging.
+                        // See if it has a sibling where an entry can be removed without merging.
                         let mut left_sibling = if idx > 0 {
-                            Some(self.load_node(node.children[idx - 1]))
+                            Some(self.load_node(node.child(idx - 1)))
                         } else {
                             None
                         };
 
-                        let mut right_sibling = if idx + 1 < node.children.len() {
-                            Some(self.load_node(node.children[idx + 1]))
+                        let mut right_sibling = if idx + 1 < node.children_len() {
+                            Some(self.load_node(node.child(idx + 1)))
                         } else {
                             None
                         };
 
                         if let Some(ref mut left_sibling) = left_sibling {
-                            if left_sibling.keys.len() >= B as usize {
-                                // Case 3.a (left): The child has a left sibling with >= `B` keys.
+                            if left_sibling.can_remove_entry_without_merging() {
+                                // Case 3.a (left):
+                                // A key can be removed from the left child without merging.
                                 //
                                 //                            [d] (parent)
                                 //                           /   \
@@ -696,26 +685,27 @@ where
                                 child.insert_entry(0, (parent_key, parent_value));
 
                                 // Move the last child from left sibling into child.
-                                if let Some(last_child) = left_sibling.children.pop() {
-                                    assert_eq!(left_sibling.node_type, NodeType::Internal);
-                                    assert_eq!(child.node_type, NodeType::Internal);
+                                if let Some(last_child) = left_sibling.pop_child() {
+                                    assert_eq!(left_sibling.node_type(), NodeType::Internal);
+                                    assert_eq!(child.node_type(), NodeType::Internal);
 
-                                    child.children.insert(0, last_child);
+                                    child.insert_child(0, last_child);
                                 } else {
-                                    assert_eq!(left_sibling.node_type, NodeType::Leaf);
-                                    assert_eq!(child.node_type, NodeType::Leaf);
+                                    assert_eq!(left_sibling.node_type(), NodeType::Leaf);
+                                    assert_eq!(child.node_type(), NodeType::Leaf);
                                 }
 
                                 left_sibling.save(self.memory());
                                 child.save(self.memory());
                                 node.save(self.memory());
-                                return self.remove_helper(child.address, key);
+                                return self.remove_helper(child, key);
                             }
                         }
 
                         if let Some(right_sibling) = &mut right_sibling {
-                            if right_sibling.keys.len() >= B as usize {
-                                // Case 3.a (right): The child has a right sibling with >= `B` keys.
+                            if right_sibling.can_remove_entry_without_merging() {
+                                // Case 3.a (right):
+                                // A key can be removed from the right child without merging.
                                 //
                                 //                            [c] (parent)
                                 //                           /   \
@@ -747,70 +737,72 @@ where
                                 child.push_entry(parent_entry);
 
                                 // Move the first child of right_sibling into `child`.
-                                match right_sibling.node_type {
+                                match right_sibling.node_type() {
                                     NodeType::Internal => {
-                                        assert_eq!(child.node_type, NodeType::Internal);
-                                        child.children.push(right_sibling.children.remove(0));
+                                        assert_eq!(child.node_type(), NodeType::Internal);
+                                        child.push_child(right_sibling.remove_child(0));
                                     }
                                     NodeType::Leaf => {
-                                        assert_eq!(child.node_type, NodeType::Leaf);
+                                        assert_eq!(child.node_type(), NodeType::Leaf);
                                     }
                                 }
 
                                 right_sibling.save(self.memory());
                                 child.save(self.memory());
                                 node.save(self.memory());
-                                return self.remove_helper(child.address, key);
+                                return self.remove_helper(child, key);
                             }
                         }
 
-                        // Case 3.b: neither siblings of the child have >= `B` keys.
+                        // Case 3.b: Both the left and right siblings are at their minimum sizes.
 
                         if let Some(left_sibling) = left_sibling {
                             // Merge child into left sibling if it exists.
 
-                            let left_sibling_address = left_sibling.address;
-                            self.merge(child, left_sibling, node.remove_entry(idx - 1));
+                            assert!(left_sibling.at_minimum());
+                            let left_sibling =
+                                self.merge(child, left_sibling, node.remove_entry(idx - 1));
                             // Removing child from parent.
-                            node.children.remove(idx);
+                            node.remove_child(idx);
 
-                            if node.keys.is_empty() {
-                                self.allocator.deallocate(node.address);
+                            if node.entries_len() == 0 {
+                                self.allocator.deallocate(node.address());
 
-                                if node.address == self.root_addr {
+                                if node.address() == self.root_addr {
                                     // Update the root.
-                                    self.root_addr = left_sibling_address;
+                                    self.root_addr = left_sibling.address();
                                     self.save();
                                 }
                             } else {
                                 node.save(self.memory());
                             }
 
-                            return self.remove_helper(left_sibling_address, key);
+                            return self.remove_helper(left_sibling, key);
                         }
 
                         if let Some(right_sibling) = right_sibling {
                             // Merge child into right sibling.
 
-                            let right_sibling_address = right_sibling.address;
-                            self.merge(child, right_sibling, node.remove_entry(idx));
+                            assert!(right_sibling.at_minimum());
+                            let right_sibling =
+                                self.merge(child, right_sibling, node.remove_entry(idx));
 
                             // Removing child from parent.
-                            node.children.remove(idx);
+                            node.remove_child(idx);
 
-                            if node.keys.is_empty() {
-                                self.allocator.deallocate(node.address);
+                            if node.entries_len() == 0 {
+                                self.allocator.deallocate(node.address());
 
-                                if node.address == self.root_addr {
+                                if node.address() == self.root_addr {
                                     // Update the root.
-                                    self.root_addr = right_sibling_address;
+                                    self.root_addr = right_sibling.address();
                                     self.save();
                                 }
                             } else {
                                 node.save(self.memory());
                             }
 
-                            return self.remove_helper(right_sibling_address, key);
+                            return self.remove_helper(right_sibling, key);
                         }
 
                         unreachable!("At least one of the siblings must exist.");
@@ -848,7 +840,7 @@ where
             Bound::Included(key) | Bound::Excluded(key) => {
                 let mut node = self.load_node(self.root_addr);
                 loop {
-                    match node.keys.binary_search(key) {
+                    match node.search(key) {
                         Ok(idx) => {
                             if let Bound::Included(_) = key_range.start_bound() {
                                 // We found the key exactly matching the left bound.
@@ -863,13 +855,13 @@ where
                                 // exclude.  We add its right neighbor
                                 // to the stack and start iterating
                                 // from its right child.
-                                let right_child = match node.node_type {
-                                    NodeType::Internal => Some(node.children[idx + 1]),
+                                let right_child = match node.node_type() {
+                                    NodeType::Internal => Some(node.child(idx + 1)),
                                     NodeType::Leaf => None,
                                 };
 
-                                if idx + 1 != node.keys.len()
-                                    && key_range.contains(&node.keys[idx + 1])
+                                if idx + 1 != node.entries_len()
+                                    && key_range.contains(node.key(idx + 1))
                                 {
                                     cursors.push(Cursor::Node {
                                         node,
@@ -897,16 +889,16 @@ where
 
                             // Load the left child of the node to visit if it exists.
                             // This is done first to avoid cloning the node.
-                            let child = match node.node_type {
+                            let child = match node.node_type() {
                                 NodeType::Internal => {
                                     // Note that loading a child node cannot fail since
                                     // len(children) = len(entries) + 1
-                                    Some(self.load_node(node.children[idx]))
+                                    Some(self.load_node(node.child(idx)))
                                 }
                                 NodeType::Leaf => None,
                             };
 
-                            if idx < node.keys.len() && key_range.contains(&node.keys[idx]) {
+                            if idx < node.entries_len() && key_range.contains(node.key(idx)) {
                                 cursors.push(Cursor::Node {
                                     node,
                                     next: Index::Entry(idx),
@@ -944,9 +936,9 @@ where
 
         let mut node = self.load_node(self.root_addr);
         loop {
-            match node.keys.binary_search(bound) {
+            match node.search(bound) {
                 Ok(idx) | Err(idx) => {
-                    match node.node_type {
+                    match node.node_type() {
                         NodeType::Leaf => {
                             if idx == 0 {
                                 // We descended into a leaf but didn't find a node less than
@@ -961,10 +953,10 @@ where
                                             next: Index::Entry(n),
                                         } => {
                                             if n == 0 {
-                                                debug_assert!(&node.keys[n] >= bound);
+                                                debug_assert!(node.key(n) >= bound);
                                                 continue;
                                             } else {
-                                                debug_assert!(&node.keys[n - 1] < bound);
+                                                debug_assert!(node.key(n - 1) < bound);
                                                 cursors.push(Cursor::Node {
                                                     node,
                                                     next: Index::Entry(n - 1),
@@ -978,7 +970,7 @@ where
                                 // If the cursors are empty, the iterator will be empty.
                                 return Iter::new_in_range(self, dummy_bounds, cursors);
                             }
-                            debug_assert!(&node.keys[idx - 1] < bound);
+                            debug_assert!(node.key(idx - 1) < bound);
 
                             cursors.push(Cursor::Node {
                                 node,
@@ -987,8 +979,8 @@ where
                             return Iter::new_in_range(self, dummy_bounds, cursors);
                         }
                         NodeType::Internal => {
-                            let child = self.load_node(node.children[idx]);
-                            // We push the node even if idx == node.keys.len()
+                            let child = self.load_node(node.child(idx));
+                            // We push the node even if idx == node.entries_len()
                             // If we find the position in the child, the iterator will skip this
                             // cursor. But if the all keys in the child are greater than or equal to
                             // the bound, we will be able to use this cursor as a fallback.
@@ -1017,15 +1009,15 @@ where
     //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     //   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, into: Node<K>, median: Entry<K>) -> Node<K> {
-        assert_eq!(source.node_type, into.node_type);
-        assert!(!source.keys.is_empty());
-        assert!(!into.keys.is_empty());
+        assert_eq!(source.node_type(), into.node_type());
+        assert!(source.entries_len() > 0);
+        assert!(into.entries_len() > 0);
 
-        let into_address = into.address;
-        let source_address = source.address;
+        let into_address = into.address();
+        let source_address = source.address();
 
         // Figure out which node contains lower values than the other.
-        let (mut lower, mut higher) = if source.keys[0] < into.keys[0] {
+        let (mut lower, mut higher) = if source.key(0) < into.key(0) {
             (source, into)
         } else {
             (into, source)
@@ -1035,10 +1027,10 @@ where
 
         lower.append_entries_from(&mut higher);
 
-        lower.address = into_address;
-
         // Move the children (if any exist).
-        lower.children.append(&mut higher.children);
+        lower.append_children_from(&mut higher);
+
+        lower.set_address(into_address);
 
         lower.save(self.memory());
 
@@ -1047,15 +1039,12 @@ where
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
-        Node {
-            address: self.allocator.allocate(),
-            keys: vec![],
-            encoded_values: vec![],
-            children: vec![],
+        Node::new(
+            self.allocator.allocate(),
             node_type,
-            max_key_size: self.max_key_size,
-            max_value_size: self.max_value_size,
-        }
+            self.max_key_size,
+            self.max_value_size,
+        )
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
@@ -1125,7 +1114,7 @@ impl std::fmt::Display for InsertError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{btreemap::node::CAPACITY, storable::Blob};
+    use crate::storable::Blob;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -1208,15 +1197,15 @@ mod test {
         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
 
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![6], vec![])]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
         // The right child should now be full, with the median key being "12"
-        let right_child = btree.load_node(root.children[1]);
+        let right_child = btree.load_node(root.child(1));
         assert!(right_child.is_full());
-        let median_index = right_child.keys.len() / 2;
-        assert_eq!(right_child.keys[median_index], vec![12]);
+        let median_index = right_child.entries_len() / 2;
+        assert_eq!(right_child.key(median_index), &vec![12]);
 
         // Overwrite the median key.
         assert_eq!(btree.insert(vec![12], vec![1, 2, 3]), Some(vec![]));
@@ -1225,8 +1214,8 @@ mod test {
         assert_eq!(btree.get(&vec![12]), Some(vec![1, 2, 3]));
 
         // The child has not been split and is still full.
-        let right_child = btree.load_node(root.children[1]);
-        assert_eq!(right_child.node_type, NodeType::Leaf);
+        let right_child = btree.load_node(root.child(1));
+        assert_eq!(right_child.node_type(), NodeType::Leaf);
         assert!(right_child.is_full());
     }
 
@@ -1249,9 +1238,9 @@ mod test {
         assert_eq!(btree.insert(vec![6], vec![4, 5, 6]), Some(vec![]));
 
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Leaf);
+        assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(btree.get(&vec![6]), Some(vec![4, 5, 6]));
-        assert_eq!(root.keys.len(), 11);
+        assert_eq!(root.entries_len(), 11);
     }
 
     #[test]
@@ -1259,8 +1248,15 @@ mod test {
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
 
-        for i in 0..CAPACITY as u8 {
+        // Insert entries until the root node is full.
+        let mut i = 0;
+        loop {
             assert_eq!(btree.insert(vec![i], vec![]), None);
+            let root = btree.load_node(btree.root_addr);
+            if root.is_full() {
+                break;
+            }
+            i += 1;
         }
 
         // Only need a single allocation to store up to `CAPACITY` elements.
@@ -1320,31 +1316,6 @@ mod test {
     }
 
     #[test]
-    fn overwrite_test() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-
-        let num_elements: u8 = 255;
-
-        // Ensure that the number of elements we insert is significantly
-        // higher than `CAPACITY` so that we test interesting cases (e.g.
-        // overwriting the value in an internal node).
-        assert!(num_elements as u64 > 10 * CAPACITY);
-
-        for i in 0..num_elements {
-            assert_eq!(btree.insert(vec![i], vec![]), None);
-        }
-
-        // Overwrite the values.
-        for i in 0..num_elements {
-            // Assert we retrieved the old value correctly.
-            assert_eq!(btree.insert(vec![i], vec![1, 2, 3]), Some(vec![]));
-            // Assert we retrieved the new value correctly.
-            assert_eq!(btree.get(&vec![i]), Some(vec![1, 2, 3]));
-        }
-    }
-
-    #[test]
     fn insert_split_multiple_nodes() {
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
@@ -1361,12 +1332,12 @@ mod test {
         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![6], vec![])]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(
             child_0.entries(),
             vec![
@@ -1378,8 +1349,8 @@ mod test {
             ]
         );
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(
             child_1.entries(),
             vec![
@@ -1410,12 +1381,12 @@ mod test {
         }
 
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![6], vec![]), (vec![12], vec![])]);
-        assert_eq!(root.children.len(), 3);
+        assert_eq!(root.children_len(), 3);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(
             child_0.entries(),
             vec![
@@ -1427,8 +1398,8 @@ mod test {
             ]
         );
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(
             child_1.entries(),
             vec![
@@ -1440,8 +1411,8 @@ mod test {
             ]
         );
 
-        let child_2 = btree.load_node(root.children[2]);
-        assert_eq!(child_2.node_type, NodeType::Leaf);
+        let child_2 = btree.load_node(root.child(2));
+        assert_eq!(child_2.node_type(), NodeType::Leaf);
         assert_eq!(
             child_2.entries(),
             vec![
@@ -1494,16 +1465,16 @@ mod test {
         //               /   \
         // [0, 1, 2, 3, 4]   [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![e(5)]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(child_0.entries(), vec![e(0), e(1), e(2), e(3), e(4)]);
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(child_1.entries(), vec![e(7), e(8), e(9), e(10), e(11)]);
 
         // There are three allocated nodes.
@@ -1555,16 +1526,16 @@ mod test {
         //               /   \
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![e(7)]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
 
         // Remove node 7. Triggers case 2.c
@@ -1573,7 +1544,7 @@ mod test {
         //
         // [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Leaf);
+        assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
             root.entries(),
             vec![
@@ -1616,16 +1587,16 @@ mod test {
         //               /   \
         // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![7], vec![])]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(child_0.entries(), vec![e(1), e(2), e(4), e(5), e(6)]);
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
 
         // There are three allocated nodes.
@@ -1656,16 +1627,16 @@ mod test {
         //               /   \
         // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![5], vec![])]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(child_0.entries(), vec![e(0), e(1), e(2), e(3), e(4)]);
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(child_1.entries(), vec![e(6), e(7), e(9), e(10), e(11)]);
 
         // There are three allocated nodes.
@@ -1699,16 +1670,16 @@ mod test {
         //               /   \
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![7], vec![])]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
 
         // There are three allocated nodes.
@@ -1724,7 +1695,7 @@ mod test {
         //
         // [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Leaf);
+        assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
             root.entries(),
             vec![
@@ -1774,16 +1745,16 @@ mod test {
         //               /   \
         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![7], vec![])]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(child_0.entries(), vec![e(1), e(2), e(3), e(4), e(5)]);
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(child_1.entries(), vec![e(8), e(9), e(10), e(11), e(12)]);
 
         // There are three allocated nodes.
@@ -1799,7 +1770,7 @@ mod test {
         //
         // [1, 2, 3, 4, 5, 7, 8, 9, 11, 12]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Leaf);
+        assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
             root.entries(),
             vec![e(1), e(2), e(3), e(4), e(5), e(7), e(8), e(9), e(11), e(12)]
@@ -2018,9 +1989,9 @@ mod test {
         // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 1)]       [(1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4)]
 
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![1, 2], vec![])]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
         // Tests a prefix that's smaller than the value in the internal node.
         assert_eq!(
@@ -2087,15 +2058,15 @@ mod test {
         //                                                |
         //                             [(1, 6), (1, 8), (1, 10), (2, 1), (2, 2)]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(
             root.entries(),
             vec![(vec![1, 4], vec![]), (vec![2, 3], vec![])]
         );
-        assert_eq!(root.children.len(), 3);
+        assert_eq!(root.children_len(), 3);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(
             child_0.entries(),
             vec![
@@ -2107,8 +2078,8 @@ mod test {
             ]
         );
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(
             child_1.entries(),
             vec![
@@ -2120,7 +2091,7 @@ mod test {
             ]
         );
 
-        let child_2 = btree.load_node(root.children[2]);
+        let child_2 = btree.load_node(root.child(2));
         assert_eq!(
             child_2.entries(),
             vec![
@@ -2234,9 +2205,9 @@ mod test {
         // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 1)]       [(1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4)]
 
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(root.entries(), vec![(vec![1, 2], vec![])]);
-        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children_len(), 2);
 
         assert_eq!(
             btree.range(vec![0]..vec![1]).collect::<Vec<_>>(),
@@ -2289,15 +2260,15 @@ mod test {
         //                                                |
         //                             [(1, 6), (1, 8), (1, 10), (2, 1), (2, 2)]
         let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type, NodeType::Internal);
+        assert_eq!(root.node_type(), NodeType::Internal);
         assert_eq!(
             root.entries(),
             vec![(vec![1, 4], vec![]), (vec![2, 3], vec![])]
         );
-        assert_eq!(root.children.len(), 3);
+        assert_eq!(root.children_len(), 3);
 
-        let child_0 = btree.load_node(root.children[0]);
-        assert_eq!(child_0.node_type, NodeType::Leaf);
+        let child_0 = btree.load_node(root.child(0));
+        assert_eq!(child_0.node_type(), NodeType::Leaf);
         assert_eq!(
             child_0.entries(),
             vec![
@@ -2309,8 +2280,8 @@ mod test {
             ]
         );
 
-        let child_1 = btree.load_node(root.children[1]);
-        assert_eq!(child_1.node_type, NodeType::Leaf);
+        let child_1 = btree.load_node(root.child(1));
+        assert_eq!(child_1.node_type(), NodeType::Leaf);
         assert_eq!(
             child_1.entries(),
             vec![
@@ -2322,7 +2293,7 @@ mod test {
             ]
         );
 
-        let child_2 = btree.load_node(root.children[2]);
+        let child_2 = btree.load_node(root.child(2));
         assert_eq!(
             child_2.entries(),
             vec![
@@ -2563,7 +2534,6 @@ mod test {
     }
 
     #[test]
-    #[allow(unaligned_references)]
     fn read_write_header_is_identical_to_read_write_struct() {
         #[repr(C, packed)]
         struct BTreePackedHeader {
@@ -2604,11 +2574,11 @@ mod test {
 
         let packed_header: BTreePackedHeader = crate::read_struct(Address::from(0), &v1_mem);
         let v1_header = BTreeMap::<Vec<_>, Vec<_>, RefCell<Vec<_>>>::read_header(&v1_mem);
-        assert_eq!(packed_header.magic, v1_header.magic);
-        assert_eq!(packed_header.version, v1_header.version);
-        assert_eq!(packed_header.max_key_size, v1_header.max_key_size);
-        assert_eq!(packed_header.max_value_size, v1_header.max_value_size);
-        assert_eq!(packed_header.root_addr, v1_header.root_addr);
-        assert_eq!(packed_header.length, v1_header.length);
+        assert!(packed_header.magic == v1_header.magic);
+        assert!(packed_header.version == v1_header.version);
+        assert!(packed_header.max_key_size == v1_header.max_key_size);
+        assert!(packed_header.max_value_size == v1_header.max_value_size);
+        assert!(packed_header.root_addr == v1_header.root_addr);
+        assert!(packed_header.length == v1_header.length);
     }
 }

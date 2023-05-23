@@ -1,6 +1,6 @@
 [package]
 name = "ic-stable-structures"
-version = "0.5.1"
+version = "0.5.3"
 edition = "2021"
 description = "A collection of data structures for fearless canister upgrades."
 homepage = "https://docs.rs/ic-stable-structures"
@@ -13,6 +13,8 @@ repository = "https://github.com/dfinity/stable-structures"
 
 [dev-dependencies]
 criterion = "0.4.0"
+ic-cdk = "0.6.8"
+ic-cdk-macros = "0.6.8"
 lazy_static = "1.4.0"
 maplit = "1.0.2"
 proptest = "1"
@@ -21,3 +23,9 @@ tempfile = "3.3.0"
 [[bench]]
 name = "benches"
 harness = false
+path = "benches/benches.rs"
+
+[workspace]
+members = [
+  "benchmark-canisters"
+]
