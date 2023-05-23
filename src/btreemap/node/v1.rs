@@ -58,4 +58,57 @@ impl<K: Storable + Ord + Clone> Node<K> {
             version: header.version,
         }
     }
+
+    pub fn save_v1<M: Memory>(&mut self, memory: &M) {
+        let header = NodeHeader {
+            magic: *MAGIC,
+            version: LAYOUT_VERSION_1,
+            node_type: match self.node_type {
+                NodeType::Leaf => LEAF_NODE_TYPE,
+                NodeType::Internal => INTERNAL_NODE_TYPE,
+            },
+            num_entries: self.keys.len() as u16,
+        };
+
+        write_struct(&header, self.address, memory);
+
+        let mut offset = NodeHeader::size();
+
+        // Load all the values. This is necessary so that we don't overwrite referenced
+        // values when writing the entries to the node.
+        for i in 0..self.keys.len() {
+            self.value(i, memory);
+        }
+
+        // Write the entries.
+        for (idx, key) in self.keys.iter().enumerate() {
+            // Write the size of the key.
+            let key_bytes = key.to_bytes();
+            write_u32(memory, self.address + offset, key_bytes.len() as u32);
+            offset += U32_SIZE;
+
+            // Write the key.
+            write(memory, (self.address + offset).get(), key_bytes.borrow());
+            offset += Bytes::from(self.max_key_size);
+
+            // Write the size of the value.
+            let value = self.value(idx, memory);
+            write_u32(memory, self.address + offset, value.len() as u32);
+            offset += U32_SIZE;
+
+            // Write the value.
+            write(memory, (self.address + offset).get(), &value);
+            offset += Bytes::from(self.max_value_size);
+        }
+
+        // Write the children
+        for child in self.children.iter() {
+            write(
+                memory,
+                (self.address + offset).get(),
+                &child.get().to_le_bytes(),
+            );
+            offset += Address::size();
+        }
+    }
 }
