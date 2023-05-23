@@ -59,6 +59,14 @@ pub trait Memory {
 
 // A helper function that reads a single 32bit integer encoded as
 // little-endian from the specified memory at the specified offset.
+fn read_u16<M: Memory>(m: &M, addr: Address) -> u16 {
+    let mut buf: [u8; 2] = [0; 2];
+    m.read(addr.get(), &mut buf);
+    u16::from_le_bytes(buf)
+}
+
+// A helper function that reads a single 32bit integer encoded as
+// little-endian from the specified memory at the specified offset.
 fn read_u32<M: Memory>(m: &M, addr: Address) -> u32 {
     let mut buf: [u8; 4] = [0; 4];
     m.read(addr.get(), &mut buf);
@@ -75,6 +83,11 @@ fn read_u64<M: Memory>(m: &M, addr: Address) -> u64 {
 
 // Writes a single 32-bit integer encoded as little-endian.
 fn write_u32<M: Memory>(m: &M, addr: Address, val: u32) {
+    write(m, addr.get(), &val.to_le_bytes());
+}
+
+// Writes a single 16-bit integer encoded as little-endian.
+fn write_u16<M: Memory>(m: &M, addr: Address, val: u16) {
     write(m, addr.get(), &val.to_le_bytes());
 }
 

@@ -1,8 +1,8 @@
 use crate::{
-    read_struct, read_u32, read_u64,
+    read_struct, read_u16, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
-    write, write_struct, write_u32, Memory,
+    write, write_struct, write_u16, write_u32, Memory,
 };
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
@@ -18,6 +18,7 @@ const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
 // The size of u32 in bytes.
 const U32_SIZE: Bytes = Bytes::new(4);
+const U16_SIZE: Bytes = Bytes::new(2);
 
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum NodeType {
@@ -53,6 +54,8 @@ pub struct Node<K: Storable + Ord + Clone> {
     node_type: NodeType,
     max_key_size: u32,
     max_value_size: u32,
+
+    version: u8,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -71,6 +74,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             node_type,
             max_key_size,
             max_value_size,
+            version: 2,
         }
     }
 
@@ -84,14 +88,30 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
-        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
+        //assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
+        if header.version == 1 {
+            Self::load_v1(address, header, memory, max_key_size, max_value_size)
+        } else if header.version == 2 {
+            Self::load_v2(address, header, memory, max_key_size, max_value_size)
+        } else {
+            panic!("unsupported version");
+        }
+    }
+
+    fn load_v1<M: Memory>(
+        address: Address,
+        header: NodeHeader,
+        memory: &M,
+        max_key_size: u32,
+        max_value_size: u32,
+    ) -> Self {
         // Load the entries.
         let mut keys = Vec::with_capacity(header.num_entries as usize);
         let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
         let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
-        for _ in 0..header.num_entries {
+        for i in 0..header.num_entries {
             // Read the key's size.
             let key_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
@@ -104,7 +124,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys.push(key);
 
             // Values are loaded lazily. Store a reference and skip loading it.
-            encoded_values.push(Value::ByRef(offset));
+            encoded_values.push(Value::ByRef(i as u8));
             offset += U32_SIZE + Bytes::from(max_value_size);
         }
 
@@ -133,11 +153,123 @@ impl<K: Storable + Ord + Clone> Node<K> {
             },
             max_key_size,
             max_value_size,
+            version: header.version,
+        }
+    }
+
+    fn load_v2<M: Memory>(
+        address: Address,
+        header: NodeHeader,
+        memory: &M,
+        max_key_size: u32,
+        max_value_size: u32,
+    ) -> Self {
+        // Load the cell array.
+        let cell_array: [u8; CAPACITY] = read_struct(address + NodeHeader::size(), memory);
+
+        // Load the entries.
+        let encoded_values: Vec<_> = (0..header.num_entries as usize)
+            .map(|i| Value::ByRef(cell_array[i]))
+            .collect();
+        let mut keys = Vec::with_capacity(header.num_entries as usize);
+        let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
+        let entries_offset = NodeHeader::size() + Bytes::new(2 * CAPACITY as u64);
+        let entry_size = (max_key_size + 2 + max_value_size + 4) as u64;
+        for i in 0..header.num_entries as usize {
+            let idx = cell_array[i];
+            let mut offset = entries_offset + Bytes::new(idx as u64 * entry_size);
+
+            // Read the key's size.
+            let key_size = read_u16(memory, address + offset);
+            offset += U16_SIZE;
+
+            // Read the key.
+            buf.resize(key_size as usize, 0);
+            memory.read((address + offset).get(), &mut buf);
+            let key = K::from_bytes(Cow::Borrowed(&buf));
+            keys.push(key);
+        }
+
+        // Get the offset of the children. This line is a bit of a hack.
+        let children_address = address
+                    + NodeHeader::size()
+                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
+                    + Bytes::new(
+                        (CAPACITY as u32 * (max_key_size + 2 + max_value_size + 4)
+                    ) as u64);
+
+        let mut offset = Bytes::new(0);
+
+        // Load children if this is an internal node.
+        let mut children = vec![];
+        if header.node_type == INTERNAL_NODE_TYPE {
+            // The number of children is equal to the number of entries + 1.
+            for _ in 0..header.num_entries + 1 {
+                let child = Address::from(read_u64(memory, children_address + offset));
+                offset += Address::size();
+                children.push(child);
+            }
+
+            assert_eq!(children.len(), keys.len() + 1);
+        }
+
+        Self {
+            address,
+            keys,
+            encoded_values: RefCell::new(encoded_values),
+            children,
+            node_type: match header.node_type {
+                LEAF_NODE_TYPE => NodeType::Leaf,
+                INTERNAL_NODE_TYPE => NodeType::Internal,
+                other => unreachable!("Unknown node type {}", other),
+            },
+            max_key_size,
+            max_value_size,
+            version: header.version,
+        }
+    }
+
+    fn get_free_slots(&self) -> Vec<u8> {
+        // Assume all slots are free.
+        let mut cell_array = vec![true; CAPACITY];
+
+        // Iterate over the values, seeing which slots are used.
+        for val in self.encoded_values.borrow().iter() {
+            if let Value::ByRef(idx) = val {
+                // Mark the element as not free.
+                cell_array[*idx as usize] = false;
+            }
+        }
+
+        cell_array
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, is_free)| if is_free { Some(idx as u8) } else { None })
+            .collect()
+    }
+
+    fn get_entry_offset(idx: usize, max_key_size: u32, max_value_size: u32, version: u8) -> Bytes {
+        match version {
+            1 => {
+                NodeHeader::size()
+                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
+                    + Bytes::new(
+                        (idx as u32 * (max_key_size + 2 + max_value_size + 4)
+                    ) as u64)
+            }
+            2 => {
+                NodeHeader::size()
+                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
+                    + Bytes::new(
+                        (idx as u32 * (max_key_size + 2 + max_value_size + 4)
+                    ) as u64)
+            }
+            _ => unreachable!(),
         }
     }
 
     /// Saves the node to memory.
-    pub fn save<M: Memory>(&self, memory: &M) {
+    pub fn save<M: Memory>(&mut self, memory: &M) {
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());
@@ -153,9 +285,87 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Assert entries are sorted in strictly increasing order.
         assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
 
+        let mut free_slots = self.get_free_slots();
+
+        // Load all the values. This is necessary so that we don't overwrite referenced
+        // values when writing the entries to the node.
+        //        for i in 0..self.keys.len() {
+        //           self.value(i, memory);
+        //       }
+
+        let mut cell_array = vec![];
+
+        // Write the entries.
+        for (idx, key) in self.keys.iter().enumerate() {
+            // TODO: borrow outside?
+            if let Value::ByRef(slot_idx) = self.encoded_values.borrow()[idx] {
+                // Value hasn't been touched. Add idx to cell array and skip writing the keys and
+                // values.
+                cell_array.push(slot_idx);
+                continue;
+            }
+
+            // This is a new entry. Insert it at the next available free slot.
+
+            let free_slot_idx = free_slots.pop().unwrap();
+
+            cell_array.push(free_slot_idx);
+
+            let mut address = self.address
+                + Self::get_entry_offset(
+                    free_slot_idx as usize,
+                    self.max_key_size,
+                    self.max_value_size,
+                    self.version,
+                );
+
+            // Write the size of the key.
+            let key_bytes = key.to_bytes();
+            // TODO: asset key size.
+            write_u16(memory, address, key_bytes.len() as u16);
+            address += U16_SIZE;
+
+            // Write the key.
+            write(memory, address.get(), key_bytes.borrow());
+            address += Bytes::from(self.max_key_size);
+
+            // Write the size of the value.
+            let value = self.value(idx, memory);
+            write_u32(memory, address, value.len() as u32);
+            address += U32_SIZE;
+
+            // Write the value.
+            write(memory, address.get(), &value);
+            address += Bytes::from(self.max_value_size);
+        }
+
+        // Get the offset of the children. This line is a bit of a hack.
+        let address = self.address
+            + Self::get_entry_offset(
+                CAPACITY,
+                self.max_key_size,
+                self.max_value_size,
+                self.version,
+            );
+        let mut offset = Bytes::new(0);
+
+        // Write the children
+        for child in self.children.iter() {
+            write(memory, (address + offset).get(), &child.get().to_le_bytes());
+            offset += Address::size();
+        }
+
+        // Write the cell array.
+        cell_array.resize(CAPACITY, 0);
+        let cell_array: [u8; CAPACITY] = cell_array.try_into().unwrap();
+        write_struct(&cell_array, self.address + NodeHeader::size(), memory);
+
+        // Update the version (is this necessary?)
+        self.version = 2;
+
         let header = NodeHeader {
             magic: *MAGIC,
-            version: LAYOUT_VERSION,
+            version: 2,
             node_type: match self.node_type {
                 NodeType::Leaf => LEAF_NODE_TYPE,
                 NodeType::Internal => INTERNAL_NODE_TYPE,
@@ -164,45 +374,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         write_struct(&header, self.address, memory);
-
-        let mut offset = NodeHeader::size();
-
-        // Load all the values. This is necessary so that we don't overwrite referenced
-        // values when writing the entries to the node.
-        for i in 0..self.keys.len() {
-            self.value(i, memory);
-        }
-
-        // Write the entries.
-        for (idx, key) in self.keys.iter().enumerate() {
-            // Write the size of the key.
-            let key_bytes = key.to_bytes();
-            write_u32(memory, self.address + offset, key_bytes.len() as u32);
-            offset += U32_SIZE;
-
-            // Write the key.
-            write(memory, (self.address + offset).get(), key_bytes.borrow());
-            offset += Bytes::from(self.max_key_size);
-
-            // Write the size of the value.
-            let value = self.value(idx, memory);
-            write_u32(memory, self.address + offset, value.len() as u32);
-            offset += U32_SIZE;
-
-            // Write the value.
-            write(memory, (self.address + offset).get(), &value);
-            offset += Bytes::from(self.max_value_size);
-        }
-
-        // Write the children
-        for child in self.children.iter() {
-            write(
-                memory,
-                (self.address + offset).get(),
-                &child.get().to_le_bytes(),
-            );
-            offset += Address::size();
-        }
     }
 
     /// Returns the address of the node.
@@ -290,7 +461,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             if let Value::ByRef(offset) = values[idx] {
                 // Value isn't loaded yet.
-                let value_address = self.address + offset;
+                let value_address = self.value_address(offset);
                 let value_len = read_u32(memory, value_address) as usize;
                 let mut value = vec![0; value_len];
                 memory.read((value_address + U32_SIZE).get(), &mut value);
@@ -308,6 +479,29 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 unreachable!("value must have been loaded already.");
             }
         })
+    }
+
+    fn value_address(&self, idx: u8) -> Address {
+        match self.version {
+            1 => {
+                self.address
+                    + NodeHeader::size()
+                    + Bytes::new(
+                        (idx as u32 * (self.max_key_size + 4 + self.max_value_size + 4)
+                            + (4 + self.max_key_size)) as u64,
+                    )
+            }
+            2 => {
+                self.address
+                    + NodeHeader::size()
+                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
+                    + Bytes::new(
+                        (idx as u32 * (self.max_key_size + 2 + self.max_value_size + 4)
+                            + (2 + self.max_key_size)) as u64,
+                    )
+            }
+            _ => unreachable!(),
+        }
     }
 
     /// Returns a reference to the key at the specified index.
@@ -536,8 +730,9 @@ struct NodeHeader {
 }
 
 impl NodeHeader {
-    fn size() -> Bytes {
-        Bytes::from(core::mem::size_of::<Self>() as u64)
+    const fn size() -> Bytes {
+        //Bytes::from(core::mem::size_of::<Self>() as u64)
+        Bytes::new(7)
     }
 }
 
@@ -547,6 +742,6 @@ enum Value {
     // The value's encoded bytes.
     ByVal(Vec<u8>),
 
-    // The value's offset in the node.
-    ByRef(Bytes),
+    // The value's index in the node.
+    ByRef(u8),
 }

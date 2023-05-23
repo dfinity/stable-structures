@@ -600,7 +600,7 @@ where
                         assert!(right_child.at_minimum());
 
                         // Merge the right child into the left child.
-                        let new_child = self.merge(
+                        let mut new_child = self.merge(
                             right_child,
                             left_child,
                             node.remove_entry(idx, self.memory()),
