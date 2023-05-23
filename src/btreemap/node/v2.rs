@@ -159,4 +159,44 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         write_struct(&header, self.address, memory);
     }
+
+    fn get_free_slots(&self) -> Vec<u8> {
+        // Assume all slots are free.
+        let mut cell_array = vec![true; CAPACITY];
+
+        // Iterate over the values, seeing which slots are used.
+        for val in self.encoded_values.borrow().iter() {
+            if let Value::ByRef(idx) = val {
+                // Mark the element as not free.
+                cell_array[*idx as usize] = false;
+            }
+        }
+
+        cell_array
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, is_free)| if is_free { Some(idx as u8) } else { None })
+            .collect()
+    }
+
+    // FIXME: remove logic here that's specific to v1
+    fn get_entry_offset(idx: usize, max_key_size: u32, max_value_size: u32, version: u8) -> Bytes {
+        match version {
+            1 => {
+                NodeHeader::size()
+                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
+                    + Bytes::new(
+                        (idx as u32 * (max_key_size + 2 + max_value_size + 4)
+                    ) as u64)
+            }
+            2 => {
+                NodeHeader::size()
+                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
+                    + Bytes::new(
+                        (idx as u32 * (max_key_size + 2 + max_value_size + 4)
+                    ) as u64)
+            }
+            _ => unreachable!(),
+        }
+    }
 }
