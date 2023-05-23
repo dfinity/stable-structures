@@ -6,6 +6,9 @@ use crate::{
 };
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
+
+#[cfg(test)]
+mod tests;
 mod v1;
 mod v2;
 
@@ -30,6 +33,12 @@ pub enum NodeType {
 }
 
 pub type Entry<K> = (K, Vec<u8>);
+
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
+pub enum Version {
+    V1,
+    V2,
+}
 
 /// A node of a B-Tree.
 ///
@@ -58,7 +67,7 @@ pub struct Node<K: Storable + Ord + Clone> {
     max_key_size: u32,
     max_value_size: u32,
 
-    version: u8,
+    version: Version,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -77,7 +86,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             node_type,
             max_key_size,
             max_value_size,
-            version: 2,
+            version: Version::V2, // FIXME: should be v1 if key is too big.
         }
     }
 
@@ -235,9 +244,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     fn value_offset(&self, idx: u8) -> Bytes {
         match self.version {
-            1 => self.value_offset_v1(idx),
-            2 => self.value_offset_v2(idx),
-            _ => unreachable!(),
+            Version::V1 => self.value_offset_v1(idx),
+            Version::V2 => self.value_offset_v2(idx),
         }
     }
 

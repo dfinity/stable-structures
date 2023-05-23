@@ -55,7 +55,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             },
             max_key_size,
             max_value_size,
-            version: header.version,
+            version: Version::V1,
         }
     }
 

@@ -100,21 +100,33 @@ impl<K: Storable + Ord + Clone> Node<K> {
             },
             max_key_size,
             max_value_size,
-            version: header.version,
+            version: Version::V2,
         }
     }
 
-    /// Saves the node to memory.
+    /// Saves the node to memory based on the V2 layout.
+    ///
+    /// PRECONDITION:
+    ///   * The node is at version 1 or 2.
     pub(super) fn save_v2<M: Memory>(&mut self, memory: &M) {
-        let mut free_entry_indices = self.get_free_entry_indices();
+        // Assert precondition.
+        debug_assert!(self.version == Version::V1 || self.version == Version::V2);
 
+        if self.version == Version::V1 {
+            // Migrate to the new layout. Eagerly load all the values.
+            for idx in 0..self.entries_len() {
+                self.value(idx, memory);
+            }
+        }
+
+        let mut free_entry_indices = self.get_free_entry_indices();
         let mut order_array = vec![];
 
         // Write the entries.
         for (idx, key) in self.keys.iter().enumerate() {
-            // TODO: borrow outside?
             if let Value::ByRef(entry_idx) = self.encoded_values.borrow()[idx] {
-                // Entry hasn't been touched. Add its entry index to the order array and skip it.
+                // The value is a reference, which means the entry hasn't been touched.
+                // Add its entry index to the order array and skip saving it.
                 order_array.push(entry_idx);
                 continue;
             }
@@ -127,7 +139,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     entry_idx,
                     self.max_key_size,
                     self.max_value_size,
-                    self.version,
+                    Version::V2,
                 );
 
             // Write the size of the key.
@@ -173,7 +185,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         write_struct(&order_array, self.address + ORDER_ARRAY_OFFSET, memory);
 
         // Update the version (is this necessary?)
-        self.version = 2;
+        self.version = Version::V2;
 
         let header = NodeHeader {
             magic: *MAGIC,
@@ -217,22 +229,21 @@ impl<K: Storable + Ord + Clone> Node<K> {
             )
     }
 
-    fn get_entry_offset(idx: u8, max_key_size: u32, max_value_size: u32, version: u8) -> Bytes {
+    fn get_entry_offset(
+        idx: u8,
+        max_key_size: u32,
+        max_value_size: u32,
+        version: Version,
+    ) -> Bytes {
         match version {
-            1 => {
-                // FIXME: this is broken. add test to uncover this case.
-                todo!()
-                /*NodeHeader::size()
-                + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
-                + Bytes::new(
-                    (idx as u32 * (max_key_size + 2 + max_value_size + 4)
-                ) as u64)*/
+            Version::V1 => {
+                NodeHeader::size()
+                    + Bytes::from(idx) * Bytes::from(max_key_size + 4 + max_value_size + 4)
             }
-            2 => {
+            Version::V2 => {
                 ENTRIES_OFFSET
                     + Bytes::from(idx) * Bytes::from(max_key_size + 2 + max_value_size + 4)
             }
-            _ => unreachable!(),
         }
     }
 }
