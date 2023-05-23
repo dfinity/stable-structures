@@ -6,13 +6,16 @@ use crate::{
 };
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
+mod v1;
+mod v2;
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
 const B: usize = 6;
 // The maximum number of entries per node.
 const CAPACITY: usize = 2 * B - 1;
-const LAYOUT_VERSION: u8 = 1;
+const LAYOUT_VERSION_1: u8 = 1;
+const LAYOUT_VERSION_2: u8 = 2;
 const MAGIC: &[u8; 3] = b"BTN";
 const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
@@ -88,144 +91,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
-        //assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
-        if header.version == 1 {
-            Self::load_v1(address, header, memory, max_key_size, max_value_size)
-        } else if header.version == 2 {
-            Self::load_v2(address, header, memory, max_key_size, max_value_size)
-        } else {
-            panic!("unsupported version");
-        }
-    }
-
-    fn load_v1<M: Memory>(
-        address: Address,
-        header: NodeHeader,
-        memory: &M,
-        max_key_size: u32,
-        max_value_size: u32,
-    ) -> Self {
-        // Load the entries.
-        let mut keys = Vec::with_capacity(header.num_entries as usize);
-        let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
-        let mut offset = NodeHeader::size();
-        let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
-        for i in 0..header.num_entries {
-            // Read the key's size.
-            let key_size = read_u32(memory, address + offset);
-            offset += U32_SIZE;
-
-            // Read the key.
-            buf.resize(key_size as usize, 0);
-            memory.read((address + offset).get(), &mut buf);
-            offset += Bytes::from(max_key_size);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
-            keys.push(key);
-
-            // Values are loaded lazily. Store a reference and skip loading it.
-            encoded_values.push(Value::ByRef(i as u8));
-            offset += U32_SIZE + Bytes::from(max_value_size);
-        }
-
-        // Load children if this is an internal node.
-        let mut children = vec![];
-        if header.node_type == INTERNAL_NODE_TYPE {
-            // The number of children is equal to the number of entries + 1.
-            for _ in 0..header.num_entries + 1 {
-                let child = Address::from(read_u64(memory, address + offset));
-                offset += Address::size();
-                children.push(child);
+        match header.version {
+            LAYOUT_VERSION_1 => {
+                Self::load_v1(address, header, memory, max_key_size, max_value_size)
             }
-
-            assert_eq!(children.len(), keys.len() + 1);
-        }
-
-        Self {
-            address,
-            keys,
-            encoded_values: RefCell::new(encoded_values),
-            children,
-            node_type: match header.node_type {
-                LEAF_NODE_TYPE => NodeType::Leaf,
-                INTERNAL_NODE_TYPE => NodeType::Internal,
-                other => unreachable!("Unknown node type {}", other),
-            },
-            max_key_size,
-            max_value_size,
-            version: header.version,
-        }
-    }
-
-    fn load_v2<M: Memory>(
-        address: Address,
-        header: NodeHeader,
-        memory: &M,
-        max_key_size: u32,
-        max_value_size: u32,
-    ) -> Self {
-        // Load the cell array.
-        let cell_array: [u8; CAPACITY] = read_struct(address + NodeHeader::size(), memory);
-
-        // Load the entries.
-        let encoded_values: Vec<_> = (0..header.num_entries as usize)
-            .map(|i| Value::ByRef(cell_array[i]))
-            .collect();
-        let mut keys = Vec::with_capacity(header.num_entries as usize);
-        let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
-        let entries_offset = NodeHeader::size() + Bytes::new(2 * CAPACITY as u64);
-        let entry_size = (max_key_size + 2 + max_value_size + 4) as u64;
-        for i in 0..header.num_entries as usize {
-            let idx = cell_array[i];
-            let mut offset = entries_offset + Bytes::new(idx as u64 * entry_size);
-
-            // Read the key's size.
-            let key_size = read_u16(memory, address + offset);
-            offset += U16_SIZE;
-
-            // Read the key.
-            buf.resize(key_size as usize, 0);
-            memory.read((address + offset).get(), &mut buf);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
-            keys.push(key);
-        }
-
-        // Get the offset of the children. This line is a bit of a hack.
-        let children_address = address
-                    + NodeHeader::size()
-                    + Bytes::new(2 * CAPACITY as u64) /* the cell array size */
-                    + Bytes::new(
-                        (CAPACITY as u32 * (max_key_size + 2 + max_value_size + 4)
-                    ) as u64);
-
-        let mut offset = Bytes::new(0);
-
-        // Load children if this is an internal node.
-        let mut children = vec![];
-        if header.node_type == INTERNAL_NODE_TYPE {
-            // The number of children is equal to the number of entries + 1.
-            for _ in 0..header.num_entries + 1 {
-                let child = Address::from(read_u64(memory, children_address + offset));
-                offset += Address::size();
-                children.push(child);
+            LAYOUT_VERSION_2 => {
+                Self::load_v2(address, header, memory, max_key_size, max_value_size)
             }
-
-            assert_eq!(children.len(), keys.len() + 1);
-        }
-
-        Self {
-            address,
-            keys,
-            encoded_values: RefCell::new(encoded_values),
-            children,
-            node_type: match header.node_type {
-                LEAF_NODE_TYPE => NodeType::Leaf,
-                INTERNAL_NODE_TYPE => NodeType::Internal,
-                other => unreachable!("Unknown node type {}", other),
-            },
-            max_key_size,
-            max_value_size,
-            version: header.version,
+            _ => panic!("Unsupported node version.")
         }
     }
 
