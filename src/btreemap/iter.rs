@@ -128,7 +128,7 @@ where
                     return self.next();
                 }
 
-                let (key, encoded_value) = node.entry(entry_idx);
+                let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
