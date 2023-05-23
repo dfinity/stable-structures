@@ -1,7 +1,39 @@
 //! V2 of a B-Tree node.
 //!
-//! The node is stored in stable memory with the following layout:
+//! V2 evolves of V1 to make the insert and remove operations of a BTreeMap more efficient.
+//! The primary difference in V2 is that entries in a node are not necessarily written in
+//! sorted order. Entries can be written in the node in any order, and an "order array" is
+//! introduced that stores the entry indices in sorted order.
 //!
+//! Not requiring entries to be written in sorted means that touching all the entries isn't
+//! needed in the case of shifting. For example, consider a node that has the following keys:
+//!
+//! ```text
+//! A - B - D - E - F - G`
+//! ```
+//!
+//! Let's say we want to insert the key `C`. The node will then look like the following:
+//!
+//! ```text
+//! A - B - C - D - E - F - G`
+//! ```
+//!
+//! Notice that all entries from `C` onwards have shifted, and in V1 we'd have to reload and
+//! rewrite keys `D` to `F`. In V2, these keys would be left completely untouched. Only the
+//! order array would need to be updated.
+//!
+//! ## Compatibility
+//!
+//! V2 is _mostly_ backward compatible with V1, and the transition from V1 to V2 happens
+//! automatically and invisibly. The only exception where the upgrade doesn't happen is a node
+//! keys that are larger than `u16::MAX` in size.
+//!
+//! The reason for this limitation is that, to free up space for the order array, the maximum
+//! allowed key size in V2 is `u16` rather than `u32`.
+//!
+//! ## Memory Layout
+//!
+//! The node is stored in stable memory with the following layout:
 //!
 //! ```text
 //! --------------------------------------------------------------- <- Address 0
@@ -54,9 +86,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut keys = Vec::with_capacity(header.num_entries as usize);
         let mut buf = Vec::with_capacity(max_key_size as usize);
         let entry_size = (max_key_size + 2 + max_value_size + 4) as u64;
-        for i in 0..header.num_entries as usize {
-            let idx = order_array[i];
-            let mut offset = ENTRIES_OFFSET + Bytes::new(idx as u64 * entry_size);
+        for idx in order_array.iter().take(header.num_entries as usize) {
+            let mut offset = ENTRIES_OFFSET + Bytes::new(*idx as u64 * entry_size);
 
             // Read the key's size.
             let key_size = read_u16(memory, address + offset);
