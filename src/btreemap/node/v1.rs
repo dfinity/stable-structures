@@ -12,7 +12,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut keys = Vec::with_capacity(header.num_entries as usize);
         let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
-        let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
+        let mut buf = Vec::with_capacity(max_key_size as usize);
         for i in 0..header.num_entries {
             // Read the key's size.
             let key_size = read_u32(memory, address + offset);

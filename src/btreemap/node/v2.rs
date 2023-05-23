@@ -51,7 +51,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .map(|i| Value::ByRef(order_array[i]))
             .collect();
         let mut keys = Vec::with_capacity(header.num_entries as usize);
-        let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
+        let mut buf = Vec::with_capacity(max_key_size as usize);
         let entry_size = (max_key_size + 2 + max_value_size + 4) as u64;
         for i in 0..header.num_entries as usize {
             let idx = order_array[i];
