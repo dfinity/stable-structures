@@ -1,5 +1,7 @@
 //! V2 of a B-Tree node.
 //!
+//! ## Overview
+//!
 //! V2 evolves V1 to make the insert and remove operations of a BTreeMap more efficient.
 //! The difference in V2 is that entries in a node are not necessarily written in sorted order.
 //! Entries can be written in the node in any order, and an "order array" is introduced that stores
