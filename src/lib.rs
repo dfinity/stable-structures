@@ -57,7 +57,7 @@ pub trait Memory {
     fn write(&self, offset: u64, src: &[u8]);
 }
 
-// A helper function that reads a single 32bit integer encoded as
+// A helper function that reads a single 16bit integer encoded as
 // little-endian from the specified memory at the specified offset.
 fn read_u16<M: Memory>(m: &M, addr: Address) -> u16 {
     let mut buf: [u8; 2] = [0; 2];
