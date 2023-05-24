@@ -62,6 +62,7 @@
 //! ```
 
 use super::*;
+use crate::btreemap::node::v1::entry_size_v1;
 
 // header + order array size + extra bytes
 const ENTRIES_OFFSET: Bytes = Bytes::new(7 + 2 * CAPACITY as u64);
@@ -79,7 +80,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // NOTE: Loading it as an array is faster than loading it as a vec.
         let order_array: [u8; CAPACITY] = read_struct(address + ORDER_ARRAY_OFFSET, memory);
 
-        // Store references to the values.
+        // Values are loaded lazily. Load references to each one.
         let encoded_values: Vec<_> = (0..header.num_entries as usize)
             .map(|i| Value::ByRef(order_array[i]))
             .collect();
@@ -87,9 +88,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the keys.
         let mut keys = Vec::with_capacity(header.num_entries as usize);
         let mut buf = Vec::with_capacity(max_key_size as usize);
-        let entry_size = (max_key_size + 2 + max_value_size + 4) as u64;
+        let entry_size = entry_size_v2(max_key_size, max_value_size);
         for idx in order_array.iter().take(header.num_entries as usize) {
-            let mut offset = ENTRIES_OFFSET + Bytes::new(*idx as u64 * entry_size);
+            let mut offset = ENTRIES_OFFSET + Bytes::from(*idx) * entry_size;
 
             // Read the key's size.
             let key_size = read_u16(memory, address + offset);
@@ -106,7 +107,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut children = vec![];
         if header.node_type == INTERNAL_NODE_TYPE {
             let children_address =
-                address + ENTRIES_OFFSET + Bytes::new(entry_size) * (CAPACITY as u64);
+                address + ENTRIES_OFFSET + entry_size * Bytes::from(CAPACITY as u64);
             let mut offset = Bytes::new(0);
 
             // The number of children is equal to the number of entries + 1.
@@ -254,10 +255,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     pub(super) fn value_offset_v2(&self, idx: u8) -> Bytes {
         ENTRIES_OFFSET
-            + Bytes::new(
-                (idx as u32 * (self.max_key_size + 2 + self.max_value_size + 4)
-                    + (2 + self.max_key_size)) as u64,
-            )
+            + entry_size_v2(self.max_key_size, self.max_value_size) * Bytes::from(idx)
+            + key_size_v2(self.max_key_size)
     }
 
     fn get_entry_offset(
@@ -268,13 +267,26 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) -> Bytes {
         match version {
             Version::V1 => {
-                NodeHeader::size()
-                    + Bytes::from(idx) * Bytes::from(max_key_size + 4 + max_value_size + 4)
+                NodeHeader::size() + Bytes::from(idx) * entry_size_v1(max_key_size, max_value_size)
             }
             Version::V2 => {
-                ENTRIES_OFFSET
-                    + Bytes::from(idx) * Bytes::from(max_key_size + 2 + max_value_size + 4)
+                ENTRIES_OFFSET + Bytes::from(idx) * entry_size_v2(max_key_size, max_value_size)
             }
         }
     }
+}
+
+// The number of bytes needed to store an entry in the node with the V2 layout.
+fn entry_size_v2(max_key_size: u32, max_value_size: u32) -> Bytes {
+    key_size_v2(max_key_size) + value_size_v2(max_value_size)
+}
+
+// The number of bytes needed to store a key in the node.
+fn key_size_v2(max_key_size: u32) -> Bytes {
+    U16_SIZE + Bytes::from(max_key_size)
+}
+
+// The number of bytes needed to store a value in the node.
+fn value_size_v2(max_value_size: u32) -> Bytes {
+    U32_SIZE + Bytes::from(max_value_size)
 }

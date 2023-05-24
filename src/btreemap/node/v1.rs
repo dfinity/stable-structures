@@ -114,9 +114,22 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     pub(super) fn value_offset_v1(&self, idx: u8) -> Bytes {
         NodeHeader::size()
-            + Bytes::new(
-                (idx as u32 * (self.max_key_size + 4 + self.max_value_size + 4)
-                    + (4 + self.max_key_size)) as u64,
-            )
+            + Bytes::from(idx) * entry_size_v1(self.max_key_size, self.max_value_size)
+            + value_size_v1(self.max_value_size)
     }
+}
+
+// The number of bytes needed to store an entry in the node with the V1 layout.
+pub(super) fn entry_size_v1(max_key_size: u32, max_value_size: u32) -> Bytes {
+    key_size_v1(max_key_size) + value_size_v1(max_value_size)
+}
+
+// The number of bytes needed to store a key in the node.
+fn key_size_v1(max_key_size: u32) -> Bytes {
+    U32_SIZE + Bytes::from(max_key_size)
+}
+
+// The number of bytes needed to store a value in the node.
+fn value_size_v1(max_value_size: u32) -> Bytes {
+    U32_SIZE + Bytes::from(max_value_size)
 }
