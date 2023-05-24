@@ -2551,8 +2551,10 @@ mod test {
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
 
         use std::io::prelude::*;
-        let mut file =
-            std::fs::File::create(format!("dumps/btreemap_v{LAYOUT_VERSION}_packed_headers.dump")).unwrap();
+        let mut file = std::fs::File::create(format!(
+            "dumps/btreemap_v{LAYOUT_VERSION}_packed_headers.dump"
+        ))
+        .unwrap();
         file.write_all(&mem.borrow()).unwrap();
     }
 
