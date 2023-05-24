@@ -1,6 +1,7 @@
 use core::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 pub const NULL: Address = Address(0);
+const ADDRESS_SIZE: u64 = 8;
 
 #[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq)]
@@ -13,13 +14,12 @@ impl From<u64> for Address {
 }
 
 impl Address {
-    pub fn get(&self) -> u64 {
+    pub const fn get(&self) -> u64 {
         self.0
     }
 
-    pub fn size() -> Bytes {
-        assert_eq!(core::mem::size_of::<Address>(), 8);
-        Bytes::from(8u64)
+    pub const fn size() -> Bytes {
+        Bytes::new(ADDRESS_SIZE)
     }
 }
 
@@ -115,4 +115,9 @@ impl Bytes {
     pub const fn get(&self) -> u64 {
         self.0
     }
+}
+
+#[test]
+fn address_size_is_correct() {
+    assert_eq!(core::mem::size_of::<Address>() as u64, ADDRESS_SIZE);
 }

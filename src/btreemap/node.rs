@@ -5,7 +5,7 @@ use crate::{
     write, write_struct, write_u16, write_u32, Memory,
 };
 use std::borrow::{Borrow, Cow};
-use std::cell::{Ref, RefCell, Cell};
+use std::cell::{Cell, Ref, RefCell};
 
 #[cfg(test)]
 mod tests;
@@ -42,17 +42,9 @@ pub enum Version {
 
 /// A node of a B-Tree.
 ///
-/// The node is stored in stable memory with the following layout:
-///
-///    |  NodeHeader  |  Entries (keys and values) |  Children  |
-///
-/// Each node contains up to `CAPACITY` entries, each entry contains:
-///     - size of key (4 bytes)
-///     - key (`max_key_size` bytes)
-///     - size of value (4 bytes)
-///     - value (`max_value_size` bytes)
-///
-/// Each node can contain up to `CAPACITY + 1` children, each child is 8 bytes.
+/// Depending on the layout version, the node can be represented differently in stable memory.
+/// The default layout version is V2. You can read more about the different layouts in `v1.rs`
+/// and `v2.rs`.
 #[derive(Debug)]
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
@@ -223,7 +215,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             if let Value::ByRef(offset) = values[idx] {
                 // Value isn't loaded yet.
-                let value_address = self.address + self.value_offset(offset);
+                let value_address = self.value_address(offset);
                 let value_len = read_u32(memory, value_address) as usize;
                 let mut value = vec![0; value_len];
                 memory.read((value_address + U32_SIZE).get(), &mut value);
@@ -243,11 +235,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         })
     }
 
-    fn value_offset(&self, idx: u8) -> Bytes {
-        match self.version.get() {
-            Version::V1 => self.value_offset_v1(idx),
-            Version::V2 => self.value_offset_v2(idx),
-        }
+    // Returns the address of the value at the given index.
+    fn value_address(&self, idx: u8) -> Address {
+        self.address
+            + match self.version.get() {
+                Version::V1 => self.value_offset_v1(idx),
+                Version::V2 => self.value_offset_v2(idx),
+            }
     }
 
     /// Returns a reference to the key at the specified index.
@@ -421,16 +415,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///
     /// See the documentation of [`Node`] for the memory layout.
     pub fn size(max_key_size: u32, max_value_size: u32) -> Bytes {
-        let max_key_size = Bytes::from(max_key_size);
-        let max_value_size = Bytes::from(max_value_size);
-
-        let node_header_size = NodeHeader::size();
-        let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
-        let child_size = Address::size();
-
-        node_header_size
-            + Bytes::from(CAPACITY as u64) * entry_size
-            + Bytes::from((CAPACITY + 1) as u64) * child_size
+        // The size of both layouts are the same.
+        let size = Self::size_v2(max_key_size, max_value_size);
+        debug_assert_eq!(size, Self::size_v1(max_key_size, max_value_size));
+        size
     }
 
     /// Returns true if the node is at the minimum required size, false otherwise.
@@ -502,5 +490,8 @@ fn get_version_to_use(max_key_size: u32) -> Version {
 
 #[test]
 fn node_header_size_is_correct() {
-    assert_eq!(core::mem::size_of::<NodeHeader>(), NODE_HEADER_SIZE.get() as usize);
+    assert_eq!(
+        core::mem::size_of::<NodeHeader>(),
+        NODE_HEADER_SIZE.get() as usize
+    );
 }

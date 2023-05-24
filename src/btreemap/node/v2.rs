@@ -78,6 +78,8 @@ const ENTRIES_OFFSET_U64: u64 = ORDER_ARRAY_OFFSET_U64 + ORDER_ARRAY_SIZE_U64;
 const ORDER_ARRAY_OFFSET: Bytes = Bytes::new(ORDER_ARRAY_OFFSET_U64);
 const ENTRIES_OFFSET: Bytes = Bytes::new(ENTRIES_OFFSET_U64);
 
+const CHILD_SIZE: Bytes = Address::size();
+
 impl<K: Storable + Ord + Clone> Node<K> {
     pub(super) fn load_v2<M: Memory>(
         address: Address,
@@ -283,6 +285,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 ENTRIES_OFFSET + Bytes::from(idx) * entry_size_v2(max_key_size, max_value_size)
             }
         }
+    }
+
+    /// Returns the size of a node in bytes.
+    pub(super) fn size_v2(max_key_size: u32, max_value_size: u32) -> Bytes {
+        ENTRIES_OFFSET
+            + Bytes::from(CAPACITY as u64) * entry_size_v2(max_key_size, max_value_size)
+            + Bytes::from(CAPACITY as u64 + 1) * CHILD_SIZE
     }
 }
 

@@ -1,3 +1,30 @@
+//! V1 of a B-Tree node.
+//!
+//! ## Memory Layout
+//!
+//! The node is stored in stable memory with the following layout:
+//!
+//! ```text
+//! --------------------------------------------------------------- <- Address 0
+//! NodeHeader                            ↕ 7 bytes
+//! --------------------------------------------------------------- <- Entries
+//! Key 1's size (u32)                    ↕ 4 bytes
+//! ---------------------------------------------------------------
+//! Key 1's serialized bytes              ↕ `Key::MAX_SIZE bytes`
+//! ---------------------------------------------------------------
+//! Value 1's size (u32)                  ↕ 4 bytes
+//! ---------------------------------------------------------------
+//! Value 1's serialized bytes            ↕ `Value::MAX_SIZE bytes`
+//! ---------------------------------------------------------------
+//! ... (more entries - up to `CAPACITY` entries)
+//! --------------------------------------------------------------- <- Children
+//! Child 1's address                     ↕ 8 bytes
+//! ---------------------------------------------------------------
+//! Child 2's address                     ↕ 8 bytes
+//! ---------------------------------------------------------------
+//! ... (more children - up to `CAPACITY + 1` children)
+//! ---------------------------------------------------------------
+//! ```
 use super::*;
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -116,6 +143,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
         NodeHeader::size()
             + Bytes::from(idx) * entry_size_v1(self.max_key_size, self.max_value_size)
             + value_size_v1(self.max_value_size)
+    }
+
+    /// Returns the size of a node in bytes.
+    pub(super) fn size_v1(max_key_size: u32, max_value_size: u32) -> Bytes {
+        let max_key_size = Bytes::from(max_key_size);
+        let max_value_size = Bytes::from(max_value_size);
+
+        let node_header_size = NodeHeader::size();
+        let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
+        let child_size = Address::size();
+
+        node_header_size
+            + Bytes::from(CAPACITY as u64) * entry_size
+            + Bytes::from((CAPACITY + 1) as u64) * child_size
     }
 }
 

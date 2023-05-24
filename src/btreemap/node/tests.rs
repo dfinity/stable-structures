@@ -35,7 +35,7 @@ fn can_upgrade_v1_into_v2() {
         node.save_v1(&mem);
 
         // Loading the node using the v1 layout should preserve the entries.
-        let mut node = Node::<Vec<u8>>::load(address, &mem, 10, 10);
+        let node = Node::<Vec<u8>>::load(address, &mem, 10, 10);
         assert_eq!(node.entries(&mem), entries);
         assert_eq!(node.version, Version::V1.into());
 
