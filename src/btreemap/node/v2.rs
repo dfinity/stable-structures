@@ -6,27 +6,27 @@
 //! the ordering separately.
 //!
 //! Not requiring entries to be written in sorted order leads to significant performance gains.
-//! Consider a node that has the following keys:
+//! Consider a node that has the following entries:
 //!
 //! ```text
-//! A - B - D - E - F - G`
+//! A - B - D - E - F - G
 //! ```
 //!
-//! Let's say we want to insert the key `C`. The node will then be:
+//! Let's say we want to insert the entry `C`. The node will then be:
 //!
 //! ```text
-//! A - B - C - D - E - F - G`
+//! A - B - C - D - E - F - G
 //! ```
 //!
 //! Notice that all entries from `D` onwards have shifted, and in V1 we'd have to load and rewrite
-//! keys `D` to `F`. In V2, these keys would be left untouched. Only the order array would need to
-//! be updated.
+//! entries `D` to `F`. In V2, these entries would be left untouched. Only the order array would
+//! need to be updated.
 //!
 //! ## Compatibility
 //!
 //! V2 is _mostly_ backward compatible with V1, and the transition from V1 to V2 happens
-//! automatically and invisibly. The only exception where the upgrade doesn't happen is if a node
-//! has keys that are larger than `u16::MAX` in size.
+//! automatically and invisibly. The only exception where the upgrade to V2 doesn't happen is if a
+//! node has keys that are larger than `u16::MAX` in size.
 //!
 //! The reason for this limitation is that, to free up space for the order array, the maximum
 //! allowed key size in V2 is `u16` rather than `u32`.
