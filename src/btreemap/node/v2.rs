@@ -76,13 +76,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_value_size: u32,
     ) -> Self {
         // Load the order array.
-        // NOTE: Loading it as an array is faster than loading a vec.
+        // NOTE: Loading it as an array is faster than loading it as a vec.
         let order_array: [u8; CAPACITY] = read_struct(address + ORDER_ARRAY_OFFSET, memory);
 
-        // Load the entries.
+        // Store references to the values.
         let encoded_values: Vec<_> = (0..header.num_entries as usize)
             .map(|i| Value::ByRef(order_array[i]))
             .collect();
+
+        // Load the keys.
         let mut keys = Vec::with_capacity(header.num_entries as usize);
         let mut buf = Vec::with_capacity(max_key_size as usize);
         let entry_size = (max_key_size + 2 + max_value_size + 4) as u64;
@@ -100,15 +102,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys.push(key);
         }
 
-        // Get the offset of the children. This line is a bit of a hack.
-        let children_address =
-            address + ENTRIES_OFFSET + Bytes::new(entry_size) * (CAPACITY as u64);
-
-        let mut offset = Bytes::new(0);
-
         // Load children if this is an internal node.
         let mut children = vec![];
         if header.node_type == INTERNAL_NODE_TYPE {
+            let children_address =
+                address + ENTRIES_OFFSET + Bytes::new(entry_size) * (CAPACITY as u64);
+            let mut offset = Bytes::new(0);
+
             // The number of children is equal to the number of entries + 1.
             for _ in 0..header.num_entries + 1 {
                 let child = Address::from(read_u64(memory, children_address + offset));
