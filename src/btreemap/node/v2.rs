@@ -142,7 +142,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             },
             max_key_size,
             max_value_size,
-            version: Version::V2,
+            version: Version::V2.into(),
         }
     }
 
@@ -150,11 +150,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///
     /// PRECONDITION:
     ///   * The node is at version 1 or 2.
-    pub(super) fn save_v2<M: Memory>(&mut self, memory: &M) {
+    pub(super) fn save_v2<M: Memory>(&self, memory: &M) {
         // Assert precondition.
-        debug_assert!(self.version == Version::V1 || self.version == Version::V2);
+        debug_assert!(self.version.get() == Version::V1 || self.version.get() == Version::V2);
 
-        if self.version == Version::V1 {
+        if self.version.get() == Version::V1 {
             // Migrate to the new layout. Eagerly load all the values.
             for idx in 0..self.entries_len() {
                 self.value(idx, memory);
@@ -211,7 +211,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 CAPACITY as u8,
                 self.max_key_size,
                 self.max_value_size,
-                self.version,
+                self.version.get(),
             );
         let mut offset = Bytes::new(0);
 
@@ -226,8 +226,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let order_array: [u8; CAPACITY] = order_array.try_into().unwrap();
         write_struct(&order_array, self.address + ORDER_ARRAY_OFFSET, memory);
 
-        // Update the version (is this necessary?)
-        self.version = Version::V2;
+        // In case the node has been migrated from V1, update its version to V2.
+        self.version.set(Version::V2);
 
         let header = NodeHeader {
             magic: *MAGIC,

@@ -55,11 +55,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
             },
             max_key_size,
             max_value_size,
-            version: Version::V1,
+            version: Version::V1.into(),
         }
     }
 
-    pub(super) fn save_v1<M: Memory>(&mut self, memory: &M) {
+    pub(super) fn save_v1<M: Memory>(&self, memory: &M) {
         let header = NodeHeader {
             magic: *MAGIC,
             version: LAYOUT_VERSION_1,

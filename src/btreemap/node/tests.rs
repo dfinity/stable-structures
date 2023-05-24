@@ -37,13 +37,13 @@ fn can_upgrade_v1_into_v2() {
         // Loading the node using the v1 layout should preserve the entries.
         let mut node = Node::<Vec<u8>>::load(address, &mem, 10, 10);
         assert_eq!(node.entries(&mem), entries);
-        assert_eq!(node.version, Version::V1);
+        assert_eq!(node.version, Version::V1.into());
 
         // Saving the node with the v2 layout should also work and preserve the entries.
         node.save_v2(&mem);
         let node = Node::<Vec<u8>>::load(Address::from(0), &mem, 10, 10);
         assert_eq!(node.entries(&mem), entries);
-        assert_eq!(node.version, Version::V2);
+        assert_eq!(node.version, Version::V2.into());
     });
 }
 
@@ -54,12 +54,12 @@ fn keys_larger_than_u16_use_v1() {
     let address = Address::from(0);
     let mut node = Node::<Vec<u8>>::new(address, NodeType::Leaf, u16::MAX as u32 + 1, 0);
     node.insert_entry(0, (vec![], vec![]));
-    assert_eq!(node.version, Version::V1);
+    assert_eq!(node.version, Version::V1.into());
 
     // Save and reload. Version should still be V1.
     node.save(&mem);
     let node = Node::<Vec<u8>>::load(address, &mem, u16::MAX as u32 + 1, 0);
-    assert_eq!(node.version, Version::V1);
+    assert_eq!(node.version, Version::V1.into());
 }
 
 // Verifies that, if the key is <= u16::MAX, V2 layout is used.
@@ -69,10 +69,10 @@ fn keys_within_u16_use_v2() {
     let address = Address::from(0);
     let mut node = Node::<Vec<u8>>::new(address, NodeType::Leaf, u16::MAX as u32, 0);
     node.insert_entry(0, (vec![], vec![]));
-    assert_eq!(node.version, Version::V2);
+    assert_eq!(node.version, Version::V2.into());
 
     // Save and reload. Version should still be V1.
     node.save(&mem);
     let node = Node::<Vec<u8>>::load(address, &mem, u16::MAX as u32, 0);
-    assert_eq!(node.version, Version::V2);
+    assert_eq!(node.version, Version::V2.into());
 }

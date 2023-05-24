@@ -5,7 +5,7 @@ use crate::{
     write, write_struct, write_u16, write_u32, Memory,
 };
 use std::borrow::{Borrow, Cow};
-use std::cell::{Ref, RefCell};
+use std::cell::{Ref, RefCell, Cell};
 
 #[cfg(test)]
 mod tests;
@@ -67,7 +67,9 @@ pub struct Node<K: Storable + Ord + Clone> {
     max_key_size: u32,
     max_value_size: u32,
 
-    version: Version,
+    // The node's layout version. Stored in a cell to allow bumping the version without
+    // requiring exterior mutability.
+    version: Cell<Version>,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -86,7 +88,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             node_type,
             max_key_size,
             max_value_size,
-            version: get_version_to_use(max_key_size),
+            version: get_version_to_use(max_key_size).into(),
         }
     }
 
@@ -113,7 +115,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Saves the node to memory.
-    pub fn save<M: Memory>(&mut self, memory: &M) {
+    pub fn save<M: Memory>(&self, memory: &M) {
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());
@@ -242,7 +244,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     fn value_offset(&self, idx: u8) -> Bytes {
-        match self.version {
+        match self.version.get() {
             Version::V1 => self.value_offset_v1(idx),
             Version::V2 => self.value_offset_v2(idx),
         }
