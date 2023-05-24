@@ -45,7 +45,6 @@ impl AddAssign<Bytes> for Address {
     }
 }
 
-#[repr(C, packed)]
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct Bytes(u64);
 
