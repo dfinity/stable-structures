@@ -1,4 +1,7 @@
-use crate::btreemap::{node::{CAPACITY, Version}, Node, NodeType};
+use crate::btreemap::{
+    node::{Version, CAPACITY},
+    Node, NodeType,
+};
 use crate::types::Address;
 use proptest::collection::btree_set as pset;
 use proptest::collection::vec as pvec;
@@ -42,4 +45,34 @@ fn can_upgrade_v1_into_v2() {
         assert_eq!(node.entries(&mem), entries);
         assert_eq!(node.version, Version::V2);
     });
+}
+
+// Verifies that, if the key is > u16::MAX, V1 layout is used.
+#[test]
+fn keys_larger_than_u16_use_v1() {
+    let mem = make_memory();
+    let address = Address::from(0);
+    let mut node = Node::<Vec<u8>>::new(address, NodeType::Leaf, u16::MAX as u32 + 1, 0);
+    node.insert_entry(0, (vec![], vec![]));
+    assert_eq!(node.version, Version::V1);
+
+    // Save and reload. Version should still be V1.
+    node.save(&mem);
+    let node = Node::<Vec<u8>>::load(address, &mem, u16::MAX as u32 + 1, 0);
+    assert_eq!(node.version, Version::V1);
+}
+
+// Verifies that, if the key is <= u16::MAX, V2 layout is used.
+#[test]
+fn keys_within_u16_use_v2() {
+    let mem = make_memory();
+    let address = Address::from(0);
+    let mut node = Node::<Vec<u8>>::new(address, NodeType::Leaf, u16::MAX as u32, 0);
+    node.insert_entry(0, (vec![], vec![]));
+    assert_eq!(node.version, Version::V2);
+
+    // Save and reload. Version should still be V1.
+    node.save(&mem);
+    let node = Node::<Vec<u8>>::load(address, &mem, u16::MAX as u32, 0);
+    assert_eq!(node.version, Version::V2);
 }

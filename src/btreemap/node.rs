@@ -86,7 +86,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             node_type,
             max_key_size,
             max_value_size,
-            version: Version::V2, // FIXME: should be v1 if key is too big.
+            version: get_version_to_use(max_key_size),
         }
     }
 
@@ -130,10 +130,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
 
         // When possible, nodes are migrated to version 2 as it's more performant.
-        if self.max_key_size > u16::MAX as u32 {
-            self.save_v1(memory);
-        } else {
-            self.save_v2(memory);
+        match get_version_to_use(self.max_key_size) {
+            Version::V1 => self.save_v1(memory),
+            Version::V2 => self.save_v2(memory),
         }
     }
 
@@ -488,4 +487,13 @@ enum Value {
 
     // The value's index in the node.
     ByRef(u8),
+}
+
+// Determines which node layout version to use.
+fn get_version_to_use(max_key_size: u32) -> Version {
+    if max_key_size > u16::MAX as u32 {
+        Version::V1
+    } else {
+        Version::V2
+    }
 }

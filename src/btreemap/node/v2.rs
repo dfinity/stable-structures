@@ -25,8 +25,8 @@
 //! ## Compatibility
 //!
 //! V2 is _mostly_ backward compatible with V1, and the transition from V1 to V2 happens
-//! automatically and invisibly. The only exception where the upgrade doesn't happen is a node
-//! keys that are larger than `u16::MAX` in size.
+//! automatically and invisibly. The only exception where the upgrade doesn't happen is if a node
+//! has keys that are larger than `u16::MAX` in size.
 //!
 //! The reason for this limitation is that, to free up space for the order array, the maximum
 //! allowed key size in V2 is `u16` rather than `u32`.
