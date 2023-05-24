@@ -112,7 +112,7 @@ impl Bytes {
         Self(val)
     }
 
-    pub fn get(&self) -> u64 {
+    pub const fn get(&self) -> u64 {
         self.0
     }
 }

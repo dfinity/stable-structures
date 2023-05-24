@@ -24,7 +24,7 @@ const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
 // The size of u32 in bytes.
 const U32_SIZE: Bytes = Bytes::new(4);
-const U16_SIZE: Bytes = Bytes::new(2);
+const NODE_HEADER_SIZE: Bytes = Bytes::new(7);
 
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum NodeType {
@@ -474,8 +474,8 @@ struct NodeHeader {
 }
 
 impl NodeHeader {
-    fn size() -> Bytes {
-        Bytes::from(core::mem::size_of::<Self>() as u64)
+    const fn size() -> Bytes {
+        NODE_HEADER_SIZE
     }
 }
 
@@ -496,4 +496,9 @@ fn get_version_to_use(max_key_size: u32) -> Version {
     } else {
         Version::V2
     }
+}
+
+#[test]
+fn node_header_size_is_correct() {
+    assert_eq!(core::mem::size_of::<NodeHeader>(), NODE_HEADER_SIZE.get() as usize);
 }

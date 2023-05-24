@@ -64,9 +64,19 @@
 use super::*;
 use crate::btreemap::node::v1::entry_size_v1;
 
-// header + order array size + extra bytes
-const ENTRIES_OFFSET: Bytes = Bytes::new(7 + 2 * CAPACITY as u64);
-const ORDER_ARRAY_OFFSET: Bytes = Bytes::new(7 + CAPACITY as u64);
+// The size of u16 in bytes.
+const U16_SIZE: Bytes = Bytes::new(2);
+
+const RESERVED_SPACE_OFFSET_U64: u64 = NodeHeader::size().get();
+const RESERVED_SPACE_SIZE_U64: u64 = CAPACITY as u64;
+
+const ORDER_ARRAY_OFFSET_U64: u64 = RESERVED_SPACE_OFFSET_U64 + RESERVED_SPACE_SIZE_U64;
+const ORDER_ARRAY_SIZE_U64: u64 = CAPACITY as u64;
+
+const ENTRIES_OFFSET_U64: u64 = ORDER_ARRAY_OFFSET_U64 + ORDER_ARRAY_SIZE_U64;
+
+const ORDER_ARRAY_OFFSET: Bytes = Bytes::new(ORDER_ARRAY_OFFSET_U64);
+const ENTRIES_OFFSET: Bytes = Bytes::new(ENTRIES_OFFSET_U64);
 
 impl<K: Storable + Ord + Clone> Node<K> {
     pub(super) fn load_v2<M: Memory>(
