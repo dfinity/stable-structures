@@ -1,26 +1,26 @@
 //! V2 of a B-Tree node.
 //!
-//! V2 evolves of V1 to make the insert and remove operations of a BTreeMap more efficient.
-//! The primary difference in V2 is that entries in a node are not necessarily written in
-//! sorted order. Entries can be written in the node in any order, and an "order array" is
-//! introduced that stores the entry indices in sorted order.
+//! V2 evolves V1 to make the insert and remove operations of a BTreeMap more efficient.
+//! The difference in V2 is that entries in a node are not necessarily written in sorted order.
+//! Entries can be written in the node in any order, and an "order array" is introduced that stores
+//! the ordering separately.
 //!
-//! Not requiring entries to be written in sorted means that touching all the entries isn't
-//! needed in the case of shifting. For example, consider a node that has the following keys:
+//! Not requiring entries to be written in sorted order leads to significant performance gains.
+//! Consider a node that has the following keys:
 //!
 //! ```text
 //! A - B - D - E - F - G`
 //! ```
 //!
-//! Let's say we want to insert the key `C`. The node will then look like the following:
+//! Let's say we want to insert the key `C`. The node will then be:
 //!
 //! ```text
 //! A - B - C - D - E - F - G`
 //! ```
 //!
-//! Notice that all entries from `C` onwards have shifted, and in V1 we'd have to reload and
-//! rewrite keys `D` to `F`. In V2, these keys would be left completely untouched. Only the
-//! order array would need to be updated.
+//! Notice that all entries from `D` onwards have shifted, and in V1 we'd have to load and rewrite
+//! keys `D` to `F`. In V2, these keys would be left untouched. Only the order array would need to
+//! be updated.
 //!
 //! ## Compatibility
 //!
