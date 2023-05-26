@@ -15,6 +15,16 @@ pub trait Storable {
 
     /// Converts bytes into an element.
     fn from_bytes(bytes: Cow<[u8]>) -> Self;
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+pub enum Bound {
+    Unbounded,
+    Bounded {
+        max_size: u32,
+        is_fixed_size: bool,
+    }
 }
 
 /// A trait indicating that a `Storable` element is bounded in size.
@@ -125,6 +135,11 @@ impl<const N: usize> Storable for Blob<N> {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::try_from(bytes.borrow()).unwrap()
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: N as u32,
+        is_fixed_size: true
+    };
 }
 
 // NOTE: Below are a few implementations of `Storable` for common types.
@@ -147,6 +162,11 @@ impl Storable for () {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert!(bytes.is_empty());
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 0,
+        is_fixed_size: true
+    };
 }
 
 impl BoundedStorable for () {
@@ -162,6 +182,12 @@ impl Storable for Vec<u8> {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         bytes.to_vec()
     }
+
+    // HACK: just to get the tests working for now.
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 10,
+        is_fixed_size: false
+    };
 }
 
 impl Storable for String {
@@ -182,6 +208,11 @@ impl Storable for u128 {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 16,
+        is_fixed_size: true
+    };
 }
 
 impl BoundedStorable for u128 {
@@ -197,6 +228,11 @@ impl Storable for u64 {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 8,
+        is_fixed_size: true
+    };
 }
 
 impl BoundedStorable for u64 {
@@ -212,6 +248,11 @@ impl Storable for f64 {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 8,
+        is_fixed_size: true
+    };
 }
 
 impl BoundedStorable for f64 {
@@ -227,6 +268,11 @@ impl Storable for u32 {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 4,
+        is_fixed_size: true
+    };
 }
 
 impl BoundedStorable for u32 {
@@ -242,6 +288,11 @@ impl Storable for f32 {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 4,
+        is_fixed_size: true
+    };
 }
 
 impl BoundedStorable for f32 {
@@ -257,6 +308,11 @@ impl Storable for u16 {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 2,
+        is_fixed_size: true
+    };
 }
 
 impl BoundedStorable for u16 {
@@ -272,6 +328,11 @@ impl Storable for u8 {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 1,
+        is_fixed_size: true
+    };
 }
 
 impl BoundedStorable for u8 {

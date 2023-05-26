@@ -28,8 +28,9 @@ mod allocator;
 mod iter;
 mod node;
 use crate::{
+    storable::Bound as StorableBound,
     types::{Address, NULL},
-    BoundedStorable, Memory,
+    BoundedStorable, Memory, Storable,
 };
 use allocator::Allocator;
 pub use iter::Iter;
@@ -56,7 +57,7 @@ const ALLOCATOR_OFFSET: usize = 52;
 pub struct BTreeMap<K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    V: Storable,
     M: Memory,
 {
     // The address of the root node. If a root node doesn't exist, the address
@@ -93,7 +94,7 @@ struct BTreeHeaderV1 {
 impl<K, V, M> BTreeMap<K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    V: Storable,
     M: Memory,
 {
     /// Initializes a `BTreeMap`.
@@ -130,15 +131,21 @@ where
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
+        let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
+            max_size
+        } else {
+            panic!("value must have max size");
+        };
+
         let btree = Self {
             root_addr: NULL,
             allocator: Allocator::new(
                 memory,
                 Address::from(ALLOCATOR_OFFSET as u64),
-                Node::<K>::size(K::MAX_SIZE, V::MAX_SIZE),
+                Node::<K>::size(K::MAX_SIZE, max_value_size),
             ),
             max_key_size: K::MAX_SIZE,
-            max_value_size: V::MAX_SIZE,
+            max_value_size,
             length: 0,
             _phantom: PhantomData,
         };
@@ -160,8 +167,13 @@ where
             "max_key_size must be <= {expected_key_size}"
         );
         let expected_value_size = header.max_value_size;
+        let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
+            max_size
+        } else {
+            panic!("value must have max size");
+        };
         assert!(
-            V::MAX_SIZE <= expected_value_size,
+            max_value_size <= expected_value_size,
             "max_value_size must be <= {expected_value_size}"
         );
 
@@ -170,7 +182,7 @@ where
             root_addr: header.root_addr,
             allocator: Allocator::load(memory, allocator_addr),
             max_key_size: K::MAX_SIZE,
-            max_value_size: V::MAX_SIZE,
+            max_value_size,
             length: header.length,
             _phantom: PhantomData,
         }
@@ -2527,13 +2539,13 @@ mod test {
             fn from_bytes(_: Cow<[u8]>) -> Self {
                 unimplemented!();
             }
-        }
 
-        impl crate::BoundedStorable for V {
             // A buggy implementation where the MAX_SIZE is smaller than what Storable::to_bytes()
             // returns.
-            const MAX_SIZE: u32 = 0;
-            const IS_FIXED_SIZE: bool = false;
+            const BOUND: StorableBound = StorableBound::Bounded {
+                max_size: 0,
+                is_fixed_size: false,
+            };
         }
 
         let mut btree: BTreeMap<(), V, _> = BTreeMap::init(make_memory());

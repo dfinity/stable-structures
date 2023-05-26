@@ -2,7 +2,7 @@ use super::{
     node::{Node, NodeType},
     BTreeMap,
 };
-use crate::{types::NULL, Address, BoundedStorable, Memory};
+use crate::{types::NULL, Address, BoundedStorable, Memory, Storable};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
@@ -23,7 +23,7 @@ pub(crate) enum Index {
 pub struct Iter<'a, K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    V: Storable,
     M: Memory,
 {
     // A reference to the map being iterated on.
@@ -39,7 +39,7 @@ where
 impl<'a, K, V, M> Iter<'a, K, V, M>
 where
     K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    V: Storable,
     M: Memory,
 {
     pub(crate) fn new(map: &'a BTreeMap<K, V, M>) -> Self {
