@@ -1,6 +1,6 @@
 use crate::{
     btreemap::Allocator,
-    read_struct, read_u32, read_u64,
+    read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
     write, write_struct, write_u32, Memory,
@@ -20,6 +20,11 @@ const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
 // The size of u32 in bytes.
 const U32_SIZE: Bytes = Bytes::new(4);
+
+const META_DATA_OFFSET: Bytes = Bytes::new(4);
+
+const ENTRIES_OFFSET_V1: Bytes = Bytes::new(7);
+const ENTRIES_OFFSET_V2: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
 
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum NodeType {
@@ -65,6 +70,8 @@ pub struct Node<K: Storable + Ord + Clone> {
     children: Vec<Address>,
     node_type: NodeType,
     version: Version,
+
+    overflow: Option<Address>,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -77,34 +84,63 @@ impl<K: Storable + Ord + Clone> Node<K> {
             children: vec![],
             node_type,
             version,
+            overflow: None,
         }
     }
 
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, memory: &M, version: Version) -> Self {
-        // Load the header.
-        let header: NodeHeader = read_struct(address, memory);
-        assert_eq!(&header.magic, MAGIC, "Bad magic.");
+        // Read the first four bytes to validate the magic and identify the version.
+        let mut buf = [0; 4];
+        memory.read(address.get(), &mut buf);
 
-        let (max_key_size, max_value_size) = match version {
+        assert_eq!(&buf[0..3], MAGIC, "Bad magic.");
+
+        match version {
             Version::V1 {
                 max_key_size,
                 max_value_size,
-            } => (max_key_size, max_value_size),
-            Version::V2 { page_size } => {
-                return Self::load_v2(address, header, page_size, memory);
+            } => {
+                assert_eq!(buf[3], LAYOUT_VERSION, "Unsupported version.");
+                Self::load_v1(address, memory, max_key_size, max_value_size)
             }
+            Version::V2 { page_size } => {
+                assert_eq!(buf[3], LAYOUT_VERSION_2, "Unsupported version.");
+                Self::load_v2(address, page_size, memory)
+            }
+        }
+    }
+
+    // Loads a node from memory at the given address.
+    fn load_v1<M: Memory>(
+        address: Address,
+        memory: &M,
+        max_key_size: u32,
+        max_value_size: u32,
+    ) -> Self {
+        // Load the metadata.
+        let mut offset = META_DATA_OFFSET;
+        let mut buf = vec![0];
+        memory.read((address + offset).get(), &mut buf);
+        let node_type = match buf[0] {
+            LEAF_NODE_TYPE => NodeType::Leaf,
+            INTERNAL_NODE_TYPE => NodeType::Internal,
+            other => unreachable!("Unknown node type {}", other),
         };
 
-        // TODO: refactor this into load_v1
-        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
+        offset += Bytes::new(1);
+
+        // TODO: add read u16?
+        buf.resize(2, 0);
+        memory.read((address + offset).get(), &mut buf);
+        let num_entries = u16::from_le_bytes(buf.try_into().unwrap()) as usize;
 
         // Load the entries.
-        let mut keys = Vec::with_capacity(header.num_entries as usize);
-        let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
-        let mut offset = NodeHeader::size();
+        let mut keys = Vec::with_capacity(num_entries);
+        let mut encoded_values = Vec::with_capacity(num_entries);
+        let mut offset = ENTRIES_OFFSET_V1;
         let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
-        for _ in 0..header.num_entries {
+        for _ in 0..num_entries {
             // Read the key's size.
             let key_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
@@ -123,9 +159,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load children if this is an internal node.
         let mut children = vec![];
-        if header.node_type == INTERNAL_NODE_TYPE {
+        if node_type == NodeType::Internal {
             // The number of children is equal to the number of entries + 1.
-            for _ in 0..header.num_entries + 1 {
+            for _ in 0..num_entries + 1 {
                 let child = Address::from(read_u64(memory, address + offset));
                 offset += Address::size();
                 children.push(child);
@@ -139,34 +175,40 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys,
             encoded_values: RefCell::new(encoded_values),
             children,
-            node_type: match header.node_type {
-                LEAF_NODE_TYPE => NodeType::Leaf,
-                INTERNAL_NODE_TYPE => NodeType::Internal,
-                other => unreachable!("Unknown node type {}", other),
-            },
+            node_type,
             version: Version::V1 {
                 max_key_size,
                 max_value_size,
             },
+            overflow: None,
         }
     }
 
     // Loads a node from memory at the given address.
-    fn load_v2<M: Memory>(
-        address: Address,
-        header: NodeHeader,
-        page_size: u32,
-        memory: &M,
-    ) -> Self {
-        // FIXME: Do not assume that the entire node is in one page.
-        assert_eq!(header.version, LAYOUT_VERSION_2);
+    fn load_v2<M: Memory>(address: Address, page_size: u32, memory: &M) -> Self {
+        // FIXME: Do not assume that the en// Load the metadata.
+
+        // Load the metadata.
+        let mut offset = META_DATA_OFFSET;
+        let mut buf = vec![0];
+        memory.read((address + offset).get(), &mut buf);
+        let node_type = match buf[0] {
+            LEAF_NODE_TYPE => NodeType::Leaf,
+            INTERNAL_NODE_TYPE => NodeType::Internal,
+            other => unreachable!("Unknown node type {}", other),
+        };
+
+        offset += Bytes::new(1);
+        buf.resize(2, 0);
+        memory.read((address + offset).get(), &mut buf);
+        let num_entries = u16::from_le_bytes(buf.try_into().unwrap()) as usize;
 
         // Load the entries.
-        let mut keys = Vec::with_capacity(header.num_entries as usize);
-        let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
-        let mut offset = NodeHeader::size();
+        let mut keys = Vec::with_capacity(num_entries);
+        let mut encoded_values = Vec::with_capacity(num_entries);
+        let mut offset = ENTRIES_OFFSET_V2;
         let mut buf = vec![]; //Vec::with_capacity(max_key_size.max(max_value_size) as usize);
-        for _ in 0..header.num_entries {
+        for _ in 0..num_entries {
             // Read the key's size.
             let key_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
@@ -180,7 +222,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Load the values
-        for _ in 0..header.num_entries {
+        for _ in 0..num_entries {
             // Read the value's size.
             let value_size = read_u32(memory, address + offset);
 
@@ -192,9 +234,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load children if this is an internal node.
         let mut children = vec![];
-        if header.node_type == INTERNAL_NODE_TYPE {
+        if node_type == NodeType::Internal {
             // The number of children is equal to the number of entries + 1.
-            for _ in 0..header.num_entries + 1 {
+            for _ in 0..num_entries + 1 {
                 let child = Address::from(read_u64(memory, address + offset));
                 offset += Address::size();
                 children.push(child);
@@ -208,12 +250,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys,
             encoded_values: RefCell::new(encoded_values),
             children,
-            node_type: match header.node_type {
-                LEAF_NODE_TYPE => NodeType::Leaf,
-                INTERNAL_NODE_TYPE => NodeType::Internal,
-                other => unreachable!("Unknown node type {}", other),
-            },
+            node_type,
             version: Version::V2 { page_size },
+            overflow: None, // FIXME: load the overflow from the header.
         }
     }
 
@@ -248,9 +287,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         // TODO: refactor this into save_v1.
+
+        memory.write(self.address.get(), MAGIC);
+        memory.write((self.address + Bytes::new(3)).get(), &[LAYOUT_VERSION]);
         let header = NodeHeader {
-            magic: *MAGIC,
-            version: LAYOUT_VERSION,
             node_type: match self.node_type {
                 NodeType::Leaf => LEAF_NODE_TYPE,
                 NodeType::Internal => INTERNAL_NODE_TYPE,
@@ -258,9 +298,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
             num_entries: self.keys.len() as u16,
         };
 
-        write_struct(&header, self.address, memory);
+        // the u32 offset is to not overwrite the magic and version
+        write_struct(&header, self.address + U32_SIZE, memory);
 
-        let mut offset = NodeHeader::size();
+        let mut offset = ENTRIES_OFFSET_V1;
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
@@ -305,27 +346,18 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // A buffer to serialize the node into first, then write to memory.
         // TODO: Do not assume that data fits the page.
         let mut buf = vec![];
+        buf.extend_from_slice(MAGIC);
+        buf.extend_from_slice(&[LAYOUT_VERSION_2]);
+        buf.push(match self.node_type {
+            NodeType::Leaf => LEAF_NODE_TYPE,
+            NodeType::Internal => INTERNAL_NODE_TYPE,
+        });
+        buf.extend_from_slice(&(self.keys.len() as u16).to_le_bytes());
 
-        let header = NodeHeader {
-            magic: *MAGIC,
-            version: LAYOUT_VERSION_2,
-            node_type: match self.node_type {
-                NodeType::Leaf => LEAF_NODE_TYPE,
-                NodeType::Internal => INTERNAL_NODE_TYPE,
-            },
-            num_entries: self.keys.len() as u16,
-        };
+        // TODO: write the overflow pointer here.
+        buf.extend_from_slice(&[0; 8]);
 
         let memory = allocator.memory();
-
-        //write_struct(&header, self.address, memory);
-        let header_slice = unsafe {
-            core::slice::from_raw_parts(
-                &header as *const _ as *const u8,
-                core::mem::size_of::<NodeHeader>(),
-            )
-        };
-        buf.extend_from_slice(header_slice);
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
@@ -639,7 +671,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let max_key_size = Bytes::from(max_key_size);
         let max_value_size = Bytes::from(max_value_size);
 
-        let node_header_size = NodeHeader::size();
+        let node_header_size = ENTRIES_OFFSET_V1;
         let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
         let child_size = Address::size();
 
@@ -682,10 +714,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 }
 
 // A transient data structure for reading/writing metadata into/from stable memory.
+// TODO: delete this struct.
 #[repr(C, packed)]
 struct NodeHeader {
-    magic: [u8; 3],
-    version: u8,
     node_type: u8,
     num_entries: u16,
 }

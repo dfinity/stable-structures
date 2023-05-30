@@ -21,10 +21,7 @@ pub trait Storable {
 
 pub enum Bound {
     Unbounded,
-    Bounded {
-        max_size: u32,
-        is_fixed_size: bool,
-    }
+    Bounded { max_size: u32, is_fixed_size: bool },
 }
 
 /// A trait indicating that a `Storable` element is bounded in size.
@@ -138,7 +135,7 @@ impl<const N: usize> Storable for Blob<N> {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: N as u32,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
@@ -165,7 +162,7 @@ impl Storable for () {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 0,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
@@ -186,7 +183,7 @@ impl Storable for Vec<u8> {
     // HACK: just to get the tests working for now.
     const BOUND: Bound = Bound::Bounded {
         max_size: 10,
-        is_fixed_size: false
+        is_fixed_size: false,
     };
 }
 
@@ -211,7 +208,7 @@ impl Storable for u128 {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 16,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
@@ -231,7 +228,7 @@ impl Storable for u64 {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 8,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
@@ -251,7 +248,7 @@ impl Storable for f64 {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 8,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
@@ -271,7 +268,7 @@ impl Storable for u32 {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 4,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
@@ -291,7 +288,7 @@ impl Storable for f32 {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 4,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
@@ -311,7 +308,7 @@ impl Storable for u16 {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 2,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
@@ -331,7 +328,7 @@ impl Storable for u8 {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 1,
-        is_fixed_size: true
+        is_fixed_size: true,
     };
 }
 
