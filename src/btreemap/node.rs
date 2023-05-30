@@ -27,6 +27,14 @@ pub enum NodeType {
 
 pub type Entry<K> = (K, Vec<u8>);
 
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
+enum Version {
+    V1 {
+        max_key_size: u32,
+        max_value_size: u32,
+    },
+}
+
 /// A node of a B-Tree.
 ///
 /// The node is stored in stable memory with the following layout:
@@ -51,8 +59,7 @@ pub struct Node<K: Storable + Ord + Clone> {
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
     node_type: NodeType,
-    max_key_size: u32,
-    max_value_size: u32,
+    version: Version,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -69,8 +76,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
             encoded_values: RefCell::default(),
             children: vec![],
             node_type,
-            max_key_size,
-            max_value_size,
+            version: Version::V1 {
+                max_key_size,
+                max_value_size,
+            },
         }
     }
 
@@ -131,8 +140,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 INTERNAL_NODE_TYPE => NodeType::Internal,
                 other => unreachable!("Unknown node type {}", other),
             },
-            max_key_size,
-            max_value_size,
+            version: Version::V1 {
+                max_key_size,
+                max_value_size,
+            },
         }
     }
 
@@ -152,6 +163,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Assert entries are sorted in strictly increasing order.
         assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
+
+        let (max_key_size, max_value_size) = match self.version {
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => (max_key_size, max_value_size),
+        };
 
         let header = NodeHeader {
             magic: *MAGIC,
@@ -182,7 +200,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the key.
             write(memory, (self.address + offset).get(), key_bytes.borrow());
-            offset += Bytes::from(self.max_key_size);
+            offset += Bytes::from(max_key_size);
 
             // Write the size of the value.
             let value = self.value(idx, memory);
@@ -191,7 +209,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the value.
             write(memory, (self.address + offset).get(), &value);
-            offset += Bytes::from(self.max_value_size);
+            offset += Bytes::from(max_value_size);
         }
 
         // Write the children
@@ -216,6 +234,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns the entry with the max key in the subtree.
     pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
+        let (max_key_size, max_value_size) = match self.version {
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => (max_key_size, max_value_size),
+        };
+
         match self.node_type {
             NodeType::Leaf => {
                 let last_idx = self.encoded_values.borrow().len() - 1;
@@ -231,8 +256,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
                         .last()
                         .expect("An internal node must have children."),
                     memory,
-                    self.max_key_size,
-                    self.max_value_size,
+                    max_key_size,
+                    max_value_size,
                 );
                 last_child.get_max(memory)
             }
@@ -241,6 +266,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns the entry with min key in the subtree.
     pub fn get_min<M: Memory>(&self, memory: &M) -> Entry<K> {
+        let (max_key_size, max_value_size) = match self.version {
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => (max_key_size, max_value_size),
+        };
+
         match self.node_type {
             NodeType::Leaf => {
                 // NOTE: a node can never be empty, so this access is safe.
@@ -251,8 +283,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     // NOTE: an internal node must have children, so this access is safe.
                     self.children[0],
                     memory,
-                    self.max_key_size,
-                    self.max_value_size,
+                    max_key_size,
+                    max_value_size,
                 );
                 first_child.get_min(memory)
             }
