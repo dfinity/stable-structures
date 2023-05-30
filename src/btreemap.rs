@@ -10,7 +10,7 @@ use crate::{
 use allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
-use node::{Entry, Node, NodeType};
+use node::{Entry, Node, NodeType, Version};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
@@ -20,6 +20,7 @@ mod proptests;
 
 const MAGIC: &[u8; 3] = b"BTR";
 const LAYOUT_VERSION: u8 = 1;
+const LAYOUT_VERSION_2: u8 = 2;
 /// The sum of all the header fields, i.e. size of a packed header.
 const PACKED_HEADER_SIZE: usize = 28;
 /// The offset where the allocator begins.
@@ -43,11 +44,9 @@ const DEFAULT_PAGE_SIZE: Bytes = Bytes::new(256);
 /// ----------------------------------------
 /// Layout version              ↕ 1 byte
 /// ----------------------------------------
-/// Max key size                ↕ 4 bytes  // TODO: this is temporary and will be removed.
-/// ----------------------------------------
 /// Page size                   ↕ 4 bytes
 /// ----------------------------------------
-/// Reserved space              ↕ 4 bytes
+/// Reserved space              ↕ 8 bytes
 /// ----------------------------------------
 /// Root node address           ↕ 8 bytes
 /// ----------------------------------------
@@ -94,11 +93,7 @@ where
     // is set to NULL.
     root_addr: Address,
 
-    // The maximum size a key can have.
-    max_key_size: u32,
-
-    // The maximum size a value can have.
-    max_value_size: Option<u32>,
+    version: Version,
 
     // An allocator used for managing memory and allocating nodes.
     allocator: Allocator<M>,
@@ -111,35 +106,18 @@ where
 }
 
 /// The packed header size must be <= ALLOCATOR_OFFSET.
-struct BTreeHeaderV1 {
-    version: u8,
-    max_key_size: u32,
-    max_value_size: u32,
+struct BTreeHeader {
+    version: Version,
     root_addr: Address,
     length: u64,
     // Reserved bytes for future extensions
 }
 
-/// The packed header size must be <= ALLOCATOR_OFFSET.
-struct BTreeHeaderV2 {
-    version: u8,
-    max_key_size: u32,
-    page_size: u32,
-    root_addr: Address,
-    length: u64,
-    // Reserved bytes for future extensions
-}
-
-enum BTreeHeader {
-    V1(BTreeHeaderV1),
-    V2(BTreeHeaderV2),
-}
-
-impl BTreeHeader {
-    fn max_key_size(&self) -> u32 {
+/*impl BTreeHeader {
+    fn max_key_size(&self) -> Option<u32> {
         match self {
-            Self::V1(header_v1) => header_v1.max_key_size,
-            Self::V2(header_v2) => header_v2.max_key_size,
+            Self::V1(header_v1) => Some(header_v1.max_key_size),
+            Self::V2(header_v2) => None,
         }
     }
 
@@ -163,7 +141,7 @@ impl BTreeHeader {
             Self::V2(header_v2) => header_v2.length,
         }
     }
-}
+}*/
 
 impl<K, V, M> BTreeMap<K, V, M>
 where
@@ -205,22 +183,30 @@ where
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
+        let page_size = DEFAULT_PAGE_SIZE;
+
+        // For now, using v1.
         let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
-            Some(max_size)
+            max_size
         } else {
-            None
+            todo!("v2 not yet supported")
         };
 
-        let page_size = match max_value_size {
-            Some(max_value_size) => Node::<K>::size(K::MAX_SIZE, max_value_size),
-            None => DEFAULT_PAGE_SIZE,
+        let max_key_size = if let StorableBound::Bounded { max_size, .. } = K::BOUND {
+            max_size
+        } else {
+            todo!("v2 not yet supported")
         };
+
+        let page_size = Node::<K>::size(max_key_size, max_value_size);
 
         let btree = Self {
             root_addr: NULL,
             allocator: Allocator::new(memory, Address::from(ALLOCATOR_OFFSET as u64), page_size),
-            max_key_size: K::MAX_SIZE,
-            max_value_size,
+            version: Version::V1 {
+                max_key_size,
+                max_value_size,
+            },
             length: 0,
             _phantom: PhantomData,
         };
@@ -234,31 +220,38 @@ where
         // Read the header from memory.
         let header = Self::read_header(&memory);
 
-        let expected_key_size = header.max_key_size();
-        assert!(
-            K::MAX_SIZE <= expected_key_size,
-            "max_key_size must be <= {expected_key_size}"
-        );
-        let expected_value_size = header.max_value_size();
-        let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
-            max_size
-        } else {
-            panic!("value must have max size");
-        };
-        if let Some(expected_value_size) = expected_value_size {
-            assert!(
-                max_value_size <= expected_value_size,
-                "max_value_size must be <= {expected_value_size}"
-            );
+        match header.version {
+            Version::V1 {
+                max_key_size: expected_key_size,
+                max_value_size: expected_value_size,
+            } => {
+                assert!(
+                    K::MAX_SIZE <= expected_key_size,
+                    "max_key_size must be <= {expected_key_size}"
+                );
+
+                if let StorableBound::Bounded {
+                    max_size: max_value_size,
+                    ..
+                } = V::BOUND
+                {
+                    assert!(
+                        max_value_size <= expected_value_size,
+                        "max_value_size must be <= {expected_value_size}"
+                    );
+                }
+            }
+            Version::V2 { .. } => {
+                // Nothing to do.
+            }
         }
 
         let allocator_addr = Address::from(ALLOCATOR_OFFSET as u64);
         Self {
-            root_addr: header.root_addr(),
+            root_addr: header.root_addr,
             allocator: Allocator::load(memory, allocator_addr),
-            max_key_size: K::MAX_SIZE,
-            max_value_size: Some(max_value_size),
-            length: header.length(),
+            version: header.version,
+            length: header.length,
             _phantom: PhantomData,
         }
     }
@@ -274,23 +267,24 @@ where
         match buf[3] {
             LAYOUT_VERSION => {
                 // Deserialize the fields
-                BTreeHeader::V1(BTreeHeaderV1 {
-                    version: buf[3],
-                    max_key_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
-                    max_value_size: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
+                BTreeHeader {
+                    version: Version::V1 {
+                        max_key_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+                        max_value_size: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
+                    },
                     root_addr: Address::from(u64::from_le_bytes(buf[12..20].try_into().unwrap())),
                     length: u64::from_le_bytes(buf[20..28].try_into().unwrap()),
-                })
+                }
             }
             2 => {
                 // Deserialize the fields
-                BTreeHeader::V2(BTreeHeaderV2 {
-                    version: buf[3],
-                    max_key_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
-                    page_size: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
+                BTreeHeader {
+                    version: Version::V2 {
+                        page_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+                    },
                     root_addr: Address::from(u64::from_le_bytes(buf[12..20].try_into().unwrap())),
                     length: u64::from_le_bytes(buf[20..28].try_into().unwrap()),
-                })
+                }
             }
             version => {
                 panic!("Unsupported version: {}.", version);
@@ -309,20 +303,26 @@ where
         let key_bytes = key.to_bytes();
         let value_bytes = value.to_bytes();
 
-        assert!(
-            key_bytes.len() <= self.max_key_size as usize,
-            "Key is too large. Expected <= {} bytes, found {} bytes",
-            self.max_key_size,
-            key_bytes.len()
-        );
-
-        if let Some(max_value_size) = self.max_value_size {
-            assert!(
-                value_bytes.len() <= max_value_size as usize,
-                "Value is too large. Expected <= {} bytes, found {} bytes",
+        match self.version {
+            Version::V1 {
+                max_key_size,
                 max_value_size,
-                value_bytes.len()
-            );
+            } => {
+                assert!(
+                    key_bytes.len() <= max_key_size as usize,
+                    "Key is too large. Expected <= {} bytes, found {} bytes",
+                    max_key_size,
+                    key_bytes.len()
+                );
+
+                assert!(
+                    value_bytes.len() <= max_value_size as usize,
+                    "Value is too large. Expected <= {} bytes, found {} bytes",
+                    max_value_size,
+                    value_bytes.len()
+                );
+            }
+            Version::V2 { .. } => {}
         }
 
         let value = value_bytes.to_vec();
@@ -1142,29 +1142,17 @@ where
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
-        Node::new(
-            self.allocator.allocate(),
-            node_type,
-            self.max_key_size,
-            self.max_value_size.unwrap(), // FIXME
-        )
+        Node::new(self.allocator.allocate(), node_type, self.version)
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
-        Node::load(
-            address,
-            self.memory(),
-            self.max_key_size,
-            self.max_value_size.unwrap(),
-        )
+        Node::load(address, self.memory(), self.version)
     }
 
     // Saves the map to memory.
     fn save(&self) {
-        let header = BTreeHeaderV1 {
-            version: LAYOUT_VERSION,
-            max_key_size: self.max_key_size,
-            max_value_size: self.max_value_size.unwrap(), // FIXME: save to v2
+        let header = BTreeHeader {
+            version: self.version,
             root_addr: self.root_addr,
             length: self.length,
         };
@@ -1173,13 +1161,24 @@ where
     }
 
     /// Write the layout header to the memory.
-    fn write_header(header: &BTreeHeaderV1, memory: &M) {
+    fn write_header(header: &BTreeHeader, memory: &M) {
         // Serialize the header
         let mut buf = [0; PACKED_HEADER_SIZE];
         buf[0..3].copy_from_slice(MAGIC.as_slice());
-        buf[3] = header.version;
-        buf[4..8].copy_from_slice(&header.max_key_size.to_le_bytes());
-        buf[8..12].copy_from_slice(&header.max_value_size.to_le_bytes());
+        match header.version {
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => {
+                buf[3] = LAYOUT_VERSION;
+                buf[4..8].copy_from_slice(&max_key_size.to_le_bytes());
+                buf[8..12].copy_from_slice(&max_value_size.to_le_bytes());
+            }
+            Version::V2 { page_size } => {
+                buf[3] = LAYOUT_VERSION_2;
+                buf[4..8].copy_from_slice(&page_size.to_le_bytes());
+            }
+        };
         buf[12..20].copy_from_slice(&header.root_addr.get().to_le_bytes());
         buf[20..28].copy_from_slice(&header.length.to_le_bytes());
         // Write the header

@@ -28,12 +28,14 @@ pub enum NodeType {
 pub type Entry<K> = (K, Vec<u8>);
 
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
-enum Version {
+pub enum Version {
     V1 {
         max_key_size: u32,
         max_value_size: u32,
     },
-    V2,
+    V2 {
+        page_size: u32,
+    },
 }
 
 /// A node of a B-Tree.
@@ -65,36 +67,33 @@ pub struct Node<K: Storable + Ord + Clone> {
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new node at the given address.
-    pub fn new(
-        address: Address,
-        node_type: NodeType,
-        max_key_size: u32,
-        max_value_size: u32,
-    ) -> Node<K> {
+    pub fn new(address: Address, node_type: NodeType, version: Version) -> Node<K> {
         Node {
             address,
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
             node_type,
-            version: Version::V1 {
-                max_key_size,
-                max_value_size,
-            },
+            version,
         }
     }
 
     /// Loads a node from memory at the given address.
-    pub fn load<M: Memory>(
-        address: Address,
-        memory: &M,
-        max_key_size: u32,
-        max_value_size: u32,
-    ) -> Self {
+    pub fn load<M: Memory>(address: Address, memory: &M, version: Version) -> Self {
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
+
+        let (max_key_size, max_value_size) = match version {
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => (max_key_size, max_value_size),
+            Version::V2 { .. } => {
+                todo!()
+            }
+        };
 
         // Load the entries.
         let mut keys = Vec::with_capacity(header.num_entries as usize);
@@ -170,7 +169,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             } => (max_key_size, max_value_size),
-            Version::V2 => todo!("save v2"),
+            Version::V2 { .. } => todo!("save v2"),
         };
 
         let header = NodeHeader {
@@ -236,14 +235,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns the entry with the max key in the subtree.
     pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
-        let (max_key_size, max_value_size) = match self.version {
-            Version::V1 {
-                max_key_size,
-                max_value_size,
-            } => (max_key_size, max_value_size),
-            Version::V2 => todo!(),
-        };
-
         match self.node_type {
             NodeType::Leaf => {
                 let last_idx = self.encoded_values.borrow().len() - 1;
@@ -259,8 +250,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                         .last()
                         .expect("An internal node must have children."),
                     memory,
-                    max_key_size,
-                    max_value_size,
+                    self.version,
                 );
                 last_child.get_max(memory)
             }
@@ -269,14 +259,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns the entry with min key in the subtree.
     pub fn get_min<M: Memory>(&self, memory: &M) -> Entry<K> {
-        let (max_key_size, max_value_size) = match self.version {
-            Version::V1 {
-                max_key_size,
-                max_value_size,
-            } => (max_key_size, max_value_size),
-            Version::V2 => todo!(),
-        };
-
         match self.node_type {
             NodeType::Leaf => {
                 // NOTE: a node can never be empty, so this access is safe.
@@ -287,8 +269,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     // NOTE: an internal node must have children, so this access is safe.
                     self.children[0],
                     memory,
-                    max_key_size,
-                    max_value_size,
+                    self.version,
                 );
                 first_child.get_min(memory)
             }
