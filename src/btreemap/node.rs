@@ -302,7 +302,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Saves the node to memory.
     fn save_v2<M: Memory>(&self, allocator: &Allocator<M>) {
+        // A buffer to serialize the node into first, then write to memory.
         // TODO: Do not assume that data fits the page.
+        let mut buf = vec![];
 
         let header = NodeHeader {
             magic: *MAGIC,
@@ -316,9 +318,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let memory = allocator.memory();
 
-        write_struct(&header, self.address, memory);
-
-        let mut offset = NodeHeader::size();
+        //write_struct(&header, self.address, memory);
+        let header_slice = unsafe {
+            core::slice::from_raw_parts(
+                &header as *const _ as *const u8,
+                core::mem::size_of::<NodeHeader>(),
+            )
+        };
+        buf.extend_from_slice(header_slice);
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
@@ -330,12 +337,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
         for key in self.keys.iter() {
             // Write the size of the key.
             let key_bytes = key.to_bytes();
-            write_u32(memory, self.address + offset, key_bytes.len() as u32);
-            offset += U32_SIZE;
+            buf.extend_from_slice(&(key_bytes.len() as u32).to_le_bytes());
 
             // Write the key.
-            write(memory, (self.address + offset).get(), key_bytes.borrow());
-            offset += Bytes::from(key_bytes.len() as u64);
+            buf.extend_from_slice(key_bytes.borrow());
         }
 
         assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
@@ -343,23 +348,18 @@ impl<K: Storable + Ord + Clone> Node<K> {
         for idx in 0..self.entries_len() {
             // Write the size of the value.
             let value = self.value(idx, memory);
-            write_u32(memory, self.address + offset, value.len() as u32);
-            offset += U32_SIZE;
+            buf.extend_from_slice(&(value.len() as u32).to_le_bytes());
 
             // Write the value.
-            write(memory, (self.address + offset).get(), &value);
-            offset += Bytes::from(value.len() as u64);
+            buf.extend_from_slice(&value);
         }
 
         // Write the children
         for child in self.children.iter() {
-            write(
-                memory,
-                (self.address + offset).get(),
-                &child.get().to_le_bytes(),
-            );
-            offset += Address::size();
+            buf.extend_from_slice(&child.get().to_le_bytes());
         }
+
+        memory.write(self.address.get(), &buf);
     }
 
     /// Returns the address of the node.
