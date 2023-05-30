@@ -33,6 +33,7 @@ enum Version {
         max_key_size: u32,
         max_value_size: u32,
     },
+    V2,
 }
 
 /// A node of a B-Tree.
@@ -169,6 +170,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             } => (max_key_size, max_value_size),
+            Version::V2 => todo!("save v2"),
         };
 
         let header = NodeHeader {
@@ -239,6 +241,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             } => (max_key_size, max_value_size),
+            Version::V2 => todo!(),
         };
 
         match self.node_type {
@@ -271,6 +274,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             } => (max_key_size, max_value_size),
+            Version::V2 => todo!(),
         };
 
         match self.node_type {
