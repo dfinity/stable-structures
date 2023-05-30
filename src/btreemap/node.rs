@@ -14,6 +14,7 @@ const B: usize = 6;
 // The maximum number of entries per node.
 const CAPACITY: usize = 2 * B - 1;
 const LAYOUT_VERSION: u8 = 1;
+const LAYOUT_VERSION_2: u8 = 2;
 const MAGIC: &[u8; 3] = b"BTN";
 const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
@@ -84,17 +85,19 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
-        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
         let (max_key_size, max_value_size) = match version {
             Version::V1 {
                 max_key_size,
                 max_value_size,
             } => (max_key_size, max_value_size),
-            Version::V2 { .. } => {
-                todo!()
+            Version::V2 { page_size } => {
+                return Self::load_v2(address, header, page_size, memory);
             }
         };
+
+        // TODO: refactor this into load_v1
+        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
         // Load the entries.
         let mut keys = Vec::with_capacity(header.num_entries as usize);
@@ -148,6 +151,72 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
     }
 
+    // Loads a node from memory at the given address.
+    fn load_v2<M: Memory>(
+        address: Address,
+        header: NodeHeader,
+        page_size: u32,
+        memory: &M,
+    ) -> Self {
+        // FIXME: Do not assume that the entire node is in one page.
+        assert_eq!(header.version, LAYOUT_VERSION_2);
+
+        // Load the entries.
+        let mut keys = Vec::with_capacity(header.num_entries as usize);
+        let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
+        let mut offset = NodeHeader::size();
+        let mut buf = vec![]; //Vec::with_capacity(max_key_size.max(max_value_size) as usize);
+        for _ in 0..header.num_entries {
+            // Read the key's size.
+            let key_size = read_u32(memory, address + offset);
+            offset += U32_SIZE;
+
+            // Read the key.
+            buf.resize(key_size as usize, 0);
+            memory.read((address + offset).get(), &mut buf);
+            offset += Bytes::from(key_size);
+            let key = K::from_bytes(Cow::Borrowed(&buf));
+            keys.push(key);
+        }
+
+        // Load the values
+        for _ in 0..header.num_entries {
+            // Read the value's size.
+            let value_size = read_u32(memory, address + offset);
+
+            // Values are loaded lazily. Store a reference and skip loading it.
+            encoded_values.push(Value::ByRef(offset));
+            offset += U32_SIZE;
+            offset += value_size.into();
+        }
+
+        // Load children if this is an internal node.
+        let mut children = vec![];
+        if header.node_type == INTERNAL_NODE_TYPE {
+            // The number of children is equal to the number of entries + 1.
+            for _ in 0..header.num_entries + 1 {
+                let child = Address::from(read_u64(memory, address + offset));
+                offset += Address::size();
+                children.push(child);
+            }
+
+            assert_eq!(children.len(), keys.len() + 1);
+        }
+
+        Self {
+            address,
+            keys,
+            encoded_values: RefCell::new(encoded_values),
+            children,
+            node_type: match header.node_type {
+                LEAF_NODE_TYPE => NodeType::Leaf,
+                INTERNAL_NODE_TYPE => NodeType::Internal,
+                other => unreachable!("Unknown node type {}", other),
+            },
+            version: Version::V2 { page_size },
+        }
+    }
+
     /// Saves the node to memory.
     pub fn save<M: Memory>(&self, allocator: &Allocator<M>) {
         let memory = allocator.memory();
@@ -172,9 +241,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             } => (max_key_size, max_value_size),
-            Version::V2 { .. } => todo!("save v2"),
+            Version::V2 { .. } => {
+                self.save_v2(allocator);
+                return;
+            }
         };
 
+        // TODO: refactor this into save_v1.
         let header = NodeHeader {
             magic: *MAGIC,
             version: LAYOUT_VERSION,
@@ -214,6 +287,68 @@ impl<K: Storable + Ord + Clone> Node<K> {
             // Write the value.
             write(memory, (self.address + offset).get(), &value);
             offset += Bytes::from(max_value_size);
+        }
+
+        // Write the children
+        for child in self.children.iter() {
+            write(
+                memory,
+                (self.address + offset).get(),
+                &child.get().to_le_bytes(),
+            );
+            offset += Address::size();
+        }
+    }
+
+    // Saves the node to memory.
+    fn save_v2<M: Memory>(&self, allocator: &Allocator<M>) {
+        // TODO: Do not assume that data fits the page.
+
+        let header = NodeHeader {
+            magic: *MAGIC,
+            version: LAYOUT_VERSION_2,
+            node_type: match self.node_type {
+                NodeType::Leaf => LEAF_NODE_TYPE,
+                NodeType::Internal => INTERNAL_NODE_TYPE,
+            },
+            num_entries: self.keys.len() as u16,
+        };
+
+        let memory = allocator.memory();
+
+        write_struct(&header, self.address, memory);
+
+        let mut offset = NodeHeader::size();
+
+        // Load all the values. This is necessary so that we don't overwrite referenced
+        // values when writing the entries to the node.
+        for i in 0..self.keys.len() {
+            self.value(i, memory);
+        }
+
+        // Write the entries.
+        for key in self.keys.iter() {
+            // Write the size of the key.
+            let key_bytes = key.to_bytes();
+            write_u32(memory, self.address + offset, key_bytes.len() as u32);
+            offset += U32_SIZE;
+
+            // Write the key.
+            write(memory, (self.address + offset).get(), key_bytes.borrow());
+            offset += Bytes::from(key_bytes.len() as u64);
+        }
+
+        assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
+
+        for idx in 0..self.entries_len() {
+            // Write the size of the value.
+            let value = self.value(idx, memory);
+            write_u32(memory, self.address + offset, value.len() as u32);
+            offset += U32_SIZE;
+
+            // Write the value.
+            write(memory, (self.address + offset).get(), &value);
+            offset += Bytes::from(value.len() as u64);
         }
 
         // Write the children

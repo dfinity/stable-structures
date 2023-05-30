@@ -27,7 +27,7 @@ const PACKED_HEADER_SIZE: usize = 28;
 const ALLOCATOR_OFFSET: usize = 52;
 
 // TODO: this is an arbitary value.
-const DEFAULT_PAGE_SIZE: Bytes = Bytes::new(256);
+const DEFAULT_PAGE_SIZE: Bytes = Bytes::new(1024);
 
 /// A "stable" map based on a B-tree.
 ///
@@ -196,14 +196,15 @@ where
             todo!("v2 not yet supported")
         };
 
-        let page_size = Node::<K>::size(max_key_size, max_value_size);
+        let page_size = DEFAULT_PAGE_SIZE; //Node::<K>::size(max_key_size, max_value_size);
+
+        //        println!("page size: {page_size:?}");
 
         let btree = Self {
             root_addr: NULL,
             allocator: Allocator::new(memory, Address::from(ALLOCATOR_OFFSET as u64), page_size),
-            version: Version::V1 {
-                max_key_size,
-                max_value_size,
+            version: Version::V2 {
+                page_size: page_size.get() as u32,
             },
             length: 0,
             _phantom: PhantomData,
