@@ -1,4 +1,5 @@
 use crate::{
+    btreemap::Allocator,
     read_struct, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
@@ -148,7 +149,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Saves the node to memory.
-    pub fn save<M: Memory>(&self, memory: &M) {
+    pub fn save<M: Memory>(&self, allocator: &Allocator<M>) {
+        let memory = allocator.memory();
+
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());

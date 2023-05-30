@@ -183,8 +183,6 @@ where
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
-        let page_size = DEFAULT_PAGE_SIZE;
-
         // For now, using v1.
         let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
             max_size
@@ -287,7 +285,7 @@ where
                 }
             }
             version => {
-                panic!("Unsupported version: {}.", version);
+                panic!("Unsupported version: {version}.");
             }
         }
     }
@@ -341,7 +339,7 @@ where
             if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                root.save(self.memory());
+                root.save(&self.allocator);
                 return Some(V::from_bytes(Cow::Owned(previous_value)));
             }
 
@@ -387,7 +385,7 @@ where
                 // Overwrite it and return the previous value.
                 let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
 
-                node.save(self.memory());
+                node.save(&self.allocator);
                 Some(previous_value)
             }
             Err(idx) => {
@@ -398,7 +396,7 @@ where
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
                         node.insert_entry(idx, (key, value));
-                        node.save(self.memory());
+                        node.save(&self.allocator);
 
                         // Update the length.
                         self.length += 1;
@@ -418,7 +416,7 @@ where
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) =
                                     child.swap_entry(idx, (key, value), self.memory());
-                                child.save(self.memory());
+                                child.save(&self.allocator);
                                 return Some(previous_value);
                             }
 
@@ -476,9 +474,9 @@ where
 
         node.insert_entry(full_child_idx, (median_key, median_value));
 
-        sibling.save(self.memory());
-        full_child.save(self.memory());
-        node.save(self.memory());
+        sibling.save(&self.allocator);
+        full_child.save(&self.allocator);
+        node.save(&self.allocator);
     }
 
     /// Returns the value associated with the given key if it exists.
@@ -601,7 +599,7 @@ where
                             self.allocator.deallocate(node.address());
                             self.root_addr = NULL;
                         } else {
-                            node.save(self.memory());
+                            node.save(&self.allocator);
                         }
 
                         self.save();
@@ -646,7 +644,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
 
                             // Save the parent node.
-                            node.save(self.memory());
+                            node.save(&self.allocator);
                             return Some(old_value);
                         }
 
@@ -681,7 +679,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, successor, self.memory());
 
                             // Save the parent node.
-                            node.save(self.memory());
+                            node.save(&self.allocator);
                             return Some(old_value);
                         }
 
@@ -730,8 +728,8 @@ where
                             self.save();
                         }
 
-                        node.save(self.memory());
-                        new_child.save(self.memory());
+                        node.save(&self.allocator);
+                        new_child.save(&self.allocator);
 
                         // Recursively delete the key.
                         self.remove_helper(new_child, key)
@@ -811,9 +809,9 @@ where
                                     assert_eq!(child.node_type(), NodeType::Leaf);
                                 }
 
-                                left_sibling.save(self.memory());
-                                child.save(self.memory());
-                                node.save(self.memory());
+                                left_sibling.save(&self.allocator);
+                                child.save(&self.allocator);
+                                node.save(&self.allocator);
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -866,9 +864,9 @@ where
                                     }
                                 }
 
-                                right_sibling.save(self.memory());
-                                child.save(self.memory());
-                                node.save(self.memory());
+                                right_sibling.save(&self.allocator);
+                                child.save(&self.allocator);
+                                node.save(&self.allocator);
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -896,7 +894,7 @@ where
                                     self.save();
                                 }
                             } else {
-                                node.save(self.memory());
+                                node.save(&self.allocator);
                             }
 
                             return self.remove_helper(left_sibling, key);
@@ -924,7 +922,7 @@ where
                                     self.save();
                                 }
                             } else {
-                                node.save(self.memory());
+                                node.save(&self.allocator);
                             }
 
                             return self.remove_helper(right_sibling, key);
@@ -1136,7 +1134,7 @@ where
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         let source_address = source.address();
         into.merge(source, median, self.memory());
-        into.save(self.memory());
+        into.save(&self.allocator);
         self.allocator.deallocate(source_address);
         into
     }
