@@ -125,7 +125,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     // Saves the node to memory.
-    pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
+    pub(super) fn save_v2<M: Memory>(&self, page_size: u32, allocator: &mut Allocator<M>) {
         println!("SAVING {:?}...", self.address);
         // A buffer to serialize the node into first, then write to memory.
         let mut buf = vec![];
@@ -173,12 +173,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         for child in self.children.iter() {
             buf.extend_from_slice(&child.get().to_le_bytes());
         }
-
-        let page_size = if let Version::V2 { page_size } = self.version {
-            page_size
-        } else {
-            unreachable!()
-        };
 
         self.write_paginated(buf, allocator, page_size as usize);
         println!("DONE");
