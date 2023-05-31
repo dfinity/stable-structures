@@ -1,10 +1,14 @@
 use super::*;
 
+const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
+const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11); // magic + next address
+
+use crate::types::NULL;
+use crate::write_u64;
+
 impl<K: Storable + Ord + Clone> Node<K> {
     // Loads a node from memory at the given address.
     pub(super) fn load_v2<M: Memory>(address: Address, page_size: u32, memory: &M) -> Self {
-        //println!("load v2");
-
         // Read the node into a buffer.
         let mut full_buf = vec![0; page_size as usize];
         memory.read(address.get(), &mut full_buf);
@@ -17,7 +21,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut overflow_buf = vec![0; page_size as usize];
         memory.read(overflow_address.get(), &mut overflow_buf);
         // TODO: validate magic, read next overflow.
-        full_buf.extend_from_slice(&overflow_buf[OVERFLOW_OVERHEAD.get() as usize..]);
+        full_buf.extend_from_slice(&overflow_buf[PAGE_OVERFLOW_DATA_OFFSET.get() as usize..]);
 
         // Load the metadata.
         let mut offset = META_DATA_OFFSET;
@@ -70,8 +74,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             );
             offset += U32_SIZE;
 
-            //            println!("value size: {value_size}");
-
             // TODO Values are loaded lazily. Store a reference and skip loading it.
             buf.resize(value_size as usize, 0);
             encoded_values.push(Value::ByVal(
@@ -79,7 +81,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     .to_vec(),
             ));
 
-            //println!("values: {:?}", encoded_values);
             offset += value_size.into();
         }
 
@@ -180,41 +181,99 @@ impl<K: Storable + Ord + Clone> Node<K> {
         allocator: &mut Allocator<M>,
         page_size: usize,
     ) {
-        if buf.len() > page_size {
-            let additional_pages_needed =
-                1 + (buf.len() - page_size) / (page_size - OVERFLOW_OVERHEAD.get() as usize);
-
-            if self.overflow == None {
-                // Allocate a new overflow.
-                let overflow_address = allocator.allocate();
-
-                //println!("overflowed. allocated address {overflow_address:?}");
-
-                // Update buffer to include offset address.
-                buf[OVERFLOW_OFFSET.get() as usize..OVERFLOW_OFFSET.get() as usize + 8]
-                    .copy_from_slice(overflow_address.get().to_le_bytes().as_slice());
-
-                let memory = allocator.memory();
-                memory.write(overflow_address.get(), OVERFLOW_MAGIC);
-
-                // Write a NULL to indicate that there are no more overflows.
-                memory.write(overflow_address.get() + Bytes::new(3).get(), &[0; 8]);
-
-                // Write the first page
-                memory.write(self.address.get(), &buf[..page_size]);
-
-                // Write the remaining buf
-                memory.write(
-                    (overflow_address + OVERFLOW_OVERHEAD).get(),
-                    &buf[page_size..],
-                );
-            } else {
-                panic!("support overflow existing");
-            }
+        // Compute how many overflow pages are needed.
+        let additional_pages_needed = if buf.len() > page_size {
+            1 + (buf.len() - page_size) / (page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize)
         } else {
-            let memory = allocator.memory();
+            0
+        };
 
-            memory.write(self.address.get(), &buf);
+        // Get overflow addresses, making the necessary allocation/deallocations.
+        let overflow_addresses = self.get_overflow_addresses(additional_pages_needed, allocator);
+
+        // Write the first page
+        let memory = allocator.memory();
+        memory.write(
+            self.address.get(),
+            &buf[..std::cmp::min(page_size, buf.len())],
+        );
+        if overflow_addresses.len() > 0 {
+            // Update the page to write the next overflow address.
+
+            //memory.write(self.address.get(), &buf[..page_size]);
+            write_u64(
+                memory,
+                self.address + OVERFLOW_OFFSET,
+                overflow_addresses[0].get(),
+            );
         }
+
+        let mut next_idx = page_size;
+        let mut i = 0;
+
+        let data_size = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
+        while next_idx < buf.len() {
+            // Write magic and next address
+            memory.write(overflow_addresses[i].get(), &OVERFLOW_MAGIC[..]);
+            let next_address = overflow_addresses.get(i + 1).unwrap_or(&NULL);
+            write_u64(
+                memory,
+                overflow_addresses[i] + PAGE_OVERFLOW_NEXT_OFFSET,
+                next_address.get(),
+            );
+
+            // Write the data from the buffer
+            let start_idx = page_size + i * data_size;
+            let end_idx = std::cmp::min(buf.len(), page_size + (i + 1) * data_size);
+            memory.write(
+                (overflow_addresses[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
+                &buf[start_idx..end_idx],
+            );
+
+            i += 1;
+            next_idx += data_size;
+        }
+    }
+
+    fn get_overflow_addresses<M: Memory>(
+        &self,
+        num_overflow_pages: usize,
+        allocator: &mut Allocator<M>,
+    ) -> Vec<Address> {
+        // Fetch the overflow page addresses of this node.
+        let mut current_overflow_addresses = vec![];
+        let mut next = self.overflow;
+        while let Some(overflow_address) = next {
+            current_overflow_addresses.push(overflow_address);
+
+            // Load next overflow address.
+            let maybe_next = Address::from(read_u64(
+                allocator.memory(),
+                overflow_address + PAGE_OVERFLOW_NEXT_OFFSET,
+            ));
+
+            if maybe_next == crate::types::NULL {
+                next = None;
+            } else {
+                next = Some(maybe_next);
+            }
+        }
+
+        // If there are too many overflow addresses, deallocate some until we've reached
+        // the number we need.
+        if num_overflow_pages < current_overflow_addresses.len() {
+            for overflow_page in current_overflow_addresses.split_off(num_overflow_pages) {
+                println!("deallocating");
+                allocator.deallocate(overflow_page);
+            }
+        }
+
+        // Allocate more pages to accommodate the number requested, if needed.
+        while current_overflow_addresses.len() < num_overflow_pages {
+            println!("allocating");
+            current_overflow_addresses.push(allocator.allocate());
+        }
+
+        current_overflow_addresses
     }
 }
