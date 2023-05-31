@@ -30,8 +30,6 @@ const ENTRIES_OFFSET_V1: Bytes = Bytes::new(7);
 const OVERFLOW_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET_V2: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
 
-const OVERFLOW_OVERHEAD: Bytes = Bytes::new(11); // magic + address
-
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum NodeType {
     Leaf,
