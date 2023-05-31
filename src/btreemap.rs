@@ -603,7 +603,7 @@ where
                             );
 
                             // Deallocate the empty node.
-                            self.allocator.deallocate(node.address());
+                            node.deallocate(&mut self.allocator);
                             self.root_addr = NULL;
                         } else {
                             node.save(&mut self.allocator);
@@ -731,11 +731,12 @@ where
                             self.root_addr = new_child.address();
 
                             // Deallocate the root node.
-                            self.allocator.deallocate(node.address());
+                            node.deallocate(&mut self.allocator);
                             self.save();
+                        } else {
+                            node.save(&mut self.allocator);
                         }
 
-                        node.save(&mut self.allocator);
                         new_child.save(&mut self.allocator);
 
                         // Recursively delete the key.
@@ -893,13 +894,13 @@ where
                             node.remove_child(idx);
 
                             if node.entries_len() == 0 {
-                                self.allocator.deallocate(node.address());
-
                                 if node.address() == self.root_addr {
                                     // Update the root.
                                     self.root_addr = left_sibling.address();
                                     self.save();
                                 }
+
+                                node.deallocate(&mut self.allocator);
                             } else {
                                 node.save(&mut self.allocator);
                             }
@@ -921,13 +922,13 @@ where
                             node.remove_child(idx);
 
                             if node.entries_len() == 0 {
-                                self.allocator.deallocate(node.address());
-
                                 if node.address() == self.root_addr {
                                     // Update the root.
                                     self.root_addr = right_sibling.address();
                                     self.save();
                                 }
+
+                                node.deallocate(&mut self.allocator);
                             } else {
                                 node.save(&mut self.allocator);
                             }
@@ -1140,13 +1141,13 @@ where
     //   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         let source_address = source.address();
-        into.merge(source, median, self.memory());
+        into.merge(source, median, &mut self.allocator);
         into.save(&mut self.allocator);
-        self.allocator.deallocate(source_address);
         into
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
+        println!("1. ALLOCATING");
         Node::new(self.allocator.allocate(), node_type, self.version)
     }
 

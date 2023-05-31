@@ -7,6 +7,7 @@ use crate::{
 };
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
+use std::mem;
 
 mod v2;
 
@@ -113,6 +114,19 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 Self::load_v2(address, page_size, memory)
             }
         }
+    }
+
+    pub fn deallocate<M: Memory>(self, allocator: &mut Allocator<M>) {
+        println!("DEALLOCATING");
+        let overflow_addresses = self.get_overflow_addresses(allocator.memory());
+
+        // Deallocate all overflows
+        for address in overflow_addresses {
+            allocator.deallocate(address);
+        }
+
+        // Deallocate self.
+        allocator.deallocate(self.address);
     }
 
     // Loads a node from memory at the given address.
@@ -459,10 +473,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///   * `self` and `source` are of the same node type.
     ///
     /// POSTCONDITION:
-    ///   * `source` is empty (no entries and no children).
+    ///   * `source` is deallocated.
     ///   * all the entries of `source`, as well as the median, are merged into `self`, in sorted
     ///      order.
-    pub fn merge<M: Memory>(&mut self, mut source: Node<K>, median: Entry<K>, memory: &M) {
+    pub fn merge<M: Memory>(
+        &mut self,
+        mut source: Node<K>,
+        median: Entry<K>,
+        allocator: &mut Allocator<M>,
+    ) {
+        let memory = allocator.memory();
+
         // Load all the values from the source node first, as they will be moved out.
         for i in 0..source.entries_len() {
             source.value(i, memory);
@@ -478,10 +499,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
             Self::append(&mut source, self, median);
 
             // Move the entries and children into self.
-            self.keys = source.keys;
-            self.encoded_values = source.encoded_values;
-            self.children = source.children;
+            self.keys = mem::take(&mut source.keys);
+            self.encoded_values = mem::take(&mut source.encoded_values);
+            self.children = mem::take(&mut source.children);
         }
+
+        source.deallocate(allocator);
     }
 
     // Appends the entries and children of node `b` into `a`, along with the median entry.

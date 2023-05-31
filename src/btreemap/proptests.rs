@@ -59,10 +59,9 @@ proptest! {
         }
     }
 
-//    #![proptest_config(ProptestConfig::with_cases(10))]
     #[test]
-    fn variable_entries(
-        keys in pset(".*", 1000..10_000),
+    fn variable_entries_multiple_nodes(
+        keys in pset(".*", 10..100),
     ) {
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
@@ -73,9 +72,33 @@ proptest! {
 
         for key in keys.into_iter() {
             // Assert we retrieved the old value correctly.
-            assert_eq!(btree.insert(key.clone(), String::from("")), Some(key.clone()));
+//            assert_eq!(btree.insert(key.clone(), String::from("")), Some(key.clone()));
             // Assert we retrieved the new value correctly.
-            assert_eq!(btree.get(&key), Some(String::from("")));
+            assert_eq!(btree.remove(&key), Some(key));
         }
+
+        // Everything has been deallocated.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn variable_entries_single_node(
+        keys in pset(".*", 11),
+        values in pset(".*", 11),
+    ) {
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        for (k, v) in keys.iter().zip(values.iter()) {
+            assert_eq!(btree.insert(k.clone(), v.clone()), None);
+        }
+
+        for (k, v) in keys.into_iter().zip(values.into_iter()) {
+            // Assert we retrieved the new value correctly.
+            assert_eq!(btree.remove(&k), Some(v));
+        }
+
+        // Everything has been deallocated.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
     }
 }
