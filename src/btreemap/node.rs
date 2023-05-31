@@ -16,6 +16,7 @@ const CAPACITY: usize = 2 * B - 1;
 const LAYOUT_VERSION: u8 = 1;
 const LAYOUT_VERSION_2: u8 = 2;
 const MAGIC: &[u8; 3] = b"BTN";
+const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
 // The size of u32 in bytes.
@@ -24,7 +25,10 @@ const U32_SIZE: Bytes = Bytes::new(4);
 const META_DATA_OFFSET: Bytes = Bytes::new(4);
 
 const ENTRIES_OFFSET_V1: Bytes = Bytes::new(7);
+const OVERFLOW_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET_V2: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
+
+const OVERFLOW_OVERHEAD: Bytes = Bytes::new(11); // magic + address
 
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum NodeType {
@@ -186,13 +190,26 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Loads a node from memory at the given address.
     fn load_v2<M: Memory>(address: Address, page_size: u32, memory: &M) -> Self {
-        // FIXME: Do not assume that the en// Load the metadata.
+        //println!("load v2");
+
+        // Read the node into a buffer.
+        let mut full_buf = vec![0; page_size as usize];
+        memory.read(address.get(), &mut full_buf);
+
+        // Concatenate the overflow page into the buffer.
+        let mut buf = vec![0; 8];
+        memory.read((address + OVERFLOW_OFFSET).get(), &mut buf);
+        let overflow_address = Address::from(u64::from_le_bytes(buf.try_into().unwrap()));
+
+        let mut overflow_buf = vec![0; page_size as usize];
+        memory.read(overflow_address.get(), &mut overflow_buf);
+        // TODO: validate magic, read next overflow.
+        full_buf.extend_from_slice(&overflow_buf[OVERFLOW_OVERHEAD.get() as usize..]);
 
         // Load the metadata.
         let mut offset = META_DATA_OFFSET;
         let mut buf = vec![0];
-        memory.read((address + offset).get(), &mut buf);
-        let node_type = match buf[0] {
+        let node_type = match full_buf[offset.get() as usize] {
             LEAF_NODE_TYPE => NodeType::Leaf,
             INTERNAL_NODE_TYPE => NodeType::Internal,
             other => unreachable!("Unknown node type {}", other),
@@ -200,8 +217,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         offset += Bytes::new(1);
         buf.resize(2, 0);
-        memory.read((address + offset).get(), &mut buf);
-        let num_entries = u16::from_le_bytes(buf.try_into().unwrap()) as usize;
+        let num_entries = u16::from_le_bytes(
+            (&full_buf[offset.get() as usize..offset.get() as usize + 2])
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        offset += Bytes::new(2);
+
+        // Read overflow
+        buf.resize(8, 0);
 
         // Load the entries.
         let mut keys = Vec::with_capacity(num_entries);
@@ -215,20 +239,34 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Read the key.
             buf.resize(key_size as usize, 0);
-            memory.read((address + offset).get(), &mut buf);
+            let key = K::from_bytes(Cow::Borrowed(
+                &full_buf[offset.get() as usize..offset.get() as usize + key_size as usize],
+            ));
             offset += Bytes::from(key_size);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
             keys.push(key);
         }
 
         // Load the values
         for _ in 0..num_entries {
             // Read the value's size.
-            let value_size = read_u32(memory, address + offset);
-
-            // Values are loaded lazily. Store a reference and skip loading it.
-            encoded_values.push(Value::ByRef(offset));
+            //    let value_size = read_u32(memory, get_address(offset));
+            let value_size = u32::from_le_bytes(
+                (&full_buf[offset.get() as usize..offset.get() as usize + 4])
+                    .try_into()
+                    .unwrap(),
+            );
             offset += U32_SIZE;
+
+//            println!("value size: {value_size}");
+
+            // TODO Values are loaded lazily. Store a reference and skip loading it.
+            buf.resize(value_size as usize, 0);
+            encoded_values.push(Value::ByVal(
+                full_buf[offset.get() as usize..offset.get() as usize + value_size as usize]
+                    .to_vec(),
+            ));
+
+            //println!("values: {:?}", encoded_values);
             offset += value_size.into();
         }
 
@@ -237,7 +275,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
         if node_type == NodeType::Internal {
             // The number of children is equal to the number of entries + 1.
             for _ in 0..num_entries + 1 {
-                let child = Address::from(read_u64(memory, address + offset));
+                //   let child = Address::from(read_u64(memory, get_address(offset)));
+                let child = Address::from(u64::from_le_bytes(
+                    (&full_buf[offset.get() as usize..offset.get() as usize + 8])
+                        .try_into()
+                        .unwrap(),
+                ));
                 offset += Address::size();
                 children.push(child);
             }
@@ -252,12 +295,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
             children,
             node_type,
             version: Version::V2 { page_size },
-            overflow: None, // FIXME: load the overflow from the header.
+            overflow: if overflow_address == crate::types::NULL {
+                None
+            } else {
+                Some(overflow_address)
+            },
         }
     }
 
     /// Saves the node to memory.
-    pub fn save<M: Memory>(&self, allocator: &Allocator<M>) {
+    pub fn save<M: Memory>(&self, allocator: &mut Allocator<M>) {
         let memory = allocator.memory();
 
         match self.node_type {
@@ -342,9 +389,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     // Saves the node to memory.
-    fn save_v2<M: Memory>(&self, allocator: &Allocator<M>) {
+    fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
         // A buffer to serialize the node into first, then write to memory.
-        // TODO: Do not assume that data fits the page.
         let mut buf = vec![];
         buf.extend_from_slice(MAGIC);
         buf.extend_from_slice(&[LAYOUT_VERSION_2]);
@@ -391,7 +437,57 @@ impl<K: Storable + Ord + Clone> Node<K> {
             buf.extend_from_slice(&child.get().to_le_bytes());
         }
 
-        memory.write(self.address.get(), &buf);
+        let page_size = if let Version::V2 { page_size } = self.version {
+            page_size
+        } else {
+            unreachable!()
+        };
+
+        self.write_paginated(buf, allocator, page_size as usize);
+    }
+
+    fn write_paginated<M: Memory>(
+        &self,
+        mut buf: Vec<u8>,
+        allocator: &mut Allocator<M>,
+        page_size: usize,
+    ) {
+        if buf.len() > page_size {
+            let additional_pages_needed =
+                1 + (buf.len() - page_size) / (page_size - OVERFLOW_OVERHEAD.get() as usize);
+
+            if self.overflow == None {
+                // Allocate a new overflow.
+                let overflow_address = allocator.allocate();
+
+                //println!("overflowed. allocated address {overflow_address:?}");
+
+                // Update buffer to include offset address.
+                buf[OVERFLOW_OFFSET.get() as usize..OVERFLOW_OFFSET.get() as usize + 8]
+                    .copy_from_slice(overflow_address.get().to_le_bytes().as_slice());
+
+                let memory = allocator.memory();
+                memory.write(overflow_address.get(), OVERFLOW_MAGIC);
+
+                // Write a NULL to indicate that there are no more overflows.
+                memory.write(overflow_address.get() + Bytes::new(3).get(), &[0; 8]);
+
+                // Write the first page
+                memory.write(self.address.get(), &buf[..page_size]);
+
+                // Write the remaining buf
+                memory.write(
+                    (overflow_address + OVERFLOW_OVERHEAD).get(),
+                    &buf[page_size..],
+                );
+            } else {
+                panic!("support overflow existing");
+            }
+        } else {
+            let memory = allocator.memory();
+
+            memory.write(self.address.get(), &buf);
+        }
     }
 
     /// Returns the address of the node.

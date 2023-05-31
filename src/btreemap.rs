@@ -27,7 +27,7 @@ const PACKED_HEADER_SIZE: usize = 28;
 const ALLOCATOR_OFFSET: usize = 52;
 
 // TODO: this is an arbitary value.
-const DEFAULT_PAGE_SIZE: Bytes = Bytes::new(1024);
+const DEFAULT_PAGE_SIZE: Bytes = Bytes::new(256);
 
 /// A "stable" map based on a B-tree.
 ///
@@ -340,7 +340,7 @@ where
             if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                root.save(&self.allocator);
+                root.save(&mut self.allocator);
                 return Some(V::from_bytes(Cow::Owned(previous_value)));
             }
 
@@ -386,7 +386,7 @@ where
                 // Overwrite it and return the previous value.
                 let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
 
-                node.save(&self.allocator);
+                node.save(&mut self.allocator);
                 Some(previous_value)
             }
             Err(idx) => {
@@ -397,7 +397,7 @@ where
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
                         node.insert_entry(idx, (key, value));
-                        node.save(&self.allocator);
+                        node.save(&mut self.allocator);
 
                         // Update the length.
                         self.length += 1;
@@ -417,7 +417,7 @@ where
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) =
                                     child.swap_entry(idx, (key, value), self.memory());
-                                child.save(&self.allocator);
+                                child.save(&mut self.allocator);
                                 return Some(previous_value);
                             }
 
@@ -475,9 +475,9 @@ where
 
         node.insert_entry(full_child_idx, (median_key, median_value));
 
-        sibling.save(&self.allocator);
-        full_child.save(&self.allocator);
-        node.save(&self.allocator);
+        sibling.save(&mut self.allocator);
+        full_child.save(&mut self.allocator);
+        node.save(&mut self.allocator);
     }
 
     /// Returns the value associated with the given key if it exists.
@@ -600,7 +600,7 @@ where
                             self.allocator.deallocate(node.address());
                             self.root_addr = NULL;
                         } else {
-                            node.save(&self.allocator);
+                            node.save(&mut self.allocator);
                         }
 
                         self.save();
@@ -645,7 +645,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
 
                             // Save the parent node.
-                            node.save(&self.allocator);
+                            node.save(&mut self.allocator);
                             return Some(old_value);
                         }
 
@@ -680,7 +680,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, successor, self.memory());
 
                             // Save the parent node.
-                            node.save(&self.allocator);
+                            node.save(&mut self.allocator);
                             return Some(old_value);
                         }
 
@@ -729,8 +729,8 @@ where
                             self.save();
                         }
 
-                        node.save(&self.allocator);
-                        new_child.save(&self.allocator);
+                        node.save(&mut self.allocator);
+                        new_child.save(&mut self.allocator);
 
                         // Recursively delete the key.
                         self.remove_helper(new_child, key)
@@ -810,9 +810,9 @@ where
                                     assert_eq!(child.node_type(), NodeType::Leaf);
                                 }
 
-                                left_sibling.save(&self.allocator);
-                                child.save(&self.allocator);
-                                node.save(&self.allocator);
+                                left_sibling.save(&mut self.allocator);
+                                child.save(&mut self.allocator);
+                                node.save(&mut self.allocator);
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -865,9 +865,9 @@ where
                                     }
                                 }
 
-                                right_sibling.save(&self.allocator);
-                                child.save(&self.allocator);
-                                node.save(&self.allocator);
+                                right_sibling.save(&mut self.allocator);
+                                child.save(&mut self.allocator);
+                                node.save(&mut self.allocator);
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -895,7 +895,7 @@ where
                                     self.save();
                                 }
                             } else {
-                                node.save(&self.allocator);
+                                node.save(&mut self.allocator);
                             }
 
                             return self.remove_helper(left_sibling, key);
@@ -923,7 +923,7 @@ where
                                     self.save();
                                 }
                             } else {
-                                node.save(&self.allocator);
+                                node.save(&mut self.allocator);
                             }
 
                             return self.remove_helper(right_sibling, key);
@@ -1135,7 +1135,7 @@ where
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         let source_address = source.address();
         into.merge(source, median, self.memory());
-        into.save(&self.allocator);
+        into.save(&mut self.allocator);
         self.allocator.deallocate(source_address);
         into
     }
@@ -2721,4 +2721,21 @@ mod test {
         assert!(packed_header.root_addr == v1_header.root_addr);
         assert!(packed_header.length == v1_header.length);
     }*/
+
+    #[test]
+    fn variable_entries() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::init(mem.clone());
+        assert_eq!(btree.insert(1u64, String::from("worldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldly")), None);
+        assert_eq!(btree.get(&1u64), Some(String::from("worldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldly")));
+
+        //assert_eq!(btree.insert(1u64, String::from("worldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldly")), None);
+        //assert_eq!(btree.get(&1u64), Some(String::from("worldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldly")));
+
+        // Reload the btree
+        let btree = BTreeMap::init(mem);
+
+        // Data still exists.
+        assert_eq!(btree.get(&1u64), Some(String::from("worldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldlyworldly")));
+    }
 }
