@@ -85,7 +85,7 @@ const DEFAULT_PAGE_SIZE: Bytes = Bytes::new(256);
 /// ```
 pub struct BTreeMap<K, V, M>
 where
-    K: BoundedStorable + Ord + Clone,
+    K: Storable + Ord + Clone,
     V: Storable,
     M: Memory,
 {
@@ -145,7 +145,7 @@ struct BTreeHeader {
 
 impl<K, V, M> BTreeMap<K, V, M>
 where
-    K: BoundedStorable + Ord + Clone,
+    K: Storable + Ord + Clone,
     V: Storable,
     M: Memory,
 {
@@ -224,10 +224,16 @@ where
                 max_key_size: expected_key_size,
                 max_value_size: expected_value_size,
             } => {
-                assert!(
-                    K::MAX_SIZE <= expected_key_size,
-                    "max_key_size must be <= {expected_key_size}"
-                );
+                if let StorableBound::Bounded {
+                    max_size: max_key_size,
+                    ..
+                } = K::BOUND
+                {
+                    assert!(
+                        max_key_size <= expected_key_size,
+                        "max_key_size must be <= {expected_key_size}"
+                    );
+                }
 
                 if let StorableBound::Bounded {
                     max_size: max_value_size,

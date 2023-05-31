@@ -58,4 +58,24 @@ proptest! {
             prop_assert_eq!(Some((*k, ())), map.iter_upper_bound(&(k + 1)).next());
         }
     }
+
+//    #![proptest_config(ProptestConfig::with_cases(10))]
+    #[test]
+    fn variable_entries(
+        keys in pset(".*", 1000..10_000),
+    ) {
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        for key in keys.iter() {
+            assert_eq!(btree.insert(key.clone(), key.clone()), None);
+        }
+
+        for key in keys.into_iter() {
+            // Assert we retrieved the old value correctly.
+            assert_eq!(btree.insert(key.clone(), String::from("")), Some(key.clone()));
+            // Assert we retrieved the new value correctly.
+            assert_eq!(btree.get(&key), Some(String::from("")));
+        }
+    }
 }
