@@ -186,7 +186,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) {
         // Compute how many overflow pages are needed.
         let additional_pages_needed = if buf.len() > page_size {
-            let overflow_size = (page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize);
+            let overflow_size = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
             let data_size = buf.len() - page_size;
 
             // Ceiling division

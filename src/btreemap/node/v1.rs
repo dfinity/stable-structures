@@ -1,7 +1,12 @@
 use super::*;
 
 use crate::types::NULL;
-use crate::write_u64;
+use crate::{write_u16, write_u64};
+
+const LAYOUT_VERSION_OFFSET: u64 = 3;
+const NODE_TYPE_OFFSET: u64 = 4;
+const NUM_ENTRIES_OFFSET: u64 = 5;
+const ENTRIES_OFFSET: u64 = 7;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a node from memory at the given address.
@@ -31,7 +36,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the entries.
         let mut keys = Vec::with_capacity(num_entries);
         let mut encoded_values = Vec::with_capacity(num_entries);
-        let mut offset = ENTRIES_OFFSET_V1;
+        let mut offset = Bytes::from(ENTRIES_OFFSET);
         let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
         for _ in 0..num_entries {
             // Read the key's size.
@@ -79,19 +84,24 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     pub(super) fn save_v1<M: Memory>(&self, max_key_size: u32, max_value_size: u32, memory: &M) {
         memory.write(self.address.get(), MAGIC);
-        memory.write((self.address + Bytes::new(3)).get(), &[LAYOUT_VERSION]);
-        let header = NodeHeader {
-            node_type: match self.node_type {
-                NodeType::Leaf => LEAF_NODE_TYPE,
-                NodeType::Internal => INTERNAL_NODE_TYPE,
+        memory.write(
+            self.address.get() + LAYOUT_VERSION_OFFSET,
+            &[LAYOUT_VERSION],
+        );
+        memory.write(
+            self.address.get() + NODE_TYPE_OFFSET,
+            match self.node_type {
+                NodeType::Leaf => &[LEAF_NODE_TYPE],
+                NodeType::Internal => &[INTERNAL_NODE_TYPE],
             },
-            num_entries: self.keys.len() as u16,
-        };
+        );
+        write_u16(
+            memory,
+            self.address + Bytes::from(NUM_ENTRIES_OFFSET),
+            self.keys.len() as u16,
+        );
 
-        // the u32 offset is to not overwrite the magic and version
-        write_struct(&header, self.address + U32_SIZE, memory);
-
-        let mut offset = ENTRIES_OFFSET_V1;
+        let mut offset = Bytes::from(ENTRIES_OFFSET);
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
@@ -129,5 +139,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
             );
             offset += Address::size();
         }
+    }
+
+    /// Returns the size of the V1 node in bytes.
+    ///
+    /// See the documentation of [`Node`] for the memory layout.
+    pub fn size_v1(max_key_size: u32, max_value_size: u32) -> Bytes {
+        let max_key_size = Bytes::from(max_key_size);
+        let max_value_size = Bytes::from(max_value_size);
+
+        let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
+        let child_size = Address::size();
+
+        Bytes::from(ENTRIES_OFFSET)
+            + Bytes::from(CAPACITY as u64) * entry_size
+            + Bytes::from((CAPACITY + 1) as u64) * child_size
     }
 }

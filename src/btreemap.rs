@@ -113,36 +113,6 @@ struct BTreeHeader {
     // Reserved bytes for future extensions
 }
 
-/*impl BTreeHeader {
-    fn max_key_size(&self) -> Option<u32> {
-        match self {
-            Self::V1(header_v1) => Some(header_v1.max_key_size),
-            Self::V2(header_v2) => None,
-        }
-    }
-
-    fn max_value_size(&self) -> Option<u32> {
-        match self {
-            Self::V1(header_v1) => Some(header_v1.max_value_size),
-            Self::V2(_) => None,
-        }
-    }
-
-    fn root_addr(&self) -> Address {
-        match self {
-            Self::V1(header_v1) => header_v1.root_addr,
-            Self::V2(header_v2) => header_v2.root_addr,
-        }
-    }
-
-    fn length(&self) -> u64 {
-        match self {
-            Self::V1(header_v1) => header_v1.length,
-            Self::V2(header_v2) => header_v2.length,
-        }
-    }
-}*/
-
 impl<K, V, M> BTreeMap<K, V, M>
 where
     K: Storable + Ord + Clone,
@@ -184,7 +154,7 @@ where
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
         // For now, using v1.
-        /*let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
+        let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
             max_size
         } else {
             todo!("v2 not yet supported")
@@ -194,9 +164,10 @@ where
             max_size
         } else {
             todo!("v2 not yet supported")
-        };*/
+        };
 
-        let page_size = DEFAULT_PAGE_SIZE; //Node::<K>::size(max_key_size, max_value_size);
+        //let page_size = DEFAULT_PAGE_SIZE; //Node::<K>::size(max_key_size, max_value_size);
+        let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
 
         //        println!("page size: {page_size:?}");
 
@@ -327,7 +298,9 @@ where
                     value_bytes.len()
                 );
             }
-            Version::V2 { .. } => {}
+            Version::V2 { .. } => {
+                // No assertions to be made.
+            }
         }
 
         let value = value_bytes.to_vec();

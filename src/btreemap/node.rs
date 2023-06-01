@@ -28,7 +28,6 @@ const U32_SIZE: Bytes = Bytes::new(4);
 
 const META_DATA_OFFSET: Bytes = Bytes::new(4);
 
-const ENTRIES_OFFSET_V1: Bytes = Bytes::new(7);
 const OVERFLOW_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET_V2: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
 
@@ -437,22 +436,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.keys.binary_search(key)
     }
 
-    /// Returns the size of a node in bytes.
-    ///
-    /// See the documentation of [`Node`] for the memory layout.
-    pub fn size(max_key_size: u32, max_value_size: u32) -> Bytes {
-        let max_key_size = Bytes::from(max_key_size);
-        let max_value_size = Bytes::from(max_value_size);
-
-        let node_header_size = ENTRIES_OFFSET_V1;
-        let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
-        let child_size = Address::size();
-
-        node_header_size
-            + Bytes::from(CAPACITY as u64) * entry_size
-            + Bytes::from((CAPACITY + 1) as u64) * child_size
-    }
-
     /// Returns true if the node is at the minimum required size, false otherwise.
     pub fn at_minimum(&self) -> bool {
         self.keys.len() < B
@@ -483,20 +466,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Return the median entry.
         self.pop_entry(memory)
             .expect("An initially full node cannot be empty")
-    }
-}
-
-// A transient data structure for reading/writing metadata into/from stable memory.
-// TODO: delete this struct.
-#[repr(C, packed)]
-struct NodeHeader {
-    node_type: u8,
-    num_entries: u16,
-}
-
-impl NodeHeader {
-    fn size() -> Bytes {
-        Bytes::from(core::mem::size_of::<Self>() as u64)
     }
 }
 

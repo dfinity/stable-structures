@@ -73,6 +73,11 @@ fn read_u64<M: Memory>(m: &M, addr: Address) -> u64 {
     u64::from_le_bytes(buf)
 }
 
+// Writes a single 16-bit integer encoded as little-endian.
+fn write_u16<M: Memory>(m: &M, addr: Address, val: u16) {
+    write(m, addr.get(), &val.to_le_bytes());
+}
+
 // Writes a single 32-bit integer encoded as little-endian.
 fn write_u32<M: Memory>(m: &M, addr: Address, val: u32) {
     write(m, addr.get(), &val.to_le_bytes());
