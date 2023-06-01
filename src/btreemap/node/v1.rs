@@ -1,7 +1,6 @@
 use super::*;
 
-use crate::types::NULL;
-use crate::{write_u16, write_u64};
+use crate::write_u16;
 
 const LAYOUT_VERSION_OFFSET: u64 = 3;
 const NODE_TYPE_OFFSET: u64 = 4;

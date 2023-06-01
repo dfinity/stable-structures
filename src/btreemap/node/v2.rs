@@ -15,8 +15,6 @@ use crate::write_u64;
 impl<K: Storable + Ord + Clone> Node<K> {
     // Loads a V2 node from memory at the given address.
     pub(super) fn load_v2<M: Memory>(address: Address, page_size: u32, memory: &M) -> Self {
-        println!("LOADING {:?}...", address);
-
         let full_buf = read_node(address, page_size as usize, memory);
 
         // Load the metadata.
@@ -43,34 +41,36 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the entries.
         let mut keys = Vec::with_capacity(num_entries);
         let mut encoded_values = Vec::with_capacity(num_entries);
-        let mut offset = ENTRIES_OFFSET.get() as usize;
-        let mut buf = vec![]; //Vec::with_capacity(max_key_size.max(max_value_size) as usize);
+        let mut offset = ENTRIES_OFFSET;
+        let mut buf = vec![];
         for _ in 0..num_entries {
             // Read the key's size.
-            let key_size =
-                u32::from_le_bytes((&full_buf[offset..offset + 4]).try_into().unwrap()) as usize;
-            offset += 4;
+            let key_size = read_u32_from_slice(&full_buf, offset) as usize;
+            offset += U32_SIZE;
 
             // Read the key.
-            buf.resize(key_size as usize, 0);
-            let key = K::from_bytes(Cow::Borrowed(&full_buf[offset..offset + key_size]));
-            offset += key_size;
+            buf.resize(key_size, 0);
+            let key = K::from_bytes(Cow::Borrowed(
+                &full_buf[offset.get() as usize..offset.get() as usize + key_size],
+            ));
+            offset += Bytes::from(key_size as u64);
             keys.push(key);
         }
 
         // Load the values
         for _ in 0..num_entries {
             // Read the value's size.
-            //    let value_size = read_u32(memory, get_address(offset));
-            let value_size =
-                u32::from_le_bytes((&full_buf[offset..offset + 4]).try_into().unwrap()) as usize;
-            offset += 4;
+            let value_size = read_u32_from_slice(&full_buf, offset) as usize;
+            offset += U32_SIZE;
 
-            // TODO Values are loaded lazily. Store a reference and skip loading it.
-            buf.resize(value_size as usize, 0);
-            encoded_values.push(Value::ByVal(full_buf[offset..offset + value_size].to_vec()));
+            // Read the value.
+            // TODO: Read values lazily.
+            buf.resize(value_size, 0);
+            encoded_values.push(Value::ByVal(
+                full_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
+            ));
 
-            offset += value_size;
+            offset += Bytes::from(value_size as u64);
         }
 
         // Load children if this is an internal node.
@@ -78,9 +78,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         if node_type == NodeType::Internal {
             // The number of children is equal to the number of entries + 1.
             for _ in 0..num_entries + 1 {
-                //   let child = Address::from(read_u64(memory, get_address(offset)));
-                let child = address_from_slice(&full_buf, Bytes::from(offset as u64));
-                offset += 8; //Address::size();
+                let child = address_from_slice(&full_buf, offset);
+                offset += Address::size();
                 children.push(child);
             }
 
@@ -88,8 +87,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         let original_overflow_address = address_from_slice(&full_buf, OVERFLOW_ADDRESS_OFFSET);
-
-        println!("DONE");
 
         Self {
             address,
@@ -108,7 +105,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&self, page_size: u32, allocator: &mut Allocator<M>) {
-        println!("SAVING {:?}...", self.address);
         // A buffer to serialize the node into first, then write to memory.
         let mut buf = vec![];
         buf.extend_from_slice(MAGIC);
@@ -157,12 +153,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         self.write_paginated(buf, allocator, page_size as usize);
-        println!("DONE");
     }
 
     fn write_paginated<M: Memory>(
         &self,
-        mut buf: Vec<u8>,
+        buf: Vec<u8>,
         allocator: &mut Allocator<M>,
         page_size: usize,
     ) {
@@ -177,14 +172,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
             0
         };
 
-        //       println!("overflow pages needed: {:?}", additional_pages_needed);
-        //       println!("buffer size: {}", buf.len());
-
         // Get overflow addresses, making the necessary allocation/deallocations.
         let overflow_addresses =
             self.get_overflow_addresses_rename(additional_pages_needed, allocator);
-
-        //        println!("overflow addresses: {:?}", overflow_addresses);
 
         // Write the first page
         let memory = allocator.memory();
@@ -208,15 +198,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let data_size = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
         while next_idx < buf.len() {
-            //         println!("writing page at address {:?}", overflow_addresses[i].get());
             // Write magic and next address
             memory.write(overflow_addresses[i].get(), &OVERFLOW_MAGIC[..]);
             let next_address = overflow_addresses.get(i + 1).unwrap_or(&NULL);
-            //        println!(
-            //            "The next address of {:?} is {:?}",
-            //           overflow_addresses[i] + PAGE_OVERFLOW_NEXT_OFFSET,
-            //           next_address.get()
-            //      );
             write_u64(
                 memory,
                 overflow_addresses[i] + PAGE_OVERFLOW_NEXT_OFFSET,
@@ -230,7 +214,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 (overflow_addresses[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
                 &buf[start_idx..end_idx],
             );
-            //        println!("buf write bytes from {} to {}", start_idx, end_idx);
 
             i += 1;
             next_idx += data_size;
@@ -248,14 +231,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // If there are too many overflow addresses, deallocate some until we've reached
         // the number we need.
         while current_overflow_addresses.len() > num_overflow_pages {
-            println!("1. DEALLOCATING");
             let overflow_page = current_overflow_addresses.pop().unwrap();
             allocator.deallocate(overflow_page);
         }
 
         // Allocate more pages to accommodate the number requested, if needed.
         while current_overflow_addresses.len() < num_overflow_pages {
-            println!("1. ALLOCATING");
             current_overflow_addresses.push(allocator.allocate());
         }
 
@@ -263,7 +244,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     pub(super) fn get_overflow_addresses<M: Memory>(&self, memory: &M) -> Vec<Address> {
-        println!("getting overflow addresses");
         let mut overflow_addresses = vec![];
         let mut next = self.overflow;
         while let Some(overflow_address) = next {
@@ -282,7 +262,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             }
         }
 
-        println!("DONE");
         overflow_addresses
     }
 }
@@ -315,6 +294,14 @@ fn read_node<M: Memory>(address: Address, page_size: usize, memory: &M) -> Vec<u
 
 fn read_u64_from_slice(slice: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes((&slice[offset..offset + 8]).try_into().unwrap())
+}
+
+fn read_u32_from_slice(slice: &[u8], offset: Bytes) -> u32 {
+    u32::from_le_bytes(
+        (&slice[offset.get() as usize..offset.get() as usize + 4])
+            .try_into()
+            .unwrap(),
+    )
 }
 
 fn address_from_slice(slice: &[u8], offset: Bytes) -> Address {

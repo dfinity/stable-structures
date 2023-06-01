@@ -5,7 +5,7 @@ mod node;
 use crate::{
     storable::Bound as StorableBound,
     types::{Address, Bytes, NULL},
-    BoundedStorable, Memory, Storable,
+    Memory, Storable,
 };
 use allocator::Allocator;
 pub use iter::Iter;
@@ -167,7 +167,7 @@ where
         };*/
 
         let page_size = DEFAULT_PAGE_SIZE; //Node::<K>::size(max_key_size, max_value_size);
-        //let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
+                                           //let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
 
         let btree = Self {
             root_addr: NULL,
@@ -1115,7 +1115,6 @@ where
     //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     //   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
-        let source_address = source.address();
         into.merge(source, median, &mut self.allocator);
         into.save(&mut self.allocator);
         into
