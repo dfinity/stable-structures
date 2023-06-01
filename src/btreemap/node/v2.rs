@@ -1,5 +1,10 @@
 use super::*;
 
+// The offset where the address of the overflow page is present.
+const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
+const ENTRIES_OFFSET: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
+
+
 const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
 const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11); // magic + next address
 
@@ -14,7 +19,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut full_buf = vec![0; page_size as usize];
         memory.read(address.get(), &mut full_buf);
 
-        let mut overflow_address = Address::from(read_u64(memory, address + OVERFLOW_OFFSET));
+        let mut overflow_address =
+            Address::from(read_u64(memory, address + OVERFLOW_ADDRESS_OFFSET));
 
         let original_overflow_address = overflow_address;
 
@@ -61,7 +67,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the entries.
         let mut keys = Vec::with_capacity(num_entries);
         let mut encoded_values = Vec::with_capacity(num_entries);
-        let mut offset = ENTRIES_OFFSET_V2.get() as usize;
+        let mut offset = ENTRIES_OFFSET.get() as usize;
         let mut buf = vec![]; //Vec::with_capacity(max_key_size.max(max_value_size) as usize);
         for _ in 0..num_entries {
             // Read the key's size.
@@ -216,7 +222,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             //memory.write(self.address.get(), &buf[..page_size]);
             write_u64(
                 memory,
-                self.address + OVERFLOW_OFFSET,
+                self.address + OVERFLOW_ADDRESS_OFFSET,
                 overflow_addresses[0].get(),
             );
         }

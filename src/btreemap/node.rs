@@ -3,7 +3,7 @@ use crate::{
     read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
-    write, write_struct, write_u32, Memory,
+    write, write_u32, Memory,
 };
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
@@ -27,9 +27,6 @@ const INTERNAL_NODE_TYPE: u8 = 1;
 const U32_SIZE: Bytes = Bytes::new(4);
 
 const META_DATA_OFFSET: Bytes = Bytes::new(4);
-
-const OVERFLOW_OFFSET: Bytes = Bytes::new(7);
-const ENTRIES_OFFSET_V2: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
 
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum NodeType {
@@ -131,8 +128,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Saves the node to memory.
     pub fn save<M: Memory>(&self, allocator: &mut Allocator<M>) {
-        let memory = allocator.memory();
-
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());

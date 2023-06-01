@@ -166,8 +166,8 @@ where
             todo!("v2 not yet supported")
         };
 
-        //let page_size = DEFAULT_PAGE_SIZE; //Node::<K>::size(max_key_size, max_value_size);
-        let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
+        let page_size = DEFAULT_PAGE_SIZE; //Node::<K>::size(max_key_size, max_value_size);
+        //let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
 
         //        println!("page size: {page_size:?}");
 
