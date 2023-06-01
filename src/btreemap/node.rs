@@ -17,7 +17,7 @@ mod v2;
 const B: usize = 6;
 // The maximum number of entries per node.
 const CAPACITY: usize = 2 * B - 1;
-const LAYOUT_VERSION: u8 = 1;
+const LAYOUT_VERSION_1: u8 = 1;
 const LAYOUT_VERSION_2: u8 = 2;
 const MAGIC: &[u8; 3] = b"BTN";
 const LEAF_NODE_TYPE: u8 = 0;
@@ -102,18 +102,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             } => {
-                assert_eq!(buf[3], LAYOUT_VERSION, "Unsupported version.");
+                assert_eq!(buf[3], LAYOUT_VERSION_1);
                 Self::load_v1(address, memory, max_key_size, max_value_size)
             }
             Version::V2 { page_size } => {
-                assert_eq!(buf[3], LAYOUT_VERSION_2, "Unsupported version.");
+                assert_eq!(buf[3], LAYOUT_VERSION_2);
                 Self::load_v2(address, page_size, memory)
             }
         }
     }
 
     pub fn deallocate<M: Memory>(self, allocator: &mut Allocator<M>) {
-        println!("DEALLOCATING");
         let overflow_addresses = self.get_overflow_addresses(allocator.memory());
 
         // Deallocate all overflows

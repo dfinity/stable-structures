@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::write_u16;
+use crate::{write_u16, read_u16};
 
 const LAYOUT_VERSION_OFFSET: u64 = 3;
 const NODE_TYPE_OFFSET: u64 = 4;
@@ -8,29 +8,24 @@ const NUM_ENTRIES_OFFSET: u64 = 5;
 const ENTRIES_OFFSET: u64 = 7;
 
 impl<K: Storable + Ord + Clone> Node<K> {
-    /// Loads a node from memory at the given address.
+    /// Loads a V1 node from memory at the given address.
     pub(super) fn load_v1<M: Memory>(
         address: Address,
         memory: &M,
         max_key_size: u32,
         max_value_size: u32,
     ) -> Self {
-        // Load the metadata.
-        let mut offset = META_DATA_OFFSET;
+        // Load node type.
         let mut buf = vec![0];
-        memory.read((address + offset).get(), &mut buf);
+        memory.read(address.get() + NODE_TYPE_OFFSET, &mut buf);
         let node_type = match buf[0] {
             LEAF_NODE_TYPE => NodeType::Leaf,
             INTERNAL_NODE_TYPE => NodeType::Internal,
             other => unreachable!("Unknown node type {}", other),
         };
 
-        offset += Bytes::new(1);
-
-        // TODO: add read u16?
-        buf.resize(2, 0);
-        memory.read((address + offset).get(), &mut buf);
-        let num_entries = u16::from_le_bytes(buf.try_into().unwrap()) as usize;
+        // Load number of entries.
+        let num_entries = read_u16(memory, address + Bytes::from(NUM_ENTRIES_OFFSET)) as usize;
 
         // Load the entries.
         let mut keys = Vec::with_capacity(num_entries);
@@ -38,11 +33,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut offset = Bytes::from(ENTRIES_OFFSET);
         let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
         for _ in 0..num_entries {
-            // Read the key's size.
+            // Load the key's size.
             let key_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
 
-            // Read the key.
+            // Load the key.
             buf.resize(key_size as usize, 0);
             memory.read((address + offset).get(), &mut buf);
             offset += Bytes::from(max_key_size);
@@ -85,7 +80,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         memory.write(self.address.get(), MAGIC);
         memory.write(
             self.address.get() + LAYOUT_VERSION_OFFSET,
-            &[LAYOUT_VERSION],
+            &[LAYOUT_VERSION_1],
         );
         memory.write(
             self.address.get() + NODE_TYPE_OFFSET,

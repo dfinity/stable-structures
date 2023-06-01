@@ -65,6 +65,14 @@ fn read_u32<M: Memory>(m: &M, addr: Address) -> u32 {
     u32::from_le_bytes(buf)
 }
 
+// A helper function that reads a single 16bit integer encoded as
+// little-endian from the specified memory at the specified offset.
+fn read_u16<M: Memory>(m: &M, addr: Address) -> u16 {
+    let mut buf: [u8; 2] = [0; 2];
+    m.read(addr.get(), &mut buf);
+    u16::from_le_bytes(buf)
+}
+
 // A helper function that reads a single 64bit integer encoded as
 // little-endian from the specified memory at the specified offset.
 fn read_u64<M: Memory>(m: &M, addr: Address) -> u64 {

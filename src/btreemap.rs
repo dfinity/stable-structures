@@ -1121,7 +1121,6 @@ where
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
-        println!("1. ALLOCATING");
         Node::new(self.allocator.allocate(), node_type, self.version)
     }
 
