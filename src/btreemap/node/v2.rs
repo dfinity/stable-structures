@@ -1,6 +1,8 @@
 use super::*;
 
 // The offset where the address of the overflow page is present.
+const NODE_TYPE_OFFSET: usize = 4;
+const NUM_ENTRIES_OFFSET: usize = 5;
 const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
 
@@ -15,28 +17,17 @@ use crate::write_u64;
 impl<K: Storable + Ord + Clone> Node<K> {
     // Loads a V2 node from memory at the given address.
     pub(super) fn load_v2<M: Memory>(address: Address, page_size: u32, memory: &M) -> Self {
-        let full_buf = read_node(address, page_size as usize, memory);
+        // Load the node, including any overflows, into a buffer.
+        let node_buf = read_node(address, page_size as usize, memory);
 
         // Load the metadata.
-        let mut offset = META_DATA_OFFSET;
-        let mut buf = vec![0];
-        let node_type = match full_buf[offset.get() as usize] {
+        let node_type = match node_buf[NODE_TYPE_OFFSET] {
             LEAF_NODE_TYPE => NodeType::Leaf,
             INTERNAL_NODE_TYPE => NodeType::Internal,
             other => unreachable!("Unknown node type {}", other),
         };
 
-        offset += Bytes::new(1);
-        buf.resize(2, 0);
-        let num_entries = u16::from_le_bytes(
-            (&full_buf[offset.get() as usize..offset.get() as usize + 2])
-                .try_into()
-                .unwrap(),
-        ) as usize;
-        offset += Bytes::new(2);
-
-        // Read overflow
-        buf.resize(8, 0);
+        let num_entries = read_u16_from_slice(&node_buf, NUM_ENTRIES_OFFSET) as usize;
 
         // Load the entries.
         let mut keys = Vec::with_capacity(num_entries);
@@ -45,13 +36,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut buf = vec![];
         for _ in 0..num_entries {
             // Read the key's size.
-            let key_size = read_u32_from_slice(&full_buf, offset) as usize;
+            let key_size = read_u32_from_slice(&node_buf, offset) as usize;
             offset += U32_SIZE;
 
             // Read the key.
             buf.resize(key_size, 0);
             let key = K::from_bytes(Cow::Borrowed(
-                &full_buf[offset.get() as usize..offset.get() as usize + key_size],
+                &node_buf[offset.get() as usize..offset.get() as usize + key_size],
             ));
             offset += Bytes::from(key_size as u64);
             keys.push(key);
@@ -60,14 +51,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the values
         for _ in 0..num_entries {
             // Read the value's size.
-            let value_size = read_u32_from_slice(&full_buf, offset) as usize;
+            let value_size = read_u32_from_slice(&node_buf, offset) as usize;
             offset += U32_SIZE;
 
             // Read the value.
             // TODO: Read values lazily.
             buf.resize(value_size, 0);
             encoded_values.push(Value::ByVal(
-                full_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
+                node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
             ));
 
             offset += Bytes::from(value_size as u64);
@@ -78,7 +69,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         if node_type == NodeType::Internal {
             // The number of children is equal to the number of entries + 1.
             for _ in 0..num_entries + 1 {
-                let child = address_from_slice(&full_buf, offset);
+                let child = address_from_slice(&node_buf, offset);
                 offset += Address::size();
                 children.push(child);
             }
@@ -86,7 +77,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             assert_eq!(children.len(), keys.len() + 1);
         }
 
-        let original_overflow_address = address_from_slice(&full_buf, OVERFLOW_ADDRESS_OFFSET);
+        let original_overflow_address = address_from_slice(&node_buf, OVERFLOW_ADDRESS_OFFSET);
 
         Self {
             address,
@@ -290,6 +281,10 @@ fn read_node<M: Memory>(address: Address, page_size: usize, memory: &M) -> Vec<u
     }
 
     buf
+}
+
+fn read_u16_from_slice(slice: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes((&slice[offset..offset + 2]).try_into().unwrap())
 }
 
 fn read_u64_from_slice(slice: &[u8], offset: usize) -> u64 {

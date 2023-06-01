@@ -25,8 +25,6 @@ const INTERNAL_NODE_TYPE: u8 = 1;
 // The size of u32 in bytes.
 const U32_SIZE: Bytes = Bytes::new(4);
 
-const META_DATA_OFFSET: Bytes = Bytes::new(4);
-
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum NodeType {
     Leaf,
