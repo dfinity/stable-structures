@@ -4,44 +4,20 @@ use super::*;
 const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
 
-
 const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
 const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11); // magic + next address
+                                                         //
+const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 
 use crate::types::NULL;
 use crate::write_u64;
 
 impl<K: Storable + Ord + Clone> Node<K> {
-    // Loads a node from memory at the given address.
+    // Loads a V2 node from memory at the given address.
     pub(super) fn load_v2<M: Memory>(address: Address, page_size: u32, memory: &M) -> Self {
         println!("LOADING {:?}...", address);
-        // Read the node into a buffer.
-        let mut full_buf = vec![0; page_size as usize];
-        memory.read(address.get(), &mut full_buf);
 
-        let mut overflow_address =
-            Address::from(read_u64(memory, address + OVERFLOW_ADDRESS_OFFSET));
-
-        let original_overflow_address = overflow_address;
-
-        // Concatenate the overflow page into the buffer.
-        loop {
-            if overflow_address == NULL {
-                break;
-            }
-            println!("overflow address: {:?}", overflow_address);
-
-            let mut overflow_buf = vec![0; page_size as usize];
-
-            memory.read(overflow_address.get(), &mut overflow_buf);
-            // TODO: validate magic, read next overflow.
-            full_buf.extend_from_slice(&overflow_buf[PAGE_OVERFLOW_DATA_OFFSET.get() as usize..]);
-
-            overflow_address = Address::from(read_u64(
-                memory,
-                overflow_address + PAGE_OVERFLOW_NEXT_OFFSET,
-            ));
-        }
+        let full_buf = read_node(address, page_size as usize, memory);
 
         // Load the metadata.
         let mut offset = META_DATA_OFFSET;
@@ -103,9 +79,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             // The number of children is equal to the number of entries + 1.
             for _ in 0..num_entries + 1 {
                 //   let child = Address::from(read_u64(memory, get_address(offset)));
-                let child = Address::from(u64::from_le_bytes(
-                    (&full_buf[offset..offset + 8]).try_into().unwrap(),
-                ));
+                let child = address_from_slice(&full_buf, Bytes::from(offset as u64));
                 offset += 8; //Address::size();
                 children.push(child);
             }
@@ -113,8 +87,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
             assert_eq!(children.len(), keys.len() + 1);
         }
 
-        println!("original overflow address: {:?}", original_overflow_address);
+        let original_overflow_address = address_from_slice(&full_buf, OVERFLOW_ADDRESS_OFFSET);
+
         println!("DONE");
+
         Self {
             address,
             keys,
@@ -309,4 +285,38 @@ impl<K: Storable + Ord + Clone> Node<K> {
         println!("DONE");
         overflow_addresses
     }
+}
+
+// Reads the entirety of the node, including all its overflows, into a buffer.
+fn read_node<M: Memory>(address: Address, page_size: usize, memory: &M) -> Vec<u8> {
+    // Read the first page of the node.
+    let mut buf = vec![0; page_size];
+    memory.read(address.get(), &mut buf);
+
+    // Append overflow pages, if any.
+    let mut overflow_address = address_from_slice(&buf, OVERFLOW_ADDRESS_OFFSET);
+    while overflow_address != NULL {
+        // Read the overflow.
+        let mut overflow_buf = vec![0; page_size];
+        memory.read(overflow_address.get(), &mut overflow_buf);
+
+        // Validate the magic of the overflow.
+        assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad magic.");
+
+        // Read the next address
+        overflow_address = address_from_slice(&overflow_buf, PAGE_OVERFLOW_NEXT_OFFSET);
+
+        // Append its data to the buffer.
+        buf.extend_from_slice(&overflow_buf[PAGE_OVERFLOW_DATA_OFFSET.get() as usize..]);
+    }
+
+    buf
+}
+
+fn read_u64_from_slice(slice: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes((&slice[offset..offset + 8]).try_into().unwrap())
+}
+
+fn address_from_slice(slice: &[u8], offset: Bytes) -> Address {
+    Address::from(read_u64_from_slice(slice, offset.get() as usize))
 }

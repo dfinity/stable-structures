@@ -154,7 +154,7 @@ where
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
         // For now, using v1.
-        let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
+        /*let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
             max_size
         } else {
             todo!("v2 not yet supported")
@@ -164,12 +164,10 @@ where
             max_size
         } else {
             todo!("v2 not yet supported")
-        };
+        };*/
 
         let page_size = DEFAULT_PAGE_SIZE; //Node::<K>::size(max_key_size, max_value_size);
         //let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
-
-        //        println!("page size: {page_size:?}");
 
         let btree = Self {
             root_addr: NULL,
@@ -177,6 +175,10 @@ where
             version: Version::V2 {
                 page_size: page_size.get() as u32,
             },
+            /*version: Version::V1 {
+                max_key_size,
+                max_value_size,
+            },*/
             length: 0,
             _phantom: PhantomData,
         };

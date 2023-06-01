@@ -20,7 +20,6 @@ const CAPACITY: usize = 2 * B - 1;
 const LAYOUT_VERSION: u8 = 1;
 const LAYOUT_VERSION_2: u8 = 2;
 const MAGIC: &[u8; 3] = b"BTN";
-const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
 // The size of u32 in bytes.
