@@ -26,8 +26,8 @@ const PACKED_HEADER_SIZE: usize = 28;
 /// The offset where the allocator begins.
 const ALLOCATOR_OFFSET: usize = 52;
 
-// TODO: this is an arbitary value.
-const DEFAULT_PAGE_SIZE: Bytes = Bytes::new(256);
+// NOTE: this is chosen arbitarily and needs to be revised.
+const DEFAULT_PAGE_SIZE: usize = 256;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -153,32 +153,17 @@ where
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
-        // For now, using v1.
-        /*let max_value_size = if let StorableBound::Bounded { max_size, .. } = V::BOUND {
-            max_size
-        } else {
-            todo!("v2 not yet supported")
-        };
-
-        let max_key_size = if let StorableBound::Bounded { max_size, .. } = K::BOUND {
-            max_size
-        } else {
-            todo!("v2 not yet supported")
-        };*/
-
-        let page_size = DEFAULT_PAGE_SIZE;
-        //let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
-
+        // Initialize a V2 BTree.
         let btree = Self {
             root_addr: NULL,
-            allocator: Allocator::new(memory, Address::from(ALLOCATOR_OFFSET as u64), page_size),
+            allocator: Allocator::new(
+                memory,
+                Address::from(ALLOCATOR_OFFSET as u64),
+                Bytes::new(DEFAULT_PAGE_SIZE as u64),
+            ),
             version: Version::V2 {
-                page_size: page_size.get() as usize,
+                page_size: DEFAULT_PAGE_SIZE,
             },
-            /*version: Version::V1 {
-                max_key_size,
-                max_value_size,
-            },*/
             length: 0,
             _phantom: PhantomData,
         };
@@ -197,30 +182,34 @@ where
                 max_key_size: expected_key_size,
                 max_value_size: expected_value_size,
             } => {
-                if let StorableBound::Bounded {
-                    max_size: max_key_size,
-                    ..
-                } = K::BOUND
-                {
-                    assert!(
-                        max_key_size <= expected_key_size,
-                        "max_key_size must be <= {expected_key_size}"
-                    );
-                }
+                match K::BOUND {
+                    StorableBound::Bounded {
+                        max_size: max_key_size,
+                        ..
+                    } => {
+                        assert!(
+                            max_key_size <= expected_key_size,
+                            "max_key_size must be <= {expected_key_size}"
+                        );
+                    }
+                    _ => panic!("Key must be bounded if using a V1 BTree"),
+                };
 
-                if let StorableBound::Bounded {
-                    max_size: max_value_size,
-                    ..
-                } = V::BOUND
-                {
-                    assert!(
-                        max_value_size <= expected_value_size,
-                        "max_value_size must be <= {expected_value_size}"
-                    );
+                match V::BOUND {
+                    StorableBound::Bounded {
+                        max_size: max_value_size,
+                        ..
+                    } => {
+                        assert!(
+                            max_value_size <= expected_value_size,
+                            "max_value_size must be <= {expected_value_size}"
+                        );
+                    }
+                    _ => panic!("Value must be bounded if using a V1 BTree"),
                 }
             }
             Version::V2 { .. } => {
-                // Nothing to do.
+                // Nothing to assert.
             }
         }
 
@@ -301,7 +290,7 @@ where
                 );
             }
             Version::V2 { .. } => {
-                // No assertions to be made.
+                // Nothing to assert.
             }
         }
 
