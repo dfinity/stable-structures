@@ -1195,7 +1195,7 @@ impl std::fmt::Display for InsertError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storable::Blob;
+    use crate::storable::{Blob, BoundedStorable};
     use std::cell::RefCell;
     use std::rc::Rc;
 
