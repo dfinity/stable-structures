@@ -166,14 +166,14 @@ where
             todo!("v2 not yet supported")
         };*/
 
-        let page_size = DEFAULT_PAGE_SIZE; //Node::<K>::size(max_key_size, max_value_size);
-                                           //let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
+        let page_size = DEFAULT_PAGE_SIZE;
+        //let page_size = Node::<K>::size_v1(max_key_size, max_value_size);
 
         let btree = Self {
             root_addr: NULL,
             allocator: Allocator::new(memory, Address::from(ALLOCATOR_OFFSET as u64), page_size),
             version: Version::V2 {
-                page_size: page_size.get() as u32,
+                page_size: page_size.get() as usize,
             },
             /*version: Version::V1 {
                 max_key_size,
@@ -258,7 +258,7 @@ where
                 // Deserialize the fields
                 BTreeHeader {
                     version: Version::V2 {
-                        page_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+                        page_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()) as usize,
                     },
                     root_addr: Address::from(u64::from_le_bytes(buf[12..20].try_into().unwrap())),
                     length: u64::from_le_bytes(buf[20..28].try_into().unwrap()),
@@ -1155,7 +1155,7 @@ where
             }
             Version::V2 { page_size } => {
                 buf[3] = LAYOUT_VERSION_2;
-                buf[4..8].copy_from_slice(&page_size.to_le_bytes());
+                buf[4..8].copy_from_slice(&(page_size as u32).to_le_bytes());
             }
         };
         buf[12..20].copy_from_slice(&header.root_addr.get().to_le_bytes());

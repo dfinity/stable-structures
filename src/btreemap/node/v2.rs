@@ -13,20 +13,22 @@ const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 
 use crate::types::NULL;
 use crate::write_u64;
+use std::cmp::min;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     // Loads a V2 node from memory at the given address.
-    pub(super) fn load_v2<M: Memory>(address: Address, page_size: u32, memory: &M) -> Self {
+    pub(super) fn load_v2<M: Memory>(address: Address, page_size: usize, memory: &M) -> Self {
         // Load the node, including any overflows, into a buffer.
-        let node_buf = read_node(address, page_size as usize, memory);
+        let node_buf = read_node(address, page_size, memory);
 
-        // Load the metadata.
+        // Load the node type.
         let node_type = match node_buf[NODE_TYPE_OFFSET] {
             LEAF_NODE_TYPE => NodeType::Leaf,
             INTERNAL_NODE_TYPE => NodeType::Internal,
             other => unreachable!("Unknown node type {}", other),
         };
 
+        // Load the number of entries
         let num_entries = read_u16_from_slice(&node_buf, NUM_ENTRIES_OFFSET) as usize;
 
         // Load the entries.
@@ -35,11 +37,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut offset = ENTRIES_OFFSET;
         let mut buf = vec![];
         for _ in 0..num_entries {
-            // Read the key's size.
+            // Load the key's size.
             let key_size = read_u32_from_slice(&node_buf, offset) as usize;
             offset += U32_SIZE;
 
-            // Read the key.
+            // Load the key.
             buf.resize(key_size, 0);
             let key = K::from_bytes(Cow::Borrowed(
                 &node_buf[offset.get() as usize..offset.get() as usize + key_size],
@@ -50,11 +52,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the values
         for _ in 0..num_entries {
-            // Read the value's size.
+            // Load the value's size.
             let value_size = read_u32_from_slice(&node_buf, offset) as usize;
             offset += U32_SIZE;
 
-            // Read the value.
+            // Load the value.
             // TODO: Read values lazily.
             buf.resize(value_size, 0);
             encoded_values.push(Value::ByVal(
@@ -95,7 +97,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     // Saves the node to memory.
-    pub(super) fn save_v2<M: Memory>(&self, page_size: u32, allocator: &mut Allocator<M>) {
+    pub(super) fn save_v2<M: Memory>(&self, page_size: usize, allocator: &mut Allocator<M>) {
         // A buffer to serialize the node into first, then write to memory.
         let mut buf = vec![];
         buf.extend_from_slice(MAGIC);
@@ -106,13 +108,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         });
         buf.extend_from_slice(&(self.keys.len() as u16).to_le_bytes());
 
-        // TODO: write the overflow pointer here.
+        // Add a null overflow address. This might get overwritten later in case the node
+        // does overflow.
         buf.extend_from_slice(&[0; 8]);
-
-        let memory = allocator.memory();
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
+        let memory = allocator.memory();
         for i in 0..self.keys.len() {
             self.value(i, memory);
         }
@@ -143,9 +145,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
             buf.extend_from_slice(&child.get().to_le_bytes());
         }
 
-        self.write_paginated(buf, allocator, page_size as usize);
+        self.write_paginated(buf, allocator, page_size);
     }
 
+    // Writes a buffer into pages of the given page size.
+    // Pages can be allocated and deallocated as needed.
     fn write_paginated<M: Memory>(
         &self,
         buf: Vec<u8>,
@@ -154,29 +158,23 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) {
         // Compute how many overflow pages are needed.
         let additional_pages_needed = if buf.len() > page_size {
-            let overflow_size = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
-            let data_size = buf.len() - page_size;
+            let overflow_page_capacity = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
+            let overflow_data_len = buf.len() - page_size;
 
             // Ceiling division
-            (data_size + overflow_size - 1) / overflow_size
+            (overflow_data_len + overflow_page_capacity - 1) / overflow_page_capacity
         } else {
             0
         };
 
-        // Get overflow addresses, making the necessary allocation/deallocations.
-        let overflow_addresses =
-            self.get_overflow_addresses_rename(additional_pages_needed, allocator);
+        // Retrieve the addresses for the overflow pages, making the necessary allocations.
+        let overflow_addresses = self.reallocate_overflow_pages(additional_pages_needed, allocator);
 
         // Write the first page
         let memory = allocator.memory();
-        memory.write(
-            self.address.get(),
-            &buf[..std::cmp::min(page_size, buf.len())],
-        );
-        if overflow_addresses.len() > 0 {
-            // Update the page to write the next overflow address.
-
-            //memory.write(self.address.get(), &buf[..page_size]);
+        memory.write(self.address.get(), &buf[..min(page_size, buf.len())]);
+        if !overflow_addresses.is_empty() {
+            // Write the next overflow address to the first page.
             write_u64(
                 memory,
                 self.address + OVERFLOW_ADDRESS_OFFSET,
@@ -184,11 +182,18 @@ impl<K: Storable + Ord + Clone> Node<K> {
             );
         }
 
-        let mut next_idx = page_size;
+        // Write the overflow pages.
         let mut i = 0;
+        let capacity = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
+        loop {
+            // Write the data from the buffer
+            let start_idx = page_size + i * capacity;
+            let end_idx = min(buf.len(), page_size + (i + 1) * capacity);
 
-        let data_size = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
-        while next_idx < buf.len() {
+            if start_idx >= end_idx {
+                break;
+            }
+            
             // Write magic and next address
             memory.write(overflow_addresses[i].get(), &OVERFLOW_MAGIC[..]);
             let next_address = overflow_addresses.get(i + 1).unwrap_or(&NULL);
@@ -198,40 +203,36 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 next_address.get(),
             );
 
-            // Write the data from the buffer
-            let start_idx = page_size + i * data_size;
-            let end_idx = std::cmp::min(buf.len(), page_size + (i + 1) * data_size);
+            // Write the overflow page contents
             memory.write(
                 (overflow_addresses[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
                 &buf[start_idx..end_idx],
             );
 
             i += 1;
-            next_idx += data_size;
         }
     }
 
-    fn get_overflow_addresses_rename<M: Memory>(
+    fn reallocate_overflow_pages<M: Memory>(
         &self,
         num_overflow_pages: usize,
         allocator: &mut Allocator<M>,
     ) -> Vec<Address> {
         // Fetch the overflow page addresses of this node.
-        let mut current_overflow_addresses = self.get_overflow_addresses(allocator.memory());
+        let mut addresses = self.get_overflow_addresses(allocator.memory());
 
         // If there are too many overflow addresses, deallocate some until we've reached
         // the number we need.
-        while current_overflow_addresses.len() > num_overflow_pages {
-            let overflow_page = current_overflow_addresses.pop().unwrap();
-            allocator.deallocate(overflow_page);
+        while addresses.len() > num_overflow_pages {
+            allocator.deallocate(addresses.pop().unwrap());
         }
 
         // Allocate more pages to accommodate the number requested, if needed.
-        while current_overflow_addresses.len() < num_overflow_pages {
-            current_overflow_addresses.push(allocator.allocate());
+        while addresses.len() < num_overflow_pages {
+            addresses.push(allocator.allocate());
         }
 
-        current_overflow_addresses
+        addresses
     }
 
     pub(super) fn get_overflow_addresses<M: Memory>(&self, memory: &M) -> Vec<Address> {

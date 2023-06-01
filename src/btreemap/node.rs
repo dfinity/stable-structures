@@ -40,7 +40,7 @@ pub enum Version {
         max_value_size: u32,
     },
     V2 {
-        page_size: u32,
+        page_size: usize,
     },
 }
 
