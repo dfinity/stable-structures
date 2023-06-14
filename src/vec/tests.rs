@@ -151,7 +151,7 @@ fn test_init_failures() {
     mem.write(0, b"SIC\x01\x08\x00\x00\x00\x00\x00\x00\x00\x01");
     assert_eq!(
         StableVec::<u64, M>::init(mem).unwrap_err(),
-        InitError::BadMagic(*b"SIC"),
+        InitError::BadMagic{ actual: *b"SIC", expected: *b"SVC"},
     );
 
     let mem = M::default();

@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+mod base_vec;
 pub mod btreemap;
 pub mod cell;
 pub use cell::{Cell as StableCell, Cell};
