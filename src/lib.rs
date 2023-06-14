@@ -9,6 +9,7 @@ mod ic0_memory; // Memory API for canisters.
 pub mod log;
 pub use log::{Log as StableLog, Log};
 pub mod memory_manager;
+pub mod min_heap;
 pub mod reader;
 pub mod storable;
 #[cfg(test)]
