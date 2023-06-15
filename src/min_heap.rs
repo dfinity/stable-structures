@@ -136,7 +136,7 @@ where
             }
 
             if n <= r {
-                // Only the left child is withing the array bounds.
+                // Only the left child is within the array bounds.
 
                 let left = self.0.get(l).unwrap();
                 if is_less(&left, item) {
@@ -145,7 +145,7 @@ where
                     continue;
                 }
             } else {
-                // Both children are withing the array bounds.
+                // Both children are within the array bounds.
 
                 let left = self.0.get(l).unwrap();
                 let right = self.0.get(r).unwrap();
