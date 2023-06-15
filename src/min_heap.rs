@@ -170,8 +170,8 @@ where
     }
 
     fn swap(&mut self, i: u64, x: &T, j: u64, y: &T) {
-        self.0.set(i, &y);
-        self.0.set(j, &x);
+        self.0.set(i, y);
+        self.0.set(j, x);
     }
 }
 
