@@ -118,8 +118,7 @@ where
             let p = (i - 1) / 2;
             let parent = self.0.get(p).unwrap();
             if is_less(item, &parent) {
-                self.0.set(i, &parent);
-                self.0.set(p, item);
+                self.swap(i, item, p, &parent);
             }
             i = p;
         }
@@ -139,10 +138,9 @@ where
             if n <= r {
                 // Only the left child is withing the array bounds.
 
-                let child = self.0.get(l).unwrap();
-                if is_less(&child, item) {
-                    self.0.set(i, &child);
-                    self.0.set(l, item);
+                let left = self.0.get(l).unwrap();
+                if is_less(&left, item) {
+                    self.swap(i, item, l, &left);
                     i = l;
                     continue;
                 }
@@ -154,24 +152,26 @@ where
 
                 if is_less(&left, item) {
                     if is_less(&right, &left) {
-                        self.0.set(i, &right);
-                        self.0.set(r, item);
+                        self.swap(i, item, r, &right);
                         i = r;
                     } else {
-                        self.0.set(i, &left);
-                        self.0.set(l, item);
+                        self.swap(i, item, l, &left);
                         i = l;
                     }
                     continue;
                 } else if is_less(&right, item) {
-                    self.0.set(i, &right);
-                    self.0.set(r, item);
+                    self.swap(i, item, r, &right);
                     i = r;
                     continue;
                 }
             }
             return;
         }
+    }
+
+    fn swap(&mut self, i: u64, x: &T, j: u64, y: &T) {
+        self.0.set(i, &y);
+        self.0.set(j, &x);
     }
 }
 
