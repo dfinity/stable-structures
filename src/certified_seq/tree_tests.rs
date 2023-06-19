@@ -3,12 +3,7 @@ use super::*;
 #[test]
 fn test_left_parent() {
     for n in [0, 1, 3, 7] {
-        assert_eq!(
-            left_parent(n),
-            None,
-            "Node {} does not have a left parent",
-            n
-        )
+        assert_eq!(left_parent(n), None, "Node {n} does not have a left parent",)
     }
     for (n, p) in [
         (2, 1),
@@ -25,9 +20,7 @@ fn test_left_parent() {
         assert_eq!(
             left_parent(n),
             Some(p),
-            "Expected the parent of node {} to be {}",
-            n,
-            p
+            "Expected the parent of node {n} to be {p}",
         );
     }
 }
