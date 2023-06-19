@@ -301,8 +301,8 @@ fn leaf_hash(bytes: &[u8]) -> Hash {
 /// Returns the hash of a leaf labeled with the given index.
 fn leaf_subtree_hash(idx: u64, data_hash: &Hash) -> Hash {
     let mut labeled_hasher = domain_sep("ic-hashtree-labeled");
-    labeled_hasher.update(&idx.to_be_bytes());
-    labeled_hasher.update(&data_hash);
+    labeled_hasher.update(idx.to_be_bytes());
+    labeled_hasher.update(data_hash);
     labeled_hasher.finalize().into()
 }
 
