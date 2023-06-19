@@ -96,6 +96,10 @@ impl<M: Memory> CertifiedSeq<M> {
     pub fn witness_item<B: WitnessBuilder>(&self, logical_index: u64, leaf_data: &[u8]) -> B::Tree {
         let n = self.0.len();
 
+        if n == 0 {
+            return B::empty();
+        }
+
         let (mut pos, data_witness) = if logical_index < num_leaves(n) {
             debug_assert_eq!(self.0.get(logical_index * 2).unwrap(), leaf_hash(leaf_data));
             (logical_index * 2, B::leaf(leaf_data))

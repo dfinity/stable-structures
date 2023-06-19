@@ -110,7 +110,7 @@ proptest! {
     }
 
     #[test]
-    fn test_witness_generation(data in pvec(pvec(any::<u8>(), 0..50), 1..32)) {
+    fn test_witness_generation(data in pvec(pvec(any::<u8>(), 0..50), 0..32)) {
         let seq = CertifiedSeq::new(DefaultMemoryImpl::default()).unwrap();
         for blob in &data {
             seq.append(blob).unwrap();
