@@ -45,15 +45,23 @@ where
         BaseVec::<T, M>::init(memory, MAGIC).map(Self)
     }
 
+    /// Returns the number of items in the heap.
+    ///
+    /// Complexity: O(1)
     pub fn len(&self) -> u64 {
         self.0.len()
     }
 
+    /// Returns true if the heap is empty.
+    ///
+    /// Complexity: O(1)
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    /// Pushes an item onto the min heap.
+    /// Pushes an item onto the heap.
+    ///
+    /// Complexity: O(log(self.len()))
     pub fn push(&mut self, item: &T) -> Result<(), GrowFailed> {
         self.0.push(item)?;
         self.bubble_up(self.0.len() - 1, item);
@@ -63,6 +71,8 @@ where
 
     /// Removes the smallest item from the heap and returns it.
     /// Returns `None` if the heap is empty.
+    ///
+    /// Complexity: O(log(self.len()))
     pub fn pop(&mut self) -> Option<T> {
         let n = self.len();
         match n {
@@ -81,6 +91,8 @@ where
 
     /// Returns the smallest item in the heap.
     /// Returns `None` if the heap is empty.
+    ///
+    /// Complexity: O(1)
     pub fn peek(&self) -> Option<T> {
         self.0.get(0)
     }
@@ -90,6 +102,7 @@ where
         self.0.iter()
     }
 
+    /// Returns the underlying memory instance.
     pub fn into_memory(self) -> M {
         self.0.into_memory()
     }
@@ -111,28 +124,38 @@ where
         Ok(())
     }
 
+    /// PRECONDITION: self.0.get(i) == item
     fn bubble_up(&mut self, mut i: u64, item: &T) {
-        // LOOP INVARIANT: self.0.get(i) == item
-        //                 ∧ HeapInvariant(self, i, self.len() - 1)
+        // We set the flag if self.0.get(i) does not contain the item anymore.
+        let mut swapped = false;
+        // LOOP INVARIANT: HeapInvariant(self, i, self.len() - 1)
         while i > 0 {
             let p = (i - 1) / 2;
             let parent = self.0.get(p).unwrap();
             if is_less(item, &parent) {
-                self.swap(i, item, p, &parent);
+                self.0.set(i, &parent);
+                swapped = true;
+            } else {
+                break;
             }
             i = p;
         }
+        if swapped {
+            self.0.set(i, item);
+        }
     }
 
+    /// PRECONDITION: self.0.get(i) == item
     fn bubble_down(&mut self, mut i: u64, n: u64, item: &T) {
-        // LOOP INVARIANT: ∧ self.0.get(i) == item
-        //                 ∧ HeapInvariant(self, 0, i)
+        // We set the flag if self.0.get(i) does not contain the item anymore.
+        let mut swapped = false;
+        // LOOP INVARIANT: HeapInvariant(self, 0, i)
         loop {
             let l = i * 2 + 1;
             let r = l + 1;
 
             if n <= l {
-                return;
+                break;
             }
 
             if n <= r {
@@ -140,7 +163,8 @@ where
 
                 let left = self.0.get(l).unwrap();
                 if is_less(&left, item) {
-                    self.swap(i, item, l, &left);
+                    self.0.set(i, &left);
+                    swapped = true;
                     i = l;
                     continue;
                 }
@@ -150,28 +174,24 @@ where
                 let left = self.0.get(l).unwrap();
                 let right = self.0.get(r).unwrap();
 
-                if is_less(&left, item) {
-                    if is_less(&right, &left) {
-                        self.swap(i, item, r, &right);
-                        i = r;
-                    } else {
-                        self.swap(i, item, l, &left);
-                        i = l;
-                    }
-                    continue;
-                } else if is_less(&right, item) {
-                    self.swap(i, item, r, &right);
-                    i = r;
+                let (min_index, min_elem) = if is_less(&left, &right) {
+                    (l, &left)
+                } else {
+                    (r, &right)
+                };
+
+                if is_less(min_elem, item) {
+                    self.0.set(i, min_elem);
+                    swapped = true;
+                    i = min_index;
                     continue;
                 }
             }
-            return;
+            break;
         }
-    }
-
-    fn swap(&mut self, i: u64, x: &T, j: u64, y: &T) {
-        self.0.set(i, y);
-        self.0.set(j, x);
+        if swapped {
+            self.0.set(i, item);
+        }
     }
 }
 
