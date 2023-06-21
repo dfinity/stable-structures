@@ -24,14 +24,13 @@
 //! ... free memory for nodes
 //! ----------------------------------------
 //! ```
-mod allocator;
 mod iter;
 mod node;
 use crate::{
     types::{Address, NULL},
     BoundedStorable, Memory,
 };
-use allocator::Allocator;
+use super::allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
 use node::{Entry, Node, NodeType};
@@ -49,7 +48,8 @@ const PACKED_HEADER_SIZE: usize = 28;
 /// The offset where the allocator begins.
 const ALLOCATOR_OFFSET: usize = 52;
 
-/// A "stable" map based on a B-tree.
+/// A key/value store based on a B-Tree in stable memory.
+/// In this version, both keys and values are bounded in size.
 ///
 /// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
 /// by Cormen et al.
@@ -1077,32 +1077,6 @@ where
         buf[20..28].copy_from_slice(&header.length.to_le_bytes());
         // Write the header
         crate::write(memory, 0, &buf);
-    }
-}
-
-/// An error returned when inserting entries into the map.
-#[derive(Debug, PartialEq, Eq)]
-pub enum InsertError {
-    KeyTooLarge { given: usize, max: usize },
-    ValueTooLarge { given: usize, max: usize },
-}
-
-impl std::fmt::Display for InsertError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::KeyTooLarge { given, max } => {
-                write!(
-                    f,
-                    "InsertError::KeyTooLarge Expected key to be <= {max} bytes but received key with {given} bytes."
-                )
-            }
-            Self::ValueTooLarge { given, max } => {
-                write!(
-                    f,
-                    "InsertError::ValueTooLarge Expected value to be <= {max} bytes but received value with {given} bytes."
-                )
-            }
-        }
     }
 }
 
@@ -2563,7 +2537,7 @@ mod test {
         assert_eq!(btree.insert(vec![1, 2, 3], vec![4, 5, 6]), None);
         assert_eq!(btree.get(&vec![1, 2, 3]), Some(vec![4, 5, 6]));
 
-        let btreemap_v1 = include_bytes!("../dumps/btreemap_v1_packed_headers.dump");
+        let btreemap_v1 = include_bytes!("../../dumps/btreemap_v1_packed_headers.dump");
         assert_eq!(*mem.borrow(), btreemap_v1);
     }
 
