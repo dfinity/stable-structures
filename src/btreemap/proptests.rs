@@ -21,12 +21,12 @@ proptest! {
         let mut btree = BTreeMap::new(mem);
 
         for key in keys.iter() {
-            assert_eq!(btree.insert(key.clone(), key.clone()), None);
+            assert_eq!(btree.insert(*key, *key), None);
         }
 
         for key in keys.into_iter() {
             // Assert we retrieved the old value correctly.
-            assert_eq!(btree.insert(key.clone(), b(&[])), Some(key.clone()));
+            assert_eq!(btree.insert(key, b(&[])), Some(key));
             // Assert we retrieved the new value correctly.
             assert_eq!(btree.get(&key), Some(b(&[])));
         }
