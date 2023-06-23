@@ -316,7 +316,7 @@ impl<const N: usize> Storable for [u8; N] {
 
     const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: N as u32,
-        is_fixed_size: true
+        is_fixed_size: true,
     });
 }
 
@@ -374,7 +374,7 @@ where
 
                 Cow::Owned(bytes)
             }
-            _ => todo!(),
+            _ => todo!("Serializing tuples with unbounded types is not yet supported."),
         }
     }
 
@@ -402,7 +402,7 @@ where
 
                 (a, b)
             }
-            _ => todo!(),
+            _ => todo!("Deserializing tuples with unbounded types is not yet supported."),
         }
     }
 
