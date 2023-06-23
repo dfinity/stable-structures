@@ -1,5 +1,5 @@
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::{BoundedStorable, DefaultMemoryImpl, StableBTreeMap, Storable};
+use ic_stable_structures::{storable::Bound, DefaultMemoryImpl, StableBTreeMap, Storable};
 use std::cell::RefCell;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
@@ -25,11 +25,11 @@ impl Storable for UserName {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
         Self(String::from_bytes(bytes))
     }
-}
 
-impl BoundedStorable for UserName {
-    const MAX_SIZE: u32 = MAX_USER_NAME_SIZE;
-    const IS_FIXED_SIZE: bool = false;
+    const BOUND: Bound = Bound::Bounded {
+        max_size: MAX_USER_NAME_SIZE,
+        is_fixed_size: false,
+    };
 }
 
 struct UserData(Vec<u8>);
@@ -43,11 +43,11 @@ impl Storable for UserData {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
         Self(<Vec<u8>>::from_bytes(bytes))
     }
-}
 
-impl BoundedStorable for UserData {
-    const MAX_SIZE: u32 = MAX_USER_DATA_SIZE;
-    const IS_FIXED_SIZE: bool = false;
+    const BOUND: Bound = Bound::Bounded {
+        max_size: MAX_USER_DATA_SIZE,
+        is_fixed_size: false,
+    };
 }
 
 thread_local! {
