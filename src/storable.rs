@@ -18,14 +18,6 @@ pub trait Storable {
 
     /// The size bounds the type.
     const BOUND: Bound;
-
-    // TODO: remove?
-    fn bound_unwrap() -> Bounds {
-        match Self::BOUND {
-            Bound::Bounded(b) => b,
-            Bound::Unbounded => panic!("Attempted to retrieve the bound from an unbounded type."),
-        }
-    }
 }
 
 /// States whether the type's size is bounded or unbounded.
@@ -426,11 +418,12 @@ where
     };
 }
 
-const fn bounds<A: Storable>() -> Bounds {
+/// Returns the bounds of the given type, panics if unbounded.
+pub(crate) const fn bounds<A: Storable>() -> Bounds {
     if let Bound::Bounded(bounds) = A::BOUND {
         bounds
     } else {
-        panic!("cannot get bounds of unbounded type.");
+        panic!("Cannot get bounds of unbounded type.");
     }
 }
 

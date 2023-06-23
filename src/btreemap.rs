@@ -28,6 +28,7 @@ mod allocator;
 mod iter;
 mod node;
 use crate::{
+    storable::bounds,
     types::{Address, NULL},
     Memory, Storable,
 };
@@ -130,8 +131,8 @@ where
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
-        let max_key_size = K::bound_unwrap().max_size;
-        let max_value_size = V::bound_unwrap().max_size;
+        let max_key_size = bounds::<K>().max_size;
+        let max_value_size = bounds::<V>().max_size;
 
         let btree = Self {
             root_addr: NULL,
@@ -158,12 +159,12 @@ where
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
         let expected_key_size = header.max_key_size;
         assert!(
-            K::bound_unwrap().max_size <= expected_key_size,
+            bounds::<K>().max_size <= expected_key_size,
             "max_key_size must be <= {expected_key_size}"
         );
         let expected_value_size = header.max_value_size;
         assert!(
-            V::bound_unwrap().max_size <= expected_value_size,
+            bounds::<V>().max_size <= expected_value_size,
             "max_value_size must be <= {expected_value_size}"
         );
 
