@@ -139,9 +139,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
             return Err(InitError::IncompatibleVersion(header.version));
         }
         let t_bounds = bounds::<T>();
-        if header.max_size != t_bounds.max_size
-            || header.is_fixed_size != t_bounds.is_fixed_size
-        {
+        if header.max_size != t_bounds.max_size || header.is_fixed_size != t_bounds.is_fixed_size {
             return Err(InitError::IncompatibleElementType);
         }
 
