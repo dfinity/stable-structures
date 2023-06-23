@@ -16,10 +16,11 @@ pub trait Storable {
     /// Converts bytes into an element.
     fn from_bytes(bytes: Cow<[u8]>) -> Self;
 
-    // XXX: is this actually bounded by anything? 4 bytes?
-    const BOUND: Bound = Bound::Unbounded;
+    /// The size bounds the type.
+    const BOUND: Bound;
 
-    fn bound_unwrap() -> Bounded {
+    // TODO: remove?
+    fn bound_unwrap() -> Bounds {
         match Self::BOUND {
             Bound::Bounded(b) => b,
             Bound::Unbounded => panic!("Attempted to retrieve the bound from an unbounded type."),
@@ -27,7 +28,16 @@ pub trait Storable {
     }
 }
 
-pub struct Bounded {
+/// States whether the type's size is bounded or unbounded.
+pub enum Bound {
+    /// The type has no size bounds.
+    Unbounded,
+
+    /// The type has size bounds.
+    Bounded(Bounds),
+}
+
+pub struct Bounds {
     /// The maximum size, in bytes, of the type when serialized.
     pub max_size: u32,
 
@@ -39,11 +49,6 @@ pub struct Bounded {
     /// Examples: little-/big-endian encoding of u16/u32/u64, tuples
     /// and arrays of fixed-size types.
     pub is_fixed_size: bool,
-}
-
-pub enum Bound {
-    Unbounded,
-    Bounded(Bounded),
 }
 
 /// Variable-size, but limited in capacity byte array.
@@ -135,7 +140,7 @@ impl<const N: usize> Storable for Blob<N> {
         Self::try_from(bytes.borrow()).unwrap()
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: N as u32,
         is_fixed_size: false,
     });
@@ -162,7 +167,7 @@ impl Storable for () {
         assert!(bytes.is_empty());
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: 0,
         is_fixed_size: false,
     });
@@ -176,6 +181,8 @@ impl Storable for Vec<u8> {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         bytes.to_vec()
     }
+
+    const BOUND: Bound = Bound::Unbounded;
 }
 
 impl Storable for String {
@@ -186,6 +193,8 @@ impl Storable for String {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         String::from_utf8(bytes.to_vec()).unwrap()
     }
+
+    const BOUND: Bound = Bound::Unbounded;
 }
 
 impl Storable for u128 {
@@ -197,7 +206,7 @@ impl Storable for u128 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: 16,
         is_fixed_size: true,
     });
@@ -212,7 +221,7 @@ impl Storable for u64 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: 8,
         is_fixed_size: true,
     });
@@ -227,7 +236,7 @@ impl Storable for f64 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: 8,
         is_fixed_size: true,
     });
@@ -242,7 +251,7 @@ impl Storable for u32 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: 4,
         is_fixed_size: true,
     });
@@ -257,7 +266,7 @@ impl Storable for f32 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: 4,
         is_fixed_size: true,
     });
@@ -272,7 +281,7 @@ impl Storable for u16 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: 2,
         is_fixed_size: true,
     });
@@ -287,7 +296,7 @@ impl Storable for u8 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: 1,
         is_fixed_size: true,
     });
@@ -305,7 +314,7 @@ impl<const N: usize> Storable for [u8; N] {
         arr
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounded {
+    const BOUND: Bound = Bound::Bounded(Bounds {
         max_size: N as u32,
         is_fixed_size: true
     });
@@ -330,7 +339,7 @@ where
 {
     fn to_bytes(&self) -> Cow<[u8]> {
         match Self::BOUND {
-            Bound::Bounded(Bounded { max_size, .. }) => {
+            Bound::Bounded(Bounds { max_size, .. }) => {
                 let mut bytes = vec![0; max_size as usize];
                 let a_bytes = self.0.to_bytes();
                 let b_bytes = self.1.to_bytes();
@@ -371,7 +380,7 @@ where
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         match Self::BOUND {
-            Bound::Bounded(Bounded { max_size, .. }) => {
+            Bound::Bounded(Bounds { max_size, .. }) => {
                 assert_eq!(bytes.len(), max_size as usize);
 
                 let a_bounds = bounds::<A>();
@@ -407,7 +416,7 @@ where
 
                 let is_fixed_size = a_bounds.is_fixed_size && b_bounds.is_fixed_size;
 
-                Bound::Bounded(Bounded {
+                Bound::Bounded(Bounds {
                     max_size,
                     is_fixed_size,
                 })
@@ -417,7 +426,7 @@ where
     };
 }
 
-const fn bounds<A: Storable>() -> Bounded {
+const fn bounds<A: Storable>() -> Bounds {
     if let Bound::Bounded(bounds) = A::BOUND {
         bounds
     } else {
@@ -425,7 +434,7 @@ const fn bounds<A: Storable>() -> Bounded {
     }
 }
 
-fn decode_size(src: &[u8], bounds: &Bounded) -> usize {
+fn decode_size(src: &[u8], bounds: &Bounds) -> usize {
     if bounds.is_fixed_size {
         bounds.max_size as usize
     } else if bounds.max_size <= u8::MAX as u32 {
@@ -437,7 +446,7 @@ fn decode_size(src: &[u8], bounds: &Bounded) -> usize {
     }
 }
 
-fn encode_size(dst: &mut [u8], n: usize, bounds: &Bounded) {
+fn encode_size(dst: &mut [u8], n: usize, bounds: &Bounds) {
     if bounds.is_fixed_size {
         return;
     }
@@ -451,7 +460,7 @@ fn encode_size(dst: &mut [u8], n: usize, bounds: &Bounded) {
     }
 }
 
-pub(crate) const fn bytes_to_store_size(bounds: &Bounded) -> u32 {
+pub(crate) const fn bytes_to_store_size(bounds: &Bounds) -> u32 {
     if bounds.is_fixed_size {
         0
     } else if bounds.max_size <= u8::MAX as u32 {
