@@ -1112,7 +1112,7 @@ impl std::fmt::Display for InsertError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storable::Blob;
+    use crate::storable::{Blob, Bound as StorableBound, Bounds};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -2458,7 +2458,7 @@ mod test {
         }
     }
 
-    /*#[test]
+    #[test]
     #[should_panic(expected = "Key is too large. Expected <= 0 bytes, found 4 bytes")]
     fn panics_if_key_is_too_large() {
         #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -2471,13 +2471,13 @@ mod test {
             fn from_bytes(_: Cow<[u8]>) -> Self {
                 unimplemented!();
             }
-        }
 
-        impl crate::BoundedStorable for K {
-            // A buggy implementation where the MAX_SIZE is smaller than what Storable::to_bytes()
+            // A buggy implementation where the max_size is smaller than what Storable::to_bytes()
             // returns.
-            const MAX_SIZE: u32 = 0;
-            const IS_FIXED_SIZE: bool = false;
+            const BOUND: StorableBound = StorableBound::Bounded(Bounds {
+                max_size: 0,
+                is_fixed_size: false,
+            });
         }
 
         let mut btree: BTreeMap<K, (), _> = BTreeMap::init(make_memory());
@@ -2497,18 +2497,18 @@ mod test {
             fn from_bytes(_: Cow<[u8]>) -> Self {
                 unimplemented!();
             }
-        }
 
-        impl crate::BoundedStorable for V {
-            // A buggy implementation where the MAX_SIZE is smaller than what Storable::to_bytes()
+            // A buggy implementation where the max_size is smaller than what Storable::to_bytes()
             // returns.
-            const MAX_SIZE: u32 = 0;
-            const IS_FIXED_SIZE: bool = false;
+            const BOUND: StorableBound = StorableBound::Bounded(Bounds {
+                max_size: 0,
+                is_fixed_size: false,
+            });
         }
 
         let mut btree: BTreeMap<(), V, _> = BTreeMap::init(make_memory());
         btree.insert((), V);
-    }*/
+    }
 
     // To generate the memory dump file for the current version:
     //   cargo test create_btreemap_dump_file -- --include-ignored
