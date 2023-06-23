@@ -26,21 +26,19 @@ pub enum Bound {
     Unbounded,
 
     /// The type has size bounds.
-    Bounded(Bounds),
-}
+    Bounded {
+        /// The maximum size, in bytes, of the type when serialized.
+        max_size: u32,
 
-pub struct Bounds {
-    /// The maximum size, in bytes, of the type when serialized.
-    pub max_size: u32,
-
-    /// True if all the values of this type have fixed-width encoding.
-    /// Some data structures, such as stable vector, can take
-    /// advantage of fixed size to avoid storing an explicit entry
-    /// size.
-    ///
-    /// Examples: little-/big-endian encoding of u16/u32/u64, tuples
-    /// and arrays of fixed-size types.
-    pub is_fixed_size: bool,
+        /// True if all the values of this type have fixed-width encoding.
+        /// Some data structures, such as stable vector, can take
+        /// advantage of fixed size to avoid storing an explicit entry
+        /// size.
+        ///
+        /// Examples: little-/big-endian encoding of u16/u32/u64, tuples
+        /// and arrays of fixed-size types.
+        is_fixed_size: bool,
+    },
 }
 
 /// Variable-size, but limited in capacity byte array.
@@ -132,10 +130,10 @@ impl<const N: usize> Storable for Blob<N> {
         Self::try_from(bytes.borrow()).unwrap()
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: N as u32,
         is_fixed_size: false,
-    });
+    };
 }
 
 // NOTE: Below are a few implementations of `Storable` for common types.
@@ -159,10 +157,10 @@ impl Storable for () {
         assert!(bytes.is_empty());
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: 0,
         is_fixed_size: false,
-    });
+    };
 }
 
 impl Storable for Vec<u8> {
@@ -198,10 +196,10 @@ impl Storable for u128 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: 16,
         is_fixed_size: true,
-    });
+    };
 }
 
 impl Storable for u64 {
@@ -213,10 +211,10 @@ impl Storable for u64 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: 8,
         is_fixed_size: true,
-    });
+    };
 }
 
 impl Storable for f64 {
@@ -228,10 +226,10 @@ impl Storable for f64 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: 8,
         is_fixed_size: true,
-    });
+    };
 }
 
 impl Storable for u32 {
@@ -243,10 +241,10 @@ impl Storable for u32 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: 4,
         is_fixed_size: true,
-    });
+    };
 }
 
 impl Storable for f32 {
@@ -258,10 +256,10 @@ impl Storable for f32 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: 4,
         is_fixed_size: true,
-    });
+    };
 }
 
 impl Storable for u16 {
@@ -273,10 +271,10 @@ impl Storable for u16 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: 2,
         is_fixed_size: true,
-    });
+    };
 }
 
 impl Storable for u8 {
@@ -288,10 +286,10 @@ impl Storable for u8 {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: 1,
         is_fixed_size: true,
-    });
+    };
 }
 
 impl<const N: usize> Storable for [u8; N] {
@@ -306,10 +304,10 @@ impl<const N: usize> Storable for [u8; N] {
         arr
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: N as u32,
         is_fixed_size: true,
-    });
+    };
 }
 
 impl<T: Storable> Storable for Reverse<T> {
@@ -331,7 +329,7 @@ where
 {
     fn to_bytes(&self) -> Cow<[u8]> {
         match Self::BOUND {
-            Bound::Bounded(Bounds { max_size, .. }) => {
+            Bound::Bounded { max_size, .. } => {
                 let mut bytes = vec![0; max_size as usize];
                 let a_bytes = self.0.to_bytes();
                 let b_bytes = self.1.to_bytes();
@@ -372,7 +370,7 @@ where
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         match Self::BOUND {
-            Bound::Bounded(Bounds { max_size, .. }) => {
+            Bound::Bounded { max_size, .. } => {
                 assert_eq!(bytes.len(), max_size as usize);
 
                 let a_bounds = bounds::<A>();
@@ -400,7 +398,10 @@ where
 
     const BOUND: Bound = {
         match (A::BOUND, B::BOUND) {
-            (Bound::Bounded(a_bounds), Bound::Bounded(b_bounds)) => {
+            (Bound::Bounded { .. }, Bound::Bounded { .. }) => {
+                let a_bounds = bounds::<A>();
+                let b_bounds = bounds::<B>();
+
                 let max_size = a_bounds.max_size
                     + b_bounds.max_size
                     + bytes_to_store_size(&a_bounds)
@@ -408,20 +409,32 @@ where
 
                 let is_fixed_size = a_bounds.is_fixed_size && b_bounds.is_fixed_size;
 
-                Bound::Bounded(Bounds {
+                Bound::Bounded {
                     max_size,
                     is_fixed_size,
-                })
+                }
             }
             _ => Bound::Unbounded,
         }
     };
 }
 
+pub(crate) struct Bounds {
+    pub max_size: u32,
+    pub is_fixed_size: bool,
+}
+
 /// Returns the bounds of the given type, panics if unbounded.
 pub(crate) const fn bounds<A: Storable>() -> Bounds {
-    if let Bound::Bounded(bounds) = A::BOUND {
-        bounds
+    if let Bound::Bounded {
+        max_size,
+        is_fixed_size,
+    } = A::BOUND
+    {
+        Bounds {
+            max_size,
+            is_fixed_size,
+        }
     } else {
         panic!("Cannot get bounds of unbounded type.");
     }

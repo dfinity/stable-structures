@@ -200,8 +200,10 @@ where
     /// The previous value of the key, if present, is returned.
     ///
     /// PRECONDITION:
-    ///   key.to_bytes().len() <= Key::MAX_SIZE
-    ///   value.to_bytes().len() <= Value::MAX_SIZE
+    ///   Key is bounded in size
+    ///   Value is bounded in size
+    ///   key.to_bytes().len() <= max_size(Key)
+    ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         let key_bytes = key.to_bytes();
         let value_bytes = value.to_bytes();
@@ -1112,7 +1114,7 @@ impl std::fmt::Display for InsertError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storable::{Blob, Bound as StorableBound, Bounds};
+    use crate::storable::{Blob, Bound as StorableBound};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -2474,10 +2476,10 @@ mod test {
 
             // A buggy implementation where the max_size is smaller than what Storable::to_bytes()
             // returns.
-            const BOUND: StorableBound = StorableBound::Bounded(Bounds {
+            const BOUND: StorableBound = StorableBound::Bounded {
                 max_size: 0,
                 is_fixed_size: false,
-            });
+            };
         }
 
         let mut btree: BTreeMap<K, (), _> = BTreeMap::init(make_memory());
@@ -2500,10 +2502,10 @@ mod test {
 
             // A buggy implementation where the max_size is smaller than what Storable::to_bytes()
             // returns.
-            const BOUND: StorableBound = StorableBound::Bounded(Bounds {
+            const BOUND: StorableBound = StorableBound::Bounded {
                 max_size: 0,
                 is_fixed_size: false,
-            });
+            };
         }
 
         let mut btree: BTreeMap<(), V, _> = BTreeMap::init(make_memory());

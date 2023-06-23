@@ -1,5 +1,5 @@
 use super::{InitError, Vec as StableVec};
-use crate::storable::{Bound, Bounds, Storable};
+use crate::storable::{Bound, Storable};
 use crate::vec_mem::VectorMemory as M;
 use crate::{GrowFailed, Memory};
 use proptest::collection::vec as pvec;
@@ -20,10 +20,10 @@ impl<const N: u32> Storable for UnfixedU64<N> {
         Self(u64::from_bytes(bytes))
     }
 
-    const BOUND: Bound = Bound::Bounded(Bounds {
+    const BOUND: Bound = Bound::Bounded {
         max_size: N,
         is_fixed_size: false,
-    });
+    };
 }
 
 #[derive(Debug, PartialEq, Clone)]

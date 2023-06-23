@@ -63,8 +63,8 @@ pub enum InitError {
     /// memory layout.
     IncompatibleVersion(u8),
     /// The vector type is not compatible with the current vector
-    /// layout: MAX_SIZE and/or IS_FIXED_SIZE differ from the original
-    /// initialization parameters.
+    /// layout: the type's bounds differ from the original initialization
+    /// parameters.
     IncompatibleElementType,
     /// Failed to allocate memory for the vector.
     OutOfMemory,
@@ -82,7 +82,7 @@ impl fmt::Display for InitError {
                 "unsupported layout version {version}; supported version numbers are 1..={LAYOUT_VERSION}"
             ),
             Self::IncompatibleElementType =>
-                write!(fmt, "either MAX_SIZE or IS_FIXED_SIZE of the element type do not match the persisted vector attributes"),
+                write!(fmt, "the bounds (either max_size or is_fixed_size) of the element type do not match the persisted vector attributes"),
             Self::OutOfMemory => write!(fmt, "failed to allocate memory for vector metadata"),
         }
     }
@@ -172,7 +172,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
 
     /// Sets the item at the specified index to the specified value.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     ///
     /// PRECONDITION: index < self.len()
     pub fn set(&self, index: u64, item: &T) {
@@ -188,7 +188,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
 
     /// Returns the item at the specified index.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn get(&self, index: u64) -> Option<T> {
         if index < self.len() {
             Some(self.read_entry(index))
@@ -199,7 +199,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
 
     /// Adds a new item at the end of the vector.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
         let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
@@ -214,7 +214,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
 
     /// Removes the item at the end of the vector.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn pop(&self) -> Option<T> {
         let len = self.len();
         if len == 0 {

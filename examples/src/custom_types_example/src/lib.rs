@@ -1,6 +1,9 @@
 use candid::{CandidType, Decode, Deserialize, Encode};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::{BoundedStorable, DefaultMemoryImpl, StableBTreeMap, Storable};
+use ic_stable_structures::{
+    storable::{Bound, Bounds},
+    BoundedStorable, DefaultMemoryImpl, StableBTreeMap, Storable,
+};
 use std::{borrow::Cow, cell::RefCell};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
@@ -31,11 +34,11 @@ impl Storable for UserProfile {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
-}
 
-impl BoundedStorable for UserProfile {
-    const MAX_SIZE: u32 = MAX_VALUE_SIZE;
-    const IS_FIXED_SIZE: bool = false;
+    const BOUND: Bound = Bound::Bounded(Bounds {
+        max_size: MAX_VALUE_SIZE,
+        is_fixed_size: false,
+    });
 }
 
 thread_local! {

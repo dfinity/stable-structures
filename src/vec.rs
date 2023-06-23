@@ -54,7 +54,7 @@ impl<T: Storable, M: Memory> Vec<T, M> {
 
     /// Sets the item at the specified index to the specified value.
     ///
-    /// Complexity: O(T::BOUND::Bounds(max_size) // TODO
+    /// Complexity: O(max_size(T))
     ///
     /// PRECONDITION: index < self.len()
     pub fn set(&self, index: u64, item: &T) {
@@ -63,21 +63,21 @@ impl<T: Storable, M: Memory> Vec<T, M> {
 
     /// Returns the item at the specified index.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn get(&self, index: u64) -> Option<T> {
         self.0.get(index)
     }
 
     /// Adds a new item at the end of the vector.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
         self.0.push(item)
     }
 
     /// Removes the item at the end of the vector.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn pop(&self) -> Option<T> {
         self.0.pop()
     }
