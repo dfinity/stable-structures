@@ -172,7 +172,7 @@ where
         Self {
             root_addr: header.root_addr,
             allocator: Allocator::load(memory, allocator_addr),
-            max_key_size: header.max_key_size, // FIXME: was this a bug?
+            max_key_size: header.max_key_size,
             max_value_size: header.max_value_size,
             length: header.length,
             _phantom: PhantomData,
@@ -1128,12 +1128,6 @@ mod test {
     pub(crate) fn b(x: &[u8]) -> Blob<10> {
         Blob::<10>::try_from(x).unwrap()
     }
-
-    // Make `Vec<u8>` bounded so that it can be used as a key/value in the btree.
-    /*impl BoundedStorable for Vec<u8> {
-        const MAX_SIZE: u32 = 10;
-        const IS_FIXED_SIZE: bool = false;
-    }*/
 
     #[test]
     fn init_preserves_data() {
