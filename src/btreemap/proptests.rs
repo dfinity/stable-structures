@@ -1,4 +1,4 @@
-use crate::BTreeMap;
+use crate::{btreemap::test::b, BTreeMap};
 use proptest::collection::btree_set as pset;
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
@@ -15,6 +15,9 @@ proptest! {
     fn insert(
         keys in pset(pvec(0..u8::MAX, 0..10), 1000..10_000),
     ) {
+        // XXX: build a strategy for generating blobs
+        let keys: Vec<_> = keys.into_iter().map(|k| b(k.as_slice())).collect();
+
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
 
@@ -24,9 +27,9 @@ proptest! {
 
         for key in keys.into_iter() {
             // Assert we retrieved the old value correctly.
-            assert_eq!(btree.insert(key.clone(), vec![]), Some(key.clone()));
+            assert_eq!(btree.insert(key.clone(), b(&[])), Some(key.clone()));
             // Assert we retrieved the new value correctly.
-            assert_eq!(btree.get(&key), Some(vec![]));
+            assert_eq!(btree.get(&key), Some(b(&[])));
         }
     }
 
