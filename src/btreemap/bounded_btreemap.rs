@@ -25,12 +25,13 @@
 //! ----------------------------------------
 //! ```
 mod iter;
-mod node;
+pub mod node; // FIXME
+use super::allocator::Allocator;
 use crate::{
+    btreemap::base::BaseBTreeMap,
     types::{Address, NULL},
     BoundedStorable, Memory,
 };
-use super::allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
 use node::{Entry, Node, NodeType};
@@ -69,14 +70,13 @@ where
     // The maximum size a value can have.
     max_value_size: u32,
 
-    // An allocator used for managing memory and allocating nodes.
-    allocator: Allocator<M>,
-
     // The number of elements in the map.
     length: u64,
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
+
+    base: BaseBTreeMap<K, V, M, BoundedBTreeMapSave, BTreeMapNodeMethods>,
 }
 
 /// The packed header size must be <= ALLOCATOR_OFFSET.
@@ -132,15 +132,22 @@ where
     pub fn new(memory: M) -> Self {
         let btree = Self {
             root_addr: NULL,
-            allocator: Allocator::new(
-                memory,
-                Address::from(ALLOCATOR_OFFSET as u64),
-                Node::<K>::size(K::MAX_SIZE, V::MAX_SIZE),
-            ),
             max_key_size: K::MAX_SIZE,
             max_value_size: V::MAX_SIZE,
             length: 0,
             _phantom: PhantomData,
+            base: BaseBTreeMap::new(
+                memory,
+                Node::<K>::size(K::MAX_SIZE, V::MAX_SIZE),
+                BoundedBTreeMapSave {
+                    max_key_size: K::MAX_SIZE,
+                    max_value_size: V::MAX_SIZE,
+                },
+                BTreeMapNodeMethods {
+                    max_key_size: K::MAX_SIZE,
+                    max_value_size: V::MAX_SIZE,
+                },
+            ),
         };
 
         btree.save();
@@ -166,14 +173,21 @@ where
         );
 
         let allocator_addr = Address::from(ALLOCATOR_OFFSET as u64);
-        Self {
+        todo!()
+        /*Self {
             root_addr: header.root_addr,
-            allocator: Allocator::load(memory, allocator_addr),
+            //allocator:
             max_key_size: K::MAX_SIZE,
             max_value_size: V::MAX_SIZE,
             length: header.length,
             _phantom: PhantomData,
-        }
+            base: BaseBTreeMap {
+                root_addr: header.root_addr,
+                allocator: Allocator::load(memory, allocator_addr),
+                length: header.length,
+                _phantom: PhantomData,
+            },
+        }*/
     }
 
     /// Reads the header from the specified memory.
@@ -217,187 +231,12 @@ where
             value_bytes.len()
         );
 
-        let value = value_bytes.to_vec();
-
-        let root = if self.root_addr == NULL {
-            // No root present. Allocate one.
-            let node = self.allocate_node(NodeType::Leaf);
-            self.root_addr = node.address();
-            self.save();
-            node
-        } else {
-            // Load the root from memory.
-            let mut root = self.load_node(self.root_addr);
-
-            // Check if the key already exists in the root.
-            if let Ok(idx) = root.search(&key) {
-                // The key exists. Overwrite it and return the previous value.
-                let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                root.save(self.memory());
-                return Some(V::from_bytes(Cow::Owned(previous_value)));
-            }
-
-            // If the root is full, we need to introduce a new node as the root.
-            //
-            // NOTE: In the case where we are overwriting an existing key, then introducing
-            // a new root node isn't strictly necessary. However, that's a micro-optimization
-            // that adds more complexity than it's worth.
-            if root.is_full() {
-                // The root is full. Allocate a new node that will be used as the new root.
-                let mut new_root = self.allocate_node(NodeType::Internal);
-
-                // The new root has the old root as its only child.
-                new_root.push_child(self.root_addr);
-
-                // Update the root address.
-                self.root_addr = new_root.address();
-                self.save();
-
-                // Split the old (full) root.
-                self.split_child(&mut new_root, 0);
-
-                new_root
-            } else {
-                root
-            }
-        };
-
-        self.insert_nonfull(root, key, value)
-            .map(Cow::Owned)
-            .map(V::from_bytes)
-    }
-
-    // Inserts an entry into a node that is *not full*.
-    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
-        // We're guaranteed by the caller that the provided node is not full.
-        assert!(!node.is_full());
-
-        // Look for the key in the node.
-        match node.search(&key) {
-            Ok(idx) => {
-                // The key is already in the node.
-                // Overwrite it and return the previous value.
-                let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
-
-                node.save(self.memory());
-                Some(previous_value)
-            }
-            Err(idx) => {
-                // The key isn't in the node. `idx` is where that key should be inserted.
-
-                match node.node_type() {
-                    NodeType::Leaf => {
-                        // The node is a non-full leaf.
-                        // Insert the entry at the proper location.
-                        node.insert_entry(idx, (key, value));
-                        node.save(self.memory());
-
-                        // Update the length.
-                        self.length += 1;
-                        self.save();
-
-                        // No previous value to return.
-                        None
-                    }
-                    NodeType::Internal => {
-                        // The node is an internal node.
-                        // Load the child that we should add the entry to.
-                        let mut child = self.load_node(node.child(idx));
-
-                        if child.is_full() {
-                            // Check if the key already exists in the child.
-                            if let Ok(idx) = child.search(&key) {
-                                // The key exists. Overwrite it and return the previous value.
-                                let (_, previous_value) =
-                                    child.swap_entry(idx, (key, value), self.memory());
-                                child.save(self.memory());
-                                return Some(previous_value);
-                            }
-
-                            // The child is full. Split the child.
-                            self.split_child(&mut node, idx);
-
-                            // The children have now changed. Search again for
-                            // the child where we need to store the entry in.
-                            let idx = node.search(&key).unwrap_or_else(|idx| idx);
-                            child = self.load_node(node.child(idx));
-                        }
-
-                        // The child should now be not full.
-                        assert!(!child.is_full());
-
-                        self.insert_nonfull(child, key, value)
-                    }
-                }
-            }
-        }
-    }
-
-    // Takes as input a nonfull internal `node` and index to its full child, then
-    // splits this child into two, adding an additional child to `node`.
-    //
-    // Example:
-    //
-    //                          [ ... M   Y ... ]
-    //                                  |
-    //                 [ N  O  P  Q  R  S  T  U  V  W  X ]
-    //
-    //
-    // After splitting becomes:
-    //
-    //                         [ ... M  S  Y ... ]
-    //                                 / \
-    //                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
-    //
-    fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
-        // The node must not be full.
-        assert!(!node.is_full());
-
-        // The node's child must be full.
-        let mut full_child = self.load_node(node.child(full_child_idx));
-        assert!(full_child.is_full());
-
-        // Create a sibling to this full child (which has to be the same type).
-        let mut sibling = self.allocate_node(full_child.node_type());
-        assert_eq!(sibling.node_type(), full_child.node_type());
-
-        // Add sibling as a new child in the node.
-        node.insert_child(full_child_idx + 1, sibling.address());
-
-        let (median_key, median_value) = full_child.split(&mut sibling, self.memory());
-
-        node.insert_entry(full_child_idx, (median_key, median_value));
-
-        sibling.save(self.memory());
-        full_child.save(self.memory());
-        node.save(self.memory());
+        self.base.insert(key, value)
     }
 
     /// Returns the value associated with the given key if it exists.
     pub fn get(&self, key: &K) -> Option<V> {
-        if self.root_addr == NULL {
-            return None;
-        }
-
-        self.get_helper(self.root_addr, key)
-            .map(Cow::Owned)
-            .map(V::from_bytes)
-    }
-
-    fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let node = self.load_node(node_addr);
-        match node.search(key) {
-            Ok(idx) => Some(node.value(idx, self.memory()).to_vec()),
-            Err(idx) => {
-                match node.node_type() {
-                    NodeType::Leaf => None, // Key not found.
-                    NodeType::Internal => {
-                        // The key isn't in the node. Look for the key in the child.
-                        self.get_helper(node.child(idx), key)
-                    }
-                }
-            }
-        }
+        self.base.get(key)
     }
 
     /// Returns `true` if the key exists in the map, `false` otherwise.
@@ -417,13 +256,15 @@ where
 
     /// Returns the underlying memory.
     pub fn into_memory(self) -> M {
-        self.allocator.into_memory()
+        todo!()
+        //self.allocator.into_memory()
     }
 
     /// Removes all elements from the map.
     pub fn clear(self) -> Self {
-        let mem = self.allocator.into_memory();
-        Self::new(mem)
+        todo!();
+        //let mem = self.allocator.into_memory();
+        //Self::new(mem)
     }
 
     /// Returns the first key-value pair in the map. The key in this
@@ -449,7 +290,8 @@ where
     }
 
     fn memory(&self) -> &M {
-        self.allocator.memory()
+        todo!()
+        //self.allocator.memory()
     }
 
     /// Removes a key from the map, returning the previous value at the key if it exists.
@@ -490,7 +332,8 @@ where
                             );
 
                             // Deallocate the empty node.
-                            self.allocator.deallocate(node.address());
+                            todo!();
+                            //self.allocator.deallocate(node.address());
                             self.root_addr = NULL;
                         } else {
                             node.save(self.memory());
@@ -618,7 +461,8 @@ where
                             self.root_addr = new_child.address();
 
                             // Deallocate the root node.
-                            self.allocator.deallocate(node.address());
+                            todo!();
+                            //self.allocator.deallocate(node.address());
                             self.save();
                         }
 
@@ -780,7 +624,8 @@ where
                             node.remove_child(idx);
 
                             if node.entries_len() == 0 {
-                                self.allocator.deallocate(node.address());
+                                todo!();
+                                //self.allocator.deallocate(node.address());
 
                                 if node.address() == self.root_addr {
                                     // Update the root.
@@ -808,7 +653,8 @@ where
                             node.remove_child(idx);
 
                             if node.entries_len() == 0 {
-                                self.allocator.deallocate(node.address());
+                                todo!();
+                                //self.allocator.deallocate(node.address());
 
                                 if node.address() == self.root_addr {
                                     // Update the root.
@@ -1029,13 +875,14 @@ where
         let source_address = source.address();
         into.merge(source, median, self.memory());
         into.save(self.memory());
-        self.allocator.deallocate(source_address);
+        todo!();
+        //self.allocator.deallocate(source_address);
         into
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
         Node::new(
-            self.allocator.allocate(),
+            self.base.allocator.allocate(),
             node_type,
             self.max_key_size,
             self.max_value_size,
@@ -1077,6 +924,64 @@ where
         buf[20..28].copy_from_slice(&header.length.to_le_bytes());
         // Write the header
         crate::write(memory, 0, &buf);
+    }
+}
+
+struct BoundedBTreeMapSave {
+    max_key_size: u32,
+    max_value_size: u32,
+}
+
+impl<M: Memory> crate::btreemap::base::BaseBTreeMapSave<M> for BoundedBTreeMapSave {
+    // Saves the map to memory.
+    fn save(&self, memory: &M, root_addr: Address, length: u64) {
+        let header = BTreeHeaderV1 {
+            magic: *MAGIC,
+            version: LAYOUT_VERSION,
+            max_key_size: self.max_key_size,
+            max_value_size: self.max_value_size,
+            root_addr,
+            length,
+        };
+
+        Self::write_header(&header, memory);
+    }
+}
+
+impl BoundedBTreeMapSave {
+    // Write the layout header to the memory.
+    fn write_header<M: Memory>(header: &BTreeHeaderV1, memory: &M) {
+        // Serialize the header
+        let mut buf = [0; PACKED_HEADER_SIZE];
+        buf[0..3].copy_from_slice(&header.magic);
+        buf[3] = header.version;
+        buf[4..8].copy_from_slice(&header.max_key_size.to_le_bytes());
+        buf[8..12].copy_from_slice(&header.max_value_size.to_le_bytes());
+        buf[12..20].copy_from_slice(&header.root_addr.get().to_le_bytes());
+        buf[20..28].copy_from_slice(&header.length.to_le_bytes());
+        // Write the header
+        crate::write(memory, 0, &buf);
+    }
+}
+
+struct BTreeMapNodeMethods {
+    max_key_size: u32,
+    max_value_size: u32,
+}
+
+impl<M: Memory, K: crate::Storable + Ord + Clone> crate::btreemap::base::NodeMethods<M, K>
+    for BTreeMapNodeMethods
+{
+    fn allocate(&self, node_type: NodeType, allocator: &mut Allocator<M>) -> Node<K> {
+        Node::new(
+            allocator.allocate(),
+            node_type,
+            self.max_key_size,
+            self.max_value_size,
+        )
+    }
+    fn load(&self, address: Address, memory: &M) -> Node<K> {
+        Node::load(address, memory, self.max_key_size, self.max_value_size)
     }
 }
 
@@ -1855,7 +1760,7 @@ mod test {
         }
 
         // We've deallocated everything.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        assert_eq!(btree.base.allocator.num_allocated_chunks(), 0);
     }
 
     #[test]
