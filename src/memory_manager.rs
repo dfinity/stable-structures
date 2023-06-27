@@ -102,13 +102,13 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// --------------------------------------------------
 /// Reserved space                        ↕ 32 bytes
 /// --------------------------------------------------
-/// Size of memory 0 (in pages)           ↕ 8 bytes
+/// Size of memory 0 (in pages)           ↕ 1 bytes
 /// --------------------------------------------------
-/// Size of memory 1 (in pages)           ↕ 8 bytes
+/// Size of memory 1 (in pages)           ↕ 1 bytes
 /// --------------------------------------------------
 /// ...
 /// --------------------------------------------------
-/// Size of memory 254 (in pages)         ↕ 8 bytes
+/// Size of memory 254 (in pages)         ↕ 1 bytes
 /// -------------------------------------------------- <- Bucket allocations
 /// Bucket 1                              ↕ 1 byte        (1 byte indicating which memory owns it)
 /// --------------------------------------------------
