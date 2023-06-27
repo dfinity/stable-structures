@@ -26,6 +26,7 @@ For more information about the philosophy behind the library, see [Roman's tutor
 - [Vec]: A growable array
 - [Log]: An append-only list of variable-size entries
 - [Cell]: A serializable value
+- [MinHeap]: A priority queue.
 
 ## How it Works
 
@@ -94,7 +95,7 @@ Dependencies:
 [dependencies]
 ic-cdk = "0.6.8"
 ic-cdk-macros = "0.6.8"
-ic-stable-structures = "0.5.4"
+ic-stable-structures = "0.5.5"
 ```
 
 Code:

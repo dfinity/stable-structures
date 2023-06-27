@@ -8,11 +8,10 @@ mod tests;
 
 const MAGIC: [u8; 3] = *b"SMH"; // Short for "stable min heap".
 
-/// An implementation of a binary heap.
-///
-/// Contrary to [std::collections::BinaryHeap], this heap is a min-heap (smallest items come first).
-/// Motivation: max heaps are helpful for sorting, but most daily programming tasks require min
-/// heaps.
+/// An implementation of the [binary min heap](https://en.wikipedia.org/wiki/Binary_heap).
+// NB. Contrary to [std::collections::BinaryHeap], this heap is a min-heap (smallest items come first).
+// Motivation: max heaps are helpful for sorting, but most daily programming tasks require min
+// heaps.
 pub struct MinHeap<T: BoundedStorable + PartialOrd, M: Memory>(BaseVec<T, M>);
 
 // Note: Heap Invariant

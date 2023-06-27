@@ -16,7 +16,7 @@ pub mod storable;
 mod tests;
 mod types;
 pub mod vec;
-pub use min_heap::MinHeap as StableMinHeap;
+pub use min_heap::{MinHeap, MinHeap as StableMinHeap};
 pub use vec::{Vec as StableVec, Vec};
 pub mod vec_mem;
 pub mod writer;
@@ -97,8 +97,7 @@ impl Display for GrowFailed {
         write!(
             f,
             "Failed to grow memory: current size={}, delta={}",
-            self.current_size,
-            self.delta
+            self.current_size, self.delta
         )
     }
 }
