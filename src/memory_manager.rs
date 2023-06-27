@@ -102,13 +102,13 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// --------------------------------------------------
 /// Reserved space                        ↕ 32 bytes
 /// --------------------------------------------------
-/// Size of memory 0 (in pages)           ↕ 1 bytes
+/// Size of memory 0 (in pages)           ↕ 8 bytes
 /// --------------------------------------------------
-/// Size of memory 1 (in pages)           ↕ 1 bytes
+/// Size of memory 1 (in pages)           ↕ 8 bytes
 /// --------------------------------------------------
 /// ...
 /// --------------------------------------------------
-/// Size of memory 254 (in pages)         ↕ 1 bytes
+/// Size of memory 254 (in pages)         ↕ 8 bytes
 /// -------------------------------------------------- <- Bucket allocations
 /// Bucket 1                              ↕ 1 byte        (1 byte indicating which memory owns it)
 /// --------------------------------------------------
@@ -142,13 +142,13 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// --------------------------------------------------
 /// Reserved space                        ↕ 32 bytes
 /// --------------------------------------------------
-/// Size of memory 0 (in buckets) = k0     ↕ 8 bytes
+/// Size of memory 0 (in buckets) = k0     ↕ 1 bytes
 /// --------------------------------------------------
-/// Size of memory 1 (in buckets) = k1      ↕ 8 bytes
+/// Size of memory 1 (in buckets) = k1      ↕ 1 bytes
 /// --------------------------------------------------
 /// ...
 /// --------------------------------------------------
-/// Size of memory 254 (in buckets) = k254  ↕ 8 bytes
+/// Size of memory 254 (in buckets) = k254  ↕ 1 bytes
 /// -------------------------------------------------- <- IDs of buckets belonging to different memories
 /// Bucket 1 ID belonging to memory 0       ↕ 15 bits      15 bits required since the bucket ID \in [1, 16384]
 /// --------------------------------------------------
