@@ -142,45 +142,39 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// --------------------------------------------------
 /// Reserved space                        ↕ 32 bytes
 /// --------------------------------------------------
-/// Size of memory 0 (in buckets) = k0      ↕ 8 bytes
-/// --------------------------------------------------
-/// Bucket 1 belonging to memory 0          ↕ 1 byte
-/// --------------------------------------------------
-/// Bucket 2 belonging to memory 0          ↕ 1 byte
-/// --------------------------------------------------
-/// ...
-/// --------------------------------------------------
-/// Bucket k0 belonging to memory 0          ↕ 1 byte
+/// Size of memory 0 (in buckets) = k0     ↕ 8 bytes
 /// --------------------------------------------------
 /// Size of memory 1 (in buckets) = k1      ↕ 8 bytes
 /// --------------------------------------------------
-/// Bucket 1 belonging to memory 1          ↕ 1 byte
+/// ...
 /// --------------------------------------------------
-/// Bucket 2 belonging to memory 1          ↕ 1 byte
+/// Size of memory 254 (in buckets) = k254  ↕ 8 bytes
+/// -------------------------------------------------- <- IDs of buckets belonging to different memories
+/// Bucket 1 ID belonging to memory 0       ↕ 15 bits      15 bits required since the bucket ID \in [1, 16384]
+/// --------------------------------------------------
+/// Bucket 2 ID belonging to memory 0       ↕ 15 bits
 /// --------------------------------------------------
 /// ...
 /// --------------------------------------------------
-/// Bucket k1 belonging to memory 1          ↕ 1 byte
+/// Bucket k0 ID belonging to memory 0      ↕ 15 bits
+/// --------------------------------------------------
+/// Bucket 1 ID belonging to memory 1       ↕ 15 bits
+/// --------------------------------------------------
+/// Bucket 2 ID belonging to memory 1       ↕ 15 bits
 /// --------------------------------------------------
 /// ...
 /// --------------------------------------------------
-/// Size of memory 254 (in buckets) = k254   ↕ 8 bytes
+/// Bucket k1 ID belonging to memory 1      ↕ 15 bits
 /// --------------------------------------------------
-/// Bucket 1 belonging to memory 254          ↕ 1 byte
+/// ...
+/// ---------------------------------------------------
+/// Bucket 1 ID belonging to memory 254     ↕ 15 bits
 /// --------------------------------------------------
-/// Bucket 2 belonging to memory 254          ↕ 1 byte
+/// Bucket 2 ID belonging to memory 254     ↕ 15 bits
 /// --------------------------------------------------
 /// ...
 /// --------------------------------------------------
-/// Bucket k254 belonging to memory 254          ↕ 1 byte
-/// -------------------------------------------------- <- Bucket allocations
-/// Bucket 1                              ↕ 1 byte        (1 byte indicating which memory owns it)
-/// --------------------------------------------------
-/// Bucket 2                              ↕ 1 byte
-/// --------------------------------------------------
-/// ...
-/// --------------------------------------------------
-/// Bucket `MAX_NUM_BUCKETS`              ↕ 1 byte
+/// Bucket k254 ID belonging to memory 254  ↕ 15 bits
 /// --------------------------------------------------
 /// Unallocated space                     ↕ 30'688 bytes
 /// -------------------------------------------------- <- Buckets (Page 1)
