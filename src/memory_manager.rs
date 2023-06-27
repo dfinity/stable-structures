@@ -132,24 +132,24 @@ const HEADER_RESERVED_BYTES: usize = 32;
 ///
 /// ```text
 /// -------------------------------------------------- <- Address 0
-/// Magic "MGR"                           ↕ 3 bytes
+/// Magic "MGR"                             ↕ 3 bytes
 /// --------------------------------------------------
-/// Layout version                        ↕ 1 byte
+/// Layout version                          ↕ 1 byte
 /// --------------------------------------------------
-/// Number of allocated buckets           ↕ 2 bytes
+/// Number of allocated buckets             ↕ 2 bytes
 /// --------------------------------------------------
-/// Bucket size (in pages) = N            ↕ 2 bytes
+/// Bucket size (in pages) = N              ↕ 2 bytes
 /// --------------------------------------------------
-/// Reserved space                        ↕ 32 bytes
+/// Reserved space                          ↕ 32 bytes
 /// --------------------------------------------------
-/// Size of memory 0 (in buckets) = k0    ↕ 2 bytes
+/// Size of memory 0 (in buckets) = k0      ↕ 2 bytes
 /// --------------------------------------------------
-/// Size of memory 1 (in buckets) = k1    ↕ 2 bytes
+/// Size of memory 1 (in buckets) = k1      ↕ 2 bytes
 /// --------------------------------------------------
 /// ...
 /// --------------------------------------------------
 /// Size of memory 254 (in buckets) = k254  ↕ 2 bytes
-/// -------------------------------------------------- <- IDs of buckets belonging to different memories
+/// -------------------------------------------------- <- IDs of buckets
 /// Bucket 1 ID belonging to memory 0       ↕ 15 bits
 /// --------------------------------------------------
 /// Bucket 2 ID belonging to memory 0       ↕ 15 bits
@@ -176,15 +176,15 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// --------------------------------------------------
 /// Bucket k254 ID belonging to memory 254  ↕ 15 bits
 /// --------------------------------------------------
-/// Unallocated space                     ↕ 4'566 bytes
+/// Unallocated space                       ↕ 3'546 bytes
 /// -------------------------------------------------- <- Buckets (Page 1)
-/// Bucket 1                              ↕ N pages
+/// Bucket 1                                ↕ N pages
 /// -------------------------------------------------- <- Page N + 1
-/// Bucket 2                              ↕ N pages
+/// Bucket 2                                ↕ N pages
 /// --------------------------------------------------
 /// ...
 /// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
-/// Bucket MAX_NUM_BUCKETS                ↕ N pages
+/// Bucket MAX_NUM_BUCKETS                  ↕ N pages
 /// ```
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
