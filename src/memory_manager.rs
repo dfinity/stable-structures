@@ -127,6 +127,70 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// ...
 /// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
+///
+/// # V2 layout
+///
+/// ```text
+/// -------------------------------------------------- <- Address 0
+/// Magic "MGR"                           ↕ 3 bytes
+/// --------------------------------------------------
+/// Layout version                        ↕ 1 byte
+/// --------------------------------------------------
+/// Number of allocated buckets           ↕ 2 bytes
+/// --------------------------------------------------
+/// Bucket size (in pages) = N            ↕ 2 bytes
+/// --------------------------------------------------
+/// Reserved space                        ↕ 32 bytes
+/// --------------------------------------------------
+/// Size of memory 0 (in buckets) = k0      ↕ 8 bytes
+/// --------------------------------------------------
+/// Bucket 1 belonging to memory 0          ↕ 1 byte
+/// --------------------------------------------------
+/// Bucket 2 belonging to memory 0          ↕ 1 byte
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Bucket k0 belonging to memory 0          ↕ 1 byte
+/// --------------------------------------------------
+/// Size of memory 1 (in buckets) = k1      ↕ 8 bytes
+/// --------------------------------------------------
+/// Bucket 1 belonging to memory 1          ↕ 1 byte
+/// --------------------------------------------------
+/// Bucket 2 belonging to memory 1          ↕ 1 byte
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Bucket k1 belonging to memory 1          ↕ 1 byte
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Size of memory 254 (in buckets) = k254   ↕ 8 bytes
+/// --------------------------------------------------
+/// Bucket 1 belonging to memory 254          ↕ 1 byte
+/// --------------------------------------------------
+/// Bucket 2 belonging to memory 254          ↕ 1 byte
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Bucket k254 belonging to memory 254          ↕ 1 byte
+/// -------------------------------------------------- <- Bucket allocations
+/// Bucket 1                              ↕ 1 byte        (1 byte indicating which memory owns it)
+/// --------------------------------------------------
+/// Bucket 2                              ↕ 1 byte
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Bucket `MAX_NUM_BUCKETS`              ↕ 1 byte
+/// --------------------------------------------------
+/// Unallocated space                     ↕ 30'688 bytes
+/// -------------------------------------------------- <- Buckets (Page 1)
+/// Bucket 1                              ↕ N pages
+/// -------------------------------------------------- <- Page N + 1
+/// Bucket 2                              ↕ N pages
+/// --------------------------------------------------
+/// ...
+/// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
+/// Bucket MAX_NUM_BUCKETS                ↕ N pages
 /// ```
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
@@ -154,6 +218,10 @@ impl<M: Memory> MemoryManager<M> {
             id,
             memory_manager: self.inner.clone(),
         }
+    }
+
+    pub fn free(&mut self, id: MemoryId) {
+        self.inner.borrow_mut().free(id);
     }
 }
 
@@ -419,6 +487,8 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Ceiling division.
         (num_pages + self.bucket_size_in_pages as u64 - 1) / self.bucket_size_in_pages as u64
     }
+
+    fn free(&mut self, id: MemoryId) {}
 }
 
 struct Segment {
