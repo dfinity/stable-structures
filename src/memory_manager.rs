@@ -43,15 +43,16 @@
 use crate::{
     read_struct,
     types::{Address, Bytes},
-    write, write_struct, Memory, WASM_PAGE_SIZE,
+    vec, write, write_struct, Memory, WASM_PAGE_SIZE,
 };
-use std::cell::RefCell;
-use std::cmp::min;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::{cell::RefCell, collections::BTreeSet};
+use std::{cmp::min, collections::LinkedList};
 
 const MAGIC: &[u8; 3] = b"MGR";
-const LAYOUT_VERSION: u8 = 1;
+const LAYOUT_VERSION_V1: u8 = 1;
+const LAYOUT_VERSION_V2: u8 = 2;
 
 // The maximum number of memories that can be created.
 const MAX_NUM_MEMORIES: u8 = 255;
@@ -235,7 +236,7 @@ struct Header {
     _reserved: [u8; HEADER_RESERVED_BYTES],
 
     // The size of each individual memory that can be created by the memory manager.
-    memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
+    memory_sizes_in_buckets: [u16; MAX_NUM_MEMORIES as usize],
 }
 
 impl Header {
@@ -277,12 +278,79 @@ struct MemoryManagerInner<M: Memory> {
 
     bucket_size_in_pages: u16,
 
-    // An array storing the size (in pages) of each of the managed memories.
-    memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
+    // An array storing the size (in buckets) of each of the managed memories.
+    memory_sizes_in_buckets: [u16; MAX_NUM_MEMORIES as usize],
 
     // A map mapping each managed memory to the bucket ids that are allocated to it.
     memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
+
+    // A list of the all unallocated buckets.
+    unallocated_buckets: LinkedList<BucketId>,
 }
+
+/*
+#[derive(Clone)]
+struct MemoryManagerInnerV2<M: Memory> {
+    memory: M,
+
+    // The number of buckets that have been allocated.
+    allocated_buckets: u16,
+
+    bucket_size_in_pages: u16,
+
+    // An array storing the size (in pages) of each of the managed memories.
+    memory_sizes_in_buckets: [u64; MAX_NUM_MEMORIES as usize],
+
+    // A map mapping each managed memory to the bucket ids that are allocated to it.
+    memory_buckets: BTreeMap<MemoryId, BTreeSet<BucketId>>,
+
+    unallocated_buckets: BTreeSet<BucketId>,
+}
+
+impl<M: Memory> MemoryManagerInnerV2<M> {
+    fn init(memory: M, bucket_size_in_pages: u16) -> Self {
+        if memory.size() == 0 {
+            // Memory is empty. Create a new map.
+            return Self::new(memory, bucket_size_in_pages);
+        }
+    }
+
+    fn new(memory: M, bucket_size_in_pages: u16) -> Self {
+        let mem_mgr = Self {
+            memory,
+            allocated_buckets: 0,
+            memory_sizes_in_buckets: [0; MAX_NUM_MEMORIES as usize],
+            memory_buckets: BTreeMap::new(),
+            bucket_size_in_pages,
+            unallocated_buckets: BTreeSet::new(),
+        };
+
+        mem_mgr.save_header();
+
+        // Mark all the buckets as unallocated.
+        write(
+            &mem_mgr.memory,
+            bucket_allocations_address(BucketId(0)).get(),
+            &[UNALLOCATED_BUCKET_MARKER; MAX_NUM_BUCKETS as usize],
+        );
+
+        mem_mgr
+    }
+
+    fn save_header(&self) {
+        let header = Header {
+            magic: *MAGIC,
+            version: LAYOUT_VERSION_V2,
+            num_allocated_buckets: self.allocated_buckets,
+            bucket_size_in_pages: self.bucket_size_in_pages,
+            _reserved: [0; HEADER_RESERVED_BYTES],
+            memory_sizes_in_pages: self.memory_sizes_in_buckets * self.bucket_size_in_pages,
+        };
+
+        write_struct(&header, Address::from(0), &self.memory);
+    }
+}
+*/
 
 impl<M: Memory> MemoryManagerInner<M> {
     fn init(memory: M, bucket_size_in_pages: u16) -> Self {
@@ -294,6 +362,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Check if the magic in the memory corresponds to this object.
         let mut dst = vec![0; 3];
         memory.read(0, &mut dst);
+        //here
         if dst != MAGIC {
             // No memory manager found. Create a new instance.
             MemoryManagerInner::new(memory, bucket_size_in_pages)
@@ -307,9 +376,10 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mem_mgr = Self {
             memory,
             allocated_buckets: 0,
-            memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
+            memory_sizes_in_buckets: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
+            unallocated_buckets: LinkedList::new(),
         };
 
         mem_mgr.save_header();
@@ -328,38 +398,50 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Read the header from memory.
         let header: Header = read_struct(Address::from(0), &memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
-        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
+        match header.version {
+            LAYOUT_VERSION_V1 => {
+                let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
+                memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
+                let unallocated: BTreeSet<u16> =
+                    BTreeSet::from((0..header.num_allocated_buckets).collect());
+                let mut memory_buckets = BTreeMap::new();
+                for (bucket_idx, memory) in buckets.into_iter().enumerate() {
+                    if memory != UNALLOCATED_BUCKET_MARKER {
+                        memory_buckets
+                            .entry(MemoryId(memory))
+                            .or_insert_with(Vec::new)
+                            .push(BucketId(bucket_idx as u16));
+                        unallocated.remove(&(bucket_idx as u16));
+                    }
+                }
 
-        let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
-        memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
+                let unallocated_buckets = LinkedList::new();
+                for i in unallocated.iter() {
+                    unallocated_buckets.push_back(BucketId(*i));
+                }
 
-        let mut memory_buckets = BTreeMap::new();
-        for (bucket_idx, memory) in buckets.into_iter().enumerate() {
-            if memory != UNALLOCATED_BUCKET_MARKER {
-                memory_buckets
-                    .entry(MemoryId(memory))
-                    .or_insert_with(Vec::new)
-                    .push(BucketId(bucket_idx as u16));
+                Self {
+                    memory,
+                    allocated_buckets: header.num_allocated_buckets,
+                    bucket_size_in_pages: header.bucket_size_in_pages,
+                    memory_sizes_in_buckets: header.memory_sizes_in_buckets,
+                    memory_buckets,
+                    unallocated_buckets,
+                }
             }
-        }
-
-        Self {
-            memory,
-            allocated_buckets: header.num_allocated_buckets,
-            bucket_size_in_pages: header.bucket_size_in_pages,
-            memory_sizes_in_pages: header.memory_sizes_in_pages,
-            memory_buckets,
+            LAYOUT_VERSION_V2 => {}
+            _ => panic!("Unsupported version."),
         }
     }
 
     fn save_header(&self) {
         let header = Header {
             magic: *MAGIC,
-            version: LAYOUT_VERSION,
+            version: LAYOUT_VERSION_V2,
             num_allocated_buckets: self.allocated_buckets,
             bucket_size_in_pages: self.bucket_size_in_pages,
             _reserved: [0; HEADER_RESERVED_BYTES],
-            memory_sizes_in_pages: self.memory_sizes_in_pages,
+            memory_sizes_in_buckets: self.memory_sizes_in_buckets,
         };
 
         write_struct(&header, Address::from(0), &self.memory);
@@ -367,7 +449,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     // Returns the size of a memory (in pages).
     fn memory_size(&self, id: MemoryId) -> u64 {
-        self.memory_sizes_in_pages[id.0 as usize]
+        self.memory_sizes_in_buckets[id.0 as usize] as u64 * self.bucket_size_in_pages as u64
     }
 
     // Grows the memory with the given id by the given number of pages.
@@ -415,7 +497,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         // Update the memory with the new size.
-        self.memory_sizes_in_pages[id.0 as usize] = new_size;
+        self.memory_sizes_in_buckets[id.0 as usize] = required_buckets as u16;
 
         // Update the header and return the old size.
         self.save_header();
