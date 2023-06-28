@@ -1,5 +1,5 @@
 {
-  "dfx": "0.14.0",
+  "dfx": "0.14.1",
   "canisters": {
     "quick_start": {
       "candid": "src/quick_start/candid.did",
