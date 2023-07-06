@@ -518,6 +518,22 @@ impl MemoryId {
     }
 }
 
+impl crate::Storable for MemoryId {
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        std::borrow::Cow::Owned(self.0.to_be_bytes().to_vec())
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Self(u8::from_be_bytes(bytes.as_ref().try_into().unwrap()))
+    }
+}
+
+impl crate::BoundedStorable for MemoryId
+{
+    const MAX_SIZE: u32 = 1;
+    const IS_FIXED_SIZE: bool = true;
+}
+
 // Referring to a bucket.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct BucketId(u16);
