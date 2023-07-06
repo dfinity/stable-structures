@@ -505,7 +505,7 @@ impl<'a> BucketIterator<'a> {
     }
 }
 
-#[derive(Clone, Copy, Ord, Eq, PartialEq, PartialOrd, Debug)]
+#[derive(Clone, Copy, Ord, Eq, PartialEq, PartialOrd, Debug, Hash)]
 pub struct MemoryId(u8);
 
 impl MemoryId {
@@ -515,30 +515,6 @@ impl MemoryId {
         assert!(id != UNALLOCATED_BUCKET_MARKER);
 
         Self(id)
-    }
-}
-
-impl crate::Storable for MemoryId {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        std::borrow::Cow::Owned(self.0.to_be_bytes().to_vec())
-    }
-
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
-        Self(u8::from_be_bytes(bytes.as_ref().try_into().unwrap()))
-    }
-}
-
-impl crate::BoundedStorable for MemoryId
-{
-    const MAX_SIZE: u32 = 1;
-    const IS_FIXED_SIZE: bool = true;
-}
-
-impl std::ops::Deref for MemoryId {
-    type Target = u8;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
