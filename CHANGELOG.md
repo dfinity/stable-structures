@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.5.6] - 2023-07-05
+### Fixed
+Made `stable_structures::vec::InitError` public again. It was accidentally made private in the previous release.
+
 ## [0.5.5] - 2023-07-03
 
 ### Added
