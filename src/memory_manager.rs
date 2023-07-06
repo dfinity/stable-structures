@@ -534,6 +534,14 @@ impl crate::BoundedStorable for MemoryId
     const IS_FIXED_SIZE: bool = true;
 }
 
+impl std::ops::Deref for MemoryId {
+    type Target = u8;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 // Referring to a bucket.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct BucketId(u16);
