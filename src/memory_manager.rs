@@ -223,6 +223,21 @@ impl<M: Memory> MemoryManager<M> {
 }
 
 #[repr(C, packed)]
+struct HeaderV1 {
+    magic: [u8; 3],
+    version: u8,
+    // The number of buckets allocated by the memory manager.
+    num_allocated_buckets: u16,
+    // The size of a bucket in Wasm pages.
+    bucket_size_in_pages: u16,
+    // Reserved bytes for future extensions
+    _reserved: [u8; HEADER_RESERVED_BYTES],
+
+    // The size of each individual memory that can be created by the memory manager.
+    memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
+}
+
+#[repr(C, packed)]
 struct Header {
     magic: [u8; 3],
 
@@ -241,10 +256,13 @@ struct Header {
     memory_sizes_in_buckets: [u16; MAX_NUM_MEMORIES as usize],
 }
 
-impl Header {
-    fn size_V1() -> Bytes {
-        Bytes::new(3 + 1 + 2 + 2 + 32 + 255 * 8)
+impl HeaderV1 {
+    fn size() -> Bytes {
+        Bytes::new(core::mem::size_of::<Self>() as u64)
     }
+}
+
+impl Header {
     fn size() -> Bytes {
         Bytes::new(core::mem::size_of::<Self>() as u64)
     }
@@ -337,7 +355,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     fn load(memory: M) -> Self {
         // Read the header from memory.
-        let header: Header = read_struct(Address::from(0), &memory);
+        let header: HeaderV1 = read_struct(Address::from(0), &memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         match header.version {
             LAYOUT_VERSION_V1 => {
@@ -346,8 +364,8 @@ impl<M: Memory> MemoryManagerInner<M> {
                     bucket_allocations_address_V1(BucketId(0)).get(),
                     &mut buckets,
                 );
-                let unallocated: BTreeSet<u16> =
-                    BTreeSet::from((0..header.num_allocated_buckets).collect());
+                let all_buckets: Vec<u16> = (0..header.num_allocated_buckets).collect();
+                let unallocated: BTreeSet<u16> = BTreeSet::from(all_buckets);
                 let mut memory_buckets = BTreeMap::new();
                 for (bucket_idx, memory) in buckets.into_iter().enumerate() {
                     if memory != UNALLOCATED_BUCKET_MARKER {
@@ -364,17 +382,28 @@ impl<M: Memory> MemoryManagerInner<M> {
                     unallocated_buckets.push_back(BucketId(*i));
                 }
 
+                let memory_sizes_in_buckets: [u16; 255];
+                let mut i = 0;
+                for memory_size in header.memory_sizes_in_pages {
+                    let size_in_buckets = (memory_size + header.bucket_size_in_pages as u64 - 1)
+                        / header.bucket_size_in_pages as u64;
+                    memory_sizes_in_buckets[i] = size_in_buckets as u16;
+                    i += 1;
+                }
+
                 Self {
                     memory,
                     allocated_buckets: header.num_allocated_buckets,
                     bucket_size_in_pages: header.bucket_size_in_pages,
-                    memory_sizes_in_buckets: header.memory_sizes_in_buckets,
+                    memory_sizes_in_buckets,
                     memory_buckets,
                     unallocated_buckets,
                 }
             }
             LAYOUT_VERSION_V2 => {
-                let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
+                let header: Header = read_struct(Address::from(0), &memory);
+                let size_of_buckets_ind_in_bytes = (MAX_NUM_BUCKETS * 15 + 15) / 16;
+                let mut buckets = vec![0; size_of_buckets_ind_in_bytes as usize];
                 memory.read(
                     bucket_allocations_address_V2(BucketId(0)).get(),
                     &mut buckets,
@@ -649,7 +678,7 @@ impl MemoryId {
 struct BucketId(u16);
 
 fn bucket_allocations_address_V1(id: BucketId) -> Address {
-    Address::from(0) + Header::size_V1() + Bytes::from(id.0)
+    Address::from(0) + HeaderV1::size() + Bytes::from(id.0)
 }
 
 fn bucket_allocations_address_V2(id: BucketId) -> Address {
