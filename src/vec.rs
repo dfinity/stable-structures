@@ -1,6 +1,7 @@
 //! This module implements a growable array in stable memory.
 
-use crate::base_vec::{BaseVec, InitError};
+use crate::base_vec::BaseVec;
+pub use crate::base_vec::InitError;
 use crate::storable::BoundedStorable;
 use crate::{GrowFailed, Memory};
 use std::fmt;
