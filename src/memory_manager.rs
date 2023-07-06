@@ -40,6 +40,8 @@
 //! memory_1.read(0, &mut bytes);
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
+use bit_vec::BitVec;
+
 use crate::{
     read_struct,
     types::{Address, Bytes},
@@ -240,6 +242,9 @@ struct Header {
 }
 
 impl Header {
+    fn size_V1() -> Bytes {
+        Bytes::new(3 + 1 + 2 + 2 + 32 + 255 * 8)
+    }
     fn size() -> Bytes {
         Bytes::new(core::mem::size_of::<Self>() as u64)
     }
@@ -323,7 +328,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Mark all the buckets as unallocated.
         write(
             &mem_mgr.memory,
-            bucket_allocations_address(BucketId(0)).get(),
+            bucket_allocations_address_V1(BucketId(0)).get(),
             &[UNALLOCATED_BUCKET_MARKER; MAX_NUM_BUCKETS as usize],
         );
 
@@ -337,7 +342,10 @@ impl<M: Memory> MemoryManagerInner<M> {
         match header.version {
             LAYOUT_VERSION_V1 => {
                 let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
-                memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
+                memory.read(
+                    bucket_allocations_address_V1(BucketId(0)).get(),
+                    &mut buckets,
+                );
                 let unallocated: BTreeSet<u16> =
                     BTreeSet::from((0..header.num_allocated_buckets).collect());
                 let mut memory_buckets = BTreeMap::new();
@@ -365,7 +373,17 @@ impl<M: Memory> MemoryManagerInner<M> {
                     unallocated_buckets,
                 }
             }
-            LAYOUT_VERSION_V2 => {}
+            LAYOUT_VERSION_V2 => {
+                let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
+                memory.read(
+                    bucket_allocations_address_V2(BucketId(0)).get(),
+                    &mut buckets,
+                );
+
+                let unallocated: BTreeSet<u16> =
+                    BTreeSet::from((0..header.num_allocated_buckets).collect());
+                let mut memory_buckets = BTreeMap::new();
+            }
             _ => panic!("Unsupported version."),
         }
     }
@@ -414,7 +432,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             // Write in stable store that this bucket belongs to the memory with the provided `id`.
             write(
                 &self.memory,
-                bucket_allocations_address(new_bucket_id).get(),
+                bucket_allocations_address_V1(new_bucket_id).get(),
                 &[id.0],
             );
 
@@ -503,6 +521,32 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn free(&mut self, id: MemoryId) {}
 }
 
+fn bucket_indexes_to_bytes(input: &[u16]) -> Vec<u8> {
+    let mut bit_vec = BitVec::new();
+    for bucket_ind in input {
+        let mut bit_vec_temp = BitVec::from_bytes(&bucket_ind.to_be_bytes()).split_off(1);
+        bit_vec.append(&mut bit_vec_temp);
+    }
+    bit_vec.to_bytes()
+}
+
+fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<u16> {
+    const BUCKET_IND_LEN: usize = 15;
+    let mut vec_u16 = vec![];
+    let bit_vec = BitVec::from_bytes(input);
+    for i in 0..bit_vec.len() / BUCKET_IND_LEN {
+        let mut bucket_ind: u16 = 0;
+        for j in 0..BUCKET_IND_LEN {
+            let next_bit = BUCKET_IND_LEN * i + j;
+            bucket_ind = bucket_ind << 1;
+            if bit_vec.get(next_bit) == Some(true) {
+                bucket_ind = bucket_ind | 1;
+            }
+        }
+        vec_u16.push(bucket_ind);
+    }
+    vec_u16
+}
 struct Segment {
     address: Address,
     length: Bytes,
@@ -604,7 +648,11 @@ impl MemoryId {
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct BucketId(u16);
 
-fn bucket_allocations_address(id: BucketId) -> Address {
+fn bucket_allocations_address_V1(id: BucketId) -> Address {
+    Address::from(0) + Header::size_V1() + Bytes::from(id.0)
+}
+
+fn bucket_allocations_address_V2(id: BucketId) -> Address {
     Address::from(0) + Header::size() + Bytes::from(id.0)
 }
 

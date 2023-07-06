@@ -11,6 +11,9 @@ keywords = ["internet-computer", "dfinity", "stable-structures"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 repository = "https://github.com/dfinity/stable-structures"
 
+[dependencies]
+bit-vec = "0.6"
+
 [dev-dependencies]
 criterion = "0.4.0"
 ic-cdk = "0.6.8"

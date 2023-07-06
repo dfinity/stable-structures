@@ -561,6 +561,7 @@ dependencies = [
 name = "ic-stable-structures"
 version = "0.5.4"
 dependencies = [
+ "bit-vec",
  "criterion",
  "ic-cdk",
  "ic-cdk-macros",
