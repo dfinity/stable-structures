@@ -95,7 +95,7 @@ Dependencies:
 [dependencies]
 ic-cdk = "0.6.8"
 ic-cdk-macros = "0.6.8"
-ic-stable-structures = "0.5.5"
+ic-stable-structures = "0.5.6"
 ```
 
 Code:
