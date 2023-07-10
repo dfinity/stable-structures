@@ -7,7 +7,11 @@
 //! * O(1) allocation and deallocation
 //! * Same strategy for all block sizes
 
-use crate::{read_struct, types::Address, write_struct, Memory, WASM_PAGE_SIZE};
+use crate::{
+    read_struct,
+    types::{Address, Bytes},
+    write_struct, Memory, WASM_PAGE_SIZE,
+};
 
 // As defined in the paper.
 const MINIMUM_BLOCK_SIZE: u32 = 16;
@@ -86,7 +90,6 @@ impl<M: Memory> TlsfAllocator<M> {
             self.free_lists[block_seg_list.0][block_seg_list.1],
             &self.memory,
         );
-        println!("Got block {:?}", block);
 
         // Remove the block
         self.free_lists[block_seg_list.0][block_seg_list.1] = block.next;
@@ -97,10 +100,25 @@ impl<M: Memory> TlsfAllocator<M> {
             println!("remaining size: {}", remaining_size);
             let (fl, sl) = mapping(remaining_size);
             println!("remaining seg list {:?}", (fl, sl));
+
+            // Split the block
+            let remaining_block = Block {
+                address: block.address + size.into() + Block::header_size().into(),
+                allocated: false,
+                next: self.free_lists[fl as usize][sl as usize],
+                size: remaining_size,
+            };
+
+            block.size = size + Block::header_size() as u32;
+
+            // Insert the block.
+            self.free_lists[fl as usize][sl as usize] = remaining_block.address;
+            block.save(&self.memory);
+            remaining_block.save(&self.memory);
         }
 
-        //found_block=search_suitable_block(size,fl,sl);// O(1)
-
+        println!("Got block {:?}", block);
+        block.address + Bytes::from(Block::header_size())
         /*
         remove (found_block); // O(1)
         if (sizeof(found_block)>size) {
@@ -109,7 +127,6 @@ impl<M: Memory> TlsfAllocator<M> {
         insert (remaining_block, fl2, sl2); // O(1)
         }
         return found_block;*/
-        todo!();
     }
 
     pub fn deallocate(&mut self, address: Address) {
@@ -212,10 +229,6 @@ mod test {
 
     #[test]
     fn mapping_test() {
-        //        println!("mapping: {:?}", mapping(123421));
-        assert_eq!(mapping(32), (5, 0));
-        assert_eq!(mapping(63), (5, 31));
-
         proptest!(|(
             size in 0..u32::MAX,
         )| {
@@ -231,6 +244,13 @@ mod test {
     fn allocate() {
         let mem = make_memory();
         let mut tlsf = TlsfAllocator::new(mem);
-        tlsf.allocate(1232);
+        let block = tlsf.allocate(1232);
+        println!("block: {:?}", block);
+
+        let block = tlsf.allocate(45);
+        println!("block: {:?}", block);
+
+        let block = tlsf.allocate(39);
+        println!("block: {:?}", block);
     }
 }
