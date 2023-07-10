@@ -2,6 +2,7 @@
 mod base_vec;
 pub mod btreemap;
 pub mod cell;
+pub mod tlsf;
 pub use cell::{Cell as StableCell, Cell};
 pub mod file_mem;
 #[cfg(target_arch = "wasm32")]
@@ -97,8 +98,7 @@ impl Display for GrowFailed {
         write!(
             f,
             "Failed to grow memory: current size={}, delta={}",
-            self.current_size,
-            self.delta
+            self.current_size, self.delta
         )
     }
 }

@@ -13,6 +13,10 @@ impl From<u64> for Address {
 }
 
 impl Address {
+    pub const fn new(address: u64) -> Self {
+        Self(address)
+    }
+
     pub fn get(&self) -> u64 {
         self.0
     }
@@ -21,6 +25,8 @@ impl Address {
         assert_eq!(core::mem::size_of::<Address>(), 8);
         Bytes::from(8u64)
     }
+
+    pub const NULL: Self = Self(0);
 }
 
 impl Add<Bytes> for Address {
