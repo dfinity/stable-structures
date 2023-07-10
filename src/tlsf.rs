@@ -7,7 +7,7 @@
 //! * O(1) allocation and deallocation
 //! * Same strategy for all block sizes
 
-use crate::{types::Address, write_struct, Memory, WASM_PAGE_SIZE};
+use crate::{read_struct, types::Address, write_struct, Memory, WASM_PAGE_SIZE};
 
 // As defined in the paper.
 const MINIMUM_BLOCK_SIZE: u32 = 16;
@@ -17,6 +17,8 @@ const SECOND_LEVEL_INDEX_LOG_SIZE: usize = 5;
 const SECOND_LEVEL_INDEX_SIZE: usize = 1 << SECOND_LEVEL_INDEX_LOG_SIZE;
 
 const DATA_OFFSET: Address = Address::new(WASM_PAGE_SIZE);
+
+struct SegList(usize, usize);
 
 //const GRANULARITY_LOG2: u32 = GRANULARITY.trailing_zeros();
 
@@ -59,20 +61,18 @@ impl<M: Memory> TlsfAllocator<M> {
 
         // Create a block with the memory.
         // TODO: make it span at least 1TiB.
-        let block = BlockHeader {
+        let block = Block {
+            address: DATA_OFFSET,
+            allocated: false,
             size: u32::MAX,
             next: Address::NULL,
         };
 
-        block.save(DATA_OFFSET, &memory);
+        block.save(&memory);
 
-        free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE] = DATA_OFFSET;
+        free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1] = DATA_OFFSET;
 
         Self { free_lists, memory }
-    }
-
-    fn insert_block() {
-        todo!();
     }
 
     // TODO: load, init
@@ -80,8 +80,25 @@ impl<M: Memory> TlsfAllocator<M> {
     pub fn allocate(&mut self, size: u32) -> Address {
         let (fl, sl) = mapping(size);
 
-        // XXX: This can be done with clever bit manipulation, but we can do it the
-        // native way for a V0.
+        let block_seg_list = self.search_suitable_block(size, fl as usize, sl as usize);
+
+        let mut block = Block::load(
+            self.free_lists[block_seg_list.0][block_seg_list.1],
+            &self.memory,
+        );
+        println!("Got block {:?}", block);
+
+        // Remove the block
+        self.free_lists[block_seg_list.0][block_seg_list.1] = block.next;
+        block.allocated = true;
+
+        if block.size > size {
+            let remaining_size = block.size - size - Block::header_size() as u32;
+            println!("remaining size: {}", remaining_size);
+            let (fl, sl) = mapping(remaining_size);
+            println!("remaining seg list {:?}", (fl, sl));
+        }
+
         //found_block=search_suitable_block(size,fl,sl);// O(1)
 
         /*
@@ -91,7 +108,6 @@ impl<M: Memory> TlsfAllocator<M> {
         mapping (sizeof(remaining_block),&fl2,&sl2);
         insert (remaining_block, fl2, sl2); // O(1)
         }
-        remove (found_block); // O(1)
         return found_block;*/
         todo!();
     }
@@ -106,14 +122,66 @@ impl<M: Memory> TlsfAllocator<M> {
         */
     }
 
-    fn search_suitable_block(size: u32, fl: usize, sl: usize) {
-        todo!();
+    // XXX: This can be done with clever bit manipulation, but we can do it the
+    // native way for a V0.
+    fn search_suitable_block(&self, size: u32, fl: usize, sl: usize) -> SegList {
+        // Find the smallest free block that is larger than the requested size.
+        // TODO: include header size into account.
+
+        for f in fl..FIRST_LEVEL_INDEX_SIZE {
+            for s in sl..SECOND_LEVEL_INDEX_SIZE {
+                if self.free_lists[f][s] != Address::NULL {
+                    return SegList(f, s);
+                }
+            }
+        }
+
+        panic!("OOM");
+    }
+}
+
+#[derive(Debug)]
+struct Block {
+    address: Address,
+    allocated: bool,
+    next: Address,
+    size: u32,
+}
+
+impl Block {
+    fn save<M: Memory>(&self, memory: &M) {
+        write_struct(
+            &BlockHeader {
+                allocated: self.allocated,
+                next: self.next,
+                size: self.size,
+            },
+            self.address,
+            memory,
+        )
+    }
+
+    fn load<M: Memory>(address: Address, memory: &M) -> Self {
+        let header: BlockHeader = read_struct(address, memory);
+        // TODO: check magic and version?
+
+        Self {
+            address,
+            allocated: header.allocated,
+            next: header.next,
+            size: header.size,
+        }
+    }
+
+    fn header_size() -> u64 {
+        core::mem::size_of::<BlockHeader>() as u64
     }
 }
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 struct BlockHeader {
+    allocated: bool,
     size: u32,
     next: Address,
 }
@@ -126,48 +194,43 @@ impl BlockHeader {
 
 // Returns the indexes that point to the corresponding segregated list.
 fn mapping(size: u32) -> (u32, u32) {
-    /*println!("{}", SECOND_LEVEL_INDEX_SIZE);
-    let fl = size.leading_zeros() as u32 + 1;
-    println!("fl << {}", 1 << fl);
-    println!("fl << {}", 1 << 31);
-    //let sl = (size ^ (1 << fl)) >> (fl - SECOND_LEVEL_INDEX_LOG_SIZE as u32);
-    let sl = (size ^ (1 << fl)) * ((1 << SECOND_LEVEL_INDEX_LOG_SIZE) / (1 << fl));
-    println!("step 1: {}", (size ^ (1 << fl)));
-    (fl, sl)*/
-
-    // XXX: REVISE this.
-    let mut fl = u32::BITS - 1 - size.leading_zeros();
-
-    // The shift amount can be negative, and rotation lets us handle both
-    // cases without branching.
-    let mut sl = size.rotate_right((fl).wrapping_sub(SECOND_LEVEL_INDEX_LOG_SIZE as u32));
-
-    // The most significant one of `size` should be now at `sl[SLI]`
-    //debug_assert!(((sl >> Self::SLI) & 1) == 1);
-
-    // Underflowed digits appear in `sl[SLI + 1..USIZE-BITS]`. They should
-    // be rounded up
-    sl = (sl & (SECOND_LEVEL_INDEX_SIZE as u32 - 1))
-        + (sl >= (1 << (SECOND_LEVEL_INDEX_LOG_SIZE as u32 + 1))) as u32;
-
-    // if sl[SLI] { fl += 1; sl = 0; }
-    fl += (sl >> SECOND_LEVEL_INDEX_LOG_SIZE) as u32;
-
-    // `fl` must be in a valid range
-    if fl >= FIRST_LEVEL_INDEX_SIZE as u32 {
-        panic!("what to do here?");
-    }
-
-    (fl as u32, sl & (SECOND_LEVEL_INDEX_SIZE as u32 - 1))
+    let f = u32::BITS - size.leading_zeros() - 1;
+    let s = (size ^ (1 << f)) >> (f - SECOND_LEVEL_INDEX_LOG_SIZE as u32);
+    (f, s)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use proptest::prelude::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
+        Rc::new(RefCell::new(Vec::new()))
+    }
 
     #[test]
     fn mapping_test() {
         //        println!("mapping: {:?}", mapping(123421));
-        assert_eq!(mapping(123421), (16, 29));
+        assert_eq!(mapping(32), (5, 0));
+        assert_eq!(mapping(63), (5, 31));
+
+        proptest!(|(
+            size in 0..u32::MAX,
+        )| {
+            let (f, s) = mapping(size);
+            assert!((1 << f) + (((1 << f) / SECOND_LEVEL_INDEX_SIZE as u32) * (s + 1) - 1) >= size);
+            if s > 0 {
+                assert!((1 << f) + ((1 << f) / SECOND_LEVEL_INDEX_SIZE as u32) * s < size);
+            }
+        });
+    }
+
+    #[test]
+    fn allocate() {
+        let mem = make_memory();
+        let mut tlsf = TlsfAllocator::new(mem);
+        tlsf.allocate(1232);
     }
 }
