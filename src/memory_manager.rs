@@ -521,7 +521,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
     }
 
-    //here
     fn read(&self, id: MemoryId, offset: u64, dst: &mut [u8]) {
         if (offset + dst.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
             panic!("{id:?}: read out of bounds");
