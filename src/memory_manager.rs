@@ -153,31 +153,25 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// --------------------------------------------------
 /// Size of memory 254 (in pages)           ↕ 8 bytes
 /// -------------------------------------------------- <- IDs of buckets
-/// Bucket 1 ID belonging to memory 0       ↕ 15 bits
+/// Bucket 1 belonging to memory 0          ↕ 15 bits
 /// --------------------------------------------------
-/// Bucket 2 ID belonging to memory 0       ↕ 15 bits
-/// --------------------------------------------------
-/// ...
-/// --------------------------------------------------
-/// Bucket k0 ID belonging to memory 0      ↕ 15 bits
-/// --------------------------------------------------
-/// Bucket 1 ID belonging to memory 1       ↕ 15 bits
-/// --------------------------------------------------
-/// Bucket 2 ID belonging to memory 1       ↕ 15 bits
+/// Bucket 2 belonging to memory 0          ↕ 15 bits
 /// --------------------------------------------------
 /// ...
 /// --------------------------------------------------
-/// Bucket k1 ID belonging to memory 1      ↕ 15 bits
+/// Bucket 1 belonging to memory 1          ↕ 15 bits
+/// --------------------------------------------------
+/// Bucket 2 belonging to memory 1          ↕ 15 bits
+/// --------------------------------------------------
+/// ...
 /// --------------------------------------------------
 /// ...
 /// ---------------------------------------------------
-/// Bucket 1 ID belonging to memory 254     ↕ 15 bits
+/// Bucket 1 belonging to memory 254        ↕ 15 bits
 /// --------------------------------------------------
-/// Bucket 2 ID belonging to memory 254     ↕ 15 bits
+/// Bucket 2 belonging to memory 254        ↕ 15 bits
 /// --------------------------------------------------
 /// ...
-/// --------------------------------------------------
-/// Bucket k254 ID belonging to memory 254  ↕ 15 bits
 /// --------------------------------------------------
 /// Unallocated space                       ↕ 2'016 bytes
 /// -------------------------------------------------- <- Buckets (Page 1)
