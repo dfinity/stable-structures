@@ -290,6 +290,14 @@ struct MemoryManagerInner<M: Memory> {
     unallocated_buckets: LinkedList<BucketId>,
 }
 
+fn get_all_buckets() -> LinkedList<BucketId> {
+    let mut list = LinkedList::new();
+    for i in 0..MAX_NUM_BUCKETS {
+        list.push_back(BucketId(i as u16));
+    }
+    list
+}
+
 impl<M: Memory> MemoryManagerInner<M> {
     fn init(memory: M, bucket_size_in_pages: u16) -> Self {
         if memory.size() == 0 {
@@ -316,7 +324,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
-            unallocated_buckets: LinkedList::new(),
+            unallocated_buckets: get_all_buckets(),
         };
 
         mem_mgr.save_header();
