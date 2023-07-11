@@ -424,6 +424,12 @@ impl<M: Memory> MemoryManagerInner<M> {
         self.memory_sizes_in_pages[id.0 as usize]
     }
 
+    // Returns the size of a memory (in buckets).
+    fn memory_size_in_buckets(&self, id: MemoryId) -> u64 {
+        (self.memory_size(id) + self.bucket_size_in_pages as u64 - 1)
+            / self.bucket_size_in_pages as u64
+    }
+
     // Grows the memory with the given id by the given number of pages.
     fn grow(&mut self, id: MemoryId, pages: u64) -> i64 {
         // Compute how many additional buckets are needed.
@@ -440,7 +446,10 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         // Allocate new buckets as needed.
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = BucketId(self.allocated_buckets);
+            let new_bucket_id = match self.unallocated_buckets.pop_front() {
+                Some(t) => t,
+                None => panic!("{id:?}: grow failed"),
+            };
 
             self.memory_buckets
                 .entry(id)
@@ -450,8 +459,8 @@ impl<M: Memory> MemoryManagerInner<M> {
             // Write in stable store that this bucket belongs to the memory with the provided `id`.
             write(
                 &self.memory,
-                bucket_allocations_address(new_bucket_id).get(),
-                &[id.0],
+                bucket_allocations_address(BucketId(0)).get(),
+                self.get_bucket_ids_in_bytes().as_ref(),
             );
 
             self.allocated_buckets += 1;
@@ -474,6 +483,15 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Update the header and return the old size.
         self.save_header();
         old_size as i64
+    }
+
+    fn get_bucket_ids_in_bytes(&self) -> Vec<u8> {
+        let mut vector_bytes = vec![];
+        for memory in self.memory_buckets.iter() {
+            let mut req = bucket_indexes_to_bytes(memory.1);
+            vector_bytes.append(&mut req);
+        }
+        vector_bytes
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8]) {
@@ -539,9 +557,10 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn free(&mut self, id: MemoryId) {}
 }
 
-fn bucket_indexes_to_bytes(input: &[u16]) -> Vec<u8> {
+fn bucket_indexes_to_bytes(input: &[BucketId]) -> Vec<u8> {
     let mut bit_vec = BitVec::new();
-    for bucket_ind in input {
+    for bucket in input {
+        let bucket_ind = bucket.0;
         let mut bit_vec_temp = BitVec::from_bytes(&bucket_ind.to_be_bytes()).split_off(1);
         bit_vec.append(&mut bit_vec_temp);
     }
