@@ -340,7 +340,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             LAYOUT_VERSION_V1 => {
                 let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
                 memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
-                let mut unallocated: BTreeSet<u16> = (0..header.num_allocated_buckets).collect();
+                let mut unallocated: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
                 let mut memory_buckets = BTreeMap::new();
                 for (bucket_idx, memory) in buckets.into_iter().enumerate() {
                     if memory != UNALLOCATED_BUCKET_MARKER {
@@ -374,7 +374,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
                 let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
 
-                let mut unallocated: BTreeSet<u16> = (0..header.num_allocated_buckets).collect();
+                let mut unallocated: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
                 let mut memory_buckets = BTreeMap::new();
 
                 let mut j = 0;
@@ -464,13 +464,6 @@ impl<M: Memory> MemoryManagerInner<M> {
                 .or_insert_with(Vec::new)
                 .push(new_bucket_id);
 
-            // Write in stable store that this bucket belongs to the memory with the provided `id`.
-            write(
-                &self.memory,
-                bucket_allocations_address(BucketId(0)).get(),
-                self.get_bucket_ids_in_bytes().as_ref(),
-            );
-
             self.allocated_buckets += 1;
         }
 
@@ -490,16 +483,26 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         // Update the header and return the old size.
         self.save_header();
+
+        // Write in stable store that this bucket belongs to the memory with the provided `id`.
+        write(
+            &self.memory,
+            bucket_allocations_address(BucketId(0)).get(),
+            self.get_bucket_ids_in_bytes().as_ref(),
+        );
         old_size as i64
     }
 
     fn get_bucket_ids_in_bytes(&self) -> Vec<u8> {
-        let mut vector_bytes = vec![];
+        let mut bit_vec = BitVec::new();
         for memory in self.memory_buckets.iter() {
-            let mut req = bucket_indexes_to_bytes(memory.1);
-            vector_bytes.append(&mut req);
+            for bucket in memory.1 {
+                let bucket_ind = bucket.0;
+                let mut bit_vec_temp = BitVec::from_bytes(&bucket_ind.to_be_bytes()).split_off(1);
+                bit_vec.append(&mut bit_vec_temp);
+            }
         }
-        vector_bytes
+        bit_vec.to_bytes()
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8]) {
@@ -518,6 +521,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
     }
 
+    //here
     fn read(&self, id: MemoryId, offset: u64, dst: &mut [u8]) {
         if (offset + dst.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
             panic!("{id:?}: read out of bounds");
@@ -575,16 +579,6 @@ impl<M: Memory> MemoryManagerInner<M> {
             None => (),
         };
     }
-}
-
-fn bucket_indexes_to_bytes(input: &[BucketId]) -> Vec<u8> {
-    let mut bit_vec = BitVec::new();
-    for bucket in input {
-        let bucket_ind = bucket.0;
-        let mut bit_vec_temp = BitVec::from_bytes(&bucket_ind.to_be_bytes()).split_off(1);
-        bit_vec.append(&mut bit_vec_temp);
-    }
-    bit_vec.to_bytes()
 }
 
 fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<u16> {
