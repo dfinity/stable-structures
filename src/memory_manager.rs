@@ -554,7 +554,19 @@ impl<M: Memory> MemoryManagerInner<M> {
         (num_pages + self.bucket_size_in_pages as u64 - 1) / self.bucket_size_in_pages as u64
     }
 
-    fn free(&mut self, id: MemoryId) {}
+    fn free(&mut self, id: MemoryId) {
+        self.memory_sizes_in_pages[id.0 as usize] = 0;
+        let buckets = self.memory_buckets.remove(&id);
+        match buckets {
+            Some(vec_buckets) => {
+                for bucket in vec_buckets {
+                    self.unallocated_buckets.push_back(bucket);
+                    self.allocated_buckets -= 1;
+                }
+            }
+            None => (),
+        };
+    }
 }
 
 fn bucket_indexes_to_bytes(input: &[BucketId]) -> Vec<u8> {
