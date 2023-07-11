@@ -225,11 +225,15 @@ impl<M: Memory> MemoryManager<M> {
 #[repr(C, packed)]
 struct Header {
     magic: [u8; 3],
+
     version: u8,
+
     // The number of buckets allocated by the memory manager.
     num_allocated_buckets: u16,
+
     // The size of a bucket in Wasm pages.
     bucket_size_in_pages: u16,
+
     // Reserved bytes for future extensions
     _reserved: [u8; HEADER_RESERVED_BYTES],
 
