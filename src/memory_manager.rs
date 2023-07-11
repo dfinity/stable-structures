@@ -571,16 +571,16 @@ impl<M: Memory> MemoryManagerInner<M> {
 fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<BucketId> {
     let mut bucket_ids = vec![];
     let bit_vec = BitVec::from_bytes(input);
-    for bucket_id in 0..bit_vec.len() / BUCKET_ID_LEN {
-        let mut bucket: u16 = 0;
+    for bucket_order_number in 0..bit_vec.len() / BUCKET_ID_LEN {
+        let mut bucket_id: u16 = 0;
         for bucket_id_bit in 0..BUCKET_ID_LEN {
-            let next_bit = BUCKET_ID_LEN * bucket_id + bucket_id_bit;
-            bucket <<= 1;
+            let next_bit = BUCKET_ID_LEN * bucket_order_number + bucket_id_bit;
+            bucket_id <<= 1;
             if bit_vec.get(next_bit) == Some(true) {
-                bucket |= 1;
+                bucket_id |= 1;
             }
         }
-        bucket_ids.push(BucketId(bucket));
+        bucket_ids.push(BucketId(bucket_id));
     }
     bucket_ids
 }
