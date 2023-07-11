@@ -324,84 +324,84 @@ impl<M: Memory> MemoryManagerInner<M> {
         mem_mgr
     }
 
+    fn load_layout_v1(memory: M, header: Header) -> Self {
+        let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
+        memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
+        let mut unallocated: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
+        let mut memory_buckets = BTreeMap::new();
+        for (bucket_idx, memory) in buckets.into_iter().enumerate() {
+            if memory != UNALLOCATED_BUCKET_MARKER {
+                memory_buckets
+                    .entry(MemoryId(memory))
+                    .or_insert_with(Vec::new)
+                    .push(BucketId(bucket_idx as u16));
+                unallocated.remove(&(bucket_idx as u16));
+            }
+        }
+
+        let mut unallocated_buckets = LinkedList::new();
+        for i in unallocated.iter() {
+            unallocated_buckets.push_back(BucketId(*i));
+        }
+
+        Self {
+            memory,
+            allocated_buckets: header.num_allocated_buckets,
+            bucket_size_in_pages: header.bucket_size_in_pages,
+            memory_sizes_in_pages: header.memory_sizes_in_pages,
+            memory_buckets,
+            unallocated_buckets,
+        }
+    }
+
+    fn load_layout_v2(memory: M, header: Header) -> Self {
+        let size_of_buckets_ind_in_bytes = (MAX_NUM_BUCKETS * 15 + 15) / 16;
+        let mut buckets = vec![0; size_of_buckets_ind_in_bytes as usize];
+        memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
+
+        let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
+
+        let mut unallocated: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
+        let mut memory_buckets = BTreeMap::new();
+
+        let mut j = 0;
+        for (memory, memory_size_in_pages) in header.memory_sizes_in_pages.into_iter().enumerate() {
+            let memory_size = (memory_size_in_pages + header.bucket_size_in_pages as u64 - 1)
+                / header.bucket_size_in_pages as u64;
+            let mut vec_buckets = vec![];
+            for _ in 0..memory_size {
+                let bucket = BucketId(buckets_decompressed[j]);
+                vec_buckets.push(bucket);
+                unallocated.remove(&bucket.0);
+                j += 1;
+            }
+            memory_buckets
+                .entry(MemoryId(memory as u8))
+                .or_insert(vec_buckets);
+        }
+
+        let mut unallocated_buckets = LinkedList::new();
+        for i in unallocated.iter() {
+            unallocated_buckets.push_back(BucketId(*i));
+        }
+
+        Self {
+            memory,
+            allocated_buckets: header.num_allocated_buckets,
+            bucket_size_in_pages: header.bucket_size_in_pages,
+            memory_sizes_in_pages: header.memory_sizes_in_pages,
+            memory_buckets,
+            unallocated_buckets,
+        }
+    }
+
     fn load(memory: M) -> Self {
         // Read the header from memory.
         let header: Header = read_struct(Address::from(0), &memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         match header.version {
-            LAYOUT_VERSION_V1 => {
-                let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
-                memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
-                let mut unallocated: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
-                let mut memory_buckets = BTreeMap::new();
-                for (bucket_idx, memory) in buckets.into_iter().enumerate() {
-                    if memory != UNALLOCATED_BUCKET_MARKER {
-                        memory_buckets
-                            .entry(MemoryId(memory))
-                            .or_insert_with(Vec::new)
-                            .push(BucketId(bucket_idx as u16));
-                        unallocated.remove(&(bucket_idx as u16));
-                    }
-                }
-
-                let mut unallocated_buckets = LinkedList::new();
-                for i in unallocated.iter() {
-                    unallocated_buckets.push_back(BucketId(*i));
-                }
-
-                Self {
-                    memory,
-                    allocated_buckets: header.num_allocated_buckets,
-                    bucket_size_in_pages: header.bucket_size_in_pages,
-                    memory_sizes_in_pages: header.memory_sizes_in_pages,
-                    memory_buckets,
-                    unallocated_buckets,
-                }
-            }
-            LAYOUT_VERSION_V2 => {
-                let header: Header = read_struct(Address::from(0), &memory);
-                let size_of_buckets_ind_in_bytes = (MAX_NUM_BUCKETS * 15 + 15) / 16;
-                let mut buckets = vec![0; size_of_buckets_ind_in_bytes as usize];
-                memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
-
-                let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
-
-                let mut unallocated: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
-                let mut memory_buckets = BTreeMap::new();
-
-                let mut j = 0;
-                for (memory, memory_size_in_pages) in
-                    header.memory_sizes_in_pages.into_iter().enumerate()
-                {
-                    let memory_size = (memory_size_in_pages + header.bucket_size_in_pages as u64
-                        - 1)
-                        / header.bucket_size_in_pages as u64;
-                    let mut vec_buckets = vec![];
-                    for _ in 0..memory_size {
-                        let bucket = BucketId(buckets_decompressed[j]);
-                        vec_buckets.push(bucket);
-                        unallocated.remove(&bucket.0);
-                        j += 1;
-                    }
-                    memory_buckets
-                        .entry(MemoryId(memory as u8))
-                        .or_insert(vec_buckets);
-                }
-
-                let mut unallocated_buckets = LinkedList::new();
-                for i in unallocated.iter() {
-                    unallocated_buckets.push_back(BucketId(*i));
-                }
-
-                Self {
-                    memory,
-                    allocated_buckets: header.num_allocated_buckets,
-                    bucket_size_in_pages: header.bucket_size_in_pages,
-                    memory_sizes_in_pages: header.memory_sizes_in_pages,
-                    memory_buckets,
-                    unallocated_buckets,
-                }
-            }
+            LAYOUT_VERSION_V1 => MemoryManagerInner::load_layout_v1(memory, header),
+            LAYOUT_VERSION_V2 => MemoryManagerInner::load_layout_v2(memory, header),
             _ => panic!("Unsupported version."),
         }
     }
