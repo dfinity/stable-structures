@@ -432,12 +432,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         self.memory_sizes_in_pages[id.0 as usize]
     }
 
-    // Returns the size of a memory (in buckets).
-    fn memory_size_in_buckets(&self, id: MemoryId) -> u64 {
-        (self.memory_size(id) + self.bucket_size_in_pages as u64 - 1)
-            / self.bucket_size_in_pages as u64
-    }
-
     // Grows the memory with the given id by the given number of pages.
     fn grow(&mut self, id: MemoryId, pages: u64) -> i64 {
         // Compute how many additional buckets are needed.
@@ -568,15 +562,12 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn free(&mut self, id: MemoryId) {
         self.memory_sizes_in_pages[id.0 as usize] = 0;
         let buckets = self.memory_buckets.remove(&id);
-        match buckets {
-            Some(vec_buckets) => {
-                for bucket in vec_buckets {
-                    self.unallocated_buckets.push_back(bucket);
-                    self.allocated_buckets -= 1;
-                }
+        if let Some(vec_buckets) = buckets {
+            for bucket in vec_buckets {
+                self.unallocated_buckets.push_back(bucket);
+                self.allocated_buckets -= 1;
             }
-            None => (),
-        };
+        }
     }
 }
 
@@ -588,9 +579,9 @@ fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<u16> {
         let mut bucket_ind: u16 = 0;
         for j in 0..BUCKET_IND_LEN {
             let next_bit = BUCKET_IND_LEN * i + j;
-            bucket_ind = bucket_ind << 1;
+            bucket_ind <<= 1;
             if bit_vec.get(next_bit) == Some(true) {
-                bucket_ind = bucket_ind | 1;
+                bucket_ind |= 1;
             }
         }
         vec_u16.push(bucket_ind);
