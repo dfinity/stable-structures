@@ -75,6 +75,9 @@ const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
 // Reserved bytes in the header for future extensions.
 const HEADER_RESERVED_BYTES: usize = 32;
 
+// Size of the bucked id in the memory.
+const BUCKET_ID_LEN: usize = 15;
+
 /// A memory manager simulates multiple memories within a single memory.
 ///
 /// The memory manager can return up to 255 unique instances of [`VirtualMemory`], and each can be
@@ -355,8 +358,10 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 
     fn load_layout_v2(memory: M, header: Header) -> Self {
-        let size_of_buckets_ind_in_bytes = (MAX_NUM_BUCKETS * 15 + 15) / 16;
-        let mut buckets = vec![0; size_of_buckets_ind_in_bytes as usize];
+        const BYTE_SIZE: usize = 8;
+        let size_of_buckets_ind_in_bytes =
+            (MAX_NUM_BUCKETS as usize * BUCKET_ID_LEN + (BYTE_SIZE - 1)) / BYTE_SIZE;
+        let mut buckets = vec![0; size_of_buckets_ind_in_bytes];
         memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
 
         let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
@@ -564,13 +569,12 @@ impl<M: Memory> MemoryManagerInner<M> {
 }
 
 fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<BucketId> {
-    const BUCKET_IND_LEN: usize = 15;
     let mut bucket_ids = vec![];
     let bit_vec = BitVec::from_bytes(input);
-    for i in 0..bit_vec.len() / BUCKET_IND_LEN {
+    for bucket_id in 0..bit_vec.len() / BUCKET_ID_LEN {
         let mut bucket: u16 = 0;
-        for j in 0..BUCKET_IND_LEN {
-            let next_bit = BUCKET_IND_LEN * i + j;
+        for bucket_id_bit in 0..BUCKET_ID_LEN {
+            let next_bit = BUCKET_ID_LEN * bucket_id + bucket_id_bit;
             bucket <<= 1;
             if bit_vec.get(next_bit) == Some(true) {
                 bucket |= 1;
@@ -580,6 +584,7 @@ fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<BucketId> {
     }
     bucket_ids
 }
+
 struct Segment {
     address: Address,
     length: Bytes,
