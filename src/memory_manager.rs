@@ -370,7 +370,7 @@ impl<M: Memory> MemoryManagerInner<M> {
                 / header.bucket_size_in_pages as u64;
             let mut vec_buckets = vec![];
             for _ in 0..memory_size {
-                let bucket = BucketId(buckets_decompressed[j]);
+                let bucket = buckets_decompressed[j];
                 vec_buckets.push(bucket);
                 unallocated.remove(&bucket.0);
                 j += 1;
@@ -563,22 +563,22 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 }
 
-fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<u16> {
+fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<BucketId> {
     const BUCKET_IND_LEN: usize = 15;
-    let mut vec_u16 = vec![];
+    let mut bucket_ids = vec![];
     let bit_vec = BitVec::from_bytes(input);
     for i in 0..bit_vec.len() / BUCKET_IND_LEN {
-        let mut bucket_ind: u16 = 0;
+        let mut bucket: u16 = 0;
         for j in 0..BUCKET_IND_LEN {
             let next_bit = BUCKET_IND_LEN * i + j;
-            bucket_ind <<= 1;
+            bucket <<= 1;
             if bit_vec.get(next_bit) == Some(true) {
-                bucket_ind |= 1;
+                bucket |= 1;
             }
         }
-        vec_u16.push(bucket_ind);
+        bucket_ids.push(BucketId(bucket));
     }
-    vec_u16
+    bucket_ids
 }
 struct Segment {
     address: Address,
