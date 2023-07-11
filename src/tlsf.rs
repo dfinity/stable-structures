@@ -22,13 +22,11 @@ const SECOND_LEVEL_INDEX_SIZE: usize = 1 << SECOND_LEVEL_INDEX_LOG_SIZE;
 
 const DATA_OFFSET: Address = Address::new(WASM_PAGE_SIZE);
 
+const MEMORY_POOL_SIZE: u32 = u32::MAX;
+
 struct SegList(usize, usize);
 
 //const GRANULARITY_LOG2: u32 = GRANULARITY.trailing_zeros();
-
-fn find_lowest_set_bit(mut word: u32) -> u32 {
-    word.leading_zeros()
-}
 
 /// # Memory Layout
 ///
@@ -68,8 +66,10 @@ impl<M: Memory> TlsfAllocator<M> {
         let block = Block {
             address: DATA_OFFSET,
             allocated: false,
-            size: u32::MAX,
-            next: Address::NULL,
+            size: MEMORY_POOL_SIZE,
+            prev_free: Address::NULL,
+            next_free: Address::NULL,
+            prev_physical: Address::NULL,
         };
 
         block.save(&memory);
@@ -82,6 +82,7 @@ impl<M: Memory> TlsfAllocator<M> {
     // TODO: load, init
 
     pub fn allocate(&mut self, size: u32) -> Address {
+        let size = size + Block::header_size() as u32;
         let (fl, sl) = mapping(size);
 
         let block_seg_list = self.search_suitable_block(size, fl as usize, sl as usize);
@@ -92,24 +93,24 @@ impl<M: Memory> TlsfAllocator<M> {
         );
 
         // Remove the block
-        self.free_lists[block_seg_list.0][block_seg_list.1] = block.next;
+        self.free_lists[block_seg_list.0][block_seg_list.1] = block.next_free;
         block.allocated = true;
 
         if block.size > size {
-            let remaining_size = block.size - size - Block::header_size() as u32;
-            println!("remaining size: {}", remaining_size);
+            let remaining_size = block.size - size;
             let (fl, sl) = mapping(remaining_size);
-            println!("remaining seg list {:?}", (fl, sl));
 
             // Split the block
             let remaining_block = Block {
-                address: block.address + size.into() + Block::header_size().into(),
+                address: block.address + size.into(),
                 allocated: false,
-                next: self.free_lists[fl as usize][sl as usize],
+                prev_free: block.prev_free, // TODO: assert this to be null?
+                next_free: self.free_lists[fl as usize][sl as usize],
                 size: remaining_size,
+                prev_physical: block.address,
             };
 
-            block.size = size + Block::header_size() as u32;
+            block.size = size;
 
             // Insert the block.
             self.free_lists[fl as usize][sl as usize] = remaining_block.address;
@@ -117,7 +118,6 @@ impl<M: Memory> TlsfAllocator<M> {
             remaining_block.save(&self.memory);
         }
 
-        println!("Got block {:?}", block);
         block.address + Bytes::from(Block::header_size())
         /*
         remove (found_block); // O(1)
@@ -129,7 +129,207 @@ impl<M: Memory> TlsfAllocator<M> {
         return found_block;*/
     }
 
+    // Removes a free block from the free lists.
+    //
+    // Postconditions:
+    // * block->next->prev = block->prev;
+    // * block->prev->next = block->next;
+    // * free list head is updated.
+    fn remove(&mut self, block: &Block) {
+        println!("REMOVE: {:#?}", block);
+        // Precondition: `block` is free.
+        debug_assert!(!block.allocated);
+
+        match block.get_prev_free_block(&self.memory) {
+            None => {
+                // `block` is the head of the free list.
+                //    let (f, s) = mapping(block.size);
+                // NOTE: this doesn't actually need to be the case because the block has just been
+                // freed
+                //     debug_assert_eq!(block.address, self.free_lists[f as usize][s as usize]);
+            }
+            Some(mut prev_free_block) => {
+                println!("updating prev block: {:?}", prev_free_block);
+                prev_free_block.next_free = block.next_free;
+                prev_free_block.save(&self.memory);
+            }
+        }
+
+        match block.get_next_free_block(&self.memory) {
+            None => {
+                // `block` is the tail of the free list. Nothing to do.
+            }
+            Some(mut next_free_block) => {
+                next_free_block.prev_free = block.prev_free;
+                next_free_block.save(&self.memory);
+            }
+        }
+    }
+
+    fn insert(&mut self, block: &mut Block) {
+        println!("inserting block: {:?}", block);
+        debug_assert!(!block.allocated);
+
+        let (f, s) = mapping(block.size);
+        block.next_free = self.free_lists[f as usize][s as usize];
+
+        match block.next_free {
+            Address::NULL => {}
+            next_free => {
+                let mut next_block = Block::load(next_free, &self.memory);
+                debug_assert_eq!(next_block.prev_free, Address::NULL);
+                debug_assert!(!next_block.allocated);
+                next_block.prev_free = block.address;
+                next_block.save(&self.memory);
+            }
+        };
+
+        println!("adding block to {:?}", (f, s));
+        self.free_lists[f as usize][s as usize] = block.address;
+        block.save(&self.memory);
+    }
+
+    // Merges a block with its previous and next blocks if they are free.
+    // The free lists are updated accordingly.
+    fn merge(&mut self, mut block: Block) -> Block {
+        println!("merging block {:?}", block);
+        // Precondition: `block` is free.
+        debug_assert!(!block.allocated);
+
+        match (
+            block.get_prev_physical_block(&self.memory),
+            block.get_next_physical_block(&self.memory),
+        ) {
+            (None, None) => {
+                self.remove(&block);
+                return block;
+            }
+            (Some(mut prev_block), None) => {
+                if !prev_block.allocated {
+                    self.remove(&block);
+                    self.remove(&prev_block);
+
+                    prev_block.size += block.size;
+                    self.insert(&mut prev_block);
+                    return prev_block;
+                }
+                block
+            }
+            (Some(mut prev_block), Some(mut next_block)) => {
+                println!("prev block: {:?}", prev_block);
+                println!("next block: {:?}", next_block);
+                if !prev_block.allocated {
+                    println!("MERGE CASE 3.1");
+                    self.remove(&block);
+                    self.remove(&prev_block);
+
+                    prev_block.size += block.size;
+
+                    if !next_block.allocated {
+                        self.remove(&next_block);
+                        prev_block.size += next_block.size;
+                    }
+
+                    next_block.prev_physical = prev_block.address;
+                    next_block.save(&self.memory);
+
+                    self.insert(&mut prev_block);
+                    return prev_block;
+                } else {
+                    println!("MERGE CASE 3.2");
+                    if !next_block.allocated {
+                        self.remove(&next_block);
+                        block.size += next_block.size;
+
+                        // Update prev physical of next next block.
+                        if let Some(mut uber_next_block) =
+                            next_block.get_next_physical_block(&self.memory)
+                        {
+                            println!("uber next block: {:#?}", uber_next_block);
+                            uber_next_block.prev_physical = block.address;
+                            uber_next_block.save(&self.memory);
+                        }
+                    }
+
+                    self.insert(&mut block);
+                    return block;
+                }
+            }
+            (None, Some(next_block)) => {
+                println!("MERGE CASE 4");
+                if !next_block.allocated {
+                    println!("merging next block");
+                    self.remove(&next_block);
+                    block.size += next_block.size;
+
+                    // Update prev physical of next next block.
+                    if let Some(mut uber_next_block) =
+                        next_block.get_next_physical_block(&self.memory)
+                    {
+                        println!("uber next block: {:#?}", uber_next_block);
+                        uber_next_block.prev_physical = block.address;
+                        uber_next_block.save(&self.memory);
+                    }
+                }
+
+                self.remove(&block); // TODO can/should this be moved to the if statement above?
+                self.insert(&mut block);
+                return block;
+            }
+        }
+    }
+
     pub fn deallocate(&mut self, address: Address) {
+        let address = address - Bytes::from(Block::header_size());
+        let mut block = Block::load(address, &self.memory);
+        println!("Deallocating block {:#?}", block);
+
+        block.allocated = false;
+
+        self.merge(block);
+
+        // TODO: should insertion be another explicit step?
+
+        /*// Check if the next physical block is free, and merge it.
+        let next_block_address = block_to_remove.address + Bytes::from(block_to_remove.size);
+        assert!(next_block_address <= DATA_OFFSET + Bytes::from(u32::MAX));
+        if next_block_address < DATA_OFFSET + Bytes::from(u32::MAX) {
+            // there's a next block. if it's empty, merge it into current block.
+            let next_block = Block::load(next_block_address, &self.memory);
+            if !next_block.allocated {
+                // TODO: Remove next block from free lists.
+
+                block_to_remove.size += next_block.size;
+
+                // Update list.
+            }
+        }
+
+        // Merge the previous block if it's available and free.
+        if block_to_remove.prev_physical != Address::NULL {
+            let mut prev_block = Block::load(block_to_remove.prev_physical, &self.memory);
+            if !prev_block.allocated {
+                prev_block.size += block_to_remove.size;
+                prev_block.save(&self.memory);
+
+                // TODO: remove prev block from free lists?
+
+                let (f, s) = mapping(prev_block.size);
+                prev_block.next_free = self.free_lists[f as usize][s as usize];
+                self.free_lists[f as usize][s as usize] = prev_block.address;
+                return;
+            }
+        }
+
+        block_to_remove.allocated = false;
+        block_to_remove.save(&self.memory);
+
+        // Insert the block into free blocks.
+        let (f, s) = mapping(block_to_remove.size);
+        block_to_remove.next_free = self.free_lists[f as usize][s as usize];
+        self.free_lists[f as usize][s as usize] = block_to_remove.address;
+        */
+
         /*
         int fl, sl;
         void *big_free_block;
@@ -161,7 +361,11 @@ impl<M: Memory> TlsfAllocator<M> {
 struct Block {
     address: Address,
     allocated: bool,
-    next: Address,
+    prev_free: Address,
+    next_free: Address,
+    prev_physical: Address,
+
+    // The size of the block, including the header.
     size: u32,
 }
 
@@ -170,12 +374,70 @@ impl Block {
         write_struct(
             &BlockHeader {
                 allocated: self.allocated,
-                next: self.next,
+                prev_free: self.prev_free,
+                next_free: self.next_free,
                 size: self.size,
+                prev_physical: self.prev_physical,
             },
             self.address,
             memory,
         )
+    }
+
+    // Loads the next physical block in memory.
+    // If this is the last physical block in memory, `None` is returned.
+    fn get_next_physical_block<M: Memory>(&self, memory: &M) -> Option<Block> {
+        let next_address = self.address + Bytes::from(self.size);
+
+        debug_assert!(next_address <= DATA_OFFSET + Bytes::from(MEMORY_POOL_SIZE));
+
+        if next_address < DATA_OFFSET + Bytes::from(MEMORY_POOL_SIZE) {
+            Some(Self::load(next_address, memory))
+        } else {
+            None
+        }
+    }
+
+    // Loads the previous physical block in memory.
+    // If this is the first physical block in memory, `None` is returned.
+    fn get_prev_physical_block<M: Memory>(&self, memory: &M) -> Option<Block> {
+        match self.prev_physical {
+            Address::NULL => None,
+            prev_physical => Some(Self::load(self.prev_physical, memory)),
+        }
+    }
+
+    // Loads the previous free block if it exists, `None` otherwise.
+    fn get_prev_free_block<M: Memory>(&self, memory: &M) -> Option<Block> {
+        if self.prev_free != Address::NULL {
+            let prev_free = Self::load(self.prev_free, memory);
+
+            // Assert that the previous block is pointing to the current block.
+            debug_assert_eq!(prev_free.next_free, self.address);
+            // Assert that the previous block is free.
+            debug_assert!(!prev_free.allocated);
+
+            Some(prev_free)
+        } else {
+            None
+        }
+    }
+
+    // Loads the next free block if it exists, `None` otherwise.
+    fn get_next_free_block<M: Memory>(&self, memory: &M) -> Option<Block> {
+        if self.next_free != Address::NULL {
+            let next_free = Self::load(self.next_free, memory);
+
+            println!("next free block: {:#?}", next_free);
+            // Assert that the next block is pointing to the current block.
+            debug_assert_eq!(next_free.prev_free, self.address);
+            // Assert that the next block is free.
+            debug_assert!(!next_free.allocated);
+
+            Some(next_free)
+        } else {
+            None
+        }
     }
 
     fn load<M: Memory>(address: Address, memory: &M) -> Self {
@@ -185,8 +447,10 @@ impl Block {
         Self {
             address,
             allocated: header.allocated,
-            next: header.next,
+            prev_free: header.prev_free,
+            next_free: header.next_free,
             size: header.size,
+            prev_physical: header.prev_physical,
         }
     }
 
@@ -200,13 +464,9 @@ impl Block {
 struct BlockHeader {
     allocated: bool,
     size: u32,
-    next: Address,
-}
-
-impl BlockHeader {
-    fn save<M: Memory>(&self, address: Address, memory: &M) {
-        write_struct(self, address, memory);
-    }
+    prev_free: Address,
+    next_free: Address,
+    prev_physical: Address,
 }
 
 // Returns the indexes that point to the corresponding segregated list.
@@ -244,13 +504,135 @@ mod test {
     fn allocate() {
         let mem = make_memory();
         let mut tlsf = TlsfAllocator::new(mem);
-        let block = tlsf.allocate(1232);
-        println!("block: {:?}", block);
+        let block_1 = tlsf.allocate(1232);
+        println!("Allocate (1): {:#?}", block_1);
 
-        let block = tlsf.allocate(45);
-        println!("block: {:?}", block);
+        let block_2 = tlsf.allocate(45);
+        println!("Allocate (2): {:#?}", block_2);
 
-        let block = tlsf.allocate(39);
-        println!("block: {:?}", block);
+        let block_3 = tlsf.allocate(39);
+        println!("Allocate (3): {:#?}", block_3);
+
+        assert_eq!(
+            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            DATA_OFFSET
+                + Bytes::from(1232u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(45u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(39u64)
+                + Bytes::from(Block::header_size())
+        );
+
+        println!("== Deallocate (1)");
+        tlsf.deallocate(block_1);
+
+        println!("free lists: {:#?}", tlsf.free_lists);
+
+        // block 1 is freed and is in the right list.
+        let (f, s) = mapping(1232 + Block::header_size() as u32);
+        assert_eq!(tlsf.free_lists[f as usize][s as usize], DATA_OFFSET);
+
+        assert_eq!(
+            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            DATA_OFFSET
+                + Bytes::from(1232u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(45u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(39u64)
+                + Bytes::from(Block::header_size())
+        );
+
+        println!("== Deallocate (2)");
+        tlsf.deallocate(block_2);
+
+        // block 2 is freed and is in the right list.
+        let (f, s) = mapping(1232 + 45 + Block::header_size() as u32 * 2);
+        println!("seg list: {:?}", (f, s));
+        assert_eq!(tlsf.free_lists[f as usize][s as usize], DATA_OFFSET);
+
+        println!(
+            "BLOCK 2: {:?}",
+            Block::load(tlsf.free_lists[f as usize][s as usize], &tlsf.memory),
+        );
+
+        println!(
+            "BLOCK 2 next: {:?}",
+            Block::load(tlsf.free_lists[f as usize][s as usize], &tlsf.memory)
+                .get_next_physical_block(&tlsf.memory),
+        );
+
+        assert_eq!(
+            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            DATA_OFFSET
+                + Bytes::from(1232u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(45u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(39u64)
+                + Bytes::from(Block::header_size())
+        );
+
+        println!("== Deallocate (3)");
+        tlsf.deallocate(block_3);
+
+        assert_eq!(
+            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            DATA_OFFSET
+        );
+    }
+
+    #[test]
+    fn two_allocate() {
+        let mem = make_memory();
+        let mut tlsf = TlsfAllocator::new(mem);
+        let block_1 = tlsf.allocate(1232);
+        println!("Allocate (1): {:#?}", block_1);
+
+        let block_2 = tlsf.allocate(45);
+        println!("Allocate (2): {:#?}", block_2);
+
+        let block_3 = tlsf.allocate(39);
+        println!("Allocate (3): {:#?}", block_3);
+
+        assert_eq!(
+            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            DATA_OFFSET
+                + Bytes::from(1232u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(45u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(39u64)
+                + Bytes::from(Block::header_size())
+        );
+
+        println!("== Deallocate (3)");
+        tlsf.deallocate(block_3);
+
+        assert_eq!(
+            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            DATA_OFFSET
+                + Bytes::from(1232u64)
+                + Bytes::from(Block::header_size())
+                + Bytes::from(45u64)
+                + Bytes::from(Block::header_size())
+        );
+
+        println!("== Deallocate (2)");
+        tlsf.deallocate(block_2);
+
+        assert_eq!(
+            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            DATA_OFFSET + Bytes::from(1232u64) + Bytes::from(Block::header_size())
+        );
+
+        println!("== Deallocate (1)");
+        tlsf.deallocate(block_1);
+
+        assert_eq!(
+            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            DATA_OFFSET
+        );
     }
 }
