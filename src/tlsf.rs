@@ -117,6 +117,8 @@ impl<M: Memory> TlsfAllocator<M> {
 
     /// Complexity: O(1)
     pub fn allocate(&mut self, size: u32) -> Address {
+        self.check_free_lists_invariant();
+
         // Adjust the size to accommodate the block header.
         let size = size + Block::header_size() as u32;
 
@@ -147,6 +149,8 @@ impl<M: Memory> TlsfAllocator<M> {
         block.allocated = true;
         block.save(&self.memory);
 
+        self.check_free_lists_invariant();
+
         block.address + Bytes::from(Block::header_size())
         /*
         remove (found_block); // O(1)
@@ -173,9 +177,6 @@ impl<M: Memory> TlsfAllocator<M> {
             None => {
                 // `block` is the head of the free list.
                 let (f, s) = mapping(block.size);
-                println!("mapping of block: {:?}", (f, s));
-                // NOTE: this doesn't actually need to be the case because the block has just been
-                // freed
                 debug_assert_eq!(block.address, self.free_lists[f][s]);
                 self.free_lists[f][s] = block.next_free;
             }
@@ -203,6 +204,7 @@ impl<M: Memory> TlsfAllocator<M> {
 
         let (f, s) = mapping(block.size);
         block.next_free = self.free_lists[f][s];
+        println!("SETTING NEXT FREE TO {:?}", block.next_free);
 
         match block.next_free {
             Address::NULL => {}
@@ -222,6 +224,41 @@ impl<M: Memory> TlsfAllocator<M> {
         block.save(&self.memory);
     }
 
+    // Merges two free blocks that are physically adjacent to each other.
+    fn merge_helper(&mut self, a: Block, b: Block) -> Block {
+        assert!(!a.allocated);
+        assert!(!b.allocated);
+        assert_eq!(b.prev_physical, a.address);
+        assert_eq!(a.address + Bytes::from(a.size), b.address);
+
+        // Remove them from the free lists.
+        self.remove(&a);
+        self.remove(&b);
+
+        // Reload them with new pointers.
+        let a = Block::load(a.address, &self.memory);
+        let b = Block::load(b.address, &self.memory);
+
+        if let Some(mut next_block) = b.get_next_physical_block(&self.memory) {
+            assert_eq!(next_block.prev_physical, b.address);
+            next_block.prev_physical = a.address;
+            next_block.save(&self.memory);
+        }
+
+        let mut block = Block {
+            address: a.address,
+            allocated: false,
+            prev_free: Address::NULL,
+            next_free: Address::NULL, // to be filled by "insert"
+            prev_physical: a.prev_physical,
+            size: a.size + b.size,
+        };
+
+        self.insert(&mut block);
+
+        block
+    }
+
     // Merges a block with its previous and next blocks if they are free.
     // The free lists are updated accordingly.
     fn merge(&mut self, mut block: Block) -> Block {
@@ -239,12 +276,7 @@ impl<M: Memory> TlsfAllocator<M> {
             }
             (Some(mut prev_block), None) => {
                 if !prev_block.allocated {
-                    self.remove(&block);
-                    self.remove(&prev_block);
-                    prev_block.size += block.size;
-                    self.insert(&mut prev_block);
-
-                    prev_block
+                    self.merge_helper(prev_block, block)
                 } else {
                     block
                 }
@@ -254,51 +286,23 @@ impl<M: Memory> TlsfAllocator<M> {
                 println!("next block: {:?}", next_block);
                 if !prev_block.allocated {
                     println!("MERGE CASE 3.1");
-                    self.remove(&block);
-                    self.remove(&prev_block);
-                    prev_block.size += block.size;
+
+                    let mut big_block = self.merge_helper(prev_block, block);
+
+                    // Reload next block.
+                    next_block = Block::load(next_block.address, &self.memory);
 
                     if !next_block.allocated {
-                        self.remove(&next_block);
-                        prev_block.size += next_block.size;
-
-                        // Update prev physical of next next block.
-                        if let Some(mut uber_next_block) =
-                            next_block.get_next_physical_block(&self.memory)
-                        {
-                            println!("3.1 uber next block: {:#?}", uber_next_block);
-                            uber_next_block.prev_physical = block.address;
-                            uber_next_block.save(&self.memory);
-                        }
-                    } else {
-                        // Next block is allocated. Update its previous physical address.
-                        next_block.prev_physical = prev_block.address;
-                        next_block.save(&self.memory);
+                        big_block = self.merge_helper(big_block, next_block);
                     }
 
-                    self.insert(&mut prev_block);
-                    return prev_block;
+                    return big_block;
                 } else {
                     println!("MERGE CASE 3.2");
                     if !next_block.allocated {
-                        println!(
-                            "merging block {:?} with {:?}",
-                            block.address, next_block.address
-                        );
-                        self.remove(&next_block);
-                        block.size += next_block.size;
-
-                        // Update prev physical of next next block.
-                        if let Some(mut uber_next_block) =
-                            next_block.get_next_physical_block(&self.memory)
-                        {
-                            println!("uber next block: {:#?}", uber_next_block);
-                            uber_next_block.prev_physical = block.address;
-                            uber_next_block.save(&self.memory);
-                        }
+                        return self.merge_helper(block, next_block);
                     }
 
-                    self.insert(&mut block);
                     return block;
                 }
             }
@@ -309,25 +313,7 @@ impl<M: Memory> TlsfAllocator<M> {
                         "merging block {:?} with {:?}",
                         block.address, next_block.address
                     );
-                    self.remove(&next_block);
-                    self.remove(&block);
-                    // Reload the block, as the `remove` above made changes.
-                    println!("block before: {:#?}", block);
-                    block = Block::load(block.address, &self.memory);
-
-                    println!("block after: {:#?}", block);
-                    block.size += next_block.size;
-
-                    // Update prev physical of next next block.
-                    if let Some(mut uber_next_block) =
-                        next_block.get_next_physical_block(&self.memory)
-                    {
-                        println!("uber next block: {:#?}", uber_next_block);
-                        uber_next_block.prev_physical = block.address;
-                        uber_next_block.save(&self.memory);
-                    }
-
-                    self.insert(&mut block);
+                    return self.merge_helper(block, next_block);
                 }
 
                 return block;
@@ -335,7 +321,61 @@ impl<M: Memory> TlsfAllocator<M> {
         }
     }
 
+    fn check_free_lists_invariant(&self) {
+        let mut total_size = 0;
+
+        let mut free_blocks: std::collections::BTreeMap<Address, Block> =
+            std::collections::BTreeMap::new();
+
+        let mut block = Block::load(DATA_OFFSET, &self.memory);
+        assert_eq!(block.prev_physical, Address::NULL);
+        total_size += block.size;
+        if !block.allocated {
+            free_blocks.insert(block.address, block.clone());
+        }
+
+        /*if !block.allocated {
+            free_size += block.size;
+
+            free_blocks.push(block);
+
+        }*/
+
+        let block_physical_address = block.address;
+        while let Some(next_block) = block.get_next_physical_block(&self.memory) {
+            block = next_block;
+            total_size += block.size;
+            if !block.allocated {
+                free_blocks.insert(block.address, block.clone());
+            }
+        }
+
+        // The sum of all the block sizes = MEMORY POOL.
+        assert_eq!(total_size, MEMORY_POOL_SIZE);
+
+        // Links between all free blocks are correct.
+        for free_block in free_blocks.values() {
+            if free_block.prev_free != Address::NULL {
+                println!("attempting to load prev block {:?}", free_block.prev_free);
+                assert_eq!(
+                    free_blocks.get(&free_block.prev_free).unwrap().next_free,
+                    free_block.address
+                );
+            }
+        }
+    }
+
+    /// Deallocates a previously allocated block.
+    ///
+    /// PRECONDITION:
+    ///   * `address` points to an allocated block.
+    ///
+    /// POSTCONDITION:
+    ///   * The block with `address` is freed, and merged with its neighbouring free blocks.
+    ///   TODO: explore how to make this more precise and add programmatic checks.
     pub fn deallocate(&mut self, address: Address) {
+        self.check_free_lists_invariant();
+
         let address = address - Bytes::from(Block::header_size());
         let mut block = Block::load(address, &self.memory);
 
@@ -351,6 +391,8 @@ impl<M: Memory> TlsfAllocator<M> {
         self.insert(&mut block);
 
         self.merge(block);
+
+        self.check_free_lists_invariant();
 
         // TODO: should insertion be another explicit step?
     }
@@ -400,7 +442,7 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 struct Block {
     address: Address,
     allocated: bool,
@@ -414,6 +456,14 @@ struct Block {
 
 impl Block {
     fn save<M: Memory>(&self, memory: &M) {
+        println!("about to save block: {:#?}", self);
+        if self.next_free != Address::NULL {
+            assert!(
+                self.next_free < self.address
+                    || self.next_free >= self.address + Bytes::from(self.size)
+            );
+        }
+
         write_struct(
             &BlockHeader {
                 allocated: self.allocated,
@@ -435,7 +485,9 @@ impl Block {
         debug_assert!(next_address <= DATA_OFFSET + Bytes::from(MEMORY_POOL_SIZE));
 
         if next_address < DATA_OFFSET + Bytes::from(MEMORY_POOL_SIZE) {
-            Some(Self::load(next_address, memory))
+            let block = Self::load(next_address, memory);
+            debug_assert_eq!(block.prev_physical, self.address);
+            Some(block)
         } else {
             None
         }
