@@ -274,7 +274,7 @@ impl<M: Memory> TlsfAllocator<M> {
         ) {
             (None, None) => {
                 // There are no neighbouring physical blocks. Nothing to do.
-                return block;
+                block
             }
             (Some(prev_block), None) => {
                 if !prev_block.allocated {
@@ -294,13 +294,13 @@ impl<M: Memory> TlsfAllocator<M> {
                         big_block = self.merge_helper(big_block, next_block);
                     }
 
-                    return big_block;
+                    big_block
                 } else {
                     if !next_block.allocated {
                         return self.merge_helper(block, next_block);
                     }
 
-                    return block;
+                    block
                 }
             }
             (None, Some(next_block)) => {
@@ -308,7 +308,7 @@ impl<M: Memory> TlsfAllocator<M> {
                     return self.merge_helper(block, next_block);
                 }
 
-                return block;
+                block
             }
         }
     }
@@ -399,7 +399,7 @@ impl<M: Memory> TlsfAllocator<M> {
             &TlsfHeader {
                 magic: *MAGIC,
                 version: LAYOUT_VERSION,
-                free_lists: self.free_lists.clone(),
+                free_lists: self.free_lists,
             },
             Address::NULL,
             &self.memory,
@@ -413,7 +413,6 @@ impl<M: Memory> TlsfAllocator<M> {
     fn search_suitable_block(&self, size: u32) -> Block {
         // Identify the free list to take blocks from.
         let (fl, sl) = mapping(size);
-        let (fl, sl) = (fl as usize, sl as usize);
 
         // Find the smallest free block that is larger than the requested size.
         for f in fl..FIRST_LEVEL_INDEX_SIZE {
@@ -594,13 +593,10 @@ mod test {
         let mem = make_memory();
         let mut tlsf = TlsfAllocator::new(mem);
         let block_1 = tlsf.allocate(1232);
-        println!("Allocate (1): {:#?}", block_1);
 
         let block_2 = tlsf.allocate(45);
-        println!("Allocate (2): {:#?}", block_2);
 
         let block_3 = tlsf.allocate(39);
-        println!("Allocate (3): {:#?}", block_3);
 
         assert_eq!(
             tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
@@ -613,7 +609,6 @@ mod test {
                 + Bytes::from(Block::header_size())
         );
 
-        println!("== Deallocate (3)");
         tlsf.deallocate(block_3);
 
         assert_eq!(
@@ -625,7 +620,6 @@ mod test {
                 + Bytes::from(Block::header_size())
         );
 
-        println!("== Deallocate (2)");
         tlsf.deallocate(block_2);
 
         assert_eq!(
@@ -633,7 +627,6 @@ mod test {
             DATA_OFFSET + Bytes::from(1232u64) + Bytes::from(Block::header_size())
         );
 
-        println!("== Deallocate (1)");
         tlsf.deallocate(block_1);
 
         assert_eq!(

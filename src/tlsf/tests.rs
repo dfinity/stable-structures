@@ -64,9 +64,6 @@ fn v2_deallocate_everything() {
     let data = vec![
         vec![0, 0, 0],
         vec![0, 0, 0],
-   //     vec![0, 0, 0],
-  //      vec![0, 0, 0],
-    //    vec![0, 0, 0],
     ];
     let mem = make_memory();
     let mut tlsf = TlsfAllocator::new(mem);
