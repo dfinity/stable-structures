@@ -561,7 +561,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let buckets = self.memory_buckets.remove(&id);
         if let Some(vec_buckets) = buckets {
             for bucket in vec_buckets {
-                self.unallocated_buckets.push_back(bucket);
+                self.unallocated_buckets.push_front(bucket);
                 self.allocated_buckets -= 1;
             }
         }
@@ -1016,5 +1016,57 @@ mod test {
 
         memory_1.read(0, &mut buf);
         assert_eq!(buf, vec![2; 1000]);
+    }
+
+    #[test]
+    fn free_memory_works() {
+        let mem = make_memory();
+        let initial_size = BUCKET_SIZE_IN_PAGES * 2;
+        // Grow the memory manually before passing it into the memory manager.
+        mem.grow(initial_size);
+
+        let mut mem_mgr = MemoryManager::init(mem.clone());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+
+        // Grow the memory by 1 page.
+        assert_eq!(memory_0.grow(1), 0);
+        assert_eq!(mem.size(), initial_size);
+
+        // Grow the memory by 1 page.
+        assert_eq!(memory_1.grow(1), 0);
+        assert_eq!(mem.size(), initial_size + 1);
+
+        // Grow the memory by BUCKET_SIZE_IN_PAGES more pages, which will cause the underlying
+        // allocation to increase.
+        assert_eq!(memory_0.grow(BUCKET_SIZE_IN_PAGES), 1);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 3);
+        assert_eq!(memory_1.grow(BUCKET_SIZE_IN_PAGES), 1);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 4);
+        assert_eq!(mem_mgr.get(MemoryId(1)).size(), 1 + BUCKET_SIZE_IN_PAGES);
+
+        // Free Memory ID 1.
+        mem_mgr.free(MemoryId(1));
+        assert_eq!(mem_mgr.get(MemoryId(1)).size(), 0);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 4);
+
+        let memory_2 = mem_mgr.get(MemoryId(2));
+        // When growing memory_2, mem.size() should stay the same since
+        // MemoryManager should use the memory that is freed above.
+        assert_eq!(memory_2.grow(1), 0);
+        assert_eq!(mem_mgr.get(MemoryId(2)).size(), 1);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 4);
+        assert_eq!(memory_2.grow(BUCKET_SIZE_IN_PAGES), 1);
+        assert_eq!(mem_mgr.get(MemoryId(2)).size(), 1 + BUCKET_SIZE_IN_PAGES);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 4);
+
+        // When trying to grow memory_2 again, we need more pages,
+        // because we have already used all that is left from Memory ID 1.
+        assert_ne!(memory_2.grow(BUCKET_SIZE_IN_PAGES), 0);
+        assert_eq!(
+            mem_mgr.get(MemoryId(2)).size(),
+            1 + 2 * BUCKET_SIZE_IN_PAGES
+        );
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 5);
     }
 }
