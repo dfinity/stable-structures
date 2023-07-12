@@ -1,5 +1,4 @@
 //! TLSF (Two-Level Segregated Free List) Allocator
-//! println!("merging next block too!!");
 //!
 //! This is a dynamic memory allocator that's constant time and provides reasonable fragmentation
 //! bounds.
@@ -170,7 +169,6 @@ impl<M: Memory> TlsfAllocator<M> {
     // * block->prev->next = block->next;
     // * free list head is updated.
     fn remove(&mut self, block: &Block) {
-        //    println!("REMOVE: {:#?}", block);
         // Precondition: `block` is free.
         debug_assert!(!block.allocated);
 
@@ -178,21 +176,17 @@ impl<M: Memory> TlsfAllocator<M> {
             None => {
                 // `block` is the head of the free list.
                 let (f, s) = mapping(block.size);
-                println!("updating free list {:?} to {:?}", (f, s), block.next_free);
                 debug_assert_eq!(block.address, self.free_lists[f][s]);
                 debug_assert_eq!(block.prev_free, Address::NULL);
 
-                //           println!("inserting into seglist {:?} {:?}", (f, s), block.next_free);
                 self.free_lists[f][s] = block.next_free;
 
                 if let Some(mut next_block) = block.get_next_free_block(&self.memory) {
-                    //              println!("updating prev free from {:?} to null", next_block.prev_free);
                     next_block.prev_free = Address::NULL;
                     next_block.save(&self.memory);
                 }
             }
             Some(mut prev_free_block) => {
-                //println!("updating prev block: {:?}", prev_free_block);
                 prev_free_block.next_free = block.next_free;
                 prev_free_block.save(&self.memory);
             }
@@ -210,12 +204,10 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     fn insert(&mut self, block: &mut Block) {
-        println!("inserting block: {:#?}", block);
         debug_assert!(!block.allocated);
 
         let (f, s) = mapping(block.size);
         block.next_free = self.free_lists[f][s];
-        println!("SETTING NEXT FREE TO {:?}", block.next_free);
 
         match block.next_free {
             Address::NULL => {}
@@ -225,12 +217,10 @@ impl<M: Memory> TlsfAllocator<M> {
                 debug_assert!(!next_block.allocated);
                 next_block.prev_free = block.address;
 
-                println!("saving {:#?}", next_block);
                 next_block.save(&self.memory);
             }
         };
 
-        println!("adding block to {:?}", (f, s));
         debug_assert_eq!(block.prev_free, Address::NULL);
         self.free_lists[f][s] = block.address;
         block.save(&self.memory);
@@ -238,29 +228,15 @@ impl<M: Memory> TlsfAllocator<M> {
 
     // Merges two free blocks that are physically adjacent to each other.
     fn merge_helper(&mut self, a: Block, b: Block) -> Block {
-        println!("MERGE_HELPER");
-        println!("removing a: {:#?}", a);
-        println!("FL[5]: {:?}", self.free_lists[5][0]);
-        println!("FL[6]: {:?}", self.free_lists[6][0]);
         assert!(!a.allocated);
         assert!(!b.allocated);
         assert_eq!(b.prev_physical, a.address);
         assert_eq!(a.address + Bytes::from(a.size), b.address);
 
         // Remove them from the free lists.
-        println!("removing a: {:#?}", a);
-        println!("FL[5]: {:?}", self.free_lists[5][0]);
-        println!("FL[6]: {:?}", self.free_lists[6][0]);
         self.remove(&a);
-        println!("removing b: {:#?}", b);
-        println!("FL[5]: {:?}", self.free_lists[5][0]);
-        println!("FL[6]: {:?}", self.free_lists[6][0]);
         let b = Block::load(b.address, &self.memory);
         self.remove(&b);
-
-        println!("after removing both");
-        println!("FL[5]: {:?}", self.free_lists[5][0]);
-        println!("FL[6]: {:?}", self.free_lists[6][0]);
 
         // Reload them with new pointers.
         let a = Block::load(a.address, &self.memory);
@@ -283,16 +259,12 @@ impl<M: Memory> TlsfAllocator<M> {
 
         self.insert(&mut block);
 
-        println!("DONE MERGE_HELPER");
-        println!("FL[5]: {:?}", self.free_lists[5][0]);
-        println!("FL[6]: {:?}", self.free_lists[6][0]);
         block
     }
 
     // Merges a block with its previous and next blocks if they are free.
     // The free lists are updated accordingly.
     fn merge(&mut self, block: Block) -> Block {
-        println!("merging block {:?}", block);
         // Precondition: `block` is free.
         debug_assert!(!block.allocated);
 
@@ -312,34 +284,18 @@ impl<M: Memory> TlsfAllocator<M> {
                 }
             }
             (Some(prev_block), Some(mut next_block)) => {
-                println!("prev block: {:?}", prev_block);
-                println!("next block: {:?}", next_block);
                 if !prev_block.allocated {
-                    println!("MERGE CASE 3.1");
-
-                    println!("FL[5]: {:?}", self.free_lists[5][0]);
-                    println!("FL[6]: {:?}", self.free_lists[6][0]);
-
-                    println!("prev block: {:?}", prev_block);
-                    println!("block: {:?}", block);
-
                     let mut big_block = self.merge_helper(prev_block, block);
-
-                    println!("FL[5]: {:?}", self.free_lists[5][0]);
-                    println!("FL[6]: {:?}", self.free_lists[6][0]);
 
                     // Reload next block.
                     next_block = Block::load(next_block.address, &self.memory);
 
                     if !next_block.allocated {
-                        println!("merging next block too!!");
                         big_block = self.merge_helper(big_block, next_block);
-                        println!("FL[5]: {:?}", self.free_lists[5][0]);
                     }
 
                     return big_block;
                 } else {
-                    println!("MERGE CASE 3.2");
                     if !next_block.allocated {
                         return self.merge_helper(block, next_block);
                     }
@@ -348,12 +304,7 @@ impl<M: Memory> TlsfAllocator<M> {
                 }
             }
             (None, Some(next_block)) => {
-                println!("MERGE CASE 4");
                 if !next_block.allocated {
-                    println!(
-                        "merging block {:?} with {:?}",
-                        block.address, next_block.address
-                    );
                     return self.merge_helper(block, next_block);
                 }
 
@@ -425,8 +376,6 @@ impl<M: Memory> TlsfAllocator<M> {
 
         let address = address - Bytes::from(Block::header_size());
         let mut block = Block::load(address, &self.memory);
-
-        println!("=============== Deallocating block {:#?}", block);
 
         debug_assert!(
             block.allocated,
@@ -503,7 +452,6 @@ struct Block {
 
 impl Block {
     fn save<M: Memory>(&self, memory: &M) {
-        //    println!("about to save block: {:#?}", self);
         if self.next_free != Address::NULL {
             assert!(
                 self.next_free < self.address
@@ -570,7 +518,6 @@ impl Block {
         if self.next_free != Address::NULL {
             let next_free = Self::load(self.next_free, memory);
 
-            println!("next free block: {:#?}", next_free);
             // Assert that the next block is pointing to the current block.
             //debug_assert_eq!(next_free.prev_free, self.address);
             // Assert that the next block is free.
