@@ -903,6 +903,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "task_timer"
+version = "0.2.0"
+dependencies = [
+ "candid",
+ "ic-cdk",
+ "ic-cdk-macros",
+ "ic-stable-structures",
+ "ic0",
+]
+
+[[package]]
 name = "term"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

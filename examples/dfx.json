@@ -1,5 +1,5 @@
 {
-  "dfx": "0.11.2",
+  "dfx": "0.14.1",
   "canisters": {
     "quick_start": {
       "candid": "src/quick_start/candid.did",
@@ -19,6 +19,11 @@
     "custom_types_example": {
       "candid": "src/custom_types_example/candid.did",
       "package": "custom_types_example",
+      "type": "rust"
+    },
+    "task_timer": {
+      "candid": "src/task_timer/candid.did",
+      "package": "task_timer",
       "type": "rust"
     }
   },

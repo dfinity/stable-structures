@@ -39,3 +39,12 @@ fn test_restricted_memory_rw() {
     mem.read(10, &mut buf[2..10]);
     assert_eq!(&buf[2..10], b"DEADBEEF");
 }
+
+#[test]
+#[ignore]
+fn vec_exposes_init_err() {
+    // Ensures that the `vec` module exposes `InitError` to avoid breaking
+    // clients that depend on it.
+    #[allow(unused_imports)]
+    use crate::vec::InitError;
+}
