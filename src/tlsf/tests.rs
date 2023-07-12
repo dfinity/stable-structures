@@ -60,6 +60,57 @@ fn deallocate_everything() {
 }
 
 #[test]
+fn v2_deallocate_everything() {
+    let data = vec![
+        vec![0, 0, 0],
+        vec![0, 0, 0],
+   //     vec![0, 0, 0],
+  //      vec![0, 0, 0],
+    //    vec![0, 0, 0],
+    ];
+    let mem = make_memory();
+    let mut tlsf = TlsfAllocator::new(mem);
+    let mut addresses: Vec<(Address, Vec<u8>)> = vec![];
+
+    for d in data.into_iter() {
+        let address = tlsf.allocate(d.len() as u32);
+
+        // Write the data into memory.
+        tlsf.memory.write(address.get(), &d);
+
+        addresses.push((address, d));
+    }
+
+    // Shuffle addresses to deallocate them in random order.
+    //rng.shuffle(&mut addresses);
+    for (address, data) in addresses {
+        // Read data from memory and verify its there.
+        let mut v = vec![0; data.len()];
+        tlsf.memory.read(address.get(), &mut v);
+        assert_eq!(v, data);
+
+        tlsf.deallocate(address);
+    }
+
+    assert_eq!(
+        Block::load(DATA_OFFSET, &tlsf.memory),
+        Block {
+            address: DATA_OFFSET,
+            allocated: false,
+            size: MEMORY_POOL_SIZE,
+            prev_free: Address::NULL,
+            next_free: Address::NULL,
+            prev_physical: Address::NULL,
+        }
+    );
+
+    assert_eq!(
+        tlsf.free_lists,
+        TlsfAllocator::new(make_memory()).free_lists
+    );
+}
+
+#[test]
 fn multiple_allocations_no_deallocations() {
     proptest!(|(
         data in proptest::collection::vec(
