@@ -19,9 +19,6 @@ mod tests;
 const MAGIC: &[u8; 3] = b"BTA"; // btree allocator
 const LAYOUT_VERSION: u8 = 1;
 
-// As defined in the paper.
-const MINIMUM_BLOCK_SIZE: u32 = 16;
-
 const FIRST_LEVEL_INDEX_SIZE: usize = 32;
 const SECOND_LEVEL_INDEX_LOG_SIZE: usize = 5;
 const SECOND_LEVEL_INDEX_SIZE: usize = 1 << SECOND_LEVEL_INDEX_LOG_SIZE;
@@ -120,42 +117,58 @@ impl<M: Memory> TlsfAllocator<M> {
         }
     }
 
+    /// Complexity: O(1)
     pub fn allocate(&mut self, size: u32) -> Address {
+        println!("=== ALLOCATE");
+        // Adjust the size to accommodate the block header.
         let size = size + Block::header_size() as u32;
+
+        // Identify the free list to take blocks from.
         let (fl, sl) = mapping(size);
 
-        let block_seg_list = self.search_suitable_block(size, fl as usize, sl as usize);
+        let mut block = self.search_suitable_block(size, fl as usize, sl as usize);
+        println!("suitable block found: {:#?}", block);
 
-        let mut block = Block::load(
-            self.free_lists[block_seg_list.0][block_seg_list.1],
-            &self.memory,
-        );
+        // Assert that block is at the head of the list.
+        debug_assert_eq!(block.prev_free, Address::NULL);
+        debug_assert!(!block.allocated);
 
-        // Remove the block
-        self.free_lists[block_seg_list.0][block_seg_list.1] = block.next_free;
-        block.allocated = true;
+        // Remove the block from its free list.
+        self.remove(&block);
 
         if block.size > size {
+            // Block is bigger than the requested size. Split it.
             let remaining_size = block.size - size;
-            let (fl, sl) = mapping(remaining_size);
+            block.size = size;
+
+            //let (fl, sl) = mapping(remaining_size);
 
             // Split the block
-            let remaining_block = Block {
+            let mut remaining_block = Block {
                 address: block.address + size.into(),
                 allocated: false,
-                prev_free: block.prev_free, // TODO: assert this to be null?
-                next_free: self.free_lists[fl as usize][sl as usize],
+                prev_free: block.prev_free,
+                next_free: Address::NULL, // This is set in the `insert` method.
                 size: remaining_size,
                 prev_physical: block.address,
             };
 
-            block.size = size;
+            self.insert(&mut remaining_block);
+
+            /*if let Some(nb) = remaining_block.get_next_free_block() {
+                nb.prev_free = remaining_block.address;
+                nb.save(&self.memory);
+            }*/
+
 
             // Insert the block.
-            self.free_lists[fl as usize][sl as usize] = remaining_block.address;
-            block.save(&self.memory);
-            remaining_block.save(&self.memory);
+            //self.free_lists[fl as usize][sl as usize] = remaining_block.address;
+            // remaining_block.save(&self.memory);
         }
+
+        // Mark the block as allocated.
+        block.allocated = true;
+        block.save(&self.memory);
 
         block.address + Bytes::from(Block::header_size())
         /*
@@ -182,13 +195,15 @@ impl<M: Memory> TlsfAllocator<M> {
         match block.get_prev_free_block(&self.memory) {
             None => {
                 // `block` is the head of the free list.
-                //    let (f, s) = mapping(block.size);
+                let (f, s) = mapping(block.size);
+                println!("mapping of block: {:?}", (f,s));
                 // NOTE: this doesn't actually need to be the case because the block has just been
                 // freed
-                //     debug_assert_eq!(block.address, self.free_lists[f as usize][s as usize]);
+                debug_assert_eq!(block.address, self.free_lists[f as usize][s as usize]);
+                self.free_lists[f as usize][s as usize] = block.next_free;
             }
             Some(mut prev_free_block) => {
-                println!("updating prev block: {:?}", prev_free_block);
+                //println!("updating prev block: {:?}", prev_free_block);
                 prev_free_block.next_free = block.next_free;
                 prev_free_block.save(&self.memory);
             }
@@ -206,7 +221,7 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     fn insert(&mut self, block: &mut Block) {
-        println!("inserting block: {:?}", block);
+        println!("inserting block: {:#?}", block);
         debug_assert!(!block.allocated);
 
         let (f, s) = mapping(block.size);
@@ -219,6 +234,8 @@ impl<M: Memory> TlsfAllocator<M> {
                 debug_assert_eq!(next_block.prev_free, Address::NULL);
                 debug_assert!(!next_block.allocated);
                 next_block.prev_free = block.address;
+
+                println!("saving {:#?}", next_block);
                 next_block.save(&self.memory);
             }
         };
@@ -306,6 +323,7 @@ impl<M: Memory> TlsfAllocator<M> {
                         block.address, next_block.address
                     );
                     self.remove(&next_block);
+                    self.remove(&block);
                     // Reload the block, as the `remove` above made changes.
                     println!("block before: {:#?}", block);
                     block = Block::load(block.address, &self.memory);
@@ -323,7 +341,6 @@ impl<M: Memory> TlsfAllocator<M> {
                     }
                 }
 
-                self.remove(&block); // TODO can/should this be moved to the if statement above?
                 self.insert(&mut block);
                 return block;
             }
@@ -336,6 +353,7 @@ impl<M: Memory> TlsfAllocator<M> {
         println!("Deallocating block {:#?}", block);
 
         block.allocated = false;
+        self.insert(&mut block);
 
         self.merge(block);
 
@@ -403,16 +421,16 @@ impl<M: Memory> TlsfAllocator<M> {
         );
     }
 
+    // Returns the smallest block that accommodates the size.
+    //
     // XXX: This can be done with clever bit manipulation, but we can do it the
-    // native way for a V0.
-    fn search_suitable_block(&self, size: u32, fl: usize, sl: usize) -> SegList {
+    // naive way for a V0.
+    fn search_suitable_block(&self, size: u32, fl: usize, sl: usize) -> Block {
         // Find the smallest free block that is larger than the requested size.
-        // TODO: include header size into account.
-
         for f in fl..FIRST_LEVEL_INDEX_SIZE {
             for s in sl..SECOND_LEVEL_INDEX_SIZE {
                 if self.free_lists[f][s] != Address::NULL {
-                    return SegList(f, s);
+                    return Block::load(self.free_lists[f][s], &self.memory);
                 }
             }
         }
@@ -494,7 +512,7 @@ impl Block {
 
             println!("next free block: {:#?}", next_free);
             // Assert that the next block is pointing to the current block.
-            debug_assert_eq!(next_free.prev_free, self.address);
+            //debug_assert_eq!(next_free.prev_free, self.address);
             // Assert that the next block is free.
             debug_assert!(!next_free.allocated);
 
