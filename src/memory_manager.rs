@@ -366,18 +366,19 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
 
-        let mut unallocated: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
+        let mut unallocated_buckets_set: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
         let mut memory_buckets = BTreeMap::new();
 
         let mut j = 0;
         for (memory, memory_size_in_pages) in header.memory_sizes_in_pages.into_iter().enumerate() {
-            let memory_size = (memory_size_in_pages + header.bucket_size_in_pages as u64 - 1)
-                / header.bucket_size_in_pages as u64;
+            let memory_size_in_buckets =
+                (memory_size_in_pages + header.bucket_size_in_pages as u64 - 1)
+                    / header.bucket_size_in_pages as u64;
             let mut vec_buckets = vec![];
-            for _ in 0..memory_size {
+            for _ in 0..memory_size_in_buckets {
                 let bucket = buckets_decompressed[j];
                 vec_buckets.push(bucket);
-                unallocated.remove(&bucket.0);
+                unallocated_buckets_set.remove(&bucket.0);
                 j += 1;
             }
             memory_buckets
@@ -386,7 +387,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         let mut unallocated_buckets = LinkedList::new();
-        for i in unallocated.iter() {
+        for i in unallocated_buckets_set.iter() {
             unallocated_buckets.push_back(BucketId(*i));
         }
 
@@ -489,6 +490,9 @@ impl<M: Memory> MemoryManagerInner<M> {
         for memory in self.memory_buckets.iter() {
             for bucket in memory.1 {
                 let bucket_ind = bucket.0;
+                // Splits bit_vec returning the slice [1, .., bit_vec.size() - 1].
+                // This is precisely what we need since the BucketId can be represented
+                // using only 15 bits, instead of 16.
                 let mut bit_vec_temp = BitVec::from_bytes(&bucket_ind.to_be_bytes()).split_off(1);
                 bit_vec.append(&mut bit_vec_temp);
             }
