@@ -234,19 +234,20 @@ impl<M: Memory> TlsfAllocator<M> {
             block.get_next_physical_block(&self.memory),
         ) {
             (None, None) => {
-                self.remove(&block);
+                // There are no neighbouring physical blocks. Nothing to do.
                 return block;
             }
             (Some(mut prev_block), None) => {
                 if !prev_block.allocated {
                     self.remove(&block);
                     self.remove(&prev_block);
-
                     prev_block.size += block.size;
                     self.insert(&mut prev_block);
-                    return prev_block;
+
+                    prev_block
+                } else {
+                    block
                 }
-                block
             }
             (Some(mut prev_block), Some(mut next_block)) => {
                 println!("prev block: {:?}", prev_block);
@@ -255,16 +256,25 @@ impl<M: Memory> TlsfAllocator<M> {
                     println!("MERGE CASE 3.1");
                     self.remove(&block);
                     self.remove(&prev_block);
-
                     prev_block.size += block.size;
 
                     if !next_block.allocated {
                         self.remove(&next_block);
                         prev_block.size += next_block.size;
-                    }
 
-                    next_block.prev_physical = prev_block.address;
-                    next_block.save(&self.memory);
+                        // Update prev physical of next next block.
+                        if let Some(mut uber_next_block) =
+                            next_block.get_next_physical_block(&self.memory)
+                        {
+                            println!("3.1 uber next block: {:#?}", uber_next_block);
+                            uber_next_block.prev_physical = block.address;
+                            uber_next_block.save(&self.memory);
+                        }
+                    } else {
+                        // Next block is allocated. Update its previous physical address.
+                        next_block.prev_physical = prev_block.address;
+                        next_block.save(&self.memory);
+                    }
 
                     self.insert(&mut prev_block);
                     return prev_block;
@@ -304,7 +314,7 @@ impl<M: Memory> TlsfAllocator<M> {
                     // Reload the block, as the `remove` above made changes.
                     println!("block before: {:#?}", block);
                     block = Block::load(block.address, &self.memory);
-                    block.allocated = false; // FIXME: we shouldn't really have this here.
+
                     println!("block after: {:#?}", block);
                     block.size += next_block.size;
 
@@ -316,9 +326,10 @@ impl<M: Memory> TlsfAllocator<M> {
                         uber_next_block.prev_physical = block.address;
                         uber_next_block.save(&self.memory);
                     }
+
+                    self.insert(&mut block);
                 }
 
-                self.insert(&mut block);
                 return block;
             }
         }
@@ -327,62 +338,21 @@ impl<M: Memory> TlsfAllocator<M> {
     pub fn deallocate(&mut self, address: Address) {
         let address = address - Bytes::from(Block::header_size());
         let mut block = Block::load(address, &self.memory);
+
         println!("Deallocating block {:#?}", block);
 
+        debug_assert!(
+            block.allocated,
+            "cannot deallocate an already deallocated block."
+        );
+
+        // Free the block.
         block.allocated = false;
         self.insert(&mut block);
 
         self.merge(block);
 
         // TODO: should insertion be another explicit step?
-
-        /*// Check if the next physical block is free, and merge it.
-        let next_block_address = block_to_remove.address + Bytes::from(block_to_remove.size);
-        assert!(next_block_address <= DATA_OFFSET + Bytes::from(u32::MAX));
-        if next_block_address < DATA_OFFSET + Bytes::from(u32::MAX) {
-            // there's a next block. if it's empty, merge it into current block.
-            let next_block = Block::load(next_block_address, &self.memory);
-            if !next_block.allocated {
-                // TODO: Remove next block from free lists.
-
-                block_to_remove.size += next_block.size;
-
-                // Update list.
-            }
-        }
-
-        // Merge the previous block if it's available and free.
-        if block_to_remove.prev_physical != Address::NULL {
-            let mut prev_block = Block::load(block_to_remove.prev_physical, &self.memory);
-            if !prev_block.allocated {
-                prev_block.size += block_to_remove.size;
-                prev_block.save(&self.memory);
-
-                // TODO: remove prev block from free lists?
-
-                let (f, s) = mapping(prev_block.size);
-                prev_block.next_free = self.free_lists[f as usize][s as usize];
-                self.free_lists[f as usize][s as usize] = prev_block.address;
-                return;
-            }
-        }
-
-        block_to_remove.allocated = false;
-        block_to_remove.save(&self.memory);
-
-        // Insert the block into free blocks.
-        let (f, s) = mapping(block_to_remove.size);
-        block_to_remove.next_free = self.free_lists[f as usize][s as usize];
-        self.free_lists[f as usize][s as usize] = block_to_remove.address;
-        */
-
-        /*
-        int fl, sl;
-        void *big_free_block;
-        big_free_block = merge(block); // O(1)
-        mapping (sizeof(big_free_block), &fl, &sl);
-        insert (big_free_block, fl, sl); // O(1)
-        */
     }
 
     pub fn save(&self) {
