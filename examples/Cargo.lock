@@ -415,6 +415,9 @@ dependencies = [
 [[package]]
 name = "ic-stable-structures"
 version = "0.5.4"
+dependencies = [
+ "bit-vec",
+]
 
 [[package]]
 name = "ic0"
