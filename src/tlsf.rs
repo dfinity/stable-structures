@@ -27,8 +27,6 @@ const DATA_OFFSET: Address = Address::new(WASM_PAGE_SIZE);
 
 const MEMORY_POOL_SIZE: u32 = u32::MAX;
 
-struct SegList(usize, usize);
-
 //const GRANULARITY_LOG2: u32 = GRANULARITY.trailing_zeros();
 
 /// # Memory Layout
@@ -119,19 +117,10 @@ impl<M: Memory> TlsfAllocator<M> {
 
     /// Complexity: O(1)
     pub fn allocate(&mut self, size: u32) -> Address {
-        println!("=== ALLOCATE");
         // Adjust the size to accommodate the block header.
         let size = size + Block::header_size() as u32;
 
-        // Identify the free list to take blocks from.
-        let (fl, sl) = mapping(size);
-
-        let mut block = self.search_suitable_block(size, fl as usize, sl as usize);
-        println!("suitable block found: {:#?}", block);
-
-        // Assert that block is at the head of the list.
-        debug_assert_eq!(block.prev_free, Address::NULL);
-        debug_assert!(!block.allocated);
+        let mut block = self.search_suitable_block(size);
 
         // Remove the block from its free list.
         self.remove(&block);
@@ -140,8 +129,6 @@ impl<M: Memory> TlsfAllocator<M> {
             // Block is bigger than the requested size. Split it.
             let remaining_size = block.size - size;
             block.size = size;
-
-            //let (fl, sl) = mapping(remaining_size);
 
             // Split the block
             let mut remaining_block = Block {
@@ -154,16 +141,6 @@ impl<M: Memory> TlsfAllocator<M> {
             };
 
             self.insert(&mut remaining_block);
-
-            /*if let Some(nb) = remaining_block.get_next_free_block() {
-                nb.prev_free = remaining_block.address;
-                nb.save(&self.memory);
-            }*/
-
-
-            // Insert the block.
-            //self.free_lists[fl as usize][sl as usize] = remaining_block.address;
-            // remaining_block.save(&self.memory);
         }
 
         // Mark the block as allocated.
@@ -196,11 +173,11 @@ impl<M: Memory> TlsfAllocator<M> {
             None => {
                 // `block` is the head of the free list.
                 let (f, s) = mapping(block.size);
-                println!("mapping of block: {:?}", (f,s));
+                println!("mapping of block: {:?}", (f, s));
                 // NOTE: this doesn't actually need to be the case because the block has just been
                 // freed
-                debug_assert_eq!(block.address, self.free_lists[f as usize][s as usize]);
-                self.free_lists[f as usize][s as usize] = block.next_free;
+                debug_assert_eq!(block.address, self.free_lists[f][s]);
+                self.free_lists[f][s] = block.next_free;
             }
             Some(mut prev_free_block) => {
                 //println!("updating prev block: {:?}", prev_free_block);
@@ -225,7 +202,7 @@ impl<M: Memory> TlsfAllocator<M> {
         debug_assert!(!block.allocated);
 
         let (f, s) = mapping(block.size);
-        block.next_free = self.free_lists[f as usize][s as usize];
+        block.next_free = self.free_lists[f][s];
 
         match block.next_free {
             Address::NULL => {}
@@ -241,7 +218,7 @@ impl<M: Memory> TlsfAllocator<M> {
         };
 
         println!("adding block to {:?}", (f, s));
-        self.free_lists[f as usize][s as usize] = block.address;
+        self.free_lists[f][s] = block.address;
         block.save(&self.memory);
     }
 
@@ -425,12 +402,26 @@ impl<M: Memory> TlsfAllocator<M> {
     //
     // XXX: This can be done with clever bit manipulation, but we can do it the
     // naive way for a V0.
-    fn search_suitable_block(&self, size: u32, fl: usize, sl: usize) -> Block {
+    fn search_suitable_block(&self, size: u32) -> Block {
+        // Identify the free list to take blocks from.
+        let (fl, sl) = mapping(size);
+        let (fl, sl) = (fl as usize, sl as usize);
+
         // Find the smallest free block that is larger than the requested size.
         for f in fl..FIRST_LEVEL_INDEX_SIZE {
             for s in sl..SECOND_LEVEL_INDEX_SIZE {
                 if self.free_lists[f][s] != Address::NULL {
-                    return Block::load(self.free_lists[f][s], &self.memory);
+                    let block = Block::load(self.free_lists[f][s], &self.memory);
+
+                    // The block must be:
+                    // (1) The head of its free list.
+                    debug_assert_eq!(block.prev_free, Address::NULL);
+                    // (2) Free
+                    debug_assert!(!block.allocated);
+                    // (3) Big enough
+                    debug_assert!(block.size >= size);
+
+                    return block;
                 }
             }
         }
@@ -552,10 +543,10 @@ struct BlockHeader {
 }
 
 // Returns the indexes that point to the corresponding segregated list.
-fn mapping(size: u32) -> (u32, u32) {
+fn mapping(size: u32) -> (usize, usize) {
     let f = u32::BITS - size.leading_zeros() - 1;
     let s = (size ^ (1 << f)) >> (f - SECOND_LEVEL_INDEX_LOG_SIZE as u32);
-    (f, s)
+    (f as usize, s as usize)
 }
 
 #[cfg(test)]
@@ -575,9 +566,9 @@ mod test {
             size in 0..u32::MAX,
         )| {
             let (f, s) = mapping(size);
-            assert!((1 << f) + (((1 << f) / SECOND_LEVEL_INDEX_SIZE as u32) * (s + 1) - 1) >= size);
+            assert!((1 << f) + (((1 << f) / SECOND_LEVEL_INDEX_SIZE) * (s + 1) - 1) >= size as usize);
             if s > 0 {
-                assert!((1 << f) + ((1 << f) / SECOND_LEVEL_INDEX_SIZE as u32) * s < size);
+                assert!((1 << f) + ((1 << f) / SECOND_LEVEL_INDEX_SIZE) * s < size as usize);
             }
         });
     }
