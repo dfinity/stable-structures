@@ -568,6 +568,7 @@ dependencies = [
  "maplit",
  "proptest",
  "tempfile",
+ "tiny-rng",
 ]
 
 [[package]]

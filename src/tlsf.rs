@@ -13,6 +13,12 @@ use crate::{
     write_struct, Memory, WASM_PAGE_SIZE,
 };
 
+#[cfg(test)]
+mod tests;
+
+const MAGIC: &[u8; 3] = b"BTA"; // btree allocator
+const LAYOUT_VERSION: u8 = 1;
+
 // As defined in the paper.
 const MINIMUM_BLOCK_SIZE: u32 = 16;
 
@@ -46,6 +52,9 @@ struct SegList(usize, usize);
 /// -------------------------------------------------- <- Page 1 (TODO: make this tighter)
 /// ```
 pub struct TlsfAllocator<M: Memory> {
+    // The address in memory where the `TlsfHeader` is stored.
+    header_addr: Address,
+
     //   first_level_index: u32,
     //    second_level_index: u32,
 
@@ -54,6 +63,13 @@ pub struct TlsfAllocator<M: Memory> {
     free_lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
 
     memory: M,
+}
+
+#[repr(C, packed)]
+struct TlsfHeader {
+    magic: [u8; 3],
+    version: u8,
+    free_lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
 }
 
 impl<M: Memory> TlsfAllocator<M> {
@@ -76,10 +92,33 @@ impl<M: Memory> TlsfAllocator<M> {
 
         free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1] = DATA_OFFSET;
 
-        Self { free_lists, memory }
+        let header_addr = Address::NULL; // FIXME
+        Self {
+            header_addr,
+            free_lists,
+            memory,
+        }
     }
 
-    // TODO: load, init
+    /// Load an allocator from memory at the given `addr`.
+    pub fn load(memory: M, addr: Address) -> Self {
+        let header: TlsfHeader = read_struct(addr, &memory);
+
+        assert_eq!(&header.magic, MAGIC, "Bad magic.");
+        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
+
+        assert_eq!(
+            addr,
+            Address::NULL,
+            "we don't yet support arbitrary header addresses"
+        );
+
+        Self {
+            header_addr: addr,
+            free_lists: header.free_lists,
+            memory,
+        }
+    }
 
     pub fn allocate(&mut self, size: u32) -> Address {
         let size = size + Block::header_size() as u32;
@@ -238,6 +277,10 @@ impl<M: Memory> TlsfAllocator<M> {
                 } else {
                     println!("MERGE CASE 3.2");
                     if !next_block.allocated {
+                        println!(
+                            "merging block {:?} with {:?}",
+                            block.address, next_block.address
+                        );
                         self.remove(&next_block);
                         block.size += next_block.size;
 
@@ -258,8 +301,16 @@ impl<M: Memory> TlsfAllocator<M> {
             (None, Some(next_block)) => {
                 println!("MERGE CASE 4");
                 if !next_block.allocated {
-                    println!("merging next block");
+                    println!(
+                        "merging block {:?} with {:?}",
+                        block.address, next_block.address
+                    );
                     self.remove(&next_block);
+                    // Reload the block, as the `remove` above made changes.
+                    println!("block before: {:#?}", block);
+                    block = Block::load(block.address, &self.memory);
+                    block.allocated = false; // FIXME: we shouldn't really have this here.
+                    println!("block after: {:#?}", block);
                     block.size += next_block.size;
 
                     // Update prev physical of next next block.
@@ -339,6 +390,19 @@ impl<M: Memory> TlsfAllocator<M> {
         */
     }
 
+    pub fn save(&self) {
+        // XXX: don't assume the header is stored at address 0.
+        write_struct(
+            &TlsfHeader {
+                magic: *MAGIC,
+                version: LAYOUT_VERSION,
+                free_lists: self.free_lists.clone(),
+            },
+            Address::NULL,
+            &self.memory,
+        );
+    }
+
     // XXX: This can be done with clever bit manipulation, but we can do it the
     // native way for a V0.
     fn search_suitable_block(&self, size: u32, fl: usize, sl: usize) -> SegList {
@@ -357,7 +421,7 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct Block {
     address: Address,
     allocated: bool,
@@ -403,7 +467,7 @@ impl Block {
     fn get_prev_physical_block<M: Memory>(&self, memory: &M) -> Option<Block> {
         match self.prev_physical {
             Address::NULL => None,
-            prev_physical => Some(Self::load(self.prev_physical, memory)),
+            prev_physical => Some(Self::load(prev_physical, memory)),
         }
     }
 
