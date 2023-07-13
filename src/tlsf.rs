@@ -88,6 +88,8 @@ impl<M: Memory> TlsfAllocator<M> {
             prev_physical: Address::NULL,
         });
 
+        tlsf.save();
+
         tlsf
     }
 
@@ -97,12 +99,6 @@ impl<M: Memory> TlsfAllocator<M> {
 
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
-
-        assert_eq!(
-            addr,
-            Address::NULL,
-            "we don't yet support arbitrary header addresses"
-        );
 
         Self {
             header_addr: addr,
@@ -400,7 +396,7 @@ impl<M: Memory> TlsfAllocator<M> {
                 version: LAYOUT_VERSION,
                 free_lists: self.free_lists,
             },
-            Address::NULL,
+            self.header_addr,
             &self.memory,
         );
     }

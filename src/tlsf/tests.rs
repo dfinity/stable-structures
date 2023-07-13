@@ -8,6 +8,31 @@ fn make_memory() -> Rc<RefCell<Vec<u8>>> {
     Rc::new(RefCell::new(Vec::new()))
 }
 
+#[test]
+fn new_and_load() {
+    let mem = make_memory();
+    let allocator_addr = Address::from(16);
+
+    // Create a new allocator.
+    TlsfAllocator::new(mem.clone(), allocator_addr);
+
+    // Load it from memory.
+    let tlsf = TlsfAllocator::load(mem.clone(), allocator_addr);
+
+    // Load the first memory chunk.
+    assert_eq!(
+        Block::load(tlsf.data_offset(), &tlsf.memory),
+        Block {
+            address: tlsf.data_offset(),
+            allocated: false,
+            size: MEMORY_POOL_SIZE,
+            prev_free: Address::NULL,
+            next_free: Address::NULL,
+            prev_physical: Address::NULL,
+        }
+    );
+}
+
 // TODO: add tests with small memory pools
 
 #[test]
