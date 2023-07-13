@@ -473,7 +473,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Update the memory with the new size.
         self.memory_sizes_in_pages[id.0 as usize] = new_size;
 
-        // Update the header and return the old size.
+        // Update the header.
         self.save_header();
 
         // Write in stable store that this bucket belongs to the memory with the provided `id`.
@@ -482,6 +482,8 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_allocations_address(BucketId(0)).get(),
             self.get_bucket_ids_in_bytes().as_ref(),
         );
+
+        // Return the old size.
         old_size as i64
     }
 
@@ -569,6 +571,15 @@ impl<M: Memory> MemoryManagerInner<M> {
                 self.allocated_buckets -= 1;
             }
         }
+        // Update the header.
+        self.save_header();
+
+        // Write in stable store that no bucket belongs to the memory with the provided `id`.
+        write(
+            &self.memory,
+            bucket_allocations_address(BucketId(0)).get(),
+            self.get_bucket_ids_in_bytes().as_ref(),
+        );
     }
 }
 
