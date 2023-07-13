@@ -8,6 +8,8 @@ fn make_memory() -> Rc<RefCell<Vec<u8>>> {
     Rc::new(RefCell::new(Vec::new()))
 }
 
+// TODO: add tests with small memory pools
+
 #[test]
 fn deallocate_everything() {
     proptest!(|(
@@ -41,9 +43,9 @@ fn deallocate_everything() {
         }
 
         prop_assert_eq!(
-            Block::load(DATA_OFFSET, &tlsf.memory),
+            Block::load(tlsf.data_offset(), &tlsf.memory),
             Block {
-                address: DATA_OFFSET,
+                address: tlsf.data_offset(),
                 allocated: false,
                 size: MEMORY_POOL_SIZE,
                 prev_free: Address::NULL,
@@ -87,9 +89,9 @@ fn v2_deallocate_everything() {
     }
 
     assert_eq!(
-        Block::load(DATA_OFFSET, &tlsf.memory),
+        Block::load(tlsf.data_offset(), &tlsf.memory),
         Block {
-            address: DATA_OFFSET,
+            address: tlsf.data_offset(),
             allocated: false,
             size: MEMORY_POOL_SIZE,
             prev_free: Address::NULL,
@@ -123,7 +125,7 @@ fn multiple_allocations_no_deallocations() {
             offset += Bytes::from(Block::header_size()) + Bytes::from(d.len() as u64);
             prop_assert_eq!(
                 tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
-                DATA_OFFSET + offset
+                tlsf.data_offset() + offset
             );
 
             // Write the data into memory.

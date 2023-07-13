@@ -10,7 +10,7 @@
 use crate::{
     read_struct,
     types::{Address, Bytes},
-    write_struct, Memory, WASM_PAGE_SIZE,
+    write_struct, Memory,
 };
 
 #[cfg(test)]
@@ -23,9 +23,10 @@ const FIRST_LEVEL_INDEX_SIZE: usize = 32;
 const SECOND_LEVEL_INDEX_LOG_SIZE: usize = 5;
 const SECOND_LEVEL_INDEX_SIZE: usize = 1 << SECOND_LEVEL_INDEX_LOG_SIZE;
 
-const DATA_OFFSET: Address = Address::new(WASM_PAGE_SIZE);
-
 const MEMORY_POOL_SIZE: u32 = u32::MAX;
+
+// TODO: Make this bound tighter.
+const HEADER_SIZE: Bytes = Bytes::new(10_000);
 
 //const GRANULARITY_LOG2: u32 = GRANULARITY.trailing_zeros();
 
@@ -79,7 +80,7 @@ impl<M: Memory> TlsfAllocator<M> {
         // TODO: make it span at least 1TiB.
         // Create a block with the memory.
         tlsf.insert(&mut Block {
-            address: DATA_OFFSET,
+            address: tlsf.data_offset(),
             allocated: false,
             size: MEMORY_POOL_SIZE,
             prev_free: Address::NULL,
@@ -239,7 +240,7 @@ impl<M: Memory> TlsfAllocator<M> {
         let a = Block::load(a.address, &self.memory);
         let b = Block::load(b.address, &self.memory);
 
-        if let Some(mut next_block) = b.get_next_physical_block(&self.memory) {
+        if let Some(mut next_block) = b.get_next_physical_block(&self.memory, self.data_offset()) {
             assert_eq!(next_block.prev_physical, b.address);
             next_block.prev_physical = a.address;
             next_block.save(&self.memory);
@@ -267,7 +268,7 @@ impl<M: Memory> TlsfAllocator<M> {
 
         match (
             block.get_prev_physical_block(&self.memory),
-            block.get_next_physical_block(&self.memory),
+            block.get_next_physical_block(&self.memory, self.data_offset()),
         ) {
             (None, None) => {
                 // There are no neighbouring physical blocks. Nothing to do.
@@ -315,14 +316,15 @@ impl<M: Memory> TlsfAllocator<M> {
 
         let mut free_blocks = std::collections::BTreeMap::new();
 
-        let mut block = Block::load(DATA_OFFSET, &self.memory);
+        let mut block = Block::load(self.data_offset(), &self.memory);
         assert_eq!(block.prev_physical, Address::NULL);
         total_size += block.size;
         if !block.allocated {
             free_blocks.insert(block.address, block.clone());
         }
 
-        while let Some(next_block) = block.get_next_physical_block(&self.memory) {
+        while let Some(next_block) = block.get_next_physical_block(&self.memory, self.data_offset())
+        {
             block = next_block;
             total_size += block.size;
             if !block.allocated {
@@ -432,6 +434,10 @@ impl<M: Memory> TlsfAllocator<M> {
 
         panic!("OOM");
     }
+
+    fn data_offset(&self) -> Address {
+        self.header_addr + HEADER_SIZE
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -470,17 +476,23 @@ impl Block {
 
     // Loads the next physical block in memory.
     // If this is the last physical block in memory, `None` is returned.
-    fn get_next_physical_block<M: Memory>(&self, memory: &M) -> Option<Block> {
+    fn get_next_physical_block<M: Memory>(
+        &self,
+        memory: &M,
+        data_offset: Address,
+    ) -> Option<Block> {
         let next_address = self.address + Bytes::from(self.size);
 
-        debug_assert!(next_address <= DATA_OFFSET + Bytes::from(MEMORY_POOL_SIZE));
+        let max_address = data_offset + Bytes::from(MEMORY_POOL_SIZE);
 
-        if next_address < DATA_OFFSET + Bytes::from(MEMORY_POOL_SIZE) {
+        if next_address < max_address {
             let block = Self::load(next_address, memory);
             debug_assert_eq!(block.prev_physical, self.address);
             Some(block)
-        } else {
+        } else if next_address == max_address {
             None
+        } else {
+            unreachable!("out of bounds.")
         }
     }
 
@@ -542,10 +554,6 @@ impl Block {
     fn header_size() -> u64 {
         core::mem::size_of::<BlockHeader>() as u64
     }
-
-    fn data_offset(&self) -> Address {
-        Address::new(WASM_PAGE_SIZE)
-    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -601,7 +609,7 @@ mod test {
 
         assert_eq!(
             tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
-            DATA_OFFSET
+            tlsf.data_offset()
                 + Bytes::from(1232u64)
                 + Bytes::from(Block::header_size())
                 + Bytes::from(45u64)
@@ -614,7 +622,7 @@ mod test {
 
         assert_eq!(
             tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
-            DATA_OFFSET
+            tlsf.data_offset()
                 + Bytes::from(1232u64)
                 + Bytes::from(Block::header_size())
                 + Bytes::from(45u64)
@@ -625,14 +633,14 @@ mod test {
 
         assert_eq!(
             tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
-            DATA_OFFSET + Bytes::from(1232u64) + Bytes::from(Block::header_size())
+            tlsf.data_offset() + Bytes::from(1232u64) + Bytes::from(Block::header_size())
         );
 
         tlsf.deallocate(block_1);
 
         assert_eq!(
             tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
-            DATA_OFFSET
+            tlsf.data_offset()
         );
     }
 }
