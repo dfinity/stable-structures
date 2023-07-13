@@ -69,30 +69,25 @@ struct TlsfHeader {
 
 impl<M: Memory> TlsfAllocator<M> {
     // Initialize.
-    pub fn new(memory: M) -> Self {
-        let mut free_lists = [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE];
+    pub fn new(memory: M, header_addr: Address) -> Self {
+        let mut tlsf = Self {
+            header_addr,
+            free_lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+            memory,
+        };
 
-        // Create a block with the memory.
         // TODO: make it span at least 1TiB.
-        let block = Block {
+        // Create a block with the memory.
+        tlsf.insert(&mut Block {
             address: DATA_OFFSET,
             allocated: false,
             size: MEMORY_POOL_SIZE,
             prev_free: Address::NULL,
             next_free: Address::NULL,
             prev_physical: Address::NULL,
-        };
+        });
 
-        block.save(&memory);
-
-        free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1] = DATA_OFFSET;
-
-        let header_addr = Address::NULL; // FIXME
-        Self {
-            header_addr,
-            free_lists,
-            memory,
-        }
+        tlsf
     }
 
     /// Load an allocator from memory at the given `addr`.
@@ -547,6 +542,10 @@ impl Block {
     fn header_size() -> u64 {
         core::mem::size_of::<BlockHeader>() as u64
     }
+
+    fn data_offset(&self) -> Address {
+        Address::new(WASM_PAGE_SIZE)
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -593,7 +592,7 @@ mod test {
     #[test]
     fn two_allocate() {
         let mem = make_memory();
-        let mut tlsf = TlsfAllocator::new(mem);
+        let mut tlsf = TlsfAllocator::new(mem, Address::from(0));
         let block_1 = tlsf.allocate(1232);
 
         let block_2 = tlsf.allocate(45);

@@ -17,7 +17,7 @@ fn deallocate_everything() {
     )| {
         let mut rng = Rng::from_seed(0);
         let mem = make_memory();
-        let mut tlsf = TlsfAllocator::new(mem);
+        let mut tlsf = TlsfAllocator::new(mem, Address::from(0));
         let mut addresses: Vec<(Address, Vec<u8>)> = vec![];
 
         for d in data.into_iter() {
@@ -54,19 +54,16 @@ fn deallocate_everything() {
 
         prop_assert_eq!(
             tlsf.free_lists,
-            TlsfAllocator::new(make_memory()).free_lists
+            TlsfAllocator::new(make_memory(), Address::from(0)).free_lists
         );
     });
 }
 
 #[test]
 fn v2_deallocate_everything() {
-    let data = vec![
-        vec![0, 0, 0],
-        vec![0, 0, 0],
-    ];
+    let data = vec![vec![0, 0, 0], vec![0, 0, 0]];
     let mem = make_memory();
-    let mut tlsf = TlsfAllocator::new(mem);
+    let mut tlsf = TlsfAllocator::new(mem, Address::from(0));
     let mut addresses: Vec<(Address, Vec<u8>)> = vec![];
 
     for d in data.into_iter() {
@@ -103,7 +100,7 @@ fn v2_deallocate_everything() {
 
     assert_eq!(
         tlsf.free_lists,
-        TlsfAllocator::new(make_memory()).free_lists
+        TlsfAllocator::new(make_memory(), Address::from(0)).free_lists
     );
 }
 
@@ -115,7 +112,7 @@ fn multiple_allocations_no_deallocations() {
         ),
     )| {
         let mem = make_memory();
-        let mut tlsf = TlsfAllocator::new(mem);
+        let mut tlsf = TlsfAllocator::new(mem, Address::from(0));
         let mut addresses: Vec<(Address, Vec<u8>)> = vec![];
 
         let mut offset = Bytes::new(0);
