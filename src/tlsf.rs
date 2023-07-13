@@ -151,6 +151,53 @@ impl<M: Memory> TlsfAllocator<M> {
         block.address + Bytes::from(Block::header_size())
     }
 
+    /// Deallocates a previously allocated block.
+    ///
+    /// PRECONDITION:
+    ///   * `address` points to an allocated block.
+    ///
+    /// POSTCONDITION:
+    ///   * The block with `address` is freed, and merged with its neighbouring free blocks.
+    ///   TODO: explore how to make this more precise and add programmatic checks.
+    pub fn deallocate(&mut self, address: Address) {
+        self.check_free_lists_invariant();
+
+        let address = address - Bytes::from(Block::header_size());
+        let mut block = Block::load(address, &self.memory);
+
+        debug_assert!(
+            block.allocated,
+            "cannot deallocate an already deallocated block."
+        );
+
+        // Free the block.
+        block.allocated = false;
+        block.next_free = Address::NULL;
+        self.insert(&mut block);
+
+        self.merge(block);
+
+        self.check_free_lists_invariant();
+        self.save(); // TODO: is this necessary? I think yes. Need to write a test that detects this not being there.
+
+        // TODO: should insertion be another explicit step?
+
+        // TODO: save here is needed?
+    }
+
+    /// Saves the allocator to memory.
+    pub fn save(&self) {
+        write_struct(
+            &TlsfHeader {
+                magic: *MAGIC,
+                version: LAYOUT_VERSION,
+                free_lists: self.free_lists,
+            },
+            self.header_addr,
+            &self.memory,
+        );
+    }
+
     // Removes a free block from the free lists.
     //
     // Postconditions:
@@ -192,6 +239,15 @@ impl<M: Memory> TlsfAllocator<M> {
         }
     }
 
+    // Inserts a block into the free lists.
+    //
+    // Preconditions:
+    //  TODO
+    //
+    // Postconditions:
+    //  TODO
+    //
+    // Invariants?
     fn insert(&mut self, block: &mut Block) {
         debug_assert!(!block.allocated);
 
@@ -351,52 +407,6 @@ impl<M: Memory> TlsfAllocator<M> {
                 }
             }
         }*/
-    }
-
-    /// Deallocates a previously allocated block.
-    ///
-    /// PRECONDITION:
-    ///   * `address` points to an allocated block.
-    ///
-    /// POSTCONDITION:
-    ///   * The block with `address` is freed, and merged with its neighbouring free blocks.
-    ///   TODO: explore how to make this more precise and add programmatic checks.
-    pub fn deallocate(&mut self, address: Address) {
-        self.check_free_lists_invariant();
-
-        let address = address - Bytes::from(Block::header_size());
-        let mut block = Block::load(address, &self.memory);
-
-        debug_assert!(
-            block.allocated,
-            "cannot deallocate an already deallocated block."
-        );
-
-        // Free the block.
-        block.allocated = false;
-        self.insert(&mut block);
-
-        self.merge(block);
-
-        self.check_free_lists_invariant();
-        self.save(); // TODO: is this necessary? I think yes. Need to write a test that detects this not being there.
-
-        // TODO: should insertion be another explicit step?
-
-        // TODO: save here is needed?
-    }
-
-    pub fn save(&self) {
-        // XXX: don't assume the header is stored at address 0.
-        write_struct(
-            &TlsfHeader {
-                magic: *MAGIC,
-                version: LAYOUT_VERSION,
-                free_lists: self.free_lists,
-            },
-            self.header_addr,
-            &self.memory,
-        );
     }
 
     // Returns the smallest block that accommodates the size.
