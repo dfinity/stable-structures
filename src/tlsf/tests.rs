@@ -12,7 +12,7 @@ fn make_memory() -> Rc<RefCell<Vec<u8>>> {
 fn deallocate_everything() {
     proptest!(|(
         data in proptest::collection::vec(
-            proptest::collection::vec(0..u8::MAX, 3usize..100usize), 3..20
+            proptest::collection::vec(0..u8::MAX, 3usize..100usize), 3..100
         ),
     )| {
         let mut rng = Rng::from_seed(0);

@@ -116,6 +116,8 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     /// Complexity: O(1)
+    /// TODO: need to return some object that includes the length, not just the address.
+    /// TODO: support allocating sizes < 3 bytes?
     pub fn allocate(&mut self, size: u32) -> Address {
         self.check_free_lists_invariant();
 
