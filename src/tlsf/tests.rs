@@ -17,7 +17,7 @@ fn new_and_load() {
     TlsfAllocator::new(mem.clone(), allocator_addr);
 
     // Load it from memory.
-    let tlsf = TlsfAllocator::load(mem.clone(), allocator_addr);
+    let tlsf = TlsfAllocator::load(mem, allocator_addr);
 
     // Load the first memory chunk.
     assert_eq!(
@@ -43,7 +43,7 @@ fn reloading_preserves_allocations() {
 
     let a = allocator.allocate(123);
 
-    let mut allocator = TlsfAllocator::load(mem.clone(), allocator_addr);
+    let mut allocator = TlsfAllocator::load(mem, allocator_addr);
 
     // `a` can still be deallocated.
     allocator.deallocate(a);

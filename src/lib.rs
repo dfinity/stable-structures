@@ -37,6 +37,10 @@ pub type DefaultMemoryImpl = Ic0StableMemory;
 #[cfg(not(target_arch = "wasm32"))]
 pub type DefaultMemoryImpl = VectorMemory;
 
+#[cfg(test)]
+#[macro_use]
+extern crate contracts;
+
 const WASM_PAGE_SIZE: u64 = 65536;
 
 /// The maximum number of stable memory pages a canister can address.
@@ -98,8 +102,7 @@ impl Display for GrowFailed {
         write!(
             f,
             "Failed to grow memory: current size={}, delta={}",
-            self.current_size,
-            self.delta
+            self.current_size, self.delta
         )
     }
 }

@@ -12,6 +12,7 @@ use crate::{
     types::{Address, Bytes},
     write_struct, Memory,
 };
+use std::cmp::Ordering;
 
 #[cfg(test)]
 mod tests;
@@ -110,9 +111,9 @@ impl<M: Memory> TlsfAllocator<M> {
     /// Complexity: O(1)
     /// TODO: need to return some object that includes the length, not just the address.
     /// TODO: support allocating sizes < 3 bytes?
+    #[cfg(test)]
+    #[invariant(self.check_free_lists_invariant())]
     pub fn allocate(&mut self, size: u32) -> Address {
-        self.check_free_lists_invariant();
-
         // Adjust the size to accommodate the block header.
         let size = size + Block::header_size() as u32;
 
@@ -144,9 +145,6 @@ impl<M: Memory> TlsfAllocator<M> {
         block.save(&self.memory);
 
         self.save(); // TODO: could this be done more efficiently?
-
-        #[cfg(test)]
-        self.check_free_lists_invariant();
 
         block.address + Bytes::from(Block::header_size())
     }
@@ -358,7 +356,7 @@ impl<M: Memory> TlsfAllocator<M> {
         }
     }
 
-    fn check_free_lists_invariant(&self) {
+    fn check_free_lists_invariant(&self) -> bool {
         let mut total_size = 0;
 
         let mut free_blocks = std::collections::BTreeMap::new();
@@ -380,7 +378,11 @@ impl<M: Memory> TlsfAllocator<M> {
         }
 
         // The sum of all the block sizes = MEMORY POOL.
-        assert_eq!(total_size, MEMORY_POOL_SIZE);
+        if total_size != MEMORY_POOL_SIZE {
+            return false;
+        }
+
+        true
 
         // Links between all free blocks are correct.
         /*for free_block in free_blocks.values() {
@@ -501,14 +503,16 @@ impl Block {
 
         let max_address = data_offset + Bytes::from(MEMORY_POOL_SIZE);
 
-        if next_address < max_address {
-            let block = Self::load(next_address, memory);
-            debug_assert_eq!(block.prev_physical, self.address);
-            Some(block)
-        } else if next_address == max_address {
-            None
-        } else {
-            unreachable!("out of bounds.")
+        match next_address.cmp(&max_address) {
+            Ordering::Less => {
+                let block = Self::load(next_address, memory);
+                debug_assert_eq!(block.prev_physical, self.address);
+                Some(block)
+            }
+            Ordering::Equal => None,
+            Ordering::Greater => {
+                unreachable!("out of bounds.")
+            }
         }
     }
 
