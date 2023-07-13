@@ -1108,6 +1108,7 @@ mod test {
         let memory_2 = mem_mgr.get(MemoryId(2));
 
         let mut bytes = vec![0; 3];
+        // Check that data is correctly reinitialized.
         memory_0.read(0, &mut bytes);
         assert_eq!(bytes, vec![1, 2, 3]);
 
@@ -1117,14 +1118,17 @@ mod test {
         memory_2.read(0, &mut bytes);
         assert_eq!(bytes, vec![7, 8, 9]);
 
+        // Free MemoryId 1.
         mem_mgr.free(MemoryId(1));
 
+        // Check that data of MemoryId 0 and 2 is correctly reinitialized.
         memory_0.read(0, &mut bytes);
         assert_eq!(bytes, vec![1, 2, 3]);
 
         memory_2.read(0, &mut bytes);
         assert_eq!(bytes, vec![7, 8, 9]);
 
+        // Check that date of MemoryId 1 is freed.
         assert_eq!(memory_1.size(), 0);
         memory_1.read(0, &mut bytes);
     }
