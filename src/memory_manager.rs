@@ -1084,4 +1084,48 @@ mod test {
         );
         assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 5);
     }
+
+    #[test]
+    #[should_panic = "MemoryId(1): read out of bounds"]
+    fn can_be_reinitialized_from_memory_after_freeing() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init(mem.clone());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+        let memory_2 = mem_mgr.get(MemoryId(2));
+
+        assert_eq!(memory_0.grow(1), 0);
+        assert_eq!(memory_1.grow(1), 0);
+        assert_eq!(memory_2.grow(1), 0);
+
+        memory_0.write(0, &[1, 2, 3]);
+        memory_1.write(0, &[4, 5, 6]);
+        memory_2.write(0, &[7, 8, 9]);
+
+        let mut mem_mgr = MemoryManager::init(mem);
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+        let memory_2 = mem_mgr.get(MemoryId(2));
+
+        let mut bytes = vec![0; 3];
+        memory_0.read(0, &mut bytes);
+        assert_eq!(bytes, vec![1, 2, 3]);
+
+        memory_1.read(0, &mut bytes);
+        assert_eq!(bytes, vec![4, 5, 6]);
+
+        memory_2.read(0, &mut bytes);
+        assert_eq!(bytes, vec![7, 8, 9]);
+
+        mem_mgr.free(MemoryId(1));
+
+        memory_0.read(0, &mut bytes);
+        assert_eq!(bytes, vec![1, 2, 3]);
+
+        memory_2.read(0, &mut bytes);
+        assert_eq!(bytes, vec![7, 8, 9]);
+
+        assert_eq!(memory_1.size(), 0);
+        memory_1.read(0, &mut bytes);
+    }
 }
