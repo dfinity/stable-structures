@@ -143,17 +143,12 @@ impl<M: Memory> TlsfAllocator<M> {
         block.allocated = true;
         block.save(&self.memory);
 
+        self.save(); // TODO: could this be done more efficiently?
+
+        #[cfg(test)]
         self.check_free_lists_invariant();
 
         block.address + Bytes::from(Block::header_size())
-        /*
-        remove (found_block); // O(1)
-        if (sizeof(found_block)>size) {
-        remaining_block = split (found_block, size);
-        mapping (sizeof(remaining_block),&fl2,&sl2);
-        insert (remaining_block, fl2, sl2); // O(1)
-        }
-        return found_block;*/
     }
 
     // Removes a free block from the free lists.
@@ -384,8 +379,11 @@ impl<M: Memory> TlsfAllocator<M> {
         self.merge(block);
 
         self.check_free_lists_invariant();
+        self.save(); // TODO: is this necessary? I think yes. Need to write a test that detects this not being there.
 
         // TODO: should insertion be another explicit step?
+
+        // TODO: save here is needed?
     }
 
     pub fn save(&self) {
@@ -433,6 +431,18 @@ impl<M: Memory> TlsfAllocator<M> {
 
     fn data_offset(&self) -> Address {
         self.header_addr + HEADER_SIZE
+    }
+
+    /// Destroys the allocator and returns the underlying memory.
+    #[inline]
+    pub fn into_memory(self) -> M {
+        self.memory
+    }
+
+    /// Returns a reference to the underlying memory.
+    #[inline]
+    pub fn memory(&self) -> &M {
+        &self.memory
     }
 }
 

@@ -33,6 +33,22 @@ fn new_and_load() {
     );
 }
 
+#[test]
+fn reloading_preserves_allocations() {
+    let mem = make_memory();
+    let allocator_addr = Address::from(16);
+
+    // Create a new allocator.
+    let mut allocator = TlsfAllocator::new(mem.clone(), allocator_addr);
+
+    let a = allocator.allocate(123);
+
+    let mut allocator = TlsfAllocator::load(mem.clone(), allocator_addr);
+
+    // `a` can still be deallocated.
+    allocator.deallocate(a);
+}
+
 // TODO: add tests with small memory pools
 
 #[test]
