@@ -14,6 +14,9 @@ use crate::{
 };
 use std::cmp::Ordering;
 
+mod block;
+use block::FreeBlock;
+
 #[cfg(test)]
 mod tests;
 
@@ -195,9 +198,6 @@ impl<M: Memory> TlsfAllocator<M> {
     // * block->prev->next = block->next;
     // * free list head is updated.
     fn remove(&mut self, block: FreeBlock) -> OrphanedFreeBlock {
-        // Precondition: `block` is free.
-        //debug_assert!(!block.allocated);
-
         match block.get_prev_free_block(&self.memory) {
             None => {
                 // `block` is the head of the free list.
@@ -206,11 +206,6 @@ impl<M: Memory> TlsfAllocator<M> {
                 debug_assert_eq!(block.prev_free, Address::NULL);
 
                 self.free_lists[f][s] = block.next_free;
-
-                if let Some(mut next_block) = block.get_next_free_block(&self.memory) {
-                    next_block.prev_free = Address::NULL;
-                    next_block.save(&self.memory);
-                }
             }
             Some(mut prev_free_block) => {
                 prev_free_block.next_free = block.next_free;
@@ -478,127 +473,6 @@ impl Block {
             Self::Free(b) => b.save(memory),
             Self::Used(b) => b.save(memory),
         }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct FreeBlock {
-    address: Address,
-    //    allocated: bool,
-    prev_free: Address,
-    next_free: Address,
-    prev_physical: Address,
-
-    // The size of the block, including the header.
-    size: u32,
-}
-
-impl FreeBlock {
-    fn save<M: Memory>(&self, memory: &M) {
-        if self.next_free != Address::NULL {
-            assert!(
-                self.next_free < self.address
-                    || self.next_free >= self.address + Bytes::from(self.size)
-            );
-        }
-
-        write_struct(
-            &BlockHeader {
-                allocated: false,
-                prev_free: self.prev_free,
-                next_free: self.next_free,
-                size: self.size,
-                prev_physical: self.prev_physical,
-            },
-            self.address,
-            memory,
-        )
-    }
-
-    // Loads the next physical block in memory.
-    // If this is the last physical block in memory, `None` is returned.
-    fn get_next_physical_block<M: Memory>(
-        &self,
-        memory: &M,
-        data_offset: Address,
-    ) -> Option<Block> {
-        let next_address = self.address + Bytes::from(self.size);
-
-        let max_address = data_offset + Bytes::from(MEMORY_POOL_SIZE);
-
-        match next_address.cmp(&max_address) {
-            Ordering::Less => {
-                let block = Block::load(next_address, memory);
-                // TODO: bring that assertion again.
-                //debug_assert_eq!(block.prev_physical, self.address);
-                Some(block)
-            }
-            Ordering::Equal => None,
-            Ordering::Greater => {
-                unreachable!("out of bounds.")
-            }
-        }
-    }
-
-    // Loads the previous physical block in memory.
-    // If this is the first physical block in memory, `None` is returned.
-    fn get_prev_physical_block<M: Memory>(&self, memory: &M) -> Option<Block> {
-        match self.prev_physical {
-            // TODO: in prev physical is null, maybe assert that block's address is the data
-            // offset?
-            Address::NULL => None,
-            prev_physical => Some(Block::load(prev_physical, memory)),
-        }
-    }
-
-    // Loads the previous free block if it exists, `None` otherwise.
-    fn get_prev_free_block<M: Memory>(&self, memory: &M) -> Option<FreeBlock> {
-        if self.prev_free != Address::NULL {
-            let prev_free = Self::load(self.prev_free, memory);
-
-            // Assert that the previous block is pointing to the current block.
-            debug_assert_eq!(prev_free.next_free, self.address);
-            // Assert that the previous block is free.
-            //debug_assert!(!prev_free.allocated);
-
-            Some(prev_free)
-        } else {
-            None
-        }
-    }
-
-    // Loads the next free block if it exists, `None` otherwise.
-    fn get_next_free_block<M: Memory>(&self, memory: &M) -> Option<FreeBlock> {
-        if self.next_free != Address::NULL {
-            let next_free = Self::load(self.next_free, memory);
-
-            // Assert that the next block is pointing to the current block.
-            //debug_assert_eq!(next_free.prev_free, self.address);
-            // Assert that the next block is free.
-            //debug_assert!(!next_free.allocated);
-
-            Some(next_free)
-        } else {
-            None
-        }
-    }
-
-    fn load<M: Memory>(address: Address, memory: &M) -> Self {
-        let header: BlockHeader = read_struct(address, memory);
-        // TODO: check magic and version?
-        assert!(!header.allocated);
-
-        Self {
-            address,
-            prev_free: header.prev_free,
-            next_free: header.next_free,
-            size: header.size,
-            prev_physical: header.prev_physical,
-        }
-    }
-
-    fn header_size() -> u64 {
-        core::mem::size_of::<BlockHeader>() as u64
     }
 }
 
