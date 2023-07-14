@@ -1,17 +1,36 @@
 use super::*;
 
-pub struct OrphanedFreeBlock {
+// There are three types of blocks:
+//         remove             allocate
+//   Free -------> TempFree ---------> Allocated
+//        <-------          <---------
+//         insert            deallocate
+
+
+// TODO: maybe add a drop flag?
+pub struct TempFreeBlock {
     pub address: Address,
     pub prev_physical: Address,
     pub size: u32,
 }
 
-impl OrphanedFreeBlock {
+impl TempFreeBlock {
     pub fn allocate(self) -> UsedBlock {
         UsedBlock {
             address: self.address,
             prev_physical: self.prev_physical,
             size: self.size,
+        }
+    }
+
+    pub fn into_free_block(self, next_free: Address) -> FreeBlock {
+        FreeBlock {
+            address: self.address,
+            prev_free: Address::NULL,
+            next_free,
+            prev_physical: self.prev_physical,
+            size: self.size,
+            dirty: true,
         }
     }
 
@@ -42,7 +61,7 @@ impl Block {
         }
     }
 
-    pub fn save<M: Memory>(&self, memory: &M) {
+    pub fn save<M: Memory>(&mut self, memory: &M) {
         match self {
             Self::Free(b) => b.save(memory),
             Self::Used(b) => b.save(memory),
@@ -95,8 +114,8 @@ impl UsedBlock {
         )
     }
 
-    pub fn deallocate(self) -> OrphanedFreeBlock {
-        OrphanedFreeBlock {
+    pub fn deallocate(self) -> TempFreeBlock {
+        TempFreeBlock {
             address: self.address,
             prev_physical: self.prev_physical,
             size: self.size,
@@ -112,16 +131,43 @@ impl UsedBlock {
 /// An unallocated block of memory.
 #[derive(Debug, PartialEq, Clone)]
 pub struct FreeBlock {
+    // TODO: modifications to any of these fields make the block dirty
     pub(super) address: Address,
     pub prev_free: Address,
     pub next_free: Address,
     pub prev_physical: Address,
 
     // The size of the block, including the header.
-    pub size: u32,
+    size: u32,
+
+    dirty: bool,
+}
+
+#[cfg(test)]
+impl Drop for FreeBlock {
+    fn drop(&mut self) {
+        if self.dirty {
+            panic!("cannot drop an unsaved free block");
+        }
+    }
 }
 
 impl FreeBlock {
+    pub fn genesis(address: Address) -> Self {
+        FreeBlock {
+            address,
+            size: MEMORY_POOL_SIZE,
+            prev_free: Address::NULL,
+            next_free: Address::NULL,
+            prev_physical: Address::NULL,
+            dirty: false, // FIXME: what should this be?
+        }
+    }
+
+    pub fn size(&self) -> u32 {
+        self.size
+    }
+
     /// Loads a free block from the given address.
     pub(super) fn load<M: Memory>(address: Address, memory: &M) -> Self {
         let header: BlockHeader = read_struct(address, memory);
@@ -134,10 +180,11 @@ impl FreeBlock {
             next_free: header.next_free,
             size: header.size,
             prev_physical: header.prev_physical,
+            dirty: false,
         }
     }
 
-    pub fn save<M: Memory>(&self, memory: &M) {
+    pub fn save<M: Memory>(&mut self, memory: &M) {
         // TODO: save check for previous free and previous physical?
         if self.next_free != Address::NULL {
             assert!(
@@ -156,7 +203,9 @@ impl FreeBlock {
             },
             self.address,
             memory,
-        )
+        );
+
+        self.dirty = false;
     }
 
     // Loads the next physical block in memory.

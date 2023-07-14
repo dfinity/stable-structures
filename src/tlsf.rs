@@ -15,7 +15,7 @@ use crate::{
 use std::cmp::Ordering;
 
 mod block;
-use block::{Block, FreeBlock, OrphanedFreeBlock, UsedBlock};
+use block::{Block, FreeBlock, TempFreeBlock, UsedBlock};
 
 #[cfg(test)]
 mod tests;
@@ -86,15 +86,9 @@ impl<M: Memory> TlsfAllocator<M> {
 
         // TODO: make it span at least 1TiB.
         // Create a block with the memory.
-        let block = FreeBlock {
-            address: tlsf.data_offset(),
-            size: MEMORY_POOL_SIZE,
-            prev_free: Address::NULL,
-            next_free: Address::NULL,
-            prev_physical: Address::NULL,
-        };
+        let mut block = FreeBlock::genesis(tlsf.data_offset());
 
-        let (f, s) = mapping(block.size);
+        let (f, s) = mapping(block.size());
         block.save(&tlsf.memory);
         tlsf.free_lists[f][s] = block.address;
         tlsf.save();
@@ -136,7 +130,7 @@ impl<M: Memory> TlsfAllocator<M> {
             block.size = size;
 
             // Split the block
-            let remaining_block = OrphanedFreeBlock {
+            let remaining_block = TempFreeBlock {
                 address: block.address + size.into(),
                 size: remaining_size,
                 prev_physical: block.address,
@@ -197,11 +191,11 @@ impl<M: Memory> TlsfAllocator<M> {
     // * block->next->prev = block->prev;
     // * block->prev->next = block->next;
     // * free list head is updated.
-    fn remove(&mut self, block: FreeBlock) -> OrphanedFreeBlock {
+    fn remove(&mut self, block: FreeBlock) -> TempFreeBlock {
         match block.get_prev_free_block(&self.memory) {
             None => {
                 // `block` is the head of the free list.
-                let (f, s) = mapping(block.size);
+                let (f, s) = mapping(block.size());
                 debug_assert_eq!(block.address, self.free_lists[f][s]);
                 debug_assert_eq!(block.prev_free, Address::NULL);
 
@@ -223,10 +217,10 @@ impl<M: Memory> TlsfAllocator<M> {
             }
         }
 
-        OrphanedFreeBlock {
+        TempFreeBlock {
             address: block.address,
             prev_physical: block.prev_physical,
-            size: block.size,
+            size: block.size(),
         }
     }
 
@@ -239,19 +233,12 @@ impl<M: Memory> TlsfAllocator<M> {
     //  TODO
     //
     // Invariants?
-    fn insert(&mut self, block: OrphanedFreeBlock) -> FreeBlock {
+    fn insert(&mut self, block: TempFreeBlock) -> FreeBlock {
         //    debug_assert!(!block.allocated);
         //
         let (f, s) = mapping(block.size);
 
-        let block = FreeBlock {
-            address: block.address,
-            //   allocated: false,
-            prev_free: Address::NULL,
-            next_free: self.free_lists[f][s],
-            prev_physical: block.prev_physical,
-            size: block.size,
-        };
+        let mut block = block.into_free_block(self.free_lists[f][s]);
 
         match block.next_free {
             Address::NULL => {}
@@ -275,7 +262,7 @@ impl<M: Memory> TlsfAllocator<M> {
     fn merge_helper(&mut self, a: FreeBlock, b: FreeBlock) -> FreeBlock {
         // Precondition: `a` and `b` are physically adjacent to each other.
         assert_eq!(b.prev_physical, a.address);
-        assert_eq!(a.address + Bytes::from(a.size), b.address);
+        assert_eq!(a.address + Bytes::from(a.size()), b.address);
 
         // Remove them from the free lists.
         let a = self.remove(a);
@@ -292,10 +279,10 @@ impl<M: Memory> TlsfAllocator<M> {
             next_block.save(&self.memory);
         }
 
-        self.insert(OrphanedFreeBlock {
+        self.insert(TempFreeBlock {
             address: a.address,
             prev_physical: a.prev_physical,
-            size: a.size + b.size,
+            size: a.size() + b.size(),
         })
     }
 
@@ -350,7 +337,7 @@ impl<M: Memory> TlsfAllocator<M> {
                     // (2) Free
                     //debug_assert!(!block.allocated);
                     // (3) Big enough
-                    debug_assert!(block.size >= size);
+                    debug_assert!(block.size() >= size);
 
                     return block;
                 }

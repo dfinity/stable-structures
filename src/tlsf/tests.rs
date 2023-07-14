@@ -22,13 +22,7 @@ fn new_and_load() {
     // Load the first memory chunk.
     assert_eq!(
         FreeBlock::load(tlsf.data_offset(), &tlsf.memory),
-        FreeBlock {
-            address: tlsf.data_offset(),
-            size: MEMORY_POOL_SIZE,
-            prev_free: Address::NULL,
-            next_free: Address::NULL,
-            prev_physical: Address::NULL,
-        }
+        FreeBlock::genesis(tlsf.data_offset())
     );
 }
 
@@ -84,13 +78,7 @@ fn deallocate_everything() {
 
         prop_assert_eq!(
             FreeBlock::load(tlsf.data_offset(), &tlsf.memory),
-            FreeBlock {
-                address: tlsf.data_offset(),
-                size: MEMORY_POOL_SIZE,
-                prev_free: Address::NULL,
-                next_free: Address::NULL,
-                prev_physical: Address::NULL,
-            }
+            FreeBlock::genesis(tlsf.data_offset())
         );
 
         prop_assert_eq!(
@@ -129,13 +117,7 @@ fn v2_deallocate_everything() {
 
     assert_eq!(
         FreeBlock::load(tlsf.data_offset(), &tlsf.memory),
-        FreeBlock {
-            address: tlsf.data_offset(),
-            size: MEMORY_POOL_SIZE,
-            prev_free: Address::NULL,
-            next_free: Address::NULL,
-            prev_physical: Address::NULL,
-        }
+        FreeBlock::genesis(tlsf.data_offset())
     );
 
     assert_eq!(
