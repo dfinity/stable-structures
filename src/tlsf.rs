@@ -83,7 +83,7 @@ impl<M: Memory> TlsfAllocator<M> {
 
         // TODO: make it span at least 1TiB.
         // Create a block with the memory.
-        let block = Block {
+        let block = FreeBlock {
             address: tlsf.data_offset(),
             size: MEMORY_POOL_SIZE,
             prev_free: Address::NULL,
@@ -120,9 +120,9 @@ impl<M: Memory> TlsfAllocator<M> {
     //    #[invariant(self.check_free_lists_invariant())]
     pub fn allocate(&mut self, size: u32) -> Address {
         // Adjust the size to accommodate the block header.
-        let size = size + Block::header_size() as u32;
+        let size = size + FreeBlock::header_size() as u32;
 
-        let mut block = self.search_suitable_block(size);
+        let block = self.search_suitable_block(size);
 
         // Remove the block from its free list.
         let mut block = self.remove(block);
@@ -133,7 +133,7 @@ impl<M: Memory> TlsfAllocator<M> {
             block.size = size;
 
             // Split the block
-            let mut remaining_block = OrphanedFreeBlock {
+            let remaining_block = OrphanedFreeBlock {
                 address: block.address + size.into(),
                 size: remaining_size,
                 prev_physical: block.address,
@@ -148,7 +148,7 @@ impl<M: Memory> TlsfAllocator<M> {
 
         self.save(); // TODO: could this be done more efficiently?
 
-        allocated_block.address + Bytes::from(Block::header_size())
+        allocated_block.address + Bytes::from(UsedBlock::header_size())
     }
 
     /// Deallocates a previously allocated block.
@@ -159,10 +159,10 @@ impl<M: Memory> TlsfAllocator<M> {
     /// POSTCONDITION:
     ///   * The block with `address` is freed, and merged with its neighbouring free blocks.
     ///   TODO: explore how to make this more precise and add programmatic checks.
-   // #[cfg(test)]
+    // #[cfg(test)]
     //#[invariant(self.check_free_lists_invariant())]
     pub fn deallocate(&mut self, address: Address) {
-        let address = address - Bytes::from(Block::header_size());
+        let address = address - Bytes::from(FreeBlock::header_size());
         let block = UsedBlock::load(address, &self.memory);
 
         // Free the block.
@@ -194,7 +194,7 @@ impl<M: Memory> TlsfAllocator<M> {
     // * block->next->prev = block->prev;
     // * block->prev->next = block->next;
     // * free list head is updated.
-    fn remove(&mut self, block: Block) -> OrphanedFreeBlock {
+    fn remove(&mut self, block: FreeBlock) -> OrphanedFreeBlock {
         // Precondition: `block` is free.
         //debug_assert!(!block.allocated);
 
@@ -244,12 +244,12 @@ impl<M: Memory> TlsfAllocator<M> {
     //  TODO
     //
     // Invariants?
-    fn insert(&mut self, block: OrphanedFreeBlock) -> Block {
+    fn insert(&mut self, block: OrphanedFreeBlock) -> FreeBlock {
         //    debug_assert!(!block.allocated);
         //
         let (f, s) = mapping(block.size);
 
-        let block = Block {
+        let block = FreeBlock {
             address: block.address,
             //   allocated: false,
             prev_free: Address::NULL,
@@ -261,7 +261,7 @@ impl<M: Memory> TlsfAllocator<M> {
         match block.next_free {
             Address::NULL => {}
             next_free => {
-                let mut next_block = Block::load(next_free, &self.memory);
+                let mut next_block = FreeBlock::load(next_free, &self.memory);
                 debug_assert_eq!(next_block.prev_free, Address::NULL);
                 //      debug_assert!(!next_block.allocated);
                 next_block.prev_free = block.address;
@@ -277,67 +277,61 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     // Merges two free blocks that are physically adjacent to each other.
-    fn merge_helper(&mut self, a: Block, b: Block) -> Block {
-        //assert!(!a.allocated);
-        // assert!(!b.allocated);
+    fn merge_helper(&mut self, a: FreeBlock, b: FreeBlock) -> FreeBlock {
+        // Precondition: `a` and `b` are physically adjacent to each other.
         assert_eq!(b.prev_physical, a.address);
         assert_eq!(a.address + Bytes::from(a.size), b.address);
 
         // Remove them from the free lists.
         let a = self.remove(a);
-        let b = Block::load(b.address, &self.memory);
+        let b = FreeBlock::load(b.address, &self.memory);
         let b = self.remove(b);
 
         // Reload them with new pointers.
         // TODO: load them as orphaned blocks
-        let a = Block::load(a.address, &self.memory);
-        let b = Block::load(b.address, &self.memory);
+        let a = FreeBlock::load(a.address, &self.memory);
+        let b = FreeBlock::load(b.address, &self.memory);
 
         if let Some(mut next_block) = b.get_next_physical_block(&self.memory, self.data_offset()) {
             next_block.set_prev_physical(a.address);
             next_block.save(&self.memory);
         }
 
-        let mut block = OrphanedFreeBlock {
+        self.insert(OrphanedFreeBlock {
             address: a.address,
             prev_physical: a.prev_physical,
             size: a.size + b.size,
-        };
-
-        self.insert(block)
+        })
     }
 
     // Merges a block with its previous and next blocks if they are free.
     // The free lists are updated accordingly.
-    fn merge(&mut self, block: Block) -> Block {
-        // Precondition: `block` is free.
-        //        debug_assert!(!block.allocated);
-
+    fn merge(&mut self, block: FreeBlock) -> FreeBlock {
         match (
             block.get_prev_physical_block(&self.memory),
             block.get_next_physical_block(&self.memory, self.data_offset()),
         ) {
             (None, None)
-            | (Some(BlockEnum::Used(_)), None)
-            | (None, Some(BlockEnum::Used(_)))
-            | (Some(BlockEnum::Used(_)), Some(BlockEnum::Used(_))) => {
+            | (Some(Block::Used(_)), None)
+            | (None, Some(Block::Used(_)))
+            | (Some(Block::Used(_)), Some(Block::Used(_))) => {
                 // There are no neighbouring free physical blocks. Nothing to do.
                 block
             }
-            (Some(BlockEnum::Free(prev_block)), None)
-            | (Some(BlockEnum::Free(prev_block)), Some(BlockEnum::Used(_))) => {
+            (Some(Block::Free(prev_block)), None)
+            | (Some(Block::Free(prev_block)), Some(Block::Used(_))) => {
                 self.merge_helper(prev_block, block)
             }
-            (Some(BlockEnum::Free(prev_block)), Some(BlockEnum::Free(mut next_block))) => {
+            (Some(Block::Free(prev_block)), Some(Block::Free(mut next_block))) => {
                 let mut big_block = self.merge_helper(prev_block, block);
 
                 // Reload next block.
-                next_block = Block::load(next_block.address, &self.memory);
+                next_block = FreeBlock::load(next_block.address, &self.memory);
                 big_block = self.merge_helper(big_block, next_block);
                 big_block
             }
-            (Some(BlockEnum::Used(_)), Some(BlockEnum::Free(next_block)))
-            | (None, Some(BlockEnum::Free(next_block))) => self.merge_helper(block, next_block),
+            (Some(Block::Used(_)), Some(Block::Free(next_block)))
+            | (None, Some(Block::Free(next_block))) => self.merge_helper(block, next_block),
         }
     }
 
@@ -345,7 +339,7 @@ impl<M: Memory> TlsfAllocator<M> {
     //
     // XXX: This can be done with clever bit manipulation, but we can do it the
     // naive way for a V0.
-    fn search_suitable_block(&self, size: u32) -> Block {
+    fn search_suitable_block(&self, size: u32) -> FreeBlock {
         // Identify the free list to take blocks from.
         let (fl, sl) = mapping(size);
 
@@ -353,7 +347,7 @@ impl<M: Memory> TlsfAllocator<M> {
         for f in fl..FIRST_LEVEL_INDEX_SIZE {
             for s in sl..SECOND_LEVEL_INDEX_SIZE {
                 if self.free_lists[f][s] != Address::NULL {
-                    let block = Block::load(self.free_lists[f][s], &self.memory);
+                    let block = FreeBlock::load(self.free_lists[f][s], &self.memory);
 
                     // The block must be:
                     // (1) The head of its free list.
@@ -430,6 +424,11 @@ impl UsedBlock {
             memory,
         )
     }
+
+    // TODO: used block headers are smaller.
+    fn header_size() -> u64 {
+        core::mem::size_of::<BlockHeader>() as u64
+    }
 }
 
 struct OrphanedFreeBlock {
@@ -448,33 +447,20 @@ impl OrphanedFreeBlock {
     }
 
     // TODO: maybe a split method?
-    fn load<M: Memory>(address: Address, memory: &M) -> Self {
-        let header: BlockHeader = read_struct(address, memory);
-        // TODO: check magic and version?
-        assert!(header.allocated);
-        assert_eq!(header.prev_free, Address::NULL);
-        assert_eq!(header.next_free, Address::NULL);
-
-        Self {
-            address,
-            size: header.size,
-            prev_physical: header.prev_physical,
-        }
-    }
 }
 
-enum BlockEnum {
-    Free(Block),
+enum Block {
+    Free(FreeBlock),
     Used(UsedBlock),
 }
 
-impl BlockEnum {
+impl Block {
     fn load<M: Memory>(address: Address, memory: &M) -> Self {
         let header: BlockHeader = read_struct(address, memory);
 
         // TODO: avoid reading the header twice.
         match header.allocated {
-            false => Self::Free(Block::load(address, memory)),
+            false => Self::Free(FreeBlock::load(address, memory)),
             true => Self::Used(UsedBlock::load(address, memory)),
         }
     }
@@ -496,7 +482,7 @@ impl BlockEnum {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct Block {
+struct FreeBlock {
     address: Address,
     //    allocated: bool,
     prev_free: Address,
@@ -507,7 +493,7 @@ struct Block {
     size: u32,
 }
 
-impl Block {
+impl FreeBlock {
     fn save<M: Memory>(&self, memory: &M) {
         if self.next_free != Address::NULL {
             assert!(
@@ -535,14 +521,14 @@ impl Block {
         &self,
         memory: &M,
         data_offset: Address,
-    ) -> Option<BlockEnum> {
+    ) -> Option<Block> {
         let next_address = self.address + Bytes::from(self.size);
 
         let max_address = data_offset + Bytes::from(MEMORY_POOL_SIZE);
 
         match next_address.cmp(&max_address) {
             Ordering::Less => {
-                let block = BlockEnum::load(next_address, memory);
+                let block = Block::load(next_address, memory);
                 // TODO: bring that assertion again.
                 //debug_assert_eq!(block.prev_physical, self.address);
                 Some(block)
@@ -556,17 +542,17 @@ impl Block {
 
     // Loads the previous physical block in memory.
     // If this is the first physical block in memory, `None` is returned.
-    fn get_prev_physical_block<M: Memory>(&self, memory: &M) -> Option<BlockEnum> {
+    fn get_prev_physical_block<M: Memory>(&self, memory: &M) -> Option<Block> {
         match self.prev_physical {
             // TODO: in prev physical is null, maybe assert that block's address is the data
             // offset?
             Address::NULL => None,
-            prev_physical => Some(BlockEnum::load(prev_physical, memory)),
+            prev_physical => Some(Block::load(prev_physical, memory)),
         }
     }
 
     // Loads the previous free block if it exists, `None` otherwise.
-    fn get_prev_free_block<M: Memory>(&self, memory: &M) -> Option<Block> {
+    fn get_prev_free_block<M: Memory>(&self, memory: &M) -> Option<FreeBlock> {
         if self.prev_free != Address::NULL {
             let prev_free = Self::load(self.prev_free, memory);
 
@@ -582,7 +568,7 @@ impl Block {
     }
 
     // Loads the next free block if it exists, `None` otherwise.
-    fn get_next_free_block<M: Memory>(&self, memory: &M) -> Option<Block> {
+    fn get_next_free_block<M: Memory>(&self, memory: &M) -> Option<FreeBlock> {
         if self.next_free != Address::NULL {
             let next_free = Self::load(self.next_free, memory);
 
@@ -671,11 +657,11 @@ mod test {
             tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
             tlsf.data_offset()
                 + Bytes::from(1232u64)
-                + Bytes::from(Block::header_size())
+                + Bytes::from(UsedBlock::header_size())
                 + Bytes::from(45u64)
-                + Bytes::from(Block::header_size())
+                + Bytes::from(UsedBlock::header_size())
                 + Bytes::from(39u64)
-                + Bytes::from(Block::header_size())
+                + Bytes::from(UsedBlock::header_size())
         );
 
         tlsf.deallocate(block_3);
@@ -684,16 +670,16 @@ mod test {
             tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
             tlsf.data_offset()
                 + Bytes::from(1232u64)
-                + Bytes::from(Block::header_size())
+                + Bytes::from(UsedBlock::header_size())
                 + Bytes::from(45u64)
-                + Bytes::from(Block::header_size())
+                + Bytes::from(UsedBlock::header_size())
         );
 
         tlsf.deallocate(block_2);
 
         assert_eq!(
             tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
-            tlsf.data_offset() + Bytes::from(1232u64) + Bytes::from(Block::header_size())
+            tlsf.data_offset() + Bytes::from(1232u64) + Bytes::from(UsedBlock::header_size())
         );
 
         tlsf.deallocate(block_1);
