@@ -15,7 +15,7 @@ use crate::{
 use std::cmp::Ordering;
 
 mod block;
-use block::FreeBlock;
+use block::{Block, FreeBlock, OrphanedFreeBlock, UsedBlock};
 
 #[cfg(test)]
 mod tests;
@@ -375,115 +375,6 @@ impl<M: Memory> TlsfAllocator<M> {
     pub fn memory(&self) -> &M {
         &self.memory
     }
-}
-
-struct UsedBlock {
-    address: Address,
-    prev_physical: Address,
-    size: u32,
-}
-
-impl UsedBlock {
-    fn deallocate(self) -> OrphanedFreeBlock {
-        OrphanedFreeBlock {
-            address: self.address,
-            prev_physical: self.prev_physical,
-            size: self.size,
-        }
-    }
-
-    fn load<M: Memory>(address: Address, memory: &M) -> Self {
-        let header: BlockHeader = read_struct(address, memory);
-        // TODO: check magic and version?
-        assert!(header.allocated);
-        assert_eq!(header.prev_free, Address::NULL);
-        assert_eq!(header.next_free, Address::NULL);
-
-        Self {
-            address,
-            size: header.size,
-            prev_physical: header.prev_physical,
-        }
-    }
-
-    fn save<M: Memory>(&self, memory: &M) {
-        write_struct(
-            &BlockHeader {
-                allocated: true,
-                prev_free: Address::NULL,
-                next_free: Address::NULL,
-                size: self.size,
-                prev_physical: self.prev_physical,
-            },
-            self.address,
-            memory,
-        )
-    }
-
-    // TODO: used block headers are smaller.
-    fn header_size() -> u64 {
-        core::mem::size_of::<BlockHeader>() as u64
-    }
-}
-
-struct OrphanedFreeBlock {
-    address: Address,
-    prev_physical: Address,
-    size: u32,
-}
-
-impl OrphanedFreeBlock {
-    fn allocate(self) -> UsedBlock {
-        UsedBlock {
-            address: self.address,
-            prev_physical: self.prev_physical,
-            size: self.size,
-        }
-    }
-
-    // TODO: maybe a split method?
-}
-
-enum Block {
-    Free(FreeBlock),
-    Used(UsedBlock),
-}
-
-impl Block {
-    fn load<M: Memory>(address: Address, memory: &M) -> Self {
-        let header: BlockHeader = read_struct(address, memory);
-
-        // TODO: avoid reading the header twice.
-        match header.allocated {
-            false => Self::Free(FreeBlock::load(address, memory)),
-            true => Self::Used(UsedBlock::load(address, memory)),
-        }
-    }
-
-    // TODO: consider removing this.
-    fn set_prev_physical(&mut self, prev_physical: Address) {
-        match self {
-            Self::Free(b) => b.prev_physical = prev_physical,
-            Self::Used(b) => b.prev_physical = prev_physical,
-        }
-    }
-
-    fn save<M: Memory>(&self, memory: &M) {
-        match self {
-            Self::Free(b) => b.save(memory),
-            Self::Used(b) => b.save(memory),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-#[repr(C, packed)]
-struct BlockHeader {
-    allocated: bool,
-    size: u32,
-    prev_free: Address,
-    next_free: Address,
-    prev_physical: Address,
 }
 
 // Returns the indexes that point to the corresponding segregated list.
