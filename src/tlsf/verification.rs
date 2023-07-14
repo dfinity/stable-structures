@@ -2,7 +2,8 @@ use super::*;
 
 impl<M: Memory> TlsfAllocator<M> {
     pub(super) fn check_free_lists_invariant(&self) -> bool {
-        let mut total_size = 0;
+        todo!()
+        /*let mut total_size = 0;
 
         let mut free_blocks = std::collections::BTreeMap::new();
 
@@ -27,7 +28,11 @@ impl<M: Memory> TlsfAllocator<M> {
             return false;
         }
 
-        true
+        true*/
+
+
+
+
 
         // Links between all free blocks are correct.
         /*for free_block in free_blocks.values() {

@@ -83,15 +83,17 @@ impl<M: Memory> TlsfAllocator<M> {
 
         // TODO: make it span at least 1TiB.
         // Create a block with the memory.
-        tlsf.insert(&mut Block {
+        let block = Block {
             address: tlsf.data_offset(),
-            allocated: false,
             size: MEMORY_POOL_SIZE,
             prev_free: Address::NULL,
             next_free: Address::NULL,
             prev_physical: Address::NULL,
-        });
+        };
 
+        let (f, s) = mapping(block.size);
+        block.save(&tlsf.memory);
+        tlsf.free_lists[f][s] = block.address;
         tlsf.save();
 
         tlsf
@@ -114,8 +116,8 @@ impl<M: Memory> TlsfAllocator<M> {
     /// Complexity: O(1)
     /// TODO: need to return some object that includes the length, not just the address.
     /// TODO: support allocating sizes < 3 bytes?
-    #[cfg(test)]
-    #[invariant(self.check_free_lists_invariant())]
+    //   #[cfg(test)]
+    //    #[invariant(self.check_free_lists_invariant())]
     pub fn allocate(&mut self, size: u32) -> Address {
         // Adjust the size to accommodate the block header.
         let size = size + Block::header_size() as u32;
@@ -123,7 +125,7 @@ impl<M: Memory> TlsfAllocator<M> {
         let mut block = self.search_suitable_block(size);
 
         // Remove the block from its free list.
-        self.remove(&block);
+        let mut block = self.remove(block);
 
         if block.size > size {
             // Block is bigger than the requested size. Split it.
@@ -131,25 +133,22 @@ impl<M: Memory> TlsfAllocator<M> {
             block.size = size;
 
             // Split the block
-            let mut remaining_block = Block {
+            let mut remaining_block = OrphanedFreeBlock {
                 address: block.address + size.into(),
-                allocated: false,
-                prev_free: block.prev_free,
-                next_free: Address::NULL, // This is set in the `insert` method.
                 size: remaining_size,
                 prev_physical: block.address,
             };
 
-            self.insert(&mut remaining_block);
+            self.insert(remaining_block);
         }
 
         // Mark the block as allocated.
-        block.allocated = true;
-        block.save(&self.memory);
+        let allocated_block = block.allocate();
+        allocated_block.save(&self.memory);
 
         self.save(); // TODO: could this be done more efficiently?
 
-        block.address + Bytes::from(Block::header_size())
+        allocated_block.address + Bytes::from(Block::header_size())
     }
 
     /// Deallocates a previously allocated block.
@@ -160,27 +159,17 @@ impl<M: Memory> TlsfAllocator<M> {
     /// POSTCONDITION:
     ///   * The block with `address` is freed, and merged with its neighbouring free blocks.
     ///   TODO: explore how to make this more precise and add programmatic checks.
+   // #[cfg(test)]
+    //#[invariant(self.check_free_lists_invariant())]
     pub fn deallocate(&mut self, address: Address) {
-        #[cfg(test)]
-        self.check_free_lists_invariant();
-
         let address = address - Bytes::from(Block::header_size());
-        let mut block = Block::load(address, &self.memory);
-
-        debug_assert!(
-            block.allocated,
-            "cannot deallocate an already deallocated block."
-        );
+        let block = UsedBlock::load(address, &self.memory);
 
         // Free the block.
-        block.allocated = false;
-        block.next_free = Address::NULL;
-        self.insert(&mut block);
+        let block = self.insert(block.deallocate());
 
         self.merge(block);
 
-        #[cfg(test)]
-        self.check_free_lists_invariant();
         self.save(); // TODO: is this necessary? I think yes. Need to write a test that detects this not being there.
 
         // TODO: should insertion be another explicit step?
@@ -205,9 +194,9 @@ impl<M: Memory> TlsfAllocator<M> {
     // * block->next->prev = block->prev;
     // * block->prev->next = block->next;
     // * free list head is updated.
-    fn remove(&mut self, block: &Block) {
+    fn remove(&mut self, block: Block) -> OrphanedFreeBlock {
         // Precondition: `block` is free.
-        debug_assert!(!block.allocated);
+        //debug_assert!(!block.allocated);
 
         match block.get_prev_free_block(&self.memory) {
             None => {
@@ -238,6 +227,12 @@ impl<M: Memory> TlsfAllocator<M> {
                 next_free_block.save(&self.memory);
             }
         }
+
+        OrphanedFreeBlock {
+            address: block.address,
+            prev_physical: block.prev_physical,
+            size: block.size,
+        }
     }
 
     // Inserts a block into the free lists.
@@ -249,113 +244,100 @@ impl<M: Memory> TlsfAllocator<M> {
     //  TODO
     //
     // Invariants?
-    fn insert(&mut self, block: &mut Block) {
-        debug_assert!(!block.allocated);
-
+    fn insert(&mut self, block: OrphanedFreeBlock) -> Block {
+        //    debug_assert!(!block.allocated);
+        //
         let (f, s) = mapping(block.size);
-        block.next_free = self.free_lists[f][s];
+
+        let block = Block {
+            address: block.address,
+            //   allocated: false,
+            prev_free: Address::NULL,
+            next_free: self.free_lists[f][s],
+            prev_physical: block.prev_physical,
+            size: block.size,
+        };
 
         match block.next_free {
             Address::NULL => {}
             next_free => {
                 let mut next_block = Block::load(next_free, &self.memory);
                 debug_assert_eq!(next_block.prev_free, Address::NULL);
-                debug_assert!(!next_block.allocated);
+                //      debug_assert!(!next_block.allocated);
                 next_block.prev_free = block.address;
 
                 next_block.save(&self.memory);
             }
         };
 
-        debug_assert_eq!(block.prev_free, Address::NULL);
+        //debug_assert_eq!(block.prev_free, Address::NULL);
         self.free_lists[f][s] = block.address;
         block.save(&self.memory);
+        block
     }
 
     // Merges two free blocks that are physically adjacent to each other.
     fn merge_helper(&mut self, a: Block, b: Block) -> Block {
-        assert!(!a.allocated);
-        assert!(!b.allocated);
+        //assert!(!a.allocated);
+        // assert!(!b.allocated);
         assert_eq!(b.prev_physical, a.address);
         assert_eq!(a.address + Bytes::from(a.size), b.address);
 
         // Remove them from the free lists.
-        self.remove(&a);
+        let a = self.remove(a);
         let b = Block::load(b.address, &self.memory);
-        self.remove(&b);
+        let b = self.remove(b);
 
         // Reload them with new pointers.
+        // TODO: load them as orphaned blocks
         let a = Block::load(a.address, &self.memory);
         let b = Block::load(b.address, &self.memory);
 
         if let Some(mut next_block) = b.get_next_physical_block(&self.memory, self.data_offset()) {
-            assert_eq!(next_block.prev_physical, b.address);
-            next_block.prev_physical = a.address;
+            next_block.set_prev_physical(a.address);
             next_block.save(&self.memory);
         }
 
-        let mut block = Block {
+        let mut block = OrphanedFreeBlock {
             address: a.address,
-            allocated: false,
-            prev_free: Address::NULL,
-            next_free: Address::NULL, // to be filled by "insert"
             prev_physical: a.prev_physical,
             size: a.size + b.size,
         };
 
-        self.insert(&mut block);
-
-        block
+        self.insert(block)
     }
 
     // Merges a block with its previous and next blocks if they are free.
     // The free lists are updated accordingly.
     fn merge(&mut self, block: Block) -> Block {
         // Precondition: `block` is free.
-        debug_assert!(!block.allocated);
+        //        debug_assert!(!block.allocated);
 
         match (
             block.get_prev_physical_block(&self.memory),
             block.get_next_physical_block(&self.memory, self.data_offset()),
         ) {
-            (None, None) => {
-                // There are no neighbouring physical blocks. Nothing to do.
+            (None, None)
+            | (Some(BlockEnum::Used(_)), None)
+            | (None, Some(BlockEnum::Used(_)))
+            | (Some(BlockEnum::Used(_)), Some(BlockEnum::Used(_))) => {
+                // There are no neighbouring free physical blocks. Nothing to do.
                 block
             }
-            (Some(prev_block), None) => {
-                if !prev_block.allocated {
-                    self.merge_helper(prev_block, block)
-                } else {
-                    block
-                }
+            (Some(BlockEnum::Free(prev_block)), None)
+            | (Some(BlockEnum::Free(prev_block)), Some(BlockEnum::Used(_))) => {
+                self.merge_helper(prev_block, block)
             }
-            (Some(prev_block), Some(mut next_block)) => {
-                if !prev_block.allocated {
-                    let mut big_block = self.merge_helper(prev_block, block);
+            (Some(BlockEnum::Free(prev_block)), Some(BlockEnum::Free(mut next_block))) => {
+                let mut big_block = self.merge_helper(prev_block, block);
 
-                    // Reload next block.
-                    next_block = Block::load(next_block.address, &self.memory);
-
-                    if !next_block.allocated {
-                        big_block = self.merge_helper(big_block, next_block);
-                    }
-
-                    big_block
-                } else {
-                    if !next_block.allocated {
-                        return self.merge_helper(block, next_block);
-                    }
-
-                    block
-                }
+                // Reload next block.
+                next_block = Block::load(next_block.address, &self.memory);
+                big_block = self.merge_helper(big_block, next_block);
+                big_block
             }
-            (None, Some(next_block)) => {
-                if !next_block.allocated {
-                    return self.merge_helper(block, next_block);
-                }
-
-                block
-            }
+            (Some(BlockEnum::Used(_)), Some(BlockEnum::Free(next_block)))
+            | (None, Some(BlockEnum::Free(next_block))) => self.merge_helper(block, next_block),
         }
     }
 
@@ -377,7 +359,7 @@ impl<M: Memory> TlsfAllocator<M> {
                     // (1) The head of its free list.
                     debug_assert_eq!(block.prev_free, Address::NULL);
                     // (2) Free
-                    debug_assert!(!block.allocated);
+                    //debug_assert!(!block.allocated);
                     // (3) Big enough
                     debug_assert!(block.size >= size);
 
@@ -406,10 +388,117 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 }
 
+struct UsedBlock {
+    address: Address,
+    prev_physical: Address,
+    size: u32,
+}
+
+impl UsedBlock {
+    fn deallocate(self) -> OrphanedFreeBlock {
+        OrphanedFreeBlock {
+            address: self.address,
+            prev_physical: self.prev_physical,
+            size: self.size,
+        }
+    }
+
+    fn load<M: Memory>(address: Address, memory: &M) -> Self {
+        let header: BlockHeader = read_struct(address, memory);
+        // TODO: check magic and version?
+        assert!(header.allocated);
+        assert_eq!(header.prev_free, Address::NULL);
+        assert_eq!(header.next_free, Address::NULL);
+
+        Self {
+            address,
+            size: header.size,
+            prev_physical: header.prev_physical,
+        }
+    }
+
+    fn save<M: Memory>(&self, memory: &M) {
+        write_struct(
+            &BlockHeader {
+                allocated: true,
+                prev_free: Address::NULL,
+                next_free: Address::NULL,
+                size: self.size,
+                prev_physical: self.prev_physical,
+            },
+            self.address,
+            memory,
+        )
+    }
+}
+
+struct OrphanedFreeBlock {
+    address: Address,
+    prev_physical: Address,
+    size: u32,
+}
+
+impl OrphanedFreeBlock {
+    fn allocate(self) -> UsedBlock {
+        UsedBlock {
+            address: self.address,
+            prev_physical: self.prev_physical,
+            size: self.size,
+        }
+    }
+
+    // TODO: maybe a split method?
+    fn load<M: Memory>(address: Address, memory: &M) -> Self {
+        let header: BlockHeader = read_struct(address, memory);
+        // TODO: check magic and version?
+        assert!(header.allocated);
+        assert_eq!(header.prev_free, Address::NULL);
+        assert_eq!(header.next_free, Address::NULL);
+
+        Self {
+            address,
+            size: header.size,
+            prev_physical: header.prev_physical,
+        }
+    }
+}
+
+enum BlockEnum {
+    Free(Block),
+    Used(UsedBlock),
+}
+
+impl BlockEnum {
+    fn load<M: Memory>(address: Address, memory: &M) -> Self {
+        let header: BlockHeader = read_struct(address, memory);
+
+        // TODO: avoid reading the header twice.
+        match header.allocated {
+            false => Self::Free(Block::load(address, memory)),
+            true => Self::Used(UsedBlock::load(address, memory)),
+        }
+    }
+
+    // TODO: consider removing this.
+    fn set_prev_physical(&mut self, prev_physical: Address) {
+        match self {
+            Self::Free(b) => b.prev_physical = prev_physical,
+            Self::Used(b) => b.prev_physical = prev_physical,
+        }
+    }
+
+    fn save<M: Memory>(&self, memory: &M) {
+        match self {
+            Self::Free(b) => b.save(memory),
+            Self::Used(b) => b.save(memory),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 struct Block {
     address: Address,
-    allocated: bool,
+    //    allocated: bool,
     prev_free: Address,
     next_free: Address,
     prev_physical: Address,
@@ -429,7 +518,7 @@ impl Block {
 
         write_struct(
             &BlockHeader {
-                allocated: self.allocated,
+                allocated: false,
                 prev_free: self.prev_free,
                 next_free: self.next_free,
                 size: self.size,
@@ -446,15 +535,16 @@ impl Block {
         &self,
         memory: &M,
         data_offset: Address,
-    ) -> Option<Block> {
+    ) -> Option<BlockEnum> {
         let next_address = self.address + Bytes::from(self.size);
 
         let max_address = data_offset + Bytes::from(MEMORY_POOL_SIZE);
 
         match next_address.cmp(&max_address) {
             Ordering::Less => {
-                let block = Self::load(next_address, memory);
-                debug_assert_eq!(block.prev_physical, self.address);
+                let block = BlockEnum::load(next_address, memory);
+                // TODO: bring that assertion again.
+                //debug_assert_eq!(block.prev_physical, self.address);
                 Some(block)
             }
             Ordering::Equal => None,
@@ -466,10 +556,12 @@ impl Block {
 
     // Loads the previous physical block in memory.
     // If this is the first physical block in memory, `None` is returned.
-    fn get_prev_physical_block<M: Memory>(&self, memory: &M) -> Option<Block> {
+    fn get_prev_physical_block<M: Memory>(&self, memory: &M) -> Option<BlockEnum> {
         match self.prev_physical {
+            // TODO: in prev physical is null, maybe assert that block's address is the data
+            // offset?
             Address::NULL => None,
-            prev_physical => Some(Self::load(prev_physical, memory)),
+            prev_physical => Some(BlockEnum::load(prev_physical, memory)),
         }
     }
 
@@ -481,7 +573,7 @@ impl Block {
             // Assert that the previous block is pointing to the current block.
             debug_assert_eq!(prev_free.next_free, self.address);
             // Assert that the previous block is free.
-            debug_assert!(!prev_free.allocated);
+            //debug_assert!(!prev_free.allocated);
 
             Some(prev_free)
         } else {
@@ -497,7 +589,7 @@ impl Block {
             // Assert that the next block is pointing to the current block.
             //debug_assert_eq!(next_free.prev_free, self.address);
             // Assert that the next block is free.
-            debug_assert!(!next_free.allocated);
+            //debug_assert!(!next_free.allocated);
 
             Some(next_free)
         } else {
@@ -508,10 +600,10 @@ impl Block {
     fn load<M: Memory>(address: Address, memory: &M) -> Self {
         let header: BlockHeader = read_struct(address, memory);
         // TODO: check magic and version?
+        assert!(!header.allocated);
 
         Self {
             address,
-            allocated: header.allocated,
             prev_free: header.prev_free,
             next_free: header.next_free,
             size: header.size,

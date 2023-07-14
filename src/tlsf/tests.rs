@@ -24,7 +24,7 @@ fn new_and_load() {
         Block::load(tlsf.data_offset(), &tlsf.memory),
         Block {
             address: tlsf.data_offset(),
-            allocated: false,
+//            allocated: false,
             size: MEMORY_POOL_SIZE,
             prev_free: Address::NULL,
             next_free: Address::NULL,
@@ -87,7 +87,7 @@ fn deallocate_everything() {
             Block::load(tlsf.data_offset(), &tlsf.memory),
             Block {
                 address: tlsf.data_offset(),
-                allocated: false,
+ //               allocated: false,
                 size: MEMORY_POOL_SIZE,
                 prev_free: Address::NULL,
                 next_free: Address::NULL,
@@ -133,7 +133,7 @@ fn v2_deallocate_everything() {
         Block::load(tlsf.data_offset(), &tlsf.memory),
         Block {
             address: tlsf.data_offset(),
-            allocated: false,
+            //allocated: false,
             size: MEMORY_POOL_SIZE,
             prev_free: Address::NULL,
             next_free: Address::NULL,
