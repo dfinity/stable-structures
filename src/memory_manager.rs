@@ -695,7 +695,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let buckets = self.memory_buckets.remove(&id);
         if let Some(vec_buckets) = buckets {
             for bucket in vec_buckets {
-                self.freed_buckets.push_front(bucket);
+                self.freed_buckets.push_back(bucket);
                 self.allocated_buckets -= 1;
             }
         }
