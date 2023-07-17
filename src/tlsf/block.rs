@@ -6,6 +6,7 @@ use super::*;
 //        <-------          <---------
 //         insert            deallocate
 
+const FREE_BLOCK_MAGIC: &[u8; 3] = b"FB1"; // Free block v1
 
 // TODO: maybe add a drop flag?
 pub struct TempFreeBlock {
@@ -129,6 +130,22 @@ impl UsedBlock {
 }
 
 /// An unallocated block of memory.
+///
+/// # Memory Layout
+///
+/// ```text
+/// -------------------------------------------------- <- Address 0
+/// Magic "FC1" (free chunk v1)            ↕ 3 bytes
+/// --------------------------------------------------
+/// Size                                   ↕ 8 bytes
+/// --------------------------------------------------
+/// Prev free                              ↕ 8 bytes
+/// --------------------------------------------------
+/// Next free                              ↕ 8 bytes
+/// --------------------------------------------------
+/// Previous physical                      ↕ 8 bytes
+/// --------------------------------------------------
+/// ```
 #[derive(Debug, PartialEq, Clone)]
 pub struct FreeBlock {
     // TODO: modifications to any of these fields make the block dirty
@@ -152,6 +169,16 @@ impl Drop for FreeBlock {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+#[repr(C, packed)]
+struct FreeBlockHeader {
+    magic: [u8; 3],
+    prev_free: Address,
+    next_free: Address,
+    prev_physical: Address,
+    size: u32,
+}
+
 impl FreeBlock {
     pub fn genesis(address: Address) -> Self {
         FreeBlock {
@@ -170,9 +197,8 @@ impl FreeBlock {
 
     /// Loads a free block from the given address.
     pub(super) fn load<M: Memory>(address: Address, memory: &M) -> Self {
-        let header: BlockHeader = read_struct(address, memory);
-        // TODO: check magic and version?
-        assert!(!header.allocated);
+        let header: FreeBlockHeader = read_struct(address, memory);
+        assert_eq!(&header.magic, FREE_BLOCK_MAGIC, "Bad magic.");
 
         Self {
             address,
@@ -194,11 +220,11 @@ impl FreeBlock {
         }
 
         write_struct(
-            &BlockHeader {
-                allocated: false,
+            &FreeBlockHeader {
+                magic: *FREE_BLOCK_MAGIC,
+                size: self.size,
                 prev_free: self.prev_free,
                 next_free: self.next_free,
-                size: self.size,
                 prev_physical: self.prev_physical,
             },
             self.address,
@@ -277,4 +303,9 @@ impl FreeBlock {
     pub fn header_size() -> u64 {
         core::mem::size_of::<BlockHeader>() as u64
     }
+}
+
+#[test]
+fn test_free_block_header_size() {
+    assert_eq!(core::mem::size_of::<FreeBlockHeader>(), 31);
 }
