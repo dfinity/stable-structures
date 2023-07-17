@@ -7,6 +7,7 @@ use super::*;
 //         insert            deallocate
 
 const FREE_BLOCK_MAGIC: &[u8; 3] = b"FB1"; // Free block v1
+const USED_BLOCK_MAGIC: &[u8; 3] = b"UB1"; // Used block v1
 
 // TODO: maybe add a drop flag?
 pub struct TempFreeBlock {
@@ -45,12 +46,13 @@ pub enum Block {
 
 impl Block {
     pub fn load<M: Memory>(address: Address, memory: &M) -> Self {
-        let header: BlockHeader = read_struct(address, memory);
+        let mut magic = [0; 3];
+        memory.read(address.get(), &mut magic);
 
-        // TODO: avoid reading the header twice.
-        match header.allocated {
-            false => Self::Free(FreeBlock::load(address, memory)),
-            true => Self::Used(UsedBlock::load(address, memory)),
+        match &magic {
+            FREE_BLOCK_MAGIC => Self::Free(FreeBlock::load(address, memory)),
+            USED_BLOCK_MAGIC => Self::Used(UsedBlock::load(address, memory)),
+            other => panic!("Bag magic {:?}", other),
         }
     }
 
@@ -70,45 +72,49 @@ impl Block {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-#[repr(C, packed)]
-struct BlockHeader {
-    allocated: bool,
-    size: u32,
-    prev_free: Address,
-    next_free: Address,
-    prev_physical: Address,
-}
-
 pub struct UsedBlock {
     pub address: Address,
     prev_physical: Address,
     size: u32,
 }
 
+#[derive(Debug, Copy, Clone)]
+#[repr(C, packed)]
+struct UsedBlockHeader {
+    magic: [u8; 3],
+    prev_physical: Address,
+    size: u32,
+}
+
 impl UsedBlock {
     pub fn load<M: Memory>(address: Address, memory: &M) -> Self {
-        let header: BlockHeader = read_struct(address, memory);
-        // TODO: check magic and version?
-        assert!(header.allocated);
-        assert_eq!(header.prev_free, Address::NULL);
-        assert_eq!(header.next_free, Address::NULL);
+        println!("loading block at address: {:?}", address);
+        let header: UsedBlockHeader = read_struct(address, memory);
+        println!("header: {:?}", header);
+        assert_eq!(&header.magic, USED_BLOCK_MAGIC, "Bad magic.");
 
         Self {
             address,
-            size: header.size,
             prev_physical: header.prev_physical,
+            size: header.size,
         }
     }
 
     pub fn save<M: Memory>(&self, memory: &M) {
-        write_struct(
-            &BlockHeader {
-                allocated: true,
-                prev_free: Address::NULL,
-                next_free: Address::NULL,
-                size: self.size,
+        println!("saving block at address {:?}", self.address);
+        println!(
+            "header: {:?}",
+            &UsedBlockHeader {
+                magic: *USED_BLOCK_MAGIC,
                 prev_physical: self.prev_physical,
+                size: self.size,
+            }
+        );
+        write_struct(
+            &UsedBlockHeader {
+                magic: *USED_BLOCK_MAGIC,
+                prev_physical: self.prev_physical,
+                size: self.size,
             },
             self.address,
             memory,
@@ -123,9 +129,8 @@ impl UsedBlock {
         }
     }
 
-    // TODO: used block headers are smaller.
     pub fn header_size() -> u64 {
-        core::mem::size_of::<BlockHeader>() as u64
+        core::mem::size_of::<UsedBlockHeader>() as u64
     }
 }
 
@@ -301,11 +306,12 @@ impl FreeBlock {
     }
 
     pub fn header_size() -> u64 {
-        core::mem::size_of::<BlockHeader>() as u64
+        core::mem::size_of::<FreeBlockHeader>() as u64
     }
 }
 
 #[test]
 fn test_free_block_header_size() {
-    assert_eq!(core::mem::size_of::<FreeBlockHeader>(), 31);
+    assert_eq!(FreeBlock::header_size(), 31);
+    assert_eq!(UsedBlock::header_size(), 15);
 }

@@ -112,12 +112,15 @@ impl<M: Memory> TlsfAllocator<M> {
 
     /// Complexity: O(1)
     /// TODO: need to return some object that includes the length, not just the address.
-    /// TODO: support allocating sizes < 3 bytes?
+    /// TODO: support allocating sizes < 32 bytes?
     //   #[cfg(test)]
     //    #[invariant(self.check_free_lists_invariant())]
     pub fn allocate(&mut self, size: u32) -> Address {
         // Adjust the size to accommodate the block header.
-        let size = size + FreeBlock::header_size() as u32;
+        let size = size + UsedBlock::header_size() as u32;
+
+        // TODO: is this necessary?
+        let size = std::cmp::max(size, 32);
 
         let block = self.search_suitable_block(size);
 
@@ -159,7 +162,7 @@ impl<M: Memory> TlsfAllocator<M> {
     // #[cfg(test)]
     //#[invariant(self.check_free_lists_invariant())]
     pub fn deallocate(&mut self, address: Address) {
-        let address = address - Bytes::from(FreeBlock::header_size());
+        let address = address - Bytes::from(UsedBlock::header_size());
         let block = UsedBlock::load(address, &self.memory);
 
         // Free the block.

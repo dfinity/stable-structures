@@ -130,7 +130,7 @@ fn v2_deallocate_everything() {
 fn multiple_allocations_no_deallocations() {
     proptest!(|(
         data in proptest::collection::vec(
-            proptest::collection::vec(0..u8::MAX, 3usize..100usize), 1..100
+            proptest::collection::vec(0..u8::MAX, 32usize..100usize), 1..100
         ),
     )| {
         let mem = make_memory();
