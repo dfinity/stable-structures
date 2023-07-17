@@ -35,8 +35,6 @@ impl TempFreeBlock {
             dirty: true,
         }
     }
-
-    // TODO: maybe a split method?
 }
 
 pub enum Block {
@@ -68,6 +66,26 @@ impl Block {
         match self {
             Self::Free(b) => b.save(memory),
             Self::Used(b) => b.save(memory),
+        }
+    }
+
+    pub fn size(&self) -> u64 {
+        match self {
+            Self::Free(b) => b.size,
+            Self::Used(b) => b.size,
+        }
+    }
+
+    /// Loads the next physical block in memory.
+    /// If this is the last physical block in memory, `None` is returned.
+    pub(super) fn get_next_physical_block<M: Memory>(
+        &self,
+        memory: &M,
+        data_offset: Address,
+    ) -> Option<Block> {
+        match self {
+            Self::Free(b) => b.get_next_physical_block(memory, data_offset),
+            Self::Used(b) => b.get_next_physical_block(memory, data_offset),
         }
     }
 }
@@ -109,6 +127,32 @@ impl UsedBlock {
             self.address,
             memory,
         )
+    }
+
+    // TODO: maybe introduce a trait or merge the two types?
+    /// Loads the next physical block in memory.
+    /// If this is the last physical block in memory, `None` is returned.
+    pub(super) fn get_next_physical_block<M: Memory>(
+        &self,
+        memory: &M,
+        data_offset: Address,
+    ) -> Option<Block> {
+        let next_address = self.address + Bytes::from(self.size);
+
+        let max_address = data_offset + Bytes::from(MEMORY_POOL_SIZE);
+
+        match next_address.cmp(&max_address) {
+            Ordering::Less => {
+                let block = Block::load(next_address, memory);
+                // TODO: bring that assertion again.
+                //debug_assert_eq!(block.prev_physical, self.address);
+                Some(block)
+            }
+            Ordering::Equal => None,
+            Ordering::Greater => {
+                unreachable!("out of bounds.")
+            }
+        }
     }
 
     pub fn deallocate(self) -> TempFreeBlock {
@@ -231,8 +275,8 @@ impl FreeBlock {
         self.dirty = false;
     }
 
-    // Loads the next physical block in memory.
-    // If this is the last physical block in memory, `None` is returned.
+    /// Loads the next physical block in memory.
+    /// If this is the last physical block in memory, `None` is returned.
     pub(super) fn get_next_physical_block<M: Memory>(
         &self,
         memory: &M,

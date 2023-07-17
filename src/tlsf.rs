@@ -58,7 +58,7 @@ const MINIMUM_BLOCK_SIZE: u64 = 35;
 /// ```
 pub struct TlsfAllocator<M: Memory> {
     // The address in memory where the `TlsfHeader` is stored.
-    header_addr: Address,
+    address: Address,
 
     //   first_level_index: u32,
     //    second_level_index: u32,
@@ -84,10 +84,10 @@ impl TlsfHeader {
 }
 
 impl<M: Memory> TlsfAllocator<M> {
-    // Initialize.
-    pub fn new(memory: M, header_addr: Address) -> Self {
+    /// Initialize an allocator and store it in the given `address`.
+    pub fn new(memory: M, address: Address) -> Self {
         let mut tlsf = Self {
-            header_addr,
+            address,
             free_lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
             memory,
         };
@@ -103,26 +103,30 @@ impl<M: Memory> TlsfAllocator<M> {
         tlsf
     }
 
-    /// Load an allocator from memory at the given `addr`.
-    pub fn load(memory: M, addr: Address) -> Self {
-        let header: TlsfHeader = read_struct(addr, &memory);
+    /// Load an allocator from memory at the given `address`.
+    pub fn load(memory: M, address: Address) -> Self {
+        let header: TlsfHeader = read_struct(address, &memory);
 
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
         Self {
-            header_addr: addr,
+            address,
             free_lists: header.free_lists,
             memory,
         }
     }
 
+    /// Allocates a new chunk from memory with the given `size`.
+    ///
     /// Complexity: O(1)
+    ///
     /// TODO: need to return some object that includes the length, not just the address.
     /// TODO: support allocating sizes < 32 bytes?
-    //   #[cfg(test)]
-    //    #[invariant(self.check_free_lists_invariant())]
     pub fn allocate(&mut self, size: u32) -> Address {
+        #[cfg(test)]
+        self.memory_size_invariant();
+
         // Adjust the size to accommodate the block header.
         let size = size + UsedBlock::header_size() as u32;
 
@@ -157,6 +161,9 @@ impl<M: Memory> TlsfAllocator<M> {
 
         self.save(); // TODO: could this be done more efficiently?
 
+        #[cfg(test)]
+        self.memory_size_invariant();
+
         allocated_block.address + Bytes::from(UsedBlock::header_size())
     }
 
@@ -171,6 +178,9 @@ impl<M: Memory> TlsfAllocator<M> {
     // #[cfg(test)]
     //#[invariant(self.check_free_lists_invariant())]
     pub fn deallocate(&mut self, address: Address) {
+        #[cfg(test)]
+        self.memory_size_invariant();
+
         let address = address - Bytes::from(UsedBlock::header_size());
         let block = UsedBlock::load(address, &self.memory);
 
@@ -181,7 +191,8 @@ impl<M: Memory> TlsfAllocator<M> {
 
         self.save(); // TODO: is this necessary? I think yes. Need to write a test that detects this not being there.
 
-        // TODO: should insertion be another explicit step?
+        #[cfg(test)]
+        self.memory_size_invariant();
     }
 
     /// Saves the allocator to memory.
@@ -192,7 +203,7 @@ impl<M: Memory> TlsfAllocator<M> {
                 version: LAYOUT_VERSION,
                 free_lists: self.free_lists,
             },
-            self.header_addr,
+            self.address,
             &self.memory,
         );
     }
@@ -246,8 +257,6 @@ impl<M: Memory> TlsfAllocator<M> {
     //
     // Invariants?
     fn insert(&mut self, block: TempFreeBlock) -> FreeBlock {
-        //    debug_assert!(!block.allocated);
-        //
         let (f, s) = mapping(block.size);
 
         let mut block = block.into_free_block(self.free_lists[f][s]);
@@ -360,7 +369,7 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     fn data_offset(&self) -> Address {
-        self.header_addr + TlsfHeader::size()
+        self.address + TlsfHeader::size()
     }
 
     /// Destroys the allocator and returns the underlying memory.
