@@ -450,7 +450,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             (MAX_NUM_BUCKETS as usize * BUCKET_ID_LEN_IN_BITS + (BYTE_SIZE_IN_BITS - 1))
                 / BYTE_SIZE_IN_BITS;
         let mut buckets = vec![0; BUCKETS_INDEX_SIZE_IN_BYTES];
-        memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
+        memory.read(bucket_indexes_offset().get(), &mut buckets);
 
         let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
 
@@ -514,7 +514,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Rewrite the stable store to be layout V2.
         write(
             &mem_mgr.memory,
-            bucket_allocations_address(BucketId(0)).get(),
+            bucket_indexes_offset().get(),
             mem_mgr.get_bucket_ids_in_bytes().as_ref(),
         );
 
@@ -607,7 +607,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Write in stable store that this bucket belongs to the memory with the provided `id`.
         write(
             &self.memory,
-            bucket_allocations_address(BucketId(0)).get(),
+            bucket_indexes_offset().get(),
             self.get_bucket_ids_in_bytes().as_ref(),
         );
 
@@ -705,7 +705,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Write in stable store that no bucket belongs to the memory with the provided `id`.
         write(
             &self.memory,
-            bucket_allocations_address(BucketId(0)).get(),
+            bucket_indexes_offset().get(),
             self.get_bucket_ids_in_bytes().as_ref(),
         );
     }
@@ -931,6 +931,10 @@ struct BucketId(u16);
 
 fn bucket_allocations_address(id: BucketId) -> Address {
     Address::from(0) + Header::size() + Bytes::from(id.0)
+}
+
+fn bucket_indexes_offset() -> Address {
+    Address::from(0) + Header::size()
 }
 
 #[cfg(test)]
