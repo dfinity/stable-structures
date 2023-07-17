@@ -1133,4 +1133,72 @@ mod test {
         assert_eq!(memory_1.size(), 0);
         memory_1.read(0, &mut bytes);
     }
+
+    #[test]
+    fn freeing_already_free_memory() {
+        let mem = make_memory();
+        let mut mem_mgr = MemoryManager::init(mem.clone());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+
+        assert_eq!(memory_0.grow(1), 0);
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 1);
+
+        mem_mgr.free(MemoryId(0));
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 0);
+
+        mem_mgr.free(MemoryId(0));
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 0);
+    }
+
+    #[test]
+    fn grow_memory_after_freeing_it() {
+        let mem = make_memory();
+        let mut mem_mgr = MemoryManager::init(mem.clone());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+
+        // grow and write to memory
+        assert_eq!(memory_0.grow(1), 0);
+        memory_0.write(0, &vec![7, 1, 5]);
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 1);
+
+        let mut bytes = vec![0; 3];
+
+        // read from memory
+        memory_0.read(0, &mut bytes);
+        assert_eq!(bytes, vec![7, 1, 5]);
+
+        // free memory
+        mem_mgr.free(MemoryId(0));
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 0);
+
+        // grow memory
+        assert_eq!(memory_0.grow(1), 0);
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 1);
+
+        // check that old bucket is reassign to the memory
+        memory_0.read(0, &mut bytes);
+        assert_eq!(bytes, vec![7, 1, 5]);
+
+        // try growing once more
+        assert_eq!(memory_0.grow(1), 1);
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 2);
+    }
+
+    #[test]
+    fn free_memory_that_was_not_used() {
+        let mem = make_memory();
+        let mut mem_mgr = MemoryManager::init(mem.clone());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        assert_eq!(memory_0.grow(1), 0);
+
+        mem_mgr.free(MemoryId(5));
+
+        
+    }
 }
