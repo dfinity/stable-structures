@@ -1037,21 +1037,17 @@ mod test {
     #[test]
     fn free_memory_works() {
         let mem = make_memory();
-        let initial_size = BUCKET_SIZE_IN_PAGES * 2;
-        // Grow the memory manually before passing it into the memory manager.
-        mem.grow(initial_size);
-
         let mut mem_mgr = MemoryManager::init(mem.clone());
         let memory_0 = mem_mgr.get(MemoryId(0));
         let memory_1 = mem_mgr.get(MemoryId(1));
 
         // Grow the memory by 1 page.
         assert_eq!(memory_0.grow(1), 0);
-        assert_eq!(mem.size(), initial_size);
+        assert_eq!(mem.size(), BUCKET_SIZE_IN_PAGES + 1);
 
         // Grow the memory by 1 page.
         assert_eq!(memory_1.grow(1), 0);
-        assert_eq!(mem.size(), initial_size + 1);
+        assert_eq!(mem.size(), 2 * BUCKET_SIZE_IN_PAGES + 1);
 
         // Grow the memory by BUCKET_SIZE_IN_PAGES more pages, which will cause the underlying
         // allocation to increase.
@@ -1198,7 +1194,5 @@ mod test {
         assert_eq!(memory_0.grow(1), 0);
 
         mem_mgr.free(MemoryId(5));
-
-        
     }
 }
