@@ -1087,7 +1087,7 @@ mod test {
 
     #[test]
     #[should_panic = "MemoryId(1): read out of bounds"]
-    fn can_be_reinitialized_from_memory_after_freeing() {
+    fn reading_freed_memory_panics() {
         let mem = make_memory();
         let mem_mgr = MemoryManager::init(mem.clone());
         let memory_0 = mem_mgr.get(MemoryId(0));
