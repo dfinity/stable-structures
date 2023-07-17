@@ -13,7 +13,7 @@ const USED_BLOCK_MAGIC: &[u8; 3] = b"UB1"; // Used block v1
 pub struct TempFreeBlock {
     pub address: Address,
     pub prev_physical: Address,
-    pub size: u32,
+    pub size: u64,
 }
 
 impl TempFreeBlock {
@@ -75,7 +75,7 @@ impl Block {
 pub struct UsedBlock {
     pub address: Address,
     prev_physical: Address,
-    size: u32,
+    size: u64,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -83,14 +83,12 @@ pub struct UsedBlock {
 struct UsedBlockHeader {
     magic: [u8; 3],
     prev_physical: Address,
-    size: u32,
+    size: u64,
 }
 
 impl UsedBlock {
     pub fn load<M: Memory>(address: Address, memory: &M) -> Self {
-        println!("loading block at address: {:?}", address);
         let header: UsedBlockHeader = read_struct(address, memory);
-        println!("header: {:?}", header);
         assert_eq!(&header.magic, USED_BLOCK_MAGIC, "Bad magic.");
 
         Self {
@@ -101,15 +99,7 @@ impl UsedBlock {
     }
 
     pub fn save<M: Memory>(&self, memory: &M) {
-        println!("saving block at address {:?}", self.address);
-        println!(
-            "header: {:?}",
-            &UsedBlockHeader {
-                magic: *USED_BLOCK_MAGIC,
-                prev_physical: self.prev_physical,
-                size: self.size,
-            }
-        );
+        assert!(self.size >= MINIMUM_BLOCK_SIZE);
         write_struct(
             &UsedBlockHeader {
                 magic: *USED_BLOCK_MAGIC,
@@ -160,7 +150,7 @@ pub struct FreeBlock {
     pub prev_physical: Address,
 
     // The size of the block, including the header.
-    size: u32,
+    size: u64,
 
     dirty: bool,
 }
@@ -181,7 +171,7 @@ struct FreeBlockHeader {
     prev_free: Address,
     next_free: Address,
     prev_physical: Address,
-    size: u32,
+    size: u64,
 }
 
 impl FreeBlock {
@@ -196,7 +186,7 @@ impl FreeBlock {
         }
     }
 
-    pub fn size(&self) -> u32 {
+    pub fn size(&self) -> u64 {
         self.size
     }
 
@@ -216,7 +206,9 @@ impl FreeBlock {
     }
 
     pub fn save<M: Memory>(&mut self, memory: &M) {
-        // TODO: save check for previous free and previous physical?
+        assert!(self.size >= MINIMUM_BLOCK_SIZE);
+
+        // TODO: same check for previous free and previous physical?
         if self.next_free != Address::NULL {
             assert!(
                 self.next_free < self.address
@@ -227,10 +219,10 @@ impl FreeBlock {
         write_struct(
             &FreeBlockHeader {
                 magic: *FREE_BLOCK_MAGIC,
-                size: self.size,
                 prev_free: self.prev_free,
                 next_free: self.next_free,
                 prev_physical: self.prev_physical,
+                size: self.size,
             },
             self.address,
             memory,
@@ -305,6 +297,7 @@ impl FreeBlock {
         }
     }
 
+    #[cfg(test)]
     pub fn header_size() -> u64 {
         core::mem::size_of::<FreeBlockHeader>() as u64
     }
@@ -312,6 +305,6 @@ impl FreeBlock {
 
 #[test]
 fn test_free_block_header_size() {
-    assert_eq!(FreeBlock::header_size(), 31);
-    assert_eq!(UsedBlock::header_size(), 15);
+    assert_eq!(FreeBlock::header_size(), 35);
+    assert_eq!(UsedBlock::header_size(), 19);
 }

@@ -26,16 +26,18 @@ mod verification;
 const MAGIC: &[u8; 3] = b"BTA"; // btree allocator
 const LAYOUT_VERSION: u8 = 1;
 
-const FIRST_LEVEL_INDEX_SIZE: usize = 32;
+// The allocator is designed to handle up 4TiB of memory.
+const MEMORY_POOL_BITS: u64 = 42;
+
+const FIRST_LEVEL_INDEX_SIZE: usize = 42;
 const SECOND_LEVEL_INDEX_LOG_SIZE: usize = 5;
 const SECOND_LEVEL_INDEX_SIZE: usize = 1 << SECOND_LEVEL_INDEX_LOG_SIZE;
 
-const MEMORY_POOL_SIZE: u32 = u32::MAX;
+const FOUR_TIBS: u64 = 1 << MEMORY_POOL_BITS;
+const MEMORY_POOL_SIZE: u64 = FOUR_TIBS - 1;
 
-// TODO: Make this bound tighter.
-const HEADER_SIZE: Bytes = Bytes::new(10_000);
-
-//const GRANULARITY_LOG2: u32 = GRANULARITY.trailing_zeros();
+// TODO: make this related to block header sizes?
+const MINIMUM_BLOCK_SIZE: u64 = 35;
 
 /// # Memory Layout
 ///
@@ -75,6 +77,12 @@ struct TlsfHeader {
     free_lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
 }
 
+impl TlsfHeader {
+    pub const fn size() -> Bytes {
+        Bytes::new(core::mem::size_of::<TlsfHeader>() as u64)
+    }
+}
+
 impl<M: Memory> TlsfAllocator<M> {
     // Initialize.
     pub fn new(memory: M, header_addr: Address) -> Self {
@@ -84,7 +92,6 @@ impl<M: Memory> TlsfAllocator<M> {
             memory,
         };
 
-        // TODO: make it span at least 1TiB.
         // Create a block with the memory.
         let mut block = FreeBlock::genesis(tlsf.data_offset());
 
@@ -120,26 +127,28 @@ impl<M: Memory> TlsfAllocator<M> {
         let size = size + UsedBlock::header_size() as u32;
 
         // TODO: is this necessary?
-        let size = std::cmp::max(size, 32);
+        let size = std::cmp::max(size, MINIMUM_BLOCK_SIZE as u32);
 
         let block = self.search_suitable_block(size);
 
         // Remove the block from its free list.
         let mut block = self.remove(block);
 
-        if block.size > size {
-            // Block is bigger than the requested size. Split it.
-            let remaining_size = block.size - size;
-            block.size = size;
+        if block.size > size as u64 {
+            // Block is bigger than the requested size. Split it if possible.
+            let remaining_size = block.size - size as u64;
+            if remaining_size >= MINIMUM_BLOCK_SIZE {
+                block.size = size as u64;
 
-            // Split the block
-            let remaining_block = TempFreeBlock {
-                address: block.address + size.into(),
-                size: remaining_size,
-                prev_physical: block.address,
-            };
+                // Split the block
+                let remaining_block = TempFreeBlock {
+                    address: block.address + size.into(),
+                    size: remaining_size,
+                    prev_physical: block.address,
+                };
 
-            self.insert(remaining_block);
+                self.insert(remaining_block);
+            }
         }
 
         // Mark the block as allocated.
@@ -326,7 +335,7 @@ impl<M: Memory> TlsfAllocator<M> {
     // naive way for a V0.
     fn search_suitable_block(&self, size: u32) -> FreeBlock {
         // Identify the free list to take blocks from.
-        let (fl, sl) = mapping(size);
+        let (fl, sl) = mapping(size as u64);
 
         // Find the smallest free block that is larger than the requested size.
         for f in fl..FIRST_LEVEL_INDEX_SIZE {
@@ -340,7 +349,7 @@ impl<M: Memory> TlsfAllocator<M> {
                     // (2) Free
                     //debug_assert!(!block.allocated);
                     // (3) Big enough
-                    debug_assert!(block.size() >= size);
+                    debug_assert!(block.size() >= size as u64);
 
                     return block;
                 }
@@ -351,7 +360,7 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     fn data_offset(&self) -> Address {
-        self.header_addr + HEADER_SIZE
+        self.header_addr + TlsfHeader::size()
     }
 
     /// Destroys the allocator and returns the underlying memory.
@@ -368,8 +377,10 @@ impl<M: Memory> TlsfAllocator<M> {
 }
 
 // Returns the indexes that point to the corresponding segregated list.
-fn mapping(size: u32) -> (usize, usize) {
-    let f = u32::BITS - size.leading_zeros() - 1;
+fn mapping(size: u64) -> (usize, usize) {
+    assert!(size <= MEMORY_POOL_SIZE);
+
+    let f = u64::BITS - size.leading_zeros() - 1;
     let s = (size ^ (1 << f)) >> (f - SECOND_LEVEL_INDEX_LOG_SIZE as u32);
     (f as usize, s as usize)
 }
@@ -390,7 +401,7 @@ mod test {
         proptest!(|(
             size in 0..u32::MAX,
         )| {
-            let (f, s) = mapping(size);
+            let (f, s) = mapping(size as u64);
             assert!((1 << f) + (((1 << f) / SECOND_LEVEL_INDEX_SIZE) * (s + 1) - 1) >= size as usize);
             if s > 0 {
                 assert!((1 << f) + ((1 << f) / SECOND_LEVEL_INDEX_SIZE) * s < size as usize);
