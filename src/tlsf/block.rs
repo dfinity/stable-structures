@@ -76,6 +76,13 @@ impl Block {
         }
     }
 
+    pub fn address(&self) -> Address {
+        match self {
+            Self::Free(b) => b.address,
+            Self::Used(b) => b.address,
+        }
+    }
+
     /// Loads the next physical block in memory.
     /// If this is the last physical block in memory, `None` is returned.
     pub(super) fn get_next_physical_block<M: Memory>(

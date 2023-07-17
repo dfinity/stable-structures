@@ -119,10 +119,13 @@ impl<M: Memory> TlsfAllocator<M> {
 
     /// Allocates a new chunk from memory with the given `size`.
     ///
-    /// Complexity: O(1)
+    /// Precondition:
+    ///  * A free block exists with size bigger than the requested size.
     ///
-    /// TODO: need to return some object that includes the length, not just the address.
-    /// TODO: support allocating sizes < 32 bytes?
+    /// Postcondition:
+    ///  * A block with size >= `size` is allocated.
+    ///
+    /// Complexity: O(1)
     pub fn allocate(&mut self, size: u32) -> Address {
         #[cfg(test)]
         self.memory_size_invariant();

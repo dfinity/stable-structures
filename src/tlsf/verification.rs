@@ -3,10 +3,27 @@ use super::*;
 impl<M: Memory> TlsfAllocator<M> {
     /// Invariant: The size of all blocks == MEMORY_POOL_SIZE
     pub(super) fn memory_size_invariant(&self) {
-        println!("checking memory invariant");
         let mut block = Block::load(self.data_offset(), &self.memory);
         let mut total_size = block.size();
-//        assert_eq!(block.prev_physical, Address::NULL);
+
+        while let Some(next_block) = block.get_next_physical_block(&self.memory, self.data_offset())
+        {
+            // Verify that the physical blocks properly link to each other.
+            assert_eq!(
+                block.address() + Bytes::from(block.size()),
+                next_block.address()
+            );
+
+            block = next_block;
+            total_size += block.size();
+        }
+
+        assert_eq!(total_size, MEMORY_POOL_SIZE);
+    }
+
+    pub(super) fn physical_blocks_are_properly_linked(&self) {
+        let mut block = Block::load(self.data_offset(), &self.memory);
+        let mut total_size = block.size();
 
         while let Some(next_block) = block.get_next_physical_block(&self.memory, self.data_offset())
         {
@@ -16,7 +33,6 @@ impl<M: Memory> TlsfAllocator<M> {
 
         assert_eq!(total_size, MEMORY_POOL_SIZE);
     }
-
 
     // Links between all free blocks are correct.
     /*for free_block in free_blocks.values() {
