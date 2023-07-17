@@ -283,8 +283,11 @@ struct MemoryManagerInner<M: Memory> {
     // A map mapping each managed memory to the bucket ids that are allocated to it.
     memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
 
-    // A list of the all unallocated buckets.
-    unallocated_buckets: LinkedList<BucketId>,
+    // A list of freed buckets.
+    freed_buckets: LinkedList<BucketId>,
+
+    // Bucket ID of the first bucket that was not used.
+    first_unused_bucket: BucketId,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -313,13 +316,8 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
-            unallocated_buckets: {
-                let mut list = LinkedList::new();
-                for i in 0..MAX_NUM_BUCKETS {
-                    list.push_back(BucketId(i as u16));
-                }
-                list
-            },
+            freed_buckets: LinkedList::new(),
+            first_unused_bucket: BucketId(0),
         };
 
         mem_mgr.save_header();
@@ -330,21 +328,39 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn load_layout_v1(memory: M, header: Header) -> Self {
         let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
         memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
-        let mut unallocated: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
+        let mut unallocated_buckets: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
         let mut memory_buckets = BTreeMap::new();
+        let mut last_occupied_bucket: i32 = -1;
         for (bucket_idx, memory) in buckets.into_iter().enumerate() {
             if memory != UNALLOCATED_BUCKET_MARKER {
+                last_occupied_bucket = std::cmp::max(last_occupied_bucket, bucket_idx as i32);
                 memory_buckets
                     .entry(MemoryId(memory))
                     .or_insert_with(Vec::new)
                     .push(BucketId(bucket_idx as u16));
-                unallocated.remove(&(bucket_idx as u16));
+                unallocated_buckets.remove(&(bucket_idx as u16));
             }
         }
 
-        let mut unallocated_buckets = LinkedList::new();
-        for i in unallocated.iter() {
-            unallocated_buckets.push_back(BucketId(*i));
+        if last_occupied_bucket == -1 {
+            return Self {
+                memory,
+                allocated_buckets: header.num_allocated_buckets,
+                bucket_size_in_pages: header.bucket_size_in_pages,
+                memory_sizes_in_pages: header.memory_sizes_in_pages,
+                memory_buckets,
+                freed_buckets: LinkedList::new(),
+                first_unused_bucket: BucketId(0),
+            };
+        }
+
+        let mut freed_buckets = LinkedList::new();
+        let first_unused_bucket = BucketId((last_occupied_bucket + 1) as u16);
+
+        for i in unallocated_buckets.iter() {
+            if *i < first_unused_bucket.0 {
+                freed_buckets.push_back(BucketId(*i));
+            }
         }
 
         Self {
@@ -353,7 +369,8 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
-            unallocated_buckets,
+            freed_buckets,
+            first_unused_bucket,
         }
     }
 
@@ -367,8 +384,10 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
 
-        let mut unallocated_buckets_set: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
+        let mut unallocated_buckets: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
         let mut memory_buckets = BTreeMap::new();
+
+        let mut last_occupied_bucket: i32 = -1;
 
         let mut j = 0;
         for (memory, memory_size_in_pages) in header.memory_sizes_in_pages.into_iter().enumerate() {
@@ -378,8 +397,9 @@ impl<M: Memory> MemoryManagerInner<M> {
             let mut vec_buckets = vec![];
             for _ in 0..memory_size_in_buckets {
                 let bucket = buckets_decompressed[j];
+                last_occupied_bucket = std::cmp::max(bucket.0 as i32, last_occupied_bucket);
                 vec_buckets.push(bucket);
-                unallocated_buckets_set.remove(&bucket.0);
+                unallocated_buckets.remove(&bucket.0);
                 j += 1;
             }
             memory_buckets
@@ -387,9 +407,25 @@ impl<M: Memory> MemoryManagerInner<M> {
                 .or_insert(vec_buckets);
         }
 
-        let mut unallocated_buckets = LinkedList::new();
-        for i in unallocated_buckets_set.iter() {
-            unallocated_buckets.push_back(BucketId(*i));
+        if last_occupied_bucket == -1 {
+            return Self {
+                memory,
+                allocated_buckets: header.num_allocated_buckets,
+                bucket_size_in_pages: header.bucket_size_in_pages,
+                memory_sizes_in_pages: header.memory_sizes_in_pages,
+                memory_buckets,
+                freed_buckets: LinkedList::new(),
+                first_unused_bucket: BucketId(0),
+            };
+        }
+
+        let first_unused_bucket = BucketId((last_occupied_bucket + 1) as u16);
+
+        let mut freed_buckets = LinkedList::new();
+        for i in unallocated_buckets.iter() {
+            if *i < first_unused_bucket.0 {
+                freed_buckets.push_back(BucketId(*i));
+            }
         }
 
         Self {
@@ -398,7 +434,8 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
-            unallocated_buckets,
+            freed_buckets,
+            first_unused_bucket,
         }
     }
 
@@ -447,9 +484,17 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         // Allocate new buckets as needed.
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = match self.unallocated_buckets.pop_front() {
+            let new_bucket_id = match self.freed_buckets.pop_front() {
                 Some(t) => t,
-                None => panic!("{id:?}: grow failed"),
+                None => {
+                    if self.first_unused_bucket.0 != MAX_NUM_BUCKETS as u16 {
+                        let new_id = self.first_unused_bucket;
+                        self.first_unused_bucket = BucketId(self.first_unused_bucket.0 + 1);
+                        new_id
+                    } else {
+                        panic!("{id:?}: grow failed");
+                    }
+                }
             };
 
             self.memory_buckets
@@ -568,7 +613,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let buckets = self.memory_buckets.remove(&id);
         if let Some(vec_buckets) = buckets {
             for bucket in vec_buckets {
-                self.unallocated_buckets.push_front(bucket);
+                self.freed_buckets.push_front(bucket);
                 self.allocated_buckets -= 1;
             }
         }
