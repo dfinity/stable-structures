@@ -39,6 +39,80 @@ const MEMORY_POOL_SIZE: u64 = FOUR_TIBS - 1;
 // The minimum size of a block must fit the free block header.
 const MINIMUM_BLOCK_SIZE: u64 = FreeBlock::header_size();
 
+#[derive(Debug, PartialEq)]
+struct FreeLists {
+    first_level_index: u64,
+    second_level_index: u32,
+    // TODO: remove the unneeded bits from this list.
+    lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+}
+
+impl FreeLists {
+    fn set(&mut self, f: usize, s: usize, address: Address) {
+        if address == Address::NULL {
+            // Unset the bit in the map.
+            self.first_level_index &= !(1 << f as u64);
+            self.second_level_index &= !(1 << s as u32);
+        } else {
+            // Set the bit in the map.
+            self.first_level_index |= 1 << f as u64;
+            self.second_level_index |= 1 << s as u64;
+        }
+
+        self.lists[f][s] = address;
+    }
+
+    fn get(&self, f: usize, s: usize) -> Address {
+        self.lists[f][s]
+    }
+}
+
+#[test]
+fn free_lists_test() {
+    let mut fl = FreeLists {
+        first_level_index: 0,
+        second_level_index: 0,
+        lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+    };
+
+    fl.set(0, 0, Address::new(1));
+    assert_eq!(fl.first_level_index, 1);
+    assert_eq!(fl.second_level_index, 1);
+    assert_eq!(fl.lists[0][0], Address::new(1));
+
+    fl.set(0, 0, Address::NULL);
+    assert_eq!(fl.first_level_index, 0);
+    assert_eq!(fl.second_level_index, 0);
+    assert_eq!(fl.lists[0][0], Address::NULL);
+
+    let mut fl = FreeLists {
+        first_level_index: 0,
+        second_level_index: 0,
+        lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+    };
+
+    fl.set(1, 1, Address::new(1));
+    assert_eq!(fl.first_level_index, 2);
+    assert_eq!(fl.second_level_index, 2);
+    assert_eq!(fl.lists[1][1], Address::new(1));
+
+    let mut fl = FreeLists {
+        first_level_index: 0,
+        second_level_index: 0,
+        lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+    };
+
+    fl.set(16, 16, Address::new(1));
+    assert_eq!(fl.first_level_index, 1 << 16);
+    assert_eq!(fl.second_level_index, 1 << 16);
+    assert_eq!(fl.lists[16][16], Address::new(1));
+
+    fl.set(40, 31, Address::new(1));
+    assert_eq!(fl.first_level_index, (1 << 40) | (1 << 16));
+    assert_eq!(fl.second_level_index, (1 << 31) | (1 << 16));
+    assert_eq!(fl.lists[40][31], Address::new(1));
+}
+
 /// # Memory Layout
 ///
 /// ```text
@@ -60,13 +134,9 @@ pub struct TlsfAllocator<M: Memory> {
     // The address in memory where the `TlsfHeader` is stored.
     address: Address,
 
-    //   first_level_index: u32,
-    //    second_level_index: u32,
     internal_fragmentation: u64,
 
-    // TODO: remove the unneeded bits from this list.
-    // TODO: introduce bitmaps to make searches efficient.
-    free_lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+    free_lists: FreeLists,
 
     memory: M,
 }
@@ -75,8 +145,11 @@ pub struct TlsfAllocator<M: Memory> {
 struct TlsfHeader {
     magic: [u8; 3],
     version: u8,
-    internal_fragmentation: u64,
+    first_level_index: u64,
+    second_level_index: u32,
     free_lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+
+    internal_fragmentation: u64,
 }
 
 impl TlsfHeader {
@@ -91,7 +164,11 @@ impl<M: Memory> TlsfAllocator<M> {
         let mut tlsf = Self {
             address,
             internal_fragmentation: 9,
-            free_lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+            free_lists: FreeLists {
+                first_level_index: 0,
+                second_level_index: 0,
+                lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+            },
             memory,
         };
 
@@ -100,7 +177,7 @@ impl<M: Memory> TlsfAllocator<M> {
 
         let (f, s) = mapping(block.size());
         block.save(&tlsf.memory);
-        tlsf.free_lists[f][s] = block.address;
+        tlsf.free_lists.set(f, s, block.address);
         tlsf.save();
 
         tlsf
@@ -116,7 +193,11 @@ impl<M: Memory> TlsfAllocator<M> {
         Self {
             address,
             internal_fragmentation: header.internal_fragmentation,
-            free_lists: header.free_lists,
+            free_lists: FreeLists {
+                first_level_index: header.first_level_index,
+                second_level_index: header.second_level_index,
+                lists: header.free_lists,
+            },
             memory,
         }
     }
@@ -198,8 +279,10 @@ impl<M: Memory> TlsfAllocator<M> {
             &TlsfHeader {
                 magic: *MAGIC,
                 version: LAYOUT_VERSION,
+                first_level_index: self.free_lists.first_level_index,
+                second_level_index: self.free_lists.second_level_index,
+                free_lists: self.free_lists.lists,
                 internal_fragmentation: self.internal_fragmentation,
-                free_lists: self.free_lists,
             },
             self.address,
             &self.memory,
@@ -217,10 +300,10 @@ impl<M: Memory> TlsfAllocator<M> {
             None => {
                 // `block` is the head of the free list.
                 let (f, s) = mapping(block.size());
-                debug_assert_eq!(block.address, self.free_lists[f][s]);
+                debug_assert_eq!(block.address, self.free_lists.get(f, s));
                 debug_assert_eq!(block.prev_free, Address::NULL);
 
-                self.free_lists[f][s] = block.next_free;
+                self.free_lists.set(f, s, block.next_free);
             }
             Some(mut prev_free_block) => {
                 prev_free_block.next_free = block.next_free;
@@ -249,22 +332,19 @@ impl<M: Memory> TlsfAllocator<M> {
     fn insert(&mut self, block: TempFreeBlock) -> FreeBlock {
         let (f, s) = mapping(block.size);
 
-        let mut block = block.into_free_block(self.free_lists[f][s]);
+        let mut block = block.into_free_block(self.free_lists.get(f, s));
 
         match block.next_free {
             Address::NULL => {}
             next_free => {
                 let mut next_block = FreeBlock::load(next_free, &self.memory);
                 debug_assert_eq!(next_block.prev_free, Address::NULL);
-                //      debug_assert!(!next_block.allocated);
                 next_block.prev_free = block.address;
-
                 next_block.save(&self.memory);
             }
         };
 
-        //debug_assert_eq!(block.prev_free, Address::NULL);
-        self.free_lists[f][s] = block.address;
+        self.free_lists.set(f, s, block.address);
         block.save(&self.memory);
         block
     }
@@ -300,6 +380,7 @@ impl<M: Memory> TlsfAllocator<M> {
     // Merges a block with its previous and next blocks if they are free.
     // The free lists are updated accordingly.
     fn merge(&mut self, block: FreeBlock) -> FreeBlock {
+        // TODO: consider looping several times to reduce fragmentation.
         match (
             block.get_prev_physical_block(&self.memory),
             block.get_next_physical_block(&self.memory, self.data_offset()),
@@ -336,11 +417,13 @@ impl<M: Memory> TlsfAllocator<M> {
         // Identify the free list to take blocks from.
         let (fl, sl) = mapping(size as u64);
 
+        // Search the second level index.
+
         // Find the smallest free block that is larger than the requested size.
         for f in fl..FIRST_LEVEL_INDEX_SIZE {
             for s in sl..SECOND_LEVEL_INDEX_SIZE {
-                if self.free_lists[f][s] != Address::NULL {
-                    let block = FreeBlock::load(self.free_lists[f][s], &self.memory);
+                if self.free_lists.get(f, s) != Address::NULL {
+                    let block = FreeBlock::load(self.free_lists.get(f, s), &self.memory);
 
                     // The block must be:
                     // (1) The head of its free list.
@@ -419,7 +502,7 @@ mod test {
         let block_3 = tlsf.allocate(39);
 
         assert_eq!(
-            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            tlsf.free_lists.get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
             tlsf.data_offset()
                 + Bytes::from(1232u64)
                 + Bytes::from(UsedBlock::header_size())
@@ -432,7 +515,8 @@ mod test {
         tlsf.deallocate(block_3);
 
         assert_eq!(
-            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            tlsf.free_lists
+                .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
             tlsf.data_offset()
                 + Bytes::from(1232u64)
                 + Bytes::from(UsedBlock::header_size())
@@ -443,14 +527,16 @@ mod test {
         tlsf.deallocate(block_2);
 
         assert_eq!(
-            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            tlsf.free_lists
+                .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
             tlsf.data_offset() + Bytes::from(1232u64) + Bytes::from(UsedBlock::header_size())
         );
 
         tlsf.deallocate(block_1);
 
         assert_eq!(
-            tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+            tlsf.free_lists
+                .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
             tlsf.data_offset()
         );
     }

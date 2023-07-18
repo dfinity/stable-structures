@@ -29,9 +29,9 @@ impl<M: Memory> TlsfAllocator<M> {
         let mut num_free_blocks_in_free_lists = 0;
         for f in 0..FIRST_LEVEL_INDEX_SIZE {
             for s in 0..SECOND_LEVEL_INDEX_SIZE {
-                if self.free_lists[f][s] != Address::NULL {
+                if self.free_lists.get(f, s) != Address::NULL {
                     // Non-empty free list. Iterate through it and count number of blocks.
-                    let mut block = FreeBlock::load(self.free_lists[f][s], &self.memory);
+                    let mut block = FreeBlock::load(self.free_lists.get(f, s), &self.memory);
                     num_free_blocks_in_free_lists += 1;
                     assert_eq!(block.prev_free, Address::NULL);
 

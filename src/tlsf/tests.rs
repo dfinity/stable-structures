@@ -106,7 +106,7 @@ fn multiple_allocations_no_deallocations() {
             // Asserts that the free lists have been updated accordingly.
             offset += Bytes::from(UsedBlock::header_size()) + Bytes::from(d.len() as u64);
             prop_assert_eq!(
-                tlsf.free_lists[FIRST_LEVEL_INDEX_SIZE - 1][SECOND_LEVEL_INDEX_SIZE - 1],
+                tlsf.free_lists.get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
                 tlsf.data_offset() + offset
             );
 
