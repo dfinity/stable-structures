@@ -1,62 +1,64 @@
 use super::*;
 
 impl<M: Memory> TlsfAllocator<M> {
-    /// Invariant: The size of all blocks == MEMORY_POOL_SIZE
-    pub(super) fn memory_size_invariant(&self) {
+    pub fn check_invariants(&self) -> bool {
         let mut block = Block::load(self.data_offset(), &self.memory);
         let mut total_size = block.size();
+        let mut num_free_blocks = if block.is_free() { 1 } else { 0 };
 
         while let Some(next_block) = block.get_next_physical_block(&self.memory, self.data_offset())
         {
-            // Verify that the physical blocks properly link to each other.
+            // Invariant: physical blocks are properly linked to each other.
             assert_eq!(
                 block.address() + Bytes::from(block.size()),
                 next_block.address()
             );
+            assert_eq!(next_block.prev_physical(), block.address(),);
+
+            if next_block.is_free() {
+                num_free_blocks += 1;
+            }
 
             block = next_block;
             total_size += block.size();
         }
 
+        // Invariant: The sum of the blocks' sizes == MEMORY_POOL_SIZE
         assert_eq!(total_size, MEMORY_POOL_SIZE);
-    }
 
-    pub(super) fn physical_blocks_are_properly_linked(&self) {
-        let mut block = Block::load(self.data_offset(), &self.memory);
-        let mut total_size = block.size();
+        let mut num_free_blocks_in_free_lists = 0;
+        for f in 0..FIRST_LEVEL_INDEX_SIZE {
+            for s in 0..SECOND_LEVEL_INDEX_SIZE {
+                if self.free_lists[f][s] != Address::NULL {
+                    // Non-empty free list. Iterate through it and count number of blocks.
+                    let mut block = FreeBlock::load(self.free_lists[f][s], &self.memory);
+                    num_free_blocks_in_free_lists += 1;
+                    assert_eq!(block.prev_free, Address::NULL);
 
-        while let Some(next_block) = block.get_next_physical_block(&self.memory, self.data_offset())
-        {
-            block = next_block;
-            total_size += block.size();
-        }
+                    while let Some(next_block) = block.get_next_free_block(&self.memory) {
+                        num_free_blocks_in_free_lists += 1;
 
-        assert_eq!(total_size, MEMORY_POOL_SIZE);
-    }
+                        // Invariant: free blocks are properly linked to each other.
+                        assert_eq!(next_block.prev_free, block.address);
+                        assert_eq!(block.next_free, next_block.address);
 
-    // Links between all free blocks are correct.
-    /*for free_block in free_blocks.values() {
-        if free_block.prev_free != Address::NULL {
-            println!("attempting to load prev block {:?}", free_block.prev_free);
-            assert_eq!(
-                free_blocks.get(&free_block.prev_free).unwrap().next_free,
-                free_block.address
-            );
-        }
-    }*/
+                        block = next_block;
 
-    /*let mut free_blocks_2 = std::collections::BTreeMap::new();
-    for f in 0..FIRST_LEVEL_INDEX_SIZE {
-        for s in 0..SECOND_LEVEL_INDEX_SIZE {
-            if self.free_lists[f][s] != Address::NULL {
-                let head = Block::load(self.free_lists[f][s], &self.memory);
-                println!("seg list {:?}", (f, s));
-                println!("head block: {:#?}", head);
-                assert_eq!(head.prev_free, Address::NULL);
-
-                // No duplicates.
-                assert_eq!(free_blocks_2.insert(self.free_lists[f][s], ()), None);
+                        // TODO: invariant on block sizes.
+                    }
+                }
             }
         }
-    }*/
+
+        // Invariant: The number of free blocks found when traversing blocks in physical order
+        // is the same as when the free blocks are traversed via the free lists.
+        assert_eq!(num_free_blocks, num_free_blocks_in_free_lists);
+
+        true
+    }
+
+    pub fn block_is_allocated(&self, address: Address) -> bool {
+        let address = address - Bytes::from(UsedBlock::header_size());
+        !Block::load(address, &self.memory).is_free()
+    }
 }

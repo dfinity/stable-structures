@@ -128,7 +128,7 @@ impl<M: Memory> TlsfAllocator<M> {
     /// Complexity: O(1)
     pub fn allocate(&mut self, size: u32) -> Address {
         #[cfg(test)]
-        self.memory_size_invariant();
+        self.check_invariants();
 
         // Adjust the size to accommodate the block header.
         let size = size + UsedBlock::header_size() as u32;
@@ -165,25 +165,18 @@ impl<M: Memory> TlsfAllocator<M> {
         self.save(); // TODO: could this be done more efficiently?
 
         #[cfg(test)]
-        self.memory_size_invariant();
+        self.check_invariants();
 
         allocated_block.address + Bytes::from(UsedBlock::header_size())
     }
 
     /// Deallocates a previously allocated block.
     ///
-    /// PRECONDITION:
-    ///   * `address` points to an allocated block.
-    ///
-    /// POSTCONDITION:
-    ///   * The block with `address` is freed, and merged with its neighbouring free blocks.
-    ///   TODO: explore how to make this more precise and add programmatic checks.
-    // #[cfg(test)]
-    //#[invariant(self.check_free_lists_invariant())]
+    /// Complexity: O(1)
+    #[cfg_attr(test, requires(self.block_is_allocated(address)))]
+    #[cfg_attr(test, invariant(self.check_invariants()))]
+    #[cfg_attr(test, ensures(!self.block_is_allocated(address)))]
     pub fn deallocate(&mut self, address: Address) {
-        #[cfg(test)]
-        self.memory_size_invariant();
-
         let address = address - Bytes::from(UsedBlock::header_size());
         let block = UsedBlock::load(address, &self.memory);
 
@@ -193,9 +186,6 @@ impl<M: Memory> TlsfAllocator<M> {
         self.merge(block);
 
         self.save(); // TODO: is this necessary? I think yes. Need to write a test that detects this not being there.
-
-        #[cfg(test)]
-        self.memory_size_invariant();
     }
 
     /// Saves the allocator to memory.

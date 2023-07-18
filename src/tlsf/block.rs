@@ -76,10 +76,24 @@ impl Block {
         }
     }
 
+    pub fn is_free(&self) -> bool {
+        match self {
+            Self::Free(_) => true,
+            Self::Used(_) => false,
+        }
+    }
+
     pub fn address(&self) -> Address {
         match self {
             Self::Free(b) => b.address,
             Self::Used(b) => b.address,
+        }
+    }
+
+    pub fn prev_physical(&self) -> Address {
+        match self {
+            Self::Free(b) => b.prev_physical,
+            Self::Used(b) => b.prev_physical,
         }
     }
 
