@@ -75,7 +75,7 @@ const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
 // Reserved bytes in the header for future extensions.
 const HEADER_RESERVED_BYTES: usize = 32;
 
-// Size of the bucked ID in the memory.
+// Size of the bucket ID in the header.
 const BUCKET_ID_LEN_IN_BITS: usize = 15;
 
 /// A memory manager simulates multiple memories within a single memory.
