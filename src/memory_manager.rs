@@ -398,38 +398,13 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn load_layout_v1(memory: M, header: Header) -> Self {
         let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
         memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
-        let mut unallocated_buckets: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
         let mut memory_buckets = BTreeMap::new();
-        let mut last_occupied_bucket: i32 = -1;
         for (bucket_idx, memory) in buckets.into_iter().enumerate() {
             if memory != UNALLOCATED_BUCKET_MARKER {
-                last_occupied_bucket = std::cmp::max(last_occupied_bucket, bucket_idx as i32);
                 memory_buckets
                     .entry(MemoryId(memory))
                     .or_insert_with(Vec::new)
                     .push(BucketId(bucket_idx as u16));
-                unallocated_buckets.remove(&(bucket_idx as u16));
-            }
-        }
-
-        if last_occupied_bucket == -1 {
-            return Self {
-                memory,
-                allocated_buckets: header.num_allocated_buckets,
-                bucket_size_in_pages: header.bucket_size_in_pages,
-                memory_sizes_in_pages: header.memory_sizes_in_pages,
-                memory_buckets,
-                freed_buckets: LinkedList::new(),
-                first_unused_bucket: BucketId(0),
-            };
-        }
-
-        let mut freed_buckets = LinkedList::new();
-        let first_unused_bucket = BucketId((last_occupied_bucket + 1) as u16);
-
-        for i in unallocated_buckets.iter() {
-            if *i < first_unused_bucket.0 {
-                freed_buckets.push_back(BucketId(*i));
             }
         }
 
@@ -439,8 +414,8 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
-            freed_buckets,
-            first_unused_bucket,
+            freed_buckets: LinkedList::new(),
+            first_unused_bucket: BucketId(header.num_allocated_buckets),
         }
     }
 
