@@ -15,7 +15,8 @@ pub mod reader;
 pub mod storable;
 #[cfg(test)]
 mod tests;
-mod types;
+// TODO: make this private again.
+pub mod types;
 pub mod vec;
 pub use min_heap::{MinHeap, MinHeap as StableMinHeap};
 pub use vec::{Vec as StableVec, Vec};

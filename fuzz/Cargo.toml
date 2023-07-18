@@ -1,0 +1,28 @@
+[package]
+name = "ic-stable-structures-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+#arbitrary = { version = "1", optional = true, features = ["derive"] }
+libfuzzer-sys = { version = "0.4.6", features = ["arbitrary-derive"] }
+
+[dependencies.ic-stable-structures]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "tlsf_allocator"
+path = "fuzz_targets/tlsf_allocator.rs"
+test = false
+doc = false
