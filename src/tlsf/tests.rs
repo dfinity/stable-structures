@@ -26,6 +26,28 @@ fn new_and_load() {
     );
 }
 
+// TODO: maybe make this test explicit on the "search_suitable_block"
+#[test]
+fn reallocate_a_block() {
+    let mem = make_memory();
+    let allocator_addr = Address::from(16);
+
+    // Create a new allocator.
+    let mut allocator = TlsfAllocator::new(mem.clone(), allocator_addr);
+
+    // Make two allocations.
+    // Blocks will look like this: | a (10) | b (10) | <free space>
+    let a = allocator.allocate(10);
+    let b = allocator.allocate(10);
+
+    // Remove block a
+    // | free (10) | b (10) | <free space>
+    allocator.deallocate(a);
+
+    // Allocate the same block again.
+    allocator.allocate(10);
+}
+
 #[test]
 fn reloading_preserves_allocations() {
     let mem = make_memory();

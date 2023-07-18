@@ -42,7 +42,7 @@ const MINIMUM_BLOCK_SIZE: u64 = FreeBlock::header_size();
 #[derive(Debug, PartialEq)]
 struct FreeLists {
     first_level_index: u64,
-    second_level_index: u32,
+    second_level_index: [u32; FIRST_LEVEL_INDEX_SIZE],
     // TODO: remove the unneeded bits from this list.
     lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
 }
@@ -52,11 +52,11 @@ impl FreeLists {
         if address == Address::NULL {
             // Unset the bit in the map.
             self.first_level_index &= !(1 << f as u64);
-            self.second_level_index &= !(1 << s as u32);
+            self.second_level_index[f] &= !(1 << s as u32);
         } else {
             // Set the bit in the map.
             self.first_level_index |= 1 << f as u64;
-            self.second_level_index |= 1 << s as u64;
+            self.second_level_index[f] |= 1 << s as u64;
         }
 
         self.lists[f][s] = address;
@@ -71,46 +71,46 @@ impl FreeLists {
 fn free_lists_test() {
     let mut fl = FreeLists {
         first_level_index: 0,
-        second_level_index: 0,
+        second_level_index: [0; FIRST_LEVEL_INDEX_SIZE],
         lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
     };
 
     fl.set(0, 0, Address::new(1));
     assert_eq!(fl.first_level_index, 1);
-    assert_eq!(fl.second_level_index, 1);
+    assert_eq!(fl.second_level_index[0], 1);
     assert_eq!(fl.lists[0][0], Address::new(1));
 
     fl.set(0, 0, Address::NULL);
     assert_eq!(fl.first_level_index, 0);
-    assert_eq!(fl.second_level_index, 0);
+    assert_eq!(fl.second_level_index[0], 0);
     assert_eq!(fl.lists[0][0], Address::NULL);
 
     let mut fl = FreeLists {
         first_level_index: 0,
-        second_level_index: 0,
+        second_level_index: [0; FIRST_LEVEL_INDEX_SIZE],
         lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
     };
 
     fl.set(1, 1, Address::new(1));
     assert_eq!(fl.first_level_index, 2);
-    assert_eq!(fl.second_level_index, 2);
+    assert_eq!(fl.second_level_index[1], 2);
     assert_eq!(fl.lists[1][1], Address::new(1));
 
     let mut fl = FreeLists {
         first_level_index: 0,
-        second_level_index: 0,
+        second_level_index: [0; FIRST_LEVEL_INDEX_SIZE],
         lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
     };
 
     fl.set(16, 16, Address::new(1));
     assert_eq!(fl.first_level_index, 1 << 16);
-    assert_eq!(fl.second_level_index, 1 << 16);
+    assert_eq!(fl.second_level_index[16], 1 << 16);
     assert_eq!(fl.lists[16][16], Address::new(1));
 
-    fl.set(40, 31, Address::new(1));
-    assert_eq!(fl.first_level_index, (1 << 40) | (1 << 16));
-    assert_eq!(fl.second_level_index, (1 << 31) | (1 << 16));
-    assert_eq!(fl.lists[40][31], Address::new(1));
+    fl.set(16, 31, Address::new(1));
+    assert_eq!(fl.first_level_index, 1 << 16);
+    assert_eq!(fl.second_level_index[16], (1 << 31) | (1 << 16));
+    assert_eq!(fl.lists[16][31], Address::new(1));
 }
 
 /// # Memory Layout
@@ -146,7 +146,7 @@ struct TlsfHeader {
     magic: [u8; 3],
     version: u8,
     first_level_index: u64,
-    second_level_index: u32,
+    second_level_index: [u32; FIRST_LEVEL_INDEX_SIZE],
     free_lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
 
     internal_fragmentation: u64,
@@ -166,7 +166,7 @@ impl<M: Memory> TlsfAllocator<M> {
             internal_fragmentation: 9,
             free_lists: FreeLists {
                 first_level_index: 0,
-                second_level_index: 0,
+                second_level_index: [0; FIRST_LEVEL_INDEX_SIZE],
                 lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
             },
             memory,
@@ -410,19 +410,86 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     // Returns the smallest block that accommodates the size.
-    //
-    // XXX: This can be done with clever bit manipulation, but we can do it the
-    // naive way for a V0.
     fn search_suitable_block(&self, size: u32) -> FreeBlock {
+        fn get_least_significant_bit_after(num: u32, position: usize) -> usize {
+            (num & (u32::MAX - position as u32)).trailing_zeros() as usize
+        }
+
+        fn get_least_significant_bit_after_u64(num: u64, position: usize) -> usize {
+            (num & (u64::MAX - position as u64)).trailing_zeros() as usize
+        }
+
         // Identify the free list to take blocks from.
-        let (fl, sl) = mapping(size as u64);
+        let (f_idx, s_idx) = mapping(size as u64);
 
-        // Search the second level index.
+        // The identified free list maybe not have any free blocks.
+        let (f, s) = {
+            let s =
+                get_least_significant_bit_after(self.free_lists.second_level_index[f_idx], s_idx);
 
+            if s < u32::BITS as usize {
+                (f_idx, s)
+            } else {
+                // Continue searching elsewhere.
+                let f = get_least_significant_bit_after_u64(
+                    self.free_lists.first_level_index,
+                    f_idx + 1,
+                );
+
+                let s = get_least_significant_bit_after(
+                    self.free_lists.second_level_index[f],
+                    // s_idx + 1, // FIXME: add test case to detect this
+                    0,
+                );
+                (f, s)
+            }
+        };
+
+        if self.free_lists.get(f, s) == Address::NULL {
+            panic!("Out of memory.");
+        }
+
+        let block = FreeBlock::load(self.free_lists.get(f, s), &self.memory);
+
+        // The block must be the head of its free list and big enough.
+        debug_assert_eq!(block.prev_free, Address::NULL);
+        debug_assert!(block.size() >= size as u64);
+
+        block
+    }
+
+    /*
         // Find the smallest free block that is larger than the requested size.
         for f in fl..FIRST_LEVEL_INDEX_SIZE {
             for s in sl..SECOND_LEVEL_INDEX_SIZE {
                 if self.free_lists.get(f, s) != Address::NULL {
+                    println!("found seglist {:?}", (f, s));
+                    println!("original mapping {:?}", (fl, sl));
+                    let maybe_s = (self.free_lists.second_level_index[f]
+                        & (u64::MAX - (0 << sl)).leading_zeros())
+                        as usize;
+                    if self.free_lists.get(f, maybe_s) != Address::NULL {
+                        assert_eq!(s, maybe_s);
+                    } else {
+                        // Continue searching elsewhere.
+                        println!("FLI: {:#064b}", self.free_lists.first_level_index);
+                        let new_f = (self.free_lists.first_level_index
+                            & (u64::MAX - (fl as u64 + 1)))
+                            .trailing_zeros() as usize;
+                        println!("new f: {:?}", new_f);
+
+                        let new_s = (self.free_lists.second_level_index[new_f]
+                            & (u32::MAX - (sl as u32 + 1)))
+                            .trailing_zeros() as usize;
+
+                        assert_eq!(f, new_f);
+                        assert_eq!(s, new_s);
+
+                        //let new_s = (self.free_lists.second_level_index
+                        //    & (u64::MAX - (0 << sl)).leading_zeros())
+                        //    as usize;
+                    }
+
                     let block = FreeBlock::load(self.free_lists.get(f, s), &self.memory);
 
                     // The block must be:
@@ -439,7 +506,7 @@ impl<M: Memory> TlsfAllocator<M> {
         }
 
         panic!("OOM");
-    }
+    }*/
 
     fn data_offset(&self) -> Address {
         self.address + TlsfHeader::size()

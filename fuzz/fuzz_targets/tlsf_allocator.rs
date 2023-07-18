@@ -24,7 +24,6 @@ fn make_memory() -> Rc<RefCell<Vec<u8>>> {
 }
 
 fuzz_target!(|methods: Vec<AllocatorMethod>| {
-    println!("Methods: {:?}", methods.len());
     let mem = make_memory();
     let mut allocator = TlsfAllocator::new(mem.clone(), Address::from(0));
 
