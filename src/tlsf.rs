@@ -23,7 +23,7 @@ mod tests;
 #[cfg(test)]
 mod verification;
 
-const MAGIC: &[u8; 3] = b"BTA"; // btree allocator
+const MAGIC: &[u8; 3] = b"TLS"; // "Two-Level Segregated Free List"
 const LAYOUT_VERSION: u8 = 1;
 
 // The allocator is designed to handle up 4TiB of memory.
@@ -36,8 +36,8 @@ const SECOND_LEVEL_INDEX_SIZE: usize = 1 << SECOND_LEVEL_INDEX_LOG_SIZE;
 const FOUR_TIBS: u64 = 1 << MEMORY_POOL_BITS;
 const MEMORY_POOL_SIZE: u64 = FOUR_TIBS - 1;
 
-// TODO: make this related to block header sizes?
-const MINIMUM_BLOCK_SIZE: u64 = 35;
+// The minimum size of a block must fit the free block header.
+const MINIMUM_BLOCK_SIZE: u64 = FreeBlock::header_size();
 
 /// # Memory Layout
 ///
@@ -62,6 +62,7 @@ pub struct TlsfAllocator<M: Memory> {
 
     //   first_level_index: u32,
     //    second_level_index: u32,
+    internal_fragmentation: u64,
 
     // TODO: remove the unneeded bits from this list.
     // TODO: introduce bitmaps to make searches efficient.
@@ -74,6 +75,7 @@ pub struct TlsfAllocator<M: Memory> {
 struct TlsfHeader {
     magic: [u8; 3],
     version: u8,
+    internal_fragmentation: u64,
     free_lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
 }
 
@@ -88,6 +90,7 @@ impl<M: Memory> TlsfAllocator<M> {
     pub fn new(memory: M, address: Address) -> Self {
         let mut tlsf = Self {
             address,
+            internal_fragmentation: 9,
             free_lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
             memory,
         };
@@ -112,6 +115,7 @@ impl<M: Memory> TlsfAllocator<M> {
 
         Self {
             address,
+            internal_fragmentation: header.internal_fragmentation,
             free_lists: header.free_lists,
             memory,
         }
@@ -130,10 +134,10 @@ impl<M: Memory> TlsfAllocator<M> {
         #[cfg(test)]
         self.check_invariants();
 
-        // Adjust the size to accommodate the block header.
+        // Adjust the size to accommodate the used block header.
         let size = size + UsedBlock::header_size() as u32;
 
-        // TODO: is this necessary?
+        // Size must also be >= MINIMUM_BLOCK_SIZE
         let size = std::cmp::max(size, MINIMUM_BLOCK_SIZE as u32);
 
         let block = self.search_suitable_block(size);
@@ -162,7 +166,7 @@ impl<M: Memory> TlsfAllocator<M> {
         let allocated_block = block.allocate();
         allocated_block.save(&self.memory);
 
-        self.save(); // TODO: could this be done more efficiently?
+        self.save();
 
         #[cfg(test)]
         self.check_invariants();
@@ -194,6 +198,7 @@ impl<M: Memory> TlsfAllocator<M> {
             &TlsfHeader {
                 magic: *MAGIC,
                 version: LAYOUT_VERSION,
+                internal_fragmentation: self.internal_fragmentation,
                 free_lists: self.free_lists,
             },
             self.address,
@@ -241,14 +246,6 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     // Inserts a block into the free lists.
-    //
-    // Preconditions:
-    //  TODO
-    //
-    // Postconditions:
-    //  TODO
-    //
-    // Invariants?
     fn insert(&mut self, block: TempFreeBlock) -> FreeBlock {
         let (f, s) = mapping(block.size);
 

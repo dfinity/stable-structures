@@ -184,7 +184,7 @@ impl UsedBlock {
         }
     }
 
-    pub fn header_size() -> u64 {
+    pub const fn header_size() -> u64 {
         core::mem::size_of::<UsedBlockHeader>() as u64
     }
 }
@@ -362,8 +362,7 @@ impl FreeBlock {
         }
     }
 
-    #[cfg(test)]
-    pub fn header_size() -> u64 {
+    pub const fn header_size() -> u64 {
         core::mem::size_of::<FreeBlockHeader>() as u64
     }
 }

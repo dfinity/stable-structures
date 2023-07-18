@@ -45,7 +45,7 @@ fn reloading_preserves_allocations() {
 // TODO: add tests with small memory pools
 
 #[test]
-fn deallocate_everything() {
+fn allocate_then_deallocate_randomly() {
     proptest!(|(
         data in proptest::collection::vec(
             proptest::collection::vec(0..u8::MAX, 3usize..100usize), 3..100
@@ -86,44 +86,6 @@ fn deallocate_everything() {
             TlsfAllocator::new(make_memory(), Address::from(0)).free_lists
         );
     });
-}
-
-#[test]
-fn v2_deallocate_everything() {
-    let data = vec![vec![0, 0, 0], vec![0, 0, 0]];
-    let mem = make_memory();
-    let mut tlsf = TlsfAllocator::new(mem, Address::from(0));
-    let mut addresses: Vec<(Address, Vec<u8>)> = vec![];
-
-    for d in data.into_iter() {
-        let address = tlsf.allocate(d.len() as u32);
-
-        // Write the data into memory.
-        tlsf.memory.write(address.get(), &d);
-
-        addresses.push((address, d));
-    }
-
-    // Shuffle addresses to deallocate them in random order.
-    //rng.shuffle(&mut addresses);
-    for (address, data) in addresses {
-        // Read data from memory and verify its there.
-        let mut v = vec![0; data.len()];
-        tlsf.memory.read(address.get(), &mut v);
-        assert_eq!(v, data);
-
-        tlsf.deallocate(address);
-    }
-
-    assert_eq!(
-        FreeBlock::load(tlsf.data_offset(), &tlsf.memory),
-        FreeBlock::genesis(tlsf.data_offset())
-    );
-
-    assert_eq!(
-        tlsf.free_lists,
-        TlsfAllocator::new(make_memory(), Address::from(0)).free_lists
-    );
 }
 
 #[test]
