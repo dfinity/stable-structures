@@ -32,7 +32,6 @@ impl TempFreeBlock {
             next_free,
             prev_physical: self.prev_physical,
             size: self.size,
-            dirty: true,
         }
     }
 }
@@ -208,7 +207,6 @@ impl UsedBlock {
 /// ```
 #[derive(Debug, PartialEq, Clone)]
 pub struct FreeBlock {
-    // TODO: modifications to any of these fields make the block dirty
     pub(super) address: Address,
     pub prev_free: Address,
     pub next_free: Address,
@@ -216,17 +214,6 @@ pub struct FreeBlock {
 
     // The size of the block, including the header.
     size: u64,
-
-    dirty: bool,
-}
-
-#[cfg(test)]
-impl Drop for FreeBlock {
-    fn drop(&mut self) {
-        if self.dirty {
-            panic!("cannot drop an unsaved free block");
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -247,7 +234,6 @@ impl FreeBlock {
             prev_free: Address::NULL,
             next_free: Address::NULL,
             prev_physical: Address::NULL,
-            dirty: false, // FIXME: what should this be?
         }
     }
 
@@ -266,11 +252,10 @@ impl FreeBlock {
             next_free: header.next_free,
             size: header.size,
             prev_physical: header.prev_physical,
-            dirty: false,
         }
     }
 
-    pub fn save<M: Memory>(&mut self, memory: &M) {
+    pub fn save<M: Memory>(&self, memory: &M) {
         assert!(self.size >= MINIMUM_BLOCK_SIZE);
 
         // TODO: same check for previous free and previous physical?
@@ -292,8 +277,6 @@ impl FreeBlock {
             self.address,
             memory,
         );
-
-        self.dirty = false;
     }
 
     /// Loads the next physical block in memory.
