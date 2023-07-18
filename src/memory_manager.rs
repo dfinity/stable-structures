@@ -399,6 +399,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
         memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
         let mut memory_buckets = BTreeMap::new();
+
         for (bucket_idx, memory) in buckets.into_iter().enumerate() {
             if memory != UNALLOCATED_BUCKET_MARKER {
                 memory_buckets
