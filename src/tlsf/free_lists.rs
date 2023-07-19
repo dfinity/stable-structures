@@ -6,10 +6,19 @@ use crate::Address;
 
 #[derive(Debug, PartialEq)]
 pub struct FreeLists {
-    pub first_level_index: u64,
-    pub second_level_index: [u32; FIRST_LEVEL_INDEX_SIZE],
+    /// Linked lists pointing to free blocks of various sizes.
     // TODO: remove the lower unneeded bits from this list.
     pub lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+
+    /// Bitmaps that allows us to search the lists in O(1).
+    ///
+    /// `lists[i][j]` points to a block
+    ///   IFF
+    /// `bit(first_level_index, i) = 1
+    ///   AND `bit(second_level_index, j) = 1,
+    ///   WHERE `bit(n, i)` is the i'th bit of `n`.
+    pub first_level_index: u64,
+    pub second_level_index: [u32; FIRST_LEVEL_INDEX_SIZE],
 }
 
 impl FreeLists {
