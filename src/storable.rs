@@ -16,7 +16,7 @@ pub trait Storable {
     /// Converts bytes into an element.
     fn from_bytes(bytes: Cow<[u8]>) -> Self;
 
-    /// The size bounds the type.
+    /// The size bounds of the type.
     const BOUND: Bound;
 }
 
