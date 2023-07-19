@@ -26,7 +26,7 @@ trait Random {
 
 impl<const K: usize> Random for Blob<K> {
     fn random(rng: &mut Rng) -> Self {
-        let size = rng.rand_u32() % max_size::<Blob::<K>>();
+        let size = rng.rand_u32() % max_size::<Blob<K>>();
         Blob::try_from(
             rng.iter(Rand::rand_u8)
                 .take(size as usize)
