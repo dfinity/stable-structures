@@ -159,6 +159,8 @@ impl Storable for () {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: 0,
+        // A `()` should in theory be fixed in size, but this flag was initially
+        // set incorrectly and it cannot be fixed to maintain backward-compatibility.
         is_fixed_size: false,
     };
 }
@@ -437,6 +439,15 @@ pub(crate) const fn bounds<A: Storable>() -> Bounds {
         }
     } else {
         panic!("Cannot get bounds of unbounded type.");
+    }
+}
+
+/// Returns the max size of the given type if bounded, panics if unbounded.
+pub(crate) const fn max_size<A: Storable>() -> u32 {
+    if let Bound::Bounded { max_size, .. } = A::BOUND {
+        max_size
+    } else {
+        panic!("Cannot get max size of unbounded type.");
     }
 }
 
