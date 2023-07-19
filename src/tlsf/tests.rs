@@ -84,7 +84,7 @@ fn reallocate_a_block() {
     let allocator_addr = Address::from(16);
 
     // Create a new allocator.
-    let mut allocator = TlsfAllocator::new(mem.clone(), allocator_addr);
+    let mut allocator = TlsfAllocator::new(mem, allocator_addr);
 
     // Make two allocations.
     // Blocks will look like this: | a (10) | b (10) | <free space>

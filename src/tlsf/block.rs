@@ -52,7 +52,7 @@ impl Block {
         match &magic {
             FREE_BLOCK_MAGIC => Self::Free(FreeBlock::load(address, memory)),
             USED_BLOCK_MAGIC => Self::Used(UsedBlock::load(address, memory)),
-            other => panic!("Bag magic {:?}", other),
+            other => panic!("Bad magic {other:?}"),
         }
     }
 
@@ -152,7 +152,7 @@ impl UsedBlock {
         )
     }
 
-    // TODO: maybe introduce a trait or merge the two types?
+    // TODO: avoid duplicating this and other functions.
     /// Loads the next physical block in memory.
     /// If this is the last physical block in memory, `None` is returned.
     pub(super) fn get_next_physical_block<M: Memory>(
@@ -230,6 +230,7 @@ struct FreeBlockHeader {
 }
 
 impl FreeBlock {
+    #[cfg(test)]
     pub fn genesis(address: Address) -> Self {
         FreeBlock {
             address,
@@ -261,7 +262,7 @@ impl FreeBlock {
     pub fn save<M: Memory>(&self, memory: &M) {
         assert!(self.size >= MINIMUM_BLOCK_SIZE);
 
-        // TODO: same check for previous free and previous physical?
+        // TODO: add same check for previous free and previous physical
         if self.next_free != Address::NULL {
             assert!(
                 self.next_free < self.address
