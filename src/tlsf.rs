@@ -83,8 +83,6 @@ pub struct TlsfAllocator<M: Memory> {
     // The address in memory where the `TlsfHeader` is stored.
     address: Address,
 
-    internal_fragmentation: u64,
-
     free_lists: FreeLists,
 
     memory: M,
@@ -97,8 +95,6 @@ struct TlsfHeader {
     first_level_index: u64,
     second_level_index: [u32; FIRST_LEVEL_INDEX_SIZE],
     free_lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
-
-    internal_fragmentation: u64,
 }
 
 impl TlsfHeader {
@@ -112,7 +108,6 @@ impl<M: Memory> TlsfAllocator<M> {
     pub fn new(memory: M, address: Address) -> Self {
         let mut tlsf = Self {
             address,
-            internal_fragmentation: 9,
             free_lists: FreeLists {
                 first_level_index: 0,
                 second_level_index: [0; FIRST_LEVEL_INDEX_SIZE],
@@ -142,7 +137,6 @@ impl<M: Memory> TlsfAllocator<M> {
 
         Self {
             address,
-            internal_fragmentation: header.internal_fragmentation,
             free_lists: FreeLists {
                 first_level_index: header.first_level_index,
                 second_level_index: header.second_level_index,
@@ -230,7 +224,6 @@ impl<M: Memory> TlsfAllocator<M> {
                 first_level_index: self.free_lists.first_level_index,
                 second_level_index: self.free_lists.second_level_index,
                 free_lists: self.free_lists.lists,
-                internal_fragmentation: self.internal_fragmentation,
             },
             self.address,
             &self.memory,
