@@ -1,12 +1,3 @@
-//! TLSF (Two-Level Segregated Free List) Allocator
-//!
-//! This is a dynamic memory allocator that's constant time and provides reasonable fragmentation
-//! bounds.
-//!
-//! Benefits:
-//! * O(1) allocation and deallocation
-//! * Same strategy for all block sizes
-
 use crate::{
     read_struct,
     types::{Address, Bytes},
@@ -15,14 +6,11 @@ use crate::{
 use std::cmp::Ordering;
 
 mod block;
-use block::{Block, FreeBlock, TempFreeBlock, UsedBlock};
-
+use block::{Block, FreeBlock, TransFreeBlock, UsedBlock};
 mod free_lists;
 use free_lists::{mapping, FreeLists};
-
 #[cfg(test)]
 mod tests;
-
 #[cfg(test)]
 mod verification;
 
@@ -35,29 +23,61 @@ const MEMORY_POOL_BITS: u64 = 42;
 const FIRST_LEVEL_INDEX_SIZE: usize = 42;
 const SECOND_LEVEL_INDEX_LOG_SIZE: usize = 5;
 const SECOND_LEVEL_INDEX_SIZE: usize = 1 << SECOND_LEVEL_INDEX_LOG_SIZE;
-
 const FOUR_TIBS: u64 = 1 << MEMORY_POOL_BITS;
 const MEMORY_POOL_SIZE: u64 = FOUR_TIBS - 1;
 
 // The minimum size of a block must fit the free block header.
 const MINIMUM_BLOCK_SIZE: u64 = FreeBlock::header_size();
 
+/// A Two-Level Segregated Free List (TLSF) Allocator
+///
+/// TLSF is a dynamic memory allocator. Given a `Memory`, it provides an API to allocate/deallocate
+/// blocks of memory of arbitrary size.
+///
+/// This implementation is based on the following paper:
+///
+/// "TLSF: a New Dynamic Memory Allocator for Real-Time Systems" by Masmano et al.
+/// http://www.gii.upv.es/tlsf/files/ecrts04_tlsf.pdf
+///
+/// TLSF tracks free and used memory in "blocks". Initially, the TLSF allocator considers the
+/// entire memory to be one big free block, and as allocations happen this block into is split
+/// into smaller blocks.
+///
+/// In order to find free blocks efficiently, TLSF uses linked lists to track blocks of different
+/// sizes. For example, there can be a linked list tracking containing all the free blocks that are
+/// 33-35 bytes in size, or 120-127 bytes in size, etc. This approach is referred to as "segregated
+/// free lists".
+///
+/// The more segregated free lists there are, the quicker it is to find a block that is a "good
+/// fit". In the extreme case, there can be a segregated free list for every possible size. The
+/// downside of having too many segregated free lists, on the other hand, is that it becomes slower
+/// to find blocks (Best fit).
+///
+/// TODO: add example that explains this.
+///
+/// TLSF allows us to manage a large number of segregated free lists to reduce fragmentation, while
+/// keeping the runtime complexity of `allocate` and `deallocate` at O(1).
+///
+/// TODO: add diagram for TLSF structure
+///
 /// # Memory Layout
 ///
 /// ```text
 /// -------------------------------------------------- <- Address 0
-/// Magic "BTA"                           ↕ 3 bytes
+/// Magic                                 ↕ 3 bytes
 /// --------------------------------------------------
 /// Layout version                        ↕ 1 byte
 /// --------------------------------------------------
-/// TODO: FL bitmap.                      ↕ 8 bytes    // TODO: potentially 4?
+/// First level bitmap                    ↕ 8 bytes
 /// --------------------------------------------------
-/// TODO: SL bitmap.                      ↕ 8 bytes    // TODO: potentially 4?
-/// -------------------------------------------------- <- Address 20
-/// Free Lists...
+/// Second level bitmaps                  ↕ 4 * (FIRST_LEVEL_INDEX_SIZE) bytes
 /// --------------------------------------------------
-/// TODO: Beginning of data.
-/// -------------------------------------------------- <- Page 1 (TODO: make this tighter)
+/// Free lists                            ↕ 8 * SECOND_LEVEL_INDEX_SIZE * FIRST_LEVEL_INDEX_SIZE
+/// --------------------------------------------------
+/// TODO: reserve some more space?
+/// --------------------------------------------------
+/// Blocks
+/// --------------------------------------------------
 /// ```
 pub struct TlsfAllocator<M: Memory> {
     // The address in memory where the `TlsfHeader` is stored.
@@ -140,10 +160,8 @@ impl<M: Memory> TlsfAllocator<M> {
     ///  * A block with size >= `size` is allocated.
     ///
     /// Complexity: O(1)
+    #[cfg_attr(test, invariant(self.check_invariants()))]
     pub fn allocate(&mut self, size: u32) -> Address {
-        #[cfg(test)]
-        self.check_invariants();
-
         // Adjust the size to accommodate the used block header.
         let size = size + UsedBlock::header_size() as u32;
 
@@ -162,24 +180,24 @@ impl<M: Memory> TlsfAllocator<M> {
                 block.size = size as u64;
 
                 // Split the block
-                let remaining_block = TempFreeBlock {
+                let remaining_block = TransFreeBlock {
                     address: block.address + size.into(),
                     size: remaining_size,
                     prev_physical: block.address,
                 };
 
                 self.insert(remaining_block);
+            } else {
+                // TODO: add test case for this condition.
             }
         }
 
-        // Mark the block as allocated.
+        // Allocate the block.
         let allocated_block = block.allocate();
         allocated_block.save(&self.memory);
 
+        // TODO: this can be made more efficient.
         self.save();
-
-        #[cfg(test)]
-        self.check_invariants();
 
         allocated_block.address + Bytes::from(UsedBlock::header_size())
     }
@@ -199,7 +217,7 @@ impl<M: Memory> TlsfAllocator<M> {
 
         self.merge(block);
 
-        self.save(); // TODO: is this necessary? I think yes. Need to write a test that detects this not being there.
+        self.save(); // TODO: add test that detects this save not being there.
     }
 
     /// Saves the allocator to memory.
@@ -224,7 +242,7 @@ impl<M: Memory> TlsfAllocator<M> {
     // * block->next->prev = block->prev;
     // * block->prev->next = block->next;
     // * free list head is updated.
-    fn remove(&mut self, block: FreeBlock) -> TempFreeBlock {
+    fn remove(&mut self, block: FreeBlock) -> TransFreeBlock {
         match block.get_prev_free_block(&self.memory) {
             None => {
                 // `block` is the head of the free list.
@@ -250,7 +268,7 @@ impl<M: Memory> TlsfAllocator<M> {
             }
         }
 
-        TempFreeBlock {
+        TransFreeBlock {
             address: block.address,
             prev_physical: block.prev_physical,
             size: block.size(),
@@ -258,7 +276,7 @@ impl<M: Memory> TlsfAllocator<M> {
     }
 
     // Inserts a block into the free lists.
-    fn insert(&mut self, block: TempFreeBlock) -> FreeBlock {
+    fn insert(&mut self, block: TransFreeBlock) -> FreeBlock {
         let (f, s) = mapping(block.size);
 
         let block = block.into_free_block(self.free_lists.get(f, s));
@@ -285,12 +303,12 @@ impl<M: Memory> TlsfAllocator<M> {
         assert_eq!(a.address + Bytes::from(a.size()), b.address);
 
         // Remove them from the free lists.
+        // TODO: look into reducing these loading blocks from memory.
         let a = self.remove(a);
         let b = FreeBlock::load(b.address, &self.memory);
         let b = self.remove(b);
 
         // Reload them with new pointers.
-        // TODO: load them as orphaned blocks
         let a = FreeBlock::load(a.address, &self.memory);
         let b = FreeBlock::load(b.address, &self.memory);
 
@@ -299,7 +317,7 @@ impl<M: Memory> TlsfAllocator<M> {
             next_block.save(&self.memory);
         }
 
-        self.insert(TempFreeBlock {
+        self.insert(TransFreeBlock {
             address: a.address,
             prev_physical: a.prev_physical,
             size: a.size() + b.size(),
@@ -356,56 +374,6 @@ impl<M: Memory> TlsfAllocator<M> {
         block
     }
 
-    /*
-        // Find the smallest free block that is larger than the requested size.
-        for f in fl..FIRST_LEVEL_INDEX_SIZE {
-            for s in sl..SECOND_LEVEL_INDEX_SIZE {
-                if self.free_lists.get(f, s) != Address::NULL {
-                    println!("found seglist {:?}", (f, s));
-                    println!("original mapping {:?}", (fl, sl));
-                    let maybe_s = (self.free_lists.second_level_index[f]
-                        & (u64::MAX - (0 << sl)).leading_zeros())
-                        as usize;
-                    if self.free_lists.get(f, maybe_s) != Address::NULL {
-                        assert_eq!(s, maybe_s);
-                    } else {
-                        // Continue searching elsewhere.
-                        println!("FLI: {:#064b}", self.free_lists.first_level_index);
-                        let new_f = (self.free_lists.first_level_index
-                            & (u64::MAX - (fl as u64 + 1)))
-                            .trailing_zeros() as usize;
-                        println!("new f: {:?}", new_f);
-
-                        let new_s = (self.free_lists.second_level_index[new_f]
-                            & (u32::MAX - (sl as u32 + 1)))
-                            .trailing_zeros() as usize;
-
-                        assert_eq!(f, new_f);
-                        assert_eq!(s, new_s);
-
-                        //let new_s = (self.free_lists.second_level_index
-                        //    & (u64::MAX - (0 << sl)).leading_zeros())
-                        //    as usize;
-                    }
-
-                    let block = FreeBlock::load(self.free_lists.get(f, s), &self.memory);
-
-                    // The block must be:
-                    // (1) The head of its free list.
-                    debug_assert_eq!(block.prev_free, Address::NULL);
-                    // (2) Free
-                    //debug_assert!(!block.allocated);
-                    // (3) Big enough
-                    debug_assert!(block.size() >= size as u64);
-
-                    return block;
-                }
-            }
-        }
-
-        panic!("OOM");
-    }*/
-
     fn data_offset(&self) -> Address {
         self.address + TlsfHeader::size()
     }
@@ -420,67 +388,5 @@ impl<M: Memory> TlsfAllocator<M> {
     #[inline]
     pub fn memory(&self) -> &M {
         &self.memory
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
-        Rc::new(RefCell::new(Vec::new()))
-    }
-
-    #[test]
-    fn two_allocate() {
-        let mem = make_memory();
-        let mut tlsf = TlsfAllocator::new(mem, Address::from(0));
-        let block_1 = tlsf.allocate(1232);
-
-        let block_2 = tlsf.allocate(45);
-
-        let block_3 = tlsf.allocate(39);
-
-        assert_eq!(
-            tlsf.free_lists
-                .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
-            tlsf.data_offset()
-                + Bytes::from(1232u64)
-                + Bytes::from(UsedBlock::header_size())
-                + Bytes::from(45u64)
-                + Bytes::from(UsedBlock::header_size())
-                + Bytes::from(39u64)
-                + Bytes::from(UsedBlock::header_size())
-        );
-
-        tlsf.deallocate(block_3);
-
-        assert_eq!(
-            tlsf.free_lists
-                .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
-            tlsf.data_offset()
-                + Bytes::from(1232u64)
-                + Bytes::from(UsedBlock::header_size())
-                + Bytes::from(45u64)
-                + Bytes::from(UsedBlock::header_size())
-        );
-
-        tlsf.deallocate(block_2);
-
-        assert_eq!(
-            tlsf.free_lists
-                .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
-            tlsf.data_offset() + Bytes::from(1232u64) + Bytes::from(UsedBlock::header_size())
-        );
-
-        tlsf.deallocate(block_1);
-
-        assert_eq!(
-            tlsf.free_lists
-                .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
-            tlsf.data_offset()
-        );
     }
 }

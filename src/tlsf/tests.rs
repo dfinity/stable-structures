@@ -9,6 +9,57 @@ fn make_memory() -> Rc<RefCell<Vec<u8>>> {
 }
 
 #[test]
+fn allocate() {
+    let mem = make_memory();
+    let mut tlsf = TlsfAllocator::new(mem, Address::from(0));
+    let block_1 = tlsf.allocate(1232);
+
+    let block_2 = tlsf.allocate(45);
+
+    let block_3 = tlsf.allocate(39);
+
+    assert_eq!(
+        tlsf.free_lists
+            .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
+        tlsf.data_offset()
+            + Bytes::from(1232u64)
+            + Bytes::from(UsedBlock::header_size())
+            + Bytes::from(45u64)
+            + Bytes::from(UsedBlock::header_size())
+            + Bytes::from(39u64)
+            + Bytes::from(UsedBlock::header_size())
+    );
+
+    tlsf.deallocate(block_3);
+
+    assert_eq!(
+        tlsf.free_lists
+            .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
+        tlsf.data_offset()
+            + Bytes::from(1232u64)
+            + Bytes::from(UsedBlock::header_size())
+            + Bytes::from(45u64)
+            + Bytes::from(UsedBlock::header_size())
+    );
+
+    tlsf.deallocate(block_2);
+
+    assert_eq!(
+        tlsf.free_lists
+            .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
+        tlsf.data_offset() + Bytes::from(1232u64) + Bytes::from(UsedBlock::header_size())
+    );
+
+    tlsf.deallocate(block_1);
+
+    assert_eq!(
+        tlsf.free_lists
+            .get(FIRST_LEVEL_INDEX_SIZE - 1, SECOND_LEVEL_INDEX_SIZE - 1),
+        tlsf.data_offset()
+    );
+}
+
+#[test]
 fn new_and_load() {
     let mem = make_memory();
     let allocator_addr = Address::from(16);

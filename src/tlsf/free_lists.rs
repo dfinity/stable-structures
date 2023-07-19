@@ -8,7 +8,7 @@ use crate::Address;
 pub struct FreeLists {
     pub first_level_index: u64,
     pub second_level_index: [u32; FIRST_LEVEL_INDEX_SIZE],
-    // TODO: remove the unneeded bits from this list.
+    // TODO: remove the lower unneeded bits from this list.
     pub lists: [[Address; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
 }
 
@@ -16,7 +16,9 @@ impl FreeLists {
     pub fn set(&mut self, f: usize, s: usize, address: Address) {
         if address == Address::NULL {
             // Unset the bit in the map.
-            self.first_level_index &= !(1 << f as u64);
+            self.first_level_index &= !(1 << f as u64); // FIXME: this isn't necessarily correct, as
+                                                        // there can be other second level indexes
+                                                        // that are set.
             self.second_level_index[f] &= !(1 << s as u32);
         } else {
             // Set the bit in the map.

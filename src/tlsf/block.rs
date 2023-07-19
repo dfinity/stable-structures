@@ -1,22 +1,25 @@
+//! There are three types of blocks:
+//!
+//! 1. A free block: a block that is not allocated and is in the free lists.
+//! 2. A used block: a block that is allocated.
+//! 2. A transient free block: a block that is free but is not in the free lists.
+//!
+//!          remove                allocate
+//!   Free ----------> TransFree -------------> Used
+//!        <----------          <-------------
+//!          insert               deallocate
 use super::*;
-
-// There are three types of blocks:
-//         remove             allocate
-//   Free -------> TempFree ---------> Allocated
-//        <-------          <---------
-//         insert            deallocate
 
 const FREE_BLOCK_MAGIC: &[u8; 3] = b"FB1"; // Free block v1
 const USED_BLOCK_MAGIC: &[u8; 3] = b"UB1"; // Used block v1
 
-// TODO: maybe add a drop flag?
-pub struct TempFreeBlock {
+pub struct TransFreeBlock {
     pub address: Address,
     pub prev_physical: Address,
     pub size: u64,
 }
 
-impl TempFreeBlock {
+impl TransFreeBlock {
     pub fn allocate(self) -> UsedBlock {
         UsedBlock {
             address: self.address,
@@ -175,8 +178,8 @@ impl UsedBlock {
         }
     }
 
-    pub fn deallocate(self) -> TempFreeBlock {
-        TempFreeBlock {
+    pub fn deallocate(self) -> TransFreeBlock {
+        TransFreeBlock {
             address: self.address,
             prev_physical: self.prev_physical,
             size: self.size,
@@ -321,9 +324,7 @@ impl FreeBlock {
             let prev_free = Self::load(self.prev_free, memory);
 
             // Assert that the previous block is pointing to the current block.
-            debug_assert_eq!(prev_free.next_free, self.address);
-            // Assert that the previous block is free.
-            //debug_assert!(!prev_free.allocated);
+            assert_eq!(prev_free.next_free, self.address);
 
             Some(prev_free)
         } else {
