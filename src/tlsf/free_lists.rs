@@ -15,11 +15,14 @@ pub struct FreeLists {
 impl FreeLists {
     pub fn set(&mut self, f: usize, s: usize, address: Address) {
         if address == Address::NULL {
-            // Unset the bit in the map.
-            self.first_level_index &= !(1 << f as u64); // FIXME: this isn't necessarily correct, as
-                                                        // there can be other second level indexes
-                                                        // that are set.
+            // Unset the bit in the second level bitmap.
             self.second_level_index[f] &= !(1 << s as u32);
+
+            // If there are no more bits in the second level bitmap set, then
+            // unset the associated bit in the first level bitmap.
+            if self.second_level_index[f] == 0 {
+                self.first_level_index &= !(1 << f as u64);
+            }
         } else {
             // Set the bit in the map.
             self.first_level_index |= 1 << f as u64;
@@ -90,6 +93,35 @@ mod test {
                 assert!((1 << f) + ((1 << f) / SECOND_LEVEL_INDEX_SIZE) * s < size as usize);
             }
         });
+    }
+
+    #[test]
+    fn setting_two_second_levels_in_same_first_level() {
+        let mut fl = FreeLists {
+            first_level_index: 0,
+            second_level_index: [0; FIRST_LEVEL_INDEX_SIZE],
+            lists: [[Address::NULL; SECOND_LEVEL_INDEX_SIZE]; FIRST_LEVEL_INDEX_SIZE],
+        };
+
+        fl.set(0, 0, Address::new(1));
+        assert_eq!(fl.first_level_index, 1);
+        assert_eq!(fl.second_level_index[0], 1);
+        assert_eq!(fl.lists[0][0], Address::new(1));
+
+        // Set another second level list in the same first level list.
+        fl.set(0, 1, Address::new(2));
+        assert_eq!(fl.first_level_index, 1);
+        assert_eq!(fl.second_level_index[0], 0b11); // The first two lists are set.
+        assert_eq!(fl.lists[0][1], Address::new(2));
+
+        fl.set(0, 0, Address::NULL);
+        assert_eq!(fl.first_level_index, 1);
+        assert_eq!(fl.second_level_index[0], 0b10); // Only the second list is set.
+        assert_eq!(fl.lists[0][0], Address::NULL);
+
+        fl.set(0, 1, Address::NULL);
+        assert_eq!(fl.first_level_index, 0);
+        assert_eq!(fl.second_level_index[0], 0); // None of the lists are set.
     }
 
     #[test]

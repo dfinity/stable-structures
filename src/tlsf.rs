@@ -121,12 +121,13 @@ impl<M: Memory> TlsfAllocator<M> {
             memory,
         };
 
-        // Create a block with the memory.
-        let block = FreeBlock::genesis(tlsf.data_offset());
+        // Insert the entire memory pool as a single free block.
+        tlsf.insert(TransFreeBlock {
+            address: tlsf.data_offset(),
+            prev_physical: Address::NULL,
+            size: MEMORY_POOL_SIZE,
+        });
 
-        let (f, s) = mapping(block.size());
-        block.save(&tlsf.memory);
-        tlsf.free_lists.set(f, s, block.address);
         tlsf.save();
 
         tlsf
