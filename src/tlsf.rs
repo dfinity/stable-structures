@@ -40,13 +40,12 @@ const MINIMUM_BLOCK_SIZE: u64 = FreeBlock::header_size();
 /// http://www.gii.upv.es/tlsf/files/ecrts04_tlsf.pdf
 ///
 /// TLSF tracks free and used memory in "blocks". Initially, the TLSF allocator considers the
-/// entire memory to be one big free block, and as allocations happen this block into is split
-/// into smaller blocks.
+/// entire memory to be one big free block, and as allocations happen this block is split into
+/// smaller blocks.
 ///
 /// In order to find free blocks efficiently, TLSF uses linked lists to track blocks of different
-/// sizes. For example, there can be a linked list tracking containing all the free blocks that are
-/// 33-35 bytes in size, or 120-127 bytes in size, etc. This approach is referred to as "segregated
-/// free lists".
+/// sizes. For example, there can be a linked list tracking all the free blocks that are 33-35 bytes
+/// in size, or 120-127 bytes in size, etc. This approach is referred to as "segregated free lists".
 ///
 /// The more segregated free lists there are, the quicker it is to find a block that is a "good
 /// fit". In the extreme case, there can be a segregated free list for every possible size. The
