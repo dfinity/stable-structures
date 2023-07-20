@@ -47,10 +47,10 @@ use crate::{
     types::{Address, Bytes},
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
+use std::cmp::min;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::{cell::RefCell, collections::BTreeSet};
-use std::{cmp::min, collections::LinkedList};
 
 const MAGIC: &[u8; 3] = b"MGR";
 const LAYOUT_VERSION_V1: u8 = 1;
@@ -311,7 +311,7 @@ struct MemoryManagerInner<M: Memory> {
     memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
 
     // A list of freed buckets.
-    freed_buckets: LinkedList<BucketId>,
+    freed_buckets: BTreeSet<BucketId>,
 
     // Bucket ID of the first bucket that was not used.
     first_unused_bucket: BucketId,
@@ -343,7 +343,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
-            freed_buckets: LinkedList::new(),
+            freed_buckets: BTreeSet::new(),
             first_unused_bucket: BucketId(0),
         };
 
@@ -379,7 +379,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
-            freed_buckets: LinkedList::new(),
+            freed_buckets: BTreeSet::new(),
             first_unused_bucket: BucketId(0),
         };
 
@@ -415,7 +415,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
-            freed_buckets: LinkedList::new(),
+            freed_buckets: BTreeSet::new(),
             first_unused_bucket: BucketId(header.num_allocated_buckets),
         }
     }
@@ -460,16 +460,16 @@ impl<M: Memory> MemoryManagerInner<M> {
                 bucket_size_in_pages: header.bucket_size_in_pages,
                 memory_sizes_in_pages: header.memory_sizes_in_pages,
                 memory_buckets,
-                freed_buckets: LinkedList::new(),
+                freed_buckets: BTreeSet::new(),
                 first_unused_bucket: BucketId(0),
             }
         } else {
             let first_unused_bucket = BucketId((last_occupied_bucket + 1) as u16);
 
-            let mut freed_buckets = LinkedList::new();
+            let mut freed_buckets = BTreeSet::new();
             for i in unallocated_buckets.iter() {
                 if *i < first_unused_bucket.0 {
-                    freed_buckets.push_back(BucketId(*i));
+                    freed_buckets.insert(BucketId(*i));
                 }
             }
 
@@ -542,7 +542,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         // Allocate new buckets as needed.
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = match self.freed_buckets.pop_front() {
+            let new_bucket_id = match self.freed_buckets.pop_first() {
                 Some(t) => t,
                 None => {
                     if self.first_unused_bucket.0 != MAX_NUM_BUCKETS as u16 {
@@ -671,7 +671,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let buckets = self.memory_buckets.remove(&id);
         if let Some(vec_buckets) = buckets {
             for bucket in vec_buckets {
-                self.freed_buckets.push_back(bucket);
+                self.freed_buckets.insert(bucket);
                 self.allocated_buckets -= 1;
             }
         }
@@ -902,7 +902,7 @@ impl MemoryId {
 }
 
 // Referring to a bucket.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct BucketId(u16);
 
 fn bucket_allocations_address(id: BucketId) -> Address {
