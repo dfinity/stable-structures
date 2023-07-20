@@ -1290,6 +1290,7 @@ mod test {
     #[test]
     fn upgrade_from_v1_to_v2() {
         let mem = make_memory();
+        // Initialize with layout v1.
         let mem_mgr = MemoryManager::init_with_bucket_size_v1(mem.clone(), 1); // very small bucket size.
 
         let memories_v1: Vec<_> = (0..MAX_NUM_MEMORIES)
@@ -1306,7 +1307,7 @@ mod test {
                 write(memory_v1, offset, &data);
             }
 
-            // Load as v2
+            // Load layout v1 and convert it to layout v2.
             let mem_mgr_v2 = MemoryManager::init_with_bucket_size(mem.clone(), 1);
             let memories_v2: Vec<_> = (0..MAX_NUM_MEMORIES)
                 .map(|id| mem_mgr_v2.get(MemoryId(id)))
