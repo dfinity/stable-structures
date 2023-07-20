@@ -207,13 +207,18 @@ impl<M: Memory> MemoryManager<M> {
     }
 
     #[cfg(test)]
-    pub fn init_v1(memory: M) -> Self {
+    pub fn init_with_bucket_size_v1(memory: M, bucket_size_in_pages: u16) -> Self {
         Self {
             inner: Rc::new(RefCell::new(MemoryManagerInner::init_v1(
                 memory,
-                BUCKET_SIZE_IN_PAGES as u16,
+                bucket_size_in_pages,
             ))),
         }
+    }
+
+    #[cfg(test)]
+    pub fn init_v1(memory: M) -> Self {
+        Self::init_with_bucket_size_v1(memory, BUCKET_SIZE_IN_PAGES as u16)
     }
 
     /// Returns the memory associated with the given ID.
@@ -1392,26 +1397,40 @@ mod test {
 
     #[test]
     fn upgrade_from_v1_to_v2() {
-        // Create a memory with layout V1.
         let mem = make_memory();
-        let mem_mgr = MemoryManager::init_v1(mem.clone());
-        let memory = mem_mgr.get(MemoryId(0));
-        assert_eq!(memory.grow_v1(1), 0);
-        assert_eq!(memory.size(), 1);
+        let mem_mgr = MemoryManager::init_with_bucket_size_v1(mem.clone(), 1); // very small bucket size.
 
-        memory.write_v1(0, &[8, 1, 9]);
+        let memories_v1: Vec<_> = (0..MAX_NUM_MEMORIES)
+            .map(|id| mem_mgr.get(MemoryId(id)))
+            .collect();
 
-        let mut bytes = vec![0; 3];
-        memory.read_v1(0, &mut bytes);
-        assert_eq!(bytes, vec![8, 1, 9]);
+        proptest!(|(
+            num_memories in 0..255usize,
+            data in proptest::collection::vec(0..u8::MAX, 0..2*WASM_PAGE_SIZE as usize),
+            offset in 0..10*WASM_PAGE_SIZE
+        )| {
+            for memory_v1 in memories_v1.iter().take(num_memories) {
+                // Write a random blob into the memory, growing the memory as it needs to.
+                write(memory_v1, offset, &data);
 
-        // Upgrade to layout V2.
+                // Verify the blob can be read back.
+                let mut bytes = vec![0; data.len()];
+                memory_v1.read_v1(offset, &mut bytes);
+                assert_eq!(bytes, data);
+            }
 
-        let mem_mgr_v2 = MemoryManager::init(mem);
-        let memory = mem_mgr_v2.get(MemoryId(0));
-        let mut bytes = vec![0; 3];
-        assert_eq!(memory.size(), 1);
-        memory.read(0, &mut bytes);
-        assert_eq!(bytes, vec![8, 1, 9]);
+            // Load as v2
+            let mem_mgr_v2 = MemoryManager::init_with_bucket_size(mem.clone(), 1);
+            let memories_v2: Vec<_> = (0..MAX_NUM_MEMORIES)
+                .map(|id| mem_mgr_v2.get(MemoryId(id)))
+                .collect();
+
+            for memory_v2 in memories_v2.iter().take(num_memories) {
+                // Verify the blob can be read back.
+                let mut bytes = vec![0; data.len()];
+                memory_v2.read(offset, &mut bytes);
+                assert_eq!(bytes, data);
+            }
+        });
     }
 }
