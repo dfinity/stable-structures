@@ -430,7 +430,6 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
 
-        let mut unallocated_buckets: BTreeSet<u16> = (0..MAX_NUM_BUCKETS as u16).collect();
         let mut memory_buckets = BTreeMap::new();
 
         let mut last_occupied_bucket: i32 = -1;
@@ -445,7 +444,6 @@ impl<M: Memory> MemoryManagerInner<M> {
                 let bucket = buckets_decompressed[j];
                 last_occupied_bucket = std::cmp::max(bucket.0 as i32, last_occupied_bucket);
                 vec_buckets.push(bucket);
-                unallocated_buckets.remove(&bucket.0);
                 j += 1;
             }
             memory_buckets
@@ -465,12 +463,14 @@ impl<M: Memory> MemoryManagerInner<M> {
             }
         } else {
             let first_unused_bucket = BucketId((last_occupied_bucket + 1) as u16);
-
             let mut freed_buckets = BTreeSet::new();
-            for i in unallocated_buckets.iter() {
-                if *i < first_unused_bucket.0 {
-                    freed_buckets.insert(BucketId(*i));
-                }
+
+            for id in 0..last_occupied_bucket as u16 {
+                freed_buckets.insert(BucketId(id));
+            }
+
+            for id in buckets_decompressed.iter() {
+                freed_buckets.remove(id);
             }
 
             Self {
