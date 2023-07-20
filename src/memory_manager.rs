@@ -535,7 +535,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         // Allocate new buckets as needed.
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = match self.freed_buckets.pop_first() {
+            let new_bucket_id = match self.freed_buckets.pop_last() {
                 Some(t) => t,
                 None => {
                     if self.allocated_buckets != MAX_NUM_BUCKETS as u16 {
