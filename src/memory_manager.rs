@@ -216,11 +216,6 @@ impl<M: Memory> MemoryManager<M> {
         }
     }
 
-    #[cfg(test)]
-    pub fn init_v1(memory: M) -> Self {
-        Self::init_with_bucket_size_v1(memory, BUCKET_SIZE_IN_PAGES as u16)
-    }
-
     /// Returns the memory associated with the given ID.
     pub fn get(&self, id: MemoryId) -> VirtualMemory<M> {
         VirtualMemory {
