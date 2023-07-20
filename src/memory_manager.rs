@@ -283,23 +283,6 @@ impl<M: Memory> Memory for VirtualMemory<M> {
     }
 }
 
-impl<M: Memory> VirtualMemory<M> {
-    #[cfg(test)]
-    fn grow_v1(&self, pages: u64) -> i64 {
-        self.memory_manager.borrow_mut().grow_v1(self.id, pages)
-    }
-
-    #[cfg(test)]
-    fn read_v1(&self, offset: u64, dst: &mut [u8]) {
-        self.memory_manager.borrow().read_v1(self.id, offset, dst)
-    }
-
-    #[cfg(test)]
-    fn write_v1(&self, offset: u64, src: &[u8]) {
-        self.memory_manager.borrow().write_v1(self.id, offset, src)
-    }
-}
-
 #[derive(Clone)]
 struct MemoryManagerInner<M: Memory> {
     memory: M,
@@ -693,92 +676,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         };
 
         write_struct(&header, Address::from(0), &self.memory);
-    }
-
-    #[cfg(test)]
-    fn grow_v1(&mut self, id: MemoryId, pages: u64) -> i64 {
-        // Compute how many additional buckets are needed.
-        let old_size = self.memory_size(id);
-        let new_size = old_size + pages;
-        let current_buckets = self.num_buckets_needed(old_size);
-        let required_buckets = self.num_buckets_needed(new_size);
-        let new_buckets_needed = required_buckets - current_buckets;
-
-        if new_buckets_needed + self.allocated_buckets as u64 > MAX_NUM_BUCKETS {
-            // Exceeded the memory that can be managed.
-            return -1;
-        }
-
-        // Allocate new buckets as needed.
-        for _ in 0..new_buckets_needed {
-            let new_bucket_id = BucketId(self.allocated_buckets);
-
-            self.memory_buckets
-                .entry(id)
-                .or_insert_with(Vec::new)
-                .push(new_bucket_id);
-
-            // Write in stable store that this bucket belongs to the memory with the provided `id`.
-            write(
-                &self.memory,
-                bucket_allocations_address(new_bucket_id).get(),
-                &[id.0],
-            );
-
-            self.allocated_buckets += 1;
-        }
-
-        // Grow the underlying memory if necessary.
-        let pages_needed = BUCKETS_OFFSET_IN_PAGES
-            + self.bucket_size_in_pages as u64 * self.allocated_buckets as u64;
-        if pages_needed > self.memory.size() {
-            let additional_pages_needed = pages_needed - self.memory.size();
-            let prev_pages = self.memory.grow(additional_pages_needed);
-            if prev_pages == -1 {
-                panic!("{id:?}: grow failed");
-            }
-        }
-
-        // Update the memory with the new size.
-        self.memory_sizes_in_pages[id.0 as usize] = new_size;
-
-        // Update the header and return the old size.
-        self.save_header();
-        old_size as i64
-    }
-
-    #[cfg(test)]
-    fn write_v1(&self, id: MemoryId, offset: u64, src: &[u8]) {
-        if (offset + src.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
-            panic!("{id:?}: write out of bounds");
-        }
-
-        let mut bytes_written = 0;
-        for Segment { address, length } in self.bucket_iter(id, offset, src.len()) {
-            self.memory.write(
-                address.get(),
-                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-            );
-
-            bytes_written += length.get();
-        }
-    }
-
-    #[cfg(test)]
-    fn read_v1(&self, id: MemoryId, offset: u64, dst: &mut [u8]) {
-        if (offset + dst.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
-            panic!("{id:?}: read out of bounds");
-        }
-
-        let mut bytes_read = 0;
-        for Segment { address, length } in self.bucket_iter(id, offset, dst.len()) {
-            self.memory.read(
-                address.get(),
-                &mut dst[bytes_read as usize..(bytes_read + length.get()) as usize],
-            );
-
-            bytes_read += length.get();
-        }
     }
 }
 
@@ -1412,11 +1309,6 @@ mod test {
             for memory_v1 in memories_v1.iter().take(num_memories) {
                 // Write a random blob into the memory, growing the memory as it needs to.
                 write(memory_v1, offset, &data);
-
-                // Verify the blob can be read back.
-                let mut bytes = vec![0; data.len()];
-                memory_v1.read_v1(offset, &mut bytes);
-                assert_eq!(bytes, data);
             }
 
             // Load as v2
