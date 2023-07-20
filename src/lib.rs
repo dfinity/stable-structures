@@ -3,6 +3,8 @@ mod base_vec;
 pub mod btreemap;
 pub mod cell;
 pub use cell::{Cell as StableCell, Cell};
+pub mod certification;
+mod certified_seq;
 pub mod file_mem;
 #[cfg(target_arch = "wasm32")]
 mod ic0_memory; // Memory API for canisters.

@@ -28,11 +28,13 @@ proptest! {
 
     #[test]
     fn f64_roundtrip(v in any::<f64>()) {
-        prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
+        let parsed: f64 = Storable::from_bytes(v.to_bytes());
+        prop_assert_eq!(v, parsed);
     }
 
     #[test]
     fn f32_roundtrip(v in any::<f32>()) {
-        prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
+        let parsed: f32 = Storable::from_bytes(v.to_bytes());
+        prop_assert_eq!(v, parsed);
     }
 }
