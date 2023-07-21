@@ -7,6 +7,8 @@ use crate::{
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
 
+#[cfg(test)]
+mod tests;
 mod v1;
 
 // The minimum degree to use in the btree.
@@ -341,7 +343,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert_eq!(b.children.len(), 0);
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn entries<M: Memory>(&self, memory: &M) -> Vec<Entry<K>> {
         self.keys
             .iter()
