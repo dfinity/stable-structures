@@ -34,7 +34,7 @@ use crate::{
 use allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
-use node::{Entry, Node, NodeType};
+use node::{Entry, Node, NodeType, Version};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
@@ -1046,8 +1046,10 @@ where
         Node::load(
             address,
             self.memory(),
-            self.max_key_size,
-            self.max_value_size,
+            Version::V1 {
+                max_key_size: self.max_key_size,
+                max_value_size: self.max_value_size,
+            },
         )
     }
 

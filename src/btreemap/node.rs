@@ -8,6 +8,20 @@ use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
 
 mod v1;
+mod v2;
+
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
+pub enum Version {
+    V1 {
+        max_key_size: u32,
+        max_value_size: u32,
+    },
+    V2 {
+        size_bounds: Option<(u32, u32)>,
+    //    page_size: usize, // TODO: why is this usize?
+        page_size: usize,
+    },
+}
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
@@ -31,6 +45,12 @@ pub type Entry<K> = (K, Vec<u8>);
 
 /// A node of a B-Tree.
 ///
+/// A node can have two versions:
+///
+///  V1: needs max key, max value sizes
+///  V2: needs a page size
+///  if upgrading from V1 to V2, then we need to store both.
+///
 /// The node is stored in stable memory with the following layout:
 ///
 ///    |  NodeHeader  |  Entries (keys and values) |  Children  |
@@ -53,8 +73,10 @@ pub struct Node<K: Storable + Ord + Clone> {
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
     node_type: NodeType,
-    max_key_size: u32,
-    max_value_size: u32,
+    //   max_key_size: u32,
+    //  max_value_size: u32,
+    version: Version,
+    overflow: Option<Address>,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -71,20 +93,21 @@ impl<K: Storable + Ord + Clone> Node<K> {
             encoded_values: RefCell::default(),
             children: vec![],
             node_type,
-            max_key_size,
-            max_value_size,
+            version: Version::V1 {
+                max_key_size,
+                max_value_size,
+            },
+            overflow: None,
         }
     }
 
     /// Loads a node from memory at the given address.
-    pub fn load<M: Memory>(
-        address: Address,
-        memory: &M,
-        max_key_size: u32,
-        max_value_size: u32,
-    ) -> Self {
-        // NOTE: new versions of `Node` will be introduced.
-        Self::load_v1(address, memory, max_key_size, max_value_size)
+    pub fn load<M: Memory>(address: Address, memory: &M, context: Version) -> Self {
+        // TODO: check the node version (and tests for all these cases)
+        match context {
+            Version::V1 { .. } => Self::load_v1(address, context, memory),
+            Version::V2 { .. } => Self::load_v2(address, context, memory),
+        }
     }
 
     /// Saves the node to memory.
@@ -119,8 +142,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                         .last()
                         .expect("An internal node must have children."),
                     memory,
-                    self.max_key_size,
-                    self.max_value_size,
+                    self.version,
                 );
                 last_child.get_max(memory)
             }
@@ -139,8 +161,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     // NOTE: an internal node must have children, so this access is safe.
                     self.children[0],
                     memory,
-                    self.max_key_size,
-                    self.max_value_size,
+                    self.version,
                 );
                 first_child.get_min(memory)
             }

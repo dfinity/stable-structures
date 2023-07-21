@@ -2,12 +2,21 @@ use super::*;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a node from memory at the given address.
-    pub(super) fn load_v1<M: Memory>(
-        address: Address,
-        memory: &M,
-        max_key_size: u32,
-        max_value_size: u32,
-    ) -> Self {
+    pub(super) fn load_v1<M: Memory>(address: Address, context: Version, memory: &M) -> Self {
+        let (max_key_size, max_value_size) = match context {
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            }
+            | Version::V2 {
+                size_bounds: Some((max_key_size, max_value_size)),
+                ..
+            } => (max_key_size, max_value_size),
+            Version::V2 {
+                size_bounds: None, ..
+            } => panic!("cannot load v2 node when version is v1."),
+        };
+
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
@@ -58,12 +67,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 INTERNAL_NODE_TYPE => NodeType::Internal,
                 other => unreachable!("Unknown node type {}", other),
             },
-            max_key_size,
-            max_value_size,
+            version: context,
+            overflow: None,
         }
     }
 
     pub(super) fn save_v1<M: Memory>(&self, memory: &M) {
+        let (max_key_size, max_value_size) = match self.version {
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => (max_key_size, max_value_size),
+            Version::V2 { .. } => unreachable!("cannot save v2 node as v1."),
+        };
+
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());
@@ -108,7 +125,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the key.
             write(memory, (self.address + offset).get(), key_bytes.borrow());
-            offset += Bytes::from(self.max_key_size);
+            offset += Bytes::from(max_key_size);
 
             // Write the size of the value.
             let value = self.value(idx, memory);
@@ -117,7 +134,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the value.
             write(memory, (self.address + offset).get(), &value);
-            offset += Bytes::from(self.max_value_size);
+            offset += Bytes::from(max_value_size);
         }
 
         // Write the children
