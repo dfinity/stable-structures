@@ -1,5 +1,5 @@
 //! An example showcasing how to use a MinHeap for scheduled tasks.
-use ic_cdk_macros::{post_upgrade, update};
+use ic_cdk::{post_upgrade, update};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{DefaultMemoryImpl, StableMinHeap};
 use std::cell::RefCell;

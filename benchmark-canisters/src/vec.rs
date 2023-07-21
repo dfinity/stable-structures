@@ -1,5 +1,5 @@
 use crate::{count_instructions, Random};
-use ic_cdk_macros::query;
+use ic_cdk::query;
 use ic_stable_structures::storable::Blob;
 use ic_stable_structures::{BoundedStorable, DefaultMemoryImpl, StableVec};
 use tiny_rng::{Rand, Rng};

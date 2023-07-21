@@ -65,13 +65,13 @@ thread_local! {
 }
 
 // Retrieves the value associated with the given key if it exists.
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 fn get(key: String) -> Option<Vec<u8>> {
     MAP.with(|p| p.borrow().get(&UserName(key)).map(|v| v.0))
 }
 
 // Inserts an entry into the map and returns the previous value of the key if it exists.
-#[ic_cdk_macros::update]
+#[ic_cdk::update]
 fn insert(key: String, value: Vec<u8>) -> Option<Vec<u8>> {
     MAP.with(|p| p.borrow_mut().insert(UserName(key), UserData(value)))
         .map(|v| v.0)

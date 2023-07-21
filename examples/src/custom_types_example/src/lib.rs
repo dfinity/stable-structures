@@ -52,12 +52,12 @@ thread_local! {
 }
 
 /// Retrieves the value associated with the given key if it exists.
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 fn get(key: u64) -> Option<UserProfile> {
     MAP.with(|p| p.borrow().get(&key))
 }
 
-#[ic_cdk_macros::update]
+#[ic_cdk::update]
 fn insert(key: u64, value: UserProfile) -> Option<UserProfile> {
     MAP.with(|p| p.borrow_mut().insert(key, value))
 }

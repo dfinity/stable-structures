@@ -93,8 +93,7 @@ Dependencies:
 
 ```toml
 [dependencies]
-ic-cdk = "0.6.8"
-ic-cdk-macros = "0.6.8"
+ic-cdk = "0.10"
 ic-stable-structures = "0.5.6"
 ```
 
@@ -122,13 +121,13 @@ thread_local! {
 }
 
 // Retrieves the value associated with the given key if it exists.
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 fn get(key: u128) -> Option<u128> {
     MAP.with(|p| p.borrow().get(&key))
 }
 
 // Inserts an entry into the map and returns the previous value of the key if it exists.
-#[ic_cdk_macros::update]
+#[ic_cdk::update]
 fn insert(key: u128, value: u128) -> Option<u128> {
     MAP.with(|p| p.borrow_mut().insert(key, value))
 }
