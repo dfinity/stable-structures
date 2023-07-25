@@ -20,7 +20,7 @@ pub enum Version {
     },
     V2 {
         size_bounds: Option<(u32, u32)>,
-    //    page_size: usize, // TODO: why is this usize?
+        //    page_size: usize, // TODO: why is this usize?
         page_size: usize,
     },
 }
@@ -89,18 +89,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_key_size: u32,
         max_value_size: u32,
     ) -> Node<K> {
-        Node {
-            address,
-            keys: vec![],
-            encoded_values: RefCell::default(),
-            children: vec![],
-            node_type,
-            version: Version::V1 {
-                max_key_size,
-                max_value_size,
-            },
-            overflow: None,
-        }
+        Node::new_v1(address, node_type, max_key_size, max_value_size)
     }
 
     /// Loads a node from memory at the given address.

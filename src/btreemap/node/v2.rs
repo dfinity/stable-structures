@@ -18,7 +18,23 @@ use crate::write_u64;
 use std::cmp::min;
 
 impl<K: Storable + Ord + Clone> Node<K> {
-    // Loads a V2 node from memory at the given address.
+    /// Creates a new V2 node at the given address.
+    pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: usize) -> Node<K> {
+        Node {
+            address,
+            keys: vec![],
+            encoded_values: RefCell::default(),
+            children: vec![],
+            node_type,
+            version: Version::V2 {
+                size_bounds: None,
+                page_size,
+            },
+            overflow: None,
+        }
+    }
+
+    /// Loads a V2 node from memory at the given address.
     pub(super) fn load_v2<M: Memory>(address: Address, context: Version, memory: &M) -> Self {
         let page_size = match context {
             Version::V2 { page_size, .. } => page_size,
@@ -104,7 +120,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     // Saves the node to memory.
-    pub(super) fn save_v2<M: Memory>(&self, page_size: usize, allocator: &mut Allocator<M>) {
+    pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
+        let page_size = match self.version {
+            Version::V2 { page_size, .. } => page_size,
+            Version::V1 { .. } => panic!("todo: support saving v1 node as v2 node."),
+        };
+
         // A buffer to serialize the node into first, then write to memory.
         let mut buf = vec![];
         buf.extend_from_slice(MAGIC);

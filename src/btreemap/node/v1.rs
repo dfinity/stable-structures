@@ -1,6 +1,27 @@
 use super::*;
 
 impl<K: Storable + Ord + Clone> Node<K> {
+    /// Creates a new V1 node at the given address.
+    pub(super) fn new_v1(
+        address: Address,
+        node_type: NodeType,
+        max_key_size: u32,
+        max_value_size: u32,
+    ) -> Node<K> {
+        Node {
+            address,
+            keys: vec![],
+            encoded_values: RefCell::default(),
+            children: vec![],
+            node_type,
+            version: Version::V1 {
+                max_key_size,
+                max_value_size,
+            },
+            overflow: None,
+        }
+    }
+
     /// Loads a node from memory at the given address.
     pub(super) fn load_v1<M: Memory>(address: Address, context: Version, memory: &M) -> Self {
         let (max_key_size, max_value_size) = match context {
