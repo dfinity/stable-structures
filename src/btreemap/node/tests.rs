@@ -82,7 +82,7 @@ fn loading_and_reloading_entries_v2(
 }
 
 #[proptest]
-fn loading_and_reloading_entries_v1_v2(
+fn migrating_v1_nodes_to_v2(
     #[strategy(1..100u32)] max_key_size: u32,
     #[strategy(1..1_000u32)] max_value_size: u32,
     #[strategy(
