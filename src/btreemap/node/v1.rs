@@ -29,13 +29,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             }
-            | Version::V2 {
-                size_bounds: Some((max_key_size, max_value_size)),
-                ..
-            } => (max_key_size, max_value_size),
-            Version::V2 {
-                size_bounds: None, ..
-            } => panic!("cannot load v2 node when version is v1."),
+            | Version::V2(PageSize::Kv(max_key_size, max_value_size)) => {
+                (max_key_size, max_value_size)
+            }
+            Version::V2(PageSize::Absolute(_)) => panic!("cannot load v2 node when version is v1."),
         };
 
         // Load the header.

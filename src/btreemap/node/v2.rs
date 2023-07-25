@@ -21,17 +21,14 @@ use std::cmp::min;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new V2 node at the given address.
-    pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: usize) -> Node<K> {
+    pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: u32) -> Node<K> {
         Node {
             address,
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
             node_type,
-            version: Version::V2 {
-                size_bounds: None,
-                page_size,
-            },
+            version: Version::V2(PageSize::Absolute(page_size)),
             overflow: None,
         }
     }
@@ -39,7 +36,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a V2 node from memory at the given address.
     pub(super) fn load_v2<M: Memory>(address: Address, context: Version, memory: &M) -> Self {
         let page_size = match context {
-            Version::V2 { page_size, .. } => page_size,
+            Version::V2(PageSize::Absolute(page_size)) => page_size,
+            Version::V2(PageSize::Kv(max_key_size, max_value_size)) => {
+                v1::size_v1(max_key_size, max_value_size).get() as u32
+            }
             Version::V1 { .. } => panic!("cannot load v2 node when version is v1."),
         };
 
@@ -124,14 +124,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
         let page_size = match self.version {
-            Version::V2 { page_size, .. } => page_size,
-            Version::V1 {
+            Version::V2(PageSize::Absolute(page_size)) => page_size,
+            Version::V2(PageSize::Kv(max_key_size, max_value_size))
+            | Version::V1 {
                 max_key_size,
                 max_value_size,
             } => {
                 // Saving a v1 node. The size of the page can be computed from the max key/value
                 // sizes.
-                v1::size_v1(max_key_size, max_value_size).get() as usize
+                v1::size_v1(max_key_size, max_value_size).get() as u32
             }
         };
 
@@ -182,7 +183,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             buf.extend_from_slice(&child.get().to_le_bytes());
         }
 
-        self.write_paginated(buf, allocator, page_size);
+        self.write_paginated(buf, allocator, page_size as usize);
     }
 
     // Writes a buffer into pages of the given page size.
@@ -209,7 +210,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Write the first page
         let memory = allocator.memory();
-        memory.write(self.address.get(), &buf[..min(page_size, buf.len())]);
+        memory.write(
+            self.address.get(),
+            &buf[..min(page_size as usize, buf.len())],
+        );
         if !overflow_addresses.is_empty() {
             // Write the next overflow address to the first page.
             write_u64(
@@ -296,16 +300,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
 }
 
 // Reads the entirety of the node, including all its overflows, into a buffer.
-fn read_node<M: Memory>(address: Address, page_size: usize, memory: &M) -> Vec<u8> {
+fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8> {
     // Read the first page of the node.
-    let mut buf = vec![0; page_size];
+    let mut buf = vec![0; page_size as usize];
     memory.read(address.get(), &mut buf);
 
     // Append overflow pages, if any.
     let mut overflow_address = address_from_slice(&buf, OVERFLOW_ADDRESS_OFFSET);
     while overflow_address != NULL {
         // Read the overflow.
-        let mut overflow_buf = vec![0; page_size];
+        let mut overflow_buf = vec![0; page_size as usize];
         memory.read(overflow_address.get(), &mut overflow_buf);
 
         // Validate the magic of the overflow.

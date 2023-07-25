@@ -18,11 +18,13 @@ pub enum Version {
         max_key_size: u32,
         max_value_size: u32,
     },
-    V2 {
-        size_bounds: Option<(u32, u32)>,
-        //    page_size: usize, // TODO: why is this usize?
-        page_size: usize,
-    },
+    V2(PageSize),
+}
+
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
+pub enum PageSize {
+    Kv(u32, u32),
+    Absolute(u32),
 }
 
 // The minimum degree to use in the btree.
