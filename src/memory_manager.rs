@@ -518,7 +518,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         // Allocate new buckets as needed.
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = match self.freed_buckets.pop_last() {
+            let new_bucket_id = match self.freed_buckets.pop_first() {
                 Some(t) => t,
                 None => {
                     if self.allocated_buckets != MAX_NUM_BUCKETS as u16 {
@@ -1276,6 +1276,49 @@ mod test {
         // try growing once more
         assert_eq!(memory_0.grow(1), 1);
         assert_eq!(mem_mgr.get(MemoryId(0)).size(), 2);
+    }
+
+    #[test]
+    fn test_freed_buckets_assignment_order() {
+        let mut mem_mgr = MemoryManager::init(make_memory());
+        let memory_a: VirtualMemory<Rc<RefCell<Vec<u8>>>> = mem_mgr.get(MemoryId(0));
+        let memory_b: VirtualMemory<Rc<RefCell<Vec<u8>>>> = mem_mgr.get(MemoryId(1));
+
+        // grow and write to memory
+        assert_eq!(memory_a.grow(1), 0);
+        assert_eq!(memory_b.grow(1), 0);
+        memory_a.write(0, &[7, 1, 5]);
+        memory_b.write(0, &[9, 4, 8]);
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 1);
+        assert_eq!(mem_mgr.get(MemoryId(1)).size(), 1);
+
+        let mut bytes = vec![0; 3];
+
+        // free memory
+        mem_mgr.free(MemoryId(0));
+        mem_mgr.free(MemoryId(1));
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 0);
+        assert_eq!(mem_mgr.get(MemoryId(1)).size(), 0);
+
+        let memory_c: VirtualMemory<Rc<RefCell<Vec<u8>>>> = mem_mgr.get(MemoryId(2));
+        let memory_d: VirtualMemory<Rc<RefCell<Vec<u8>>>> = mem_mgr.get(MemoryId(3));
+
+        // grow memory
+        assert_eq!(memory_c.grow(1), 0);
+        assert_eq!(memory_d.grow(1), 0);
+
+        assert_eq!(mem_mgr.get(MemoryId(2)).size(), 1);
+        assert_eq!(mem_mgr.get(MemoryId(3)).size(), 1);
+
+        // check that old bucket is reassign to the memory
+        memory_c.read(0, &mut bytes);
+        assert_eq!(bytes, &[7, 1, 5]);
+
+        // check that old bucket is reassign to the memory
+        memory_d.read(0, &mut bytes);
+        assert_eq!(bytes, &[9, 4, 8]);
     }
 
     #[test]
