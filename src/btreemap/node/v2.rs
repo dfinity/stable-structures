@@ -9,7 +9,9 @@ const ENTRIES_OFFSET: Bytes = Bytes::new(15); // an additional 8 bytes for the o
 
 const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
 const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11); // magic + next address
-                                                         //
+
+// TODO: add note that page size must be > PAGE_OVERFLOW_DATA_OFFSET
+
 const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 const LAYOUT_VERSION_2: u8 = 2;
 
@@ -123,7 +125,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
         let page_size = match self.version {
             Version::V2 { page_size, .. } => page_size,
-            Version::V1 { .. } => panic!("todo: support saving v1 node as v2 node."),
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => {
+                // Saving a v1 node. The size of the page can be computed from the max key/value
+                // sizes.
+                v1::size_v1(max_key_size, max_value_size).get() as usize
+            }
         };
 
         // A buffer to serialize the node into first, then write to memory.

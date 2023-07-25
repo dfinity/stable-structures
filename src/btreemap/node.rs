@@ -381,16 +381,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///
     /// See the documentation of [`Node`] for the memory layout.
     pub fn size(max_key_size: u32, max_value_size: u32) -> Bytes {
-        let max_key_size = Bytes::from(max_key_size);
-        let max_value_size = Bytes::from(max_value_size);
-
-        let node_header_size = NodeHeader::size();
-        let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
-        let child_size = Address::size();
-
-        node_header_size
-            + Bytes::from(CAPACITY as u64) * entry_size
-            + Bytes::from((CAPACITY + 1) as u64) * child_size
+        v1::size_v1(max_key_size, max_value_size)
     }
 
     /// Returns true if the node is at the minimum required size, false otherwise.
