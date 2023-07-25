@@ -47,7 +47,7 @@ fn loading_and_reloading_entries_v1(
 
 #[proptest]
 fn loading_and_reloading_entries_v2(
-    #[strategy(12..2_000_usize)] page_size: usize,
+    #[strategy(12..2_000_u32)] page_size: u32,
     #[strategy(
         pmap(
             pvec(0..u8::MAX, 0..100),
@@ -70,14 +70,7 @@ fn loading_and_reloading_entries_v2(
     node.save_v2(&mut allocator);
 
     // Reload the node and double check all the entries are correct.
-    let node = Node::load_v2(
-        node_addr,
-        Version::V2 {
-            size_bounds: None,
-            page_size,
-        },
-        &mem,
-    );
+    let node = Node::load_v2(node_addr, Version::V2(PageSize::Absolute(page_size)), &mem);
     assert_eq!(node.entries(&mem), entries.into_iter().collect::<Vec<_>>());
 }
 
@@ -121,11 +114,7 @@ fn migrating_v1_nodes_to_v2(
     // Reload the now v2 node and double check all the entries are correct.
     let node = Node::load_v2(
         node_addr,
-        Version::V2 {
-            size_bounds: Some((max_key_size, max_value_size)),
-            page_size: v1_size.get() as usize, // TODO: we don't need to pass
-                                               // this, right?
-        },
+        Version::V2(PageSize::Kv(max_key_size, max_value_size)),
         &mem,
     );
     assert_eq!(node.entries(&mem), entries.into_iter().collect::<Vec<_>>());
