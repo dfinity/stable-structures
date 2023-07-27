@@ -398,11 +398,22 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 
     fn load_layout_v2(memory: M, header: Header) -> Self {
+        let mut memory_size_in_buckets = vec![];
+        let mut number_of_used_buckets = 0;
+
+        for memory_size_in_pages in header.memory_sizes_in_pages.into_iter() {
+            let size_in_buckets = (memory_size_in_pages + header.bucket_size_in_pages as u64 - 1)
+                / header.bucket_size_in_pages as u64;
+            memory_size_in_buckets.push(size_in_buckets);
+            number_of_used_buckets += size_in_buckets;
+        }
+
         const BYTE_SIZE_IN_BITS: usize = 8;
-        const BUCKETS_INDEX_SIZE_IN_BYTES: usize =
-            (MAX_NUM_BUCKETS as usize * BUCKET_ID_LEN_IN_BITS + (BYTE_SIZE_IN_BITS - 1))
+        let buckets_index_size_in_bytes: usize =
+            (number_of_used_buckets as usize * BUCKET_ID_LEN_IN_BITS + (BYTE_SIZE_IN_BITS - 1))
                 / BYTE_SIZE_IN_BITS;
-        let mut buckets = vec![0; BUCKETS_INDEX_SIZE_IN_BYTES];
+
+        let mut buckets = vec![0; buckets_index_size_in_bytes];
         memory.read(bucket_indexes_offset().get(), &mut buckets);
 
         let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
@@ -412,12 +423,10 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mut last_occupied_bucket: i32 = -1;
 
         let mut j = 0;
-        for (memory, memory_size_in_pages) in header.memory_sizes_in_pages.into_iter().enumerate() {
-            let memory_size_in_buckets =
-                (memory_size_in_pages + header.bucket_size_in_pages as u64 - 1)
-                    / header.bucket_size_in_pages as u64;
+
+        for (memory, size_in_buckets) in memory_size_in_buckets.into_iter().enumerate() {
             let mut vec_buckets = vec![];
-            for _ in 0..memory_size_in_buckets {
+            for _ in 0..size_in_buckets {
                 let bucket = buckets_decompressed[j];
                 last_occupied_bucket = std::cmp::max(bucket.0 as i32, last_occupied_bucket);
                 vec_buckets.push(bucket);
@@ -521,13 +530,9 @@ impl<M: Memory> MemoryManagerInner<M> {
             let new_bucket_id = match self.freed_buckets.pop_first() {
                 Some(t) => t,
                 None => {
-                    if self.allocated_buckets != MAX_NUM_BUCKETS as u16 {
-                        let new_id = self.allocated_buckets;
-                        self.allocated_buckets += 1;
-                        BucketId(new_id)
-                    } else {
-                        panic!("{id:?}: grow failed");
-                    }
+                    let new_id = self.allocated_buckets;
+                    self.allocated_buckets += 1;
+                    BucketId(new_id)
                 }
             };
 
@@ -1328,6 +1333,31 @@ mod test {
         assert_eq!(memory_0.grow(1), 0);
 
         mem_mgr.free(MemoryId(5));
+    }
+
+    #[test]
+    fn freed_memories_are_tracked() {
+        let mem = make_memory();
+        let mut mem_mgr = MemoryManager::init(mem.clone());
+        mem_mgr.get(MemoryId(0)).grow(1);
+        mem_mgr.get(MemoryId(1)).grow(1);
+        mem_mgr.get(MemoryId(2)).grow(1);
+        mem_mgr.get(MemoryId(3)).grow(1);
+        mem_mgr.get(MemoryId(4)).grow(1);
+
+        mem_mgr.free(MemoryId(0));
+        mem_mgr.free(MemoryId(2));
+        mem_mgr.free(MemoryId(4));
+
+        let mem_mgr = MemoryManager::init(mem);
+        // Only Memory 0 and 2 buckets should be counted as freed_buckets.
+        // The bucket belonging to Memory 4 should not be counted as
+        // freed because it has the biggest Bucket ID of all allocated
+        // buckets hence it should become part of unallocated buckets.
+        assert_eq!(
+            mem_mgr.inner.borrow().freed_buckets,
+            maplit::btreeset! { BucketId(0), BucketId(2) }
+        );
     }
 
     #[test]
