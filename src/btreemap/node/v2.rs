@@ -10,7 +10,7 @@ const ENTRIES_OFFSET: Bytes = Bytes::new(15); // an additional 8 bytes for the o
 const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
 const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11); // magic + next address
 
-// TODO: add note that page size must be > PAGE_OVERFLOW_DATA_OFFSET
+// TODO: add note that page size must be > ENTRIES OFFSET
 
 const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 const LAYOUT_VERSION_2: u8 = 2;

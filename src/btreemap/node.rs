@@ -21,8 +21,14 @@ pub enum Version {
     V2(PageSize),
 }
 
+/// The size of an individual page in the memory where nodes are stored.
+/// A node, if it's bigger than a single page, can overflow into multiple pages.
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum PageSize {
+    // Used in the case where we migrate from v1 to v2.
+    // The reason we need to keep these numbers around is because migration is done
+    // incrementally. Some children of a V2 node can be a V1 node, and in that case
+    // we need this information to load them.
     Kv(u32, u32),
     Absolute(u32),
 }
