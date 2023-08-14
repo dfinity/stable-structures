@@ -27,6 +27,7 @@ struct NodeV1Data {
         )
     )]
     entries: BTreeMap<Vec<u8>, Vec<u8>>,
+    node_type: NodeType,
 }
 
 impl NodeV1Data {
@@ -34,14 +35,32 @@ impl NodeV1Data {
         // Create a new node.
         let mut node = Node::new_v1(
             address,
-            NodeType::Leaf,
+            self.node_type,
             self.max_key_size,
             self.max_value_size,
         );
+
         for entry in self.entries.clone().into_iter() {
             node.push_entry(entry);
         }
+
+        // If the node is an internal node, then insert some children addresses.
+        if self.node_type == NodeType::Internal {
+            for i in 0..=self.entries.len() {
+                node.push_child(Address::from(i as u64));
+            }
+        }
         node
+    }
+
+    fn children(&self) -> Vec<Address> {
+        if self.node_type == NodeType::Internal {
+            (0..=self.entries.len())
+                .map(|i| Address::from(i as u64))
+                .collect()
+        } else {
+            vec![]
+        }
     }
 }
 
@@ -58,15 +77,32 @@ struct NodeV2Data {
         )
     )]
     entries: BTreeMap<Vec<u8>, Vec<u8>>,
+    node_type: NodeType,
 }
 
 impl NodeV2Data {
     fn get(&self, address: Address) -> Node<Vec<u8>> {
-        let mut node = Node::new_v2(address, NodeType::Leaf, self.page_size);
+        let mut node = Node::new_v2(address, self.node_type, self.page_size);
         for entry in self.entries.clone().into_iter() {
             node.push_entry(entry);
         }
+        // If the node is an internal node, then insert some children addresses.
+        if self.node_type == NodeType::Internal {
+            for i in 0..=self.entries.len() {
+                node.push_child(Address::from(i as u64));
+            }
+        }
         node
+    }
+
+    fn children(&self) -> Vec<Address> {
+        if self.node_type == NodeType::Internal {
+            (0..=self.entries.len())
+                .map(|i| Address::from(i as u64))
+                .collect()
+        } else {
+            vec![]
+        }
     }
 }
 
@@ -79,7 +115,7 @@ fn saving_and_loading_v1(node_data: NodeV1Data) {
     let node = node_data.get(NULL);
     node.save_v1(&mem);
 
-    // Reload the node and double check all the entries are correct.
+    // Reload the node and double check all the entries and children are correct.
     let node = Node::load_v1(
         NULL,
         Version::V1 {
@@ -88,6 +124,8 @@ fn saving_and_loading_v1(node_data: NodeV1Data) {
         },
         &mem,
     );
+
+    assert_eq!(node.children, node_data.children());
     assert_eq!(
         node.entries(&mem),
         node_data.entries.into_iter().collect::<Vec<_>>()
@@ -109,12 +147,14 @@ fn saving_and_loading_v2(node_data: NodeV2Data) {
     let node = node_data.get(node_addr);
     node.save_v2(&mut allocator);
 
-    // Reload the node and double check all the entries are correct.
+    // Reload the node and double check all the entries and children are correct.
     let node = Node::load_v2(
         node_addr,
         Version::V2(PageSize::Absolute(node_data.page_size)),
         &mem,
     );
+
+    assert_eq!(node.children, node_data.children());
     assert_eq!(
         node.entries(&mem),
         node_data.entries.into_iter().collect::<Vec<_>>()
@@ -144,7 +184,7 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
     );
     node.save_v2(&mut allocator);
 
-    // Reload the now v2 node and double check all the entries are correct.
+    // Reload the now v2 node and double check all the entries and children are correct.
     let node = Node::load_v2(
         node_addr,
         Version::V2(PageSize::Kv(
@@ -153,6 +193,8 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
         )),
         &mem,
     );
+
+    assert_eq!(node.children, node_data.children());
     assert_eq!(
         node.entries(&mem),
         node_data.entries.into_iter().collect::<Vec<_>>()

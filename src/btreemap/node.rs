@@ -46,6 +46,7 @@ const INTERNAL_NODE_TYPE: u8 = 1;
 const U32_SIZE: Bytes = Bytes::new(4);
 
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
+#[cfg_attr(test, derive(test_strategy::Arbitrary))]
 pub enum NodeType {
     Leaf,
     Internal,
