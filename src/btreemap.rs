@@ -717,7 +717,7 @@ where
                                 //
                                 //                            [c] (parent)
                                 //                           /   \
-                                //             (child) [a, b]     [d, e, f] (left sibling)
+                                //             (child) [a, b]     [d, e, f] (right sibling)
                                 //                               /
                                 //                            [d']
                                 //
