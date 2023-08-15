@@ -1,7 +1,46 @@
+//! Node V1
+//!
+//! A v1 node is the first node layout, with fixed node sizes and support for
+//! bounded types only.
+//!
+//! # Memory Layout
+//!
+//! ```text
+//! ---------------------------------------- <-- Header
+//! Magic "BTN"             ↕ 3 bytes
+//! ----------------------------------------
+//! Layout version (2)      ↕ 1 byte
+//! ----------------------------------------
+//! Node type               ↕ 1 byte
+//! ----------------------------------------
+//! # Entries (k)           ↕ 2 bytes
+//! ---------------------------------------- <-- Entries (upto `CAPACITY` entries)
+//! Key(0)
+//! ----------------------------------------
+//! Value(0)
+//! ----------------------------------------
+//! Key(1) size             ↕ 4 bytes
+//! ----------------------------------------
+//! Key(1)                  ↕ `max_key_size` bytes
+//! ----------------------------------------
+//! Value(1) size           ↕ 4 bytes
+//! ----------------------------------------
+//! Value(1)                ↕ `max_value_size` bytes
+//! ----------------------------------------
+//! ...
+//! ---------------------------------------- <-- Children (upto `CAPACITY + 1` children)
+//! Child(0) address        ↕ 8 bytes
+//! ----------------------------------------
+//! ...
+//! ----------------------------------------
+//! Child(k + 1) address    ↕ 8 bytes
+//! ----------------------------------------
+//! ```
+
 use super::*;
 
 impl<K: Storable + Ord + Clone> Node<K> {
-    /// Creates a new V1 node at the given address.
+    /// Creates a new v1 node at the given address.
     pub(super) fn new_v1(
         address: Address,
         node_type: NodeType,
@@ -22,7 +61,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
     }
 
-    /// Loads a node from memory at the given address.
+    /// Loads a v1 node from memory at the given address.
     pub(super) fn load_v1<M: Memory>(
         address: Address,
         max_key_size: u32,
@@ -165,8 +204,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 }
 
 /// Returns the size of a v1 node in bytes.
-///
-/// See the documentation of [`Node`] for the memory layout.
 pub(super) fn size_v1(max_key_size: u32, max_value_size: u32) -> Bytes {
     let max_key_size = Bytes::from(max_key_size);
     let max_value_size = Bytes::from(max_value_size);

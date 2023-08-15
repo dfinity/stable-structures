@@ -90,36 +90,6 @@ pub type Entry<K> = (K, Vec<u8>);
 /// 1. `V1`, which supports only bounded types.
 /// 2. `V2`, which supports both bounded and unbounded types.
 ///
-/// # V2 Layout
-/// ```text
-/// ---------------------------------------- <-- NodeHeader
-/// Magic "BTN"             ↕ 3 bytes
-/// ----------------------------------------
-/// Layout version (2)      ↕ 1 byte
-/// ----------------------------------------
-/// Node type               ↕ 1 byte
-/// ----------------------------------------
-/// # Entries               ↕ 2 bytes
-/// ---------------------------------------- <-- Entries
-/// Entry (1)
-/// ----------------------------------------
-/// Entry (2)
-/// ----------------------------------------
-/// ...
-/// ----------------------------------------
-/// Child address
-/// ----------------------------------------
-/// Child address
-/// ----------------------------------------
-/// ```
-///
-/// TODO: how is an entry stored?
-///
-///
-///  V1: needs max key, max value sizes
-///  V2: needs a page size
-///  if upgrading from V1 to V2, then we need to store both.
-///
 /// The node is stored in stable memory with the following layout:
 ///
 ///    |  NodeHeader  |  Entries (keys and values) |  Children  |
