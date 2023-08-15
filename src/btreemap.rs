@@ -1046,8 +1046,10 @@ where
         Node::load(
             address,
             self.memory(),
-            self.max_key_size,
-            self.max_value_size,
+            node::Version::V1 {
+                max_key_size: self.max_key_size,
+                max_value_size: self.max_value_size,
+            },
         )
     }
 

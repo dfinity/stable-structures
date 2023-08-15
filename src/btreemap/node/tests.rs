@@ -1,4 +1,5 @@
 use super::*;
+use crate::btreemap::Allocator;
 use proptest::collection::btree_map as pmap;
 use proptest::collection::vec as pvec;
 use std::cell::RefCell;
@@ -66,6 +67,46 @@ impl NodeV1Data {
     }
 }
 
+#[derive(Arbitrary, Debug)]
+struct NodeV2Data {
+    #[strategy(128..10_000_u32)]
+    page_size: u32,
+    #[strategy(
+        pmap(
+            pvec(0..u8::MAX, 0..1000),
+            pvec(0..u8::MAX, 0..1000),
+            1..CAPACITY
+        )
+    )]
+    entries: BTreeMap<Vec<u8>, Vec<u8>>,
+    node_type: NodeType,
+}
+
+impl NodeV2Data {
+    fn get(&self, address: Address) -> Node<Vec<u8>> {
+        let mut node = Node::new_v2(address, self.node_type, PageSize::Value(self.page_size));
+        for entry in self.entries.clone().into_iter() {
+            node.push_entry(entry);
+        }
+        for child in self.children() {
+            node.push_child(child);
+        }
+        node
+    }
+
+    fn children(&self) -> Vec<Address> {
+        match self.node_type {
+            // A leaf node doesn't have any children.
+            NodeType::Leaf => vec![],
+            // An internal node has # entries + 1 children.
+            // Here we generate a list of addresses.
+            NodeType::Internal => (0..=self.entries.len())
+                .map(|i| Address::from(i as u64))
+                .collect(),
+        }
+    }
+}
+
 #[proptest]
 fn saving_and_loading_v1_preserves_data(node_data: NodeV1Data) {
     let mem = make_memory();
@@ -80,6 +121,69 @@ fn saving_and_loading_v1_preserves_data(node_data: NodeV1Data) {
         node_addr,
         node_data.max_key_size,
         node_data.max_value_size,
+        &mem,
+    );
+
+    assert_eq!(node.children, node_data.children());
+    assert_eq!(
+        node.entries(&mem),
+        node_data.entries.into_iter().collect::<Vec<_>>()
+    );
+}
+
+#[proptest]
+fn saving_and_loading_v2(node_data: NodeV2Data) {
+    let mem = make_memory();
+    let allocator_addr = Address::from(0);
+    let mut allocator = Allocator::new(
+        mem.clone(),
+        allocator_addr,
+        Bytes::from(node_data.page_size as u64),
+    );
+
+    // Create a new node and save it into memory.
+    let node_addr = allocator.allocate();
+    let node = node_data.get(node_addr);
+    node.save_v2(&mut allocator);
+
+    // Reload the node and double check all the entries and children are correct.
+    let node = Node::load_v2(node_addr, PageSize::Value(node_data.page_size), &mem);
+
+    assert_eq!(node.children, node_data.children());
+    assert_eq!(
+        node.entries(&mem),
+        node_data.entries.into_iter().collect::<Vec<_>>()
+    );
+}
+
+#[proptest]
+fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
+    let v1_size = v1::size_v1(node_data.max_key_size, node_data.max_value_size);
+    let mem = make_memory();
+    let allocator_addr = Address::from(0);
+    let mut allocator = Allocator::new(mem.clone(), allocator_addr, v1_size);
+
+    // Create a v1 node and save it into memory as v1.
+    let node_addr = allocator.allocate();
+    let node = node_data.get(node_addr);
+    node.save_v1(allocator.memory());
+
+    // Reload the v1 node and save it as v2.
+    let node = Node::<Vec<u8>>::load_v1(
+        node_addr,
+        node_data.max_key_size,
+        node_data.max_value_size,
+        allocator.memory(),
+    );
+    node.save_v2(&mut allocator);
+
+    // Reload the now v2 node and double check all the entries and children are correct.
+    let node = Node::load_v2(
+        node_addr,
+        PageSize::Derived {
+            max_key_size: node_data.max_key_size,
+            max_value_size: node_data.max_value_size,
+        },
         &mem,
     );
 
