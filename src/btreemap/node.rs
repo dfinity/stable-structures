@@ -90,17 +90,7 @@ pub type Entry<K> = (K, Vec<u8>);
 /// 1. `V1`, which supports only bounded types.
 /// 2. `V2`, which supports both bounded and unbounded types.
 ///
-/// The node is stored in stable memory with the following layout:
-///
-///    |  NodeHeader  |  Entries (keys and values) |  Children  |
-///
-/// Each node contains up to `CAPACITY` entries, each entry contains:
-///     - size of key (4 bytes)
-///     - key (`max_key_size` bytes)
-///     - size of value (4 bytes)
-///     - value (`max_value_size` bytes)
-///
-/// Each node can contain up to `CAPACITY + 1` children, each child is 8 bytes.
+/// See `v1.rs` and `v2.rs` for more details.
 #[derive(Debug)]
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
