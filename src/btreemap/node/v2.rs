@@ -22,7 +22,7 @@
 //! Entry
 //! ----------------------------------------
 //! ...
-//! ---------------------------------------- <-- Children
+//! ---------------------------------------- <-- Children // TODO: move children above values?
 //! Child address
 //! ----------------------------------------
 //! Child address
@@ -84,17 +84,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
     }
 
-    /// Loads a V2 node from memory at the given address.
-    pub(super) fn load_v2<M: Memory>(address: Address, page_size_2: PageSize, memory: &M) -> Self {
-        let page_size = match page_size_2 {
-            PageSize::Absolute(page_size) => page_size,
-            PageSize::Kv(max_key_size, max_value_size) => {
-                v1::size_v1(max_key_size, max_value_size).get() as u32
-            }
-        };
-
+    /// Loads a v2 node from memory at the given address.
+    pub(super) fn load_v2<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
         // Load the node, including any overflows, into a buffer.
-        let node_buf = read_node(address, page_size, memory);
+        let node_buf = read_node(address, page_size.get(), memory);
 
         // Load the node type.
         let node_type = match node_buf[NODE_TYPE_OFFSET] {
@@ -164,7 +157,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             encoded_values: RefCell::new(encoded_values),
             children,
             node_type,
-            version: Version::V2(page_size_2),
+            version: Version::V2(page_size),
             overflow: if original_overflow_address == crate::types::NULL {
                 None
             } else {
@@ -328,7 +321,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         addresses
     }
 
-    pub(super) fn get_overflow_addresses<M: Memory>(&self, memory: &M) -> Vec<Address> {
+    fn get_overflow_addresses<M: Memory>(&self, memory: &M) -> Vec<Address> {
         let mut overflow_addresses = vec![];
         let mut next = self.overflow;
         while let Some(overflow_address) = next {

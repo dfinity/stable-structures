@@ -36,6 +36,17 @@ pub enum PageSize {
     Absolute(u32),
 }
 
+impl PageSize {
+    fn get(&self) -> u32 {
+        match self {
+            Self::Absolute(page_size) => *page_size,
+            Self::Kv(max_key_size, max_value_size) => {
+                v1::size_v1(*max_key_size, *max_value_size).get() as u32
+            }
+        }
+    }
+}
+
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
 const B: usize = 6;
