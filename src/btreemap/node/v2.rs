@@ -13,19 +13,27 @@
 //! ----------------------------------------
 //! Node type               ↕ 1 byte
 //! ----------------------------------------
-//! # Entries               ↕ 2 bytes
+//! # Entries (k)           ↕ 2 bytes
 //! ----------------------------------------
 //! Overflow address        ↕ 8 bytes
-//! ---------------------------------------- <-- Entries
-//! Entry
-//! ----------------------------------------
-//! Entry
+//! ---------------------------------------- <-- Children (Address 15)
+//! Child(0) address        ↕ 8 bytes
 //! ----------------------------------------
 //! ...
-//! ---------------------------------------- <-- Children // TODO: move children above values?
-//! Child address
 //! ----------------------------------------
-//! Child address
+//! Child(k + 1) address    ↕ 8 bytes
+//! ---------------------------------------- <-- Keys
+//! Key(0)
+//! ----------------------------------------
+//! ...
+//! ----------------------------------------
+//! Key(k)
+//! ---------------------------------------- <-- Values
+//! Value(0)
+//! ----------------------------------------
+//! ...
+//! ----------------------------------------
+//! Value(k)
 //! ----------------------------------------
 //! ```
 //!
@@ -99,10 +107,21 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the number of entries
         let num_entries = read_u16_from_slice(&node_buf, NUM_ENTRIES_OFFSET) as usize;
 
-        // Load the entries.
+        // Load children if this is an internal node.
+        let mut offset = ENTRIES_OFFSET;
+        let mut children = vec![];
+        if node_type == NodeType::Internal {
+            // The number of children is equal to the number of entries + 1.
+            for _ in 0..num_entries + 1 {
+                let child = address_from_slice(&node_buf, offset);
+                offset += Address::size();
+                children.push(child);
+            }
+        }
+
+        // Load the keys.
         let mut keys = Vec::with_capacity(num_entries);
         let mut encoded_values = Vec::with_capacity(num_entries);
-        let mut offset = ENTRIES_OFFSET;
         let mut buf = vec![];
         for _ in 0..num_entries {
             // Load the key's size.
@@ -136,19 +155,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Bytes::from(value_size as u64);
         }
 
-        // Load children if this is an internal node.
-        let mut children = vec![];
-        if node_type == NodeType::Internal {
-            // The number of children is equal to the number of entries + 1.
-            for _ in 0..num_entries + 1 {
-                let child = address_from_slice(&node_buf, offset);
-                offset += Address::size();
-                children.push(child);
-            }
-
-            assert_eq!(children.len(), keys.len() + 1);
-        }
-
         let original_overflow_address = address_from_slice(&node_buf, OVERFLOW_ADDRESS_OFFSET);
 
         Self {
@@ -168,6 +174,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
+        assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
+
         let page_size = self.version.page_size();
 
         // A buffer to serialize the node into first, then write to memory.
@@ -191,7 +199,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
             self.value(i, memory);
         }
 
-        // Write the entries.
+        // Write the children
+        for child in self.children.iter() {
+            buf.extend_from_slice(&child.get().to_le_bytes());
+        }
+
+        // Write the keys.
         for key in self.keys.iter() {
             // Write the size of the key.
             let key_bytes = key.to_bytes();
@@ -201,8 +214,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             buf.extend_from_slice(key_bytes.borrow());
         }
 
-        assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
-
+        // Write the values.
         for idx in 0..self.entries_len() {
             // Write the size of the value.
             let value = self.value(idx, memory);
@@ -210,11 +222,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the value.
             buf.extend_from_slice(&value);
-        }
-
-        // Write the children
-        for child in self.children.iter() {
-            buf.extend_from_slice(&child.get().to_le_bytes());
         }
 
         self.write_paginated(buf, allocator, page_size as usize);
