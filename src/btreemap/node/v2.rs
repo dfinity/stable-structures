@@ -1,5 +1,60 @@
+//! # V2 Node
+//! V2 nodes improve on V1 nodes in the following ways:
+//!
+//! 1. Support for both bounded and unbounded types
+//! 2. Smaller memory footprint
+//!
+//! ## Memory Layout
+//! ```text
+//! ---------------------------------------- <-- Header
+//! Magic "BTN"             ↕ 3 bytes
+//! ----------------------------------------
+//! Layout version (2)      ↕ 1 byte
+//! ----------------------------------------
+//! Node type               ↕ 1 byte
+//! ----------------------------------------
+//! # Entries               ↕ 2 bytes
+//! ----------------------------------------
+//! Overflow address        ↕ 8 bytes
+//! ---------------------------------------- <-- Entries
+//! Entry
+//! ----------------------------------------
+//! Entry
+//! ----------------------------------------
+//! ...
+//! ---------------------------------------- <-- Children
+//! Child address
+//! ----------------------------------------
+//! Child address
+//! ----------------------------------------
+//! ```
+//!
+//! ## Entries
+//! An entry consists of a key and a value, both which are variable-sized blobs.
+//!
+//! TODO If the value is fixed, then the size isn't stored.
+//! Otherwise, the size is stored.
+//!
+//! ## Children
+//! TODO
+//!
+//! ## Overflow Page Memory Layout
+//!
+//! ```text
+//! ----------------------------------------
+//! Magic "NOF"             ↕ 3 bytes
+//! ----------------------------------------
+//! Next address            ↕ 8 byte
+//! ----------------------------------------
+//! Page contents
+//! ----------------------------------------
+//! ```
+
 use super::*;
 use crate::btreemap::Allocator;
+use crate::types::NULL;
+use crate::write_u64;
+use std::cmp::min;
 
 // The offset where the address of the overflow page is present.
 const NODE_TYPE_OFFSET: usize = 4;
@@ -15,12 +70,8 @@ const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11); // magic + next address
 const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 const LAYOUT_VERSION_2: u8 = 2;
 
-use crate::types::NULL;
-use crate::write_u64;
-use std::cmp::min;
-
 impl<K: Storable + Ord + Clone> Node<K> {
-    /// Creates a new V2 node at the given address.
+    /// Creates a new v2 node at the given address.
     pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: u32) -> Node<K> {
         Node {
             address,
@@ -34,13 +85,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a V2 node from memory at the given address.
-    pub(super) fn load_v2<M: Memory>(address: Address, context: Version, memory: &M) -> Self {
-        let page_size = match context {
-            Version::V2(PageSize::Absolute(page_size)) => page_size,
-            Version::V2(PageSize::Kv(max_key_size, max_value_size)) => {
+    pub(super) fn load_v2<M: Memory>(address: Address, page_size_2: PageSize, memory: &M) -> Self {
+        let page_size = match page_size_2 {
+            PageSize::Absolute(page_size) => page_size,
+            PageSize::Kv(max_key_size, max_value_size) => {
                 v1::size_v1(max_key_size, max_value_size).get() as u32
             }
-            Version::V1 { .. } => panic!("cannot load v2 node when version is v1."),
         };
 
         // Load the node, including any overflows, into a buffer.
@@ -63,6 +113,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut buf = vec![];
         for _ in 0..num_entries {
             // Load the key's size.
+            // TODO: store the size in a more efficient way.
+            // TODO: don't store the size if the key is fixed.
             let key_size = read_u32_from_slice(&node_buf, offset) as usize;
             offset += U32_SIZE;
 
@@ -112,7 +164,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             encoded_values: RefCell::new(encoded_values),
             children,
             node_type,
-            version: context,
+            version: Version::V2(page_size_2),
             overflow: if original_overflow_address == crate::types::NULL {
                 None
             } else {
