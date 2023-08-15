@@ -12,12 +12,15 @@ mod tests;
 mod v1;
 mod v2;
 
+/// Stores version-specific data.
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum Version {
+    /// V1 nodes must have bounds for the keys and values.
     V1 {
         max_key_size: u32,
         max_value_size: u32,
     },
+    /// V2 nodes do not necessarily have
     V2(PageSize),
 }
 
@@ -56,7 +59,36 @@ pub type Entry<K> = (K, Vec<u8>);
 
 /// A node of a B-Tree.
 ///
-/// A node can have two versions:
+/// There are two versions of a `Node`:
+///
+/// 1. `V1`, which supports only bounded types.
+/// 2. `V2`, which supports both bounded and unbounded types.
+///
+/// # V2 Layout
+/// ```text
+/// ---------------------------------------- <-- NodeHeader
+/// Magic "BTN"             ↕ 3 bytes
+/// ----------------------------------------
+/// Layout version (2)      ↕ 1 byte
+/// ----------------------------------------
+/// Node type               ↕ 1 byte
+/// ----------------------------------------
+/// # Entries               ↕ 2 bytes
+/// ---------------------------------------- <-- Entries
+/// Entry (1)
+/// ----------------------------------------
+/// Entry (2)
+/// ----------------------------------------
+/// ...
+/// ----------------------------------------
+/// Child address
+/// ----------------------------------------
+/// Child address
+/// ----------------------------------------
+/// ```
+///
+/// TODO: how is an entry stored?
+///
 ///
 ///  V1: needs max key, max value sizes
 ///  V2: needs a page size
@@ -84,8 +116,6 @@ pub struct Node<K: Storable + Ord + Clone> {
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
     node_type: NodeType,
-    //   max_key_size: u32,
-    //  max_value_size: u32,
     version: Version,
     overflow: Option<Address>,
 }
@@ -106,7 +136,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // TODO: check the node version (and tests for all these cases)
         match context {
             Version::V1 { .. } => Self::load_v1(address, context, memory),
-            Version::V2 { .. } => Self::load_v2(address, context, memory),
+            Version::V2(page_size) => Self::load_v2(address, page_size, memory),
         }
     }
 

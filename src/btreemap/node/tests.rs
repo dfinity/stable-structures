@@ -148,11 +148,7 @@ fn saving_and_loading_v2(node_data: NodeV2Data) {
     node.save_v2(&mut allocator);
 
     // Reload the node and double check all the entries and children are correct.
-    let node = Node::load_v2(
-        node_addr,
-        Version::V2(PageSize::Absolute(node_data.page_size)),
-        &mem,
-    );
+    let node = Node::load_v2(node_addr, PageSize::Absolute(node_data.page_size), &mem);
 
     assert_eq!(node.children, node_data.children());
     assert_eq!(
@@ -187,10 +183,7 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
     // Reload the now v2 node and double check all the entries and children are correct.
     let node = Node::load_v2(
         node_addr,
-        Version::V2(PageSize::Kv(
-            node_data.max_key_size,
-            node_data.max_value_size,
-        )),
+        PageSize::Kv(node_data.max_key_size, node_data.max_value_size),
         &mem,
     );
 
