@@ -90,7 +90,7 @@ const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
 // The minimum size a page can have.
 // Rationale: a page size needs to at least store the header (15 bytes) + all the children
 // addresses (88 bytes). We round that up to 128 to get a nice binary number.
-const MINIMUM_PAGE_SIZE = 128;
+const MINIMUM_PAGE_SIZE: u32 = 128;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v2 node at the given address.

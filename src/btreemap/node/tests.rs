@@ -117,10 +117,8 @@ fn saving_and_loading_v1(node_data: NodeV1Data) {
     // Load the node and double check all the entries and children are correct.
     let node = Node::load_v1(
         node_addr,
-        Version::V1 {
-            max_key_size: node_data.max_key_size,
-            max_value_size: node_data.max_value_size,
-        },
+        node_data.max_key_size,
+        node_data.max_value_size,
         &mem,
     );
 
@@ -171,10 +169,8 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
     // Reload the v1 node and save it as v2.
     let node = Node::<Vec<u8>>::load_v1(
         node_addr,
-        Version::V1 {
-            max_key_size: node_data.max_key_size,
-            max_value_size: node_data.max_value_size,
-        },
+        node_data.max_key_size,
+        node_data.max_value_size,
         allocator.memory(),
     );
     node.save_v2(&mut allocator);

@@ -26,7 +26,7 @@ pub enum Version {
 
 impl Version {
     fn page_size(&self) -> u32 {
-        match self{
+        match self {
             Self::V2(page_size) => page_size.get(),
             Self::V1 {
                 max_key_size,
@@ -159,9 +159,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, memory: &M, context: Version) -> Self {
-        // TODO: check the node version (and tests for all these cases)
         match context {
-            Version::V1 { .. } => Self::load_v1(address, context, memory),
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => Self::load_v1(address, max_key_size, max_value_size, memory),
             Version::V2(page_size) => Self::load_v2(address, page_size, memory),
         }
     }

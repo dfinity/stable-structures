@@ -23,18 +23,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a node from memory at the given address.
-    pub(super) fn load_v1<M: Memory>(address: Address, context: Version, memory: &M) -> Self {
-        let (max_key_size, max_value_size) = match context {
-            Version::V1 {
-                max_key_size,
-                max_value_size,
-            }
-            | Version::V2(PageSize::Kv(max_key_size, max_value_size)) => {
-                (max_key_size, max_value_size)
-            }
-            Version::V2(PageSize::Absolute(_)) => panic!("cannot load v2 node when version is v1."),
-        };
-
+    pub(super) fn load_v1<M: Memory>(
+        address: Address,
+        max_key_size: u32,
+        max_value_size: u32,
+        memory: &M,
+    ) -> Self {
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
@@ -85,7 +79,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 INTERNAL_NODE_TYPE => NodeType::Internal,
                 other => unreachable!("Unknown node type {}", other),
             },
-            version: context,
+            version: Version::V1 {
+                max_key_size,
+                max_value_size,
+            },
             overflow: None,
         }
     }
