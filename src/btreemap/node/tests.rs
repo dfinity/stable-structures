@@ -1,5 +1,5 @@
 use super::*;
-use crate::{btreemap::allocator::Allocator, types::NULL};
+use crate::btreemap::allocator::Allocator;
 use proptest::collection::btree_map as pmap;
 use proptest::collection::vec as pvec;
 use std::cell::RefCell;
@@ -18,7 +18,7 @@ struct NodeV1Data {
     #[strategy(1..1_000u32)]
     max_value_size: u32,
 
-    // NOTE: A BTreeMap is used for creating the entries so that they'd be in sorted order.
+    // NOTE: A BTreeMap is used for creating the entries so that they're in sorted order.
     #[strategy(
         pmap(
             pvec(0..u8::MAX, 0..#max_key_size as usize),
@@ -44,35 +44,34 @@ impl NodeV1Data {
             node.push_entry(entry);
         }
 
-        // If the node is an internal node, then insert some children addresses.
-        if self.node_type == NodeType::Internal {
-            for i in 0..=self.entries.len() {
-                node.push_child(Address::from(i as u64));
-            }
+        for child in self.children() {
+            node.push_child(child);
         }
+
         node
     }
 
     fn children(&self) -> Vec<Address> {
-        if self.node_type == NodeType::Internal {
-            (0..=self.entries.len())
+        match self.node_type {
+            // A leaf node doesn't have any children.
+            NodeType::Leaf => vec![],
+            // An internal node has # entries + 1 children.
+            // Here we generate a list of addresses.
+            NodeType::Internal => (0..=self.entries.len())
                 .map(|i| Address::from(i as u64))
-                .collect()
-        } else {
-            vec![]
+                .collect(),
         }
     }
 }
 
 #[derive(Arbitrary, Debug)]
 struct NodeV2Data {
-    // FIXME: figure out proper lower bound for page size.
-    #[strategy(15..2_000_u32)]
+    #[strategy(128..10_000_u32)]
     page_size: u32,
     #[strategy(
         pmap(
-            pvec(0..u8::MAX, 0..100),
-            pvec(0..u8::MAX, 0..100),
+            pvec(0..u8::MAX, 0..1000),
+            pvec(0..u8::MAX, 0..1000),
             1..CAPACITY
         )
     )]
@@ -86,22 +85,21 @@ impl NodeV2Data {
         for entry in self.entries.clone().into_iter() {
             node.push_entry(entry);
         }
-        // If the node is an internal node, then insert some children addresses.
-        if self.node_type == NodeType::Internal {
-            for i in 0..=self.entries.len() {
-                node.push_child(Address::from(i as u64));
-            }
+        for child in self.children() {
+            node.push_child(child);
         }
         node
     }
 
     fn children(&self) -> Vec<Address> {
-        if self.node_type == NodeType::Internal {
-            (0..=self.entries.len())
+        match self.node_type {
+            // A leaf node doesn't have any children.
+            NodeType::Leaf => vec![],
+            // An internal node has # entries + 1 children.
+            // Here we generate a list of addresses.
+            NodeType::Internal => (0..=self.entries.len())
                 .map(|i| Address::from(i as u64))
-                .collect()
-        } else {
-            vec![]
+                .collect(),
         }
     }
 }
@@ -112,12 +110,13 @@ fn saving_and_loading_v1(node_data: NodeV1Data) {
     let mem = make_memory();
 
     // Create a new node and save it into memory.
-    let node = node_data.get(NULL);
+    let node_addr = Address::from(0);
+    let node = node_data.get(node_addr);
     node.save_v1(&mem);
 
-    // Reload the node and double check all the entries and children are correct.
+    // Load the node and double check all the entries and children are correct.
     let node = Node::load_v1(
-        NULL,
+        node_addr,
         Version::V1 {
             max_key_size: node_data.max_key_size,
             max_value_size: node_data.max_value_size,

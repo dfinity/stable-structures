@@ -58,7 +58,7 @@
 //! ----------------------------------------
 //! Next address            ↕ 8 byte
 //! ----------------------------------------
-//! Page contents
+//! Data
 //! ----------------------------------------
 //! ```
 //!
@@ -75,23 +75,28 @@ use crate::types::NULL;
 use crate::write_u64;
 use std::cmp::min;
 
-// The offset where the address of the overflow page is present.
+// Initial page
+const LAYOUT_VERSION_2: u8 = 2;
 const NODE_TYPE_OFFSET: usize = 4;
 const NUM_ENTRIES_OFFSET: usize = 5;
 const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
-const ENTRIES_OFFSET: Bytes = Bytes::new(15); // an additional 8 bytes for the overflow pointer
+const ENTRIES_OFFSET: Bytes = Bytes::new(15);
 
-const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
-const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11); // magic + next address
-
-// TODO: add note that page size must be > ENTRIES OFFSET
-
+// Overflow page
 const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
-const LAYOUT_VERSION_2: u8 = 2;
+const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
+const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
+
+// The minimum size a page can have.
+// Rationale: a page size needs to at least store the header (15 bytes) + all the children
+// addresses (88 bytes). We round that up to 128 to get a nice binary number.
+const MINIMUM_PAGE_SIZE = 128;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v2 node at the given address.
     pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: PageSize) -> Node<K> {
+        assert!(page_size.get() >= MINIMUM_PAGE_SIZE);
+
         Node {
             address,
             node_type,
