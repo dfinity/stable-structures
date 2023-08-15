@@ -82,7 +82,7 @@ struct NodeV2Data {
 
 impl NodeV2Data {
     fn get(&self, address: Address) -> Node<Vec<u8>> {
-        let mut node = Node::new_v2(address, self.node_type, self.page_size);
+        let mut node = Node::new_v2(address, self.node_type, PageSize::Absolute(self.page_size));
         for entry in self.entries.clone().into_iter() {
             node.push_entry(entry);
         }

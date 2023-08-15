@@ -72,14 +72,14 @@ const LAYOUT_VERSION_2: u8 = 2;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v2 node at the given address.
-    pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: u32) -> Node<K> {
+    pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: PageSize) -> Node<K> {
         Node {
             address,
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
             node_type,
-            version: Version::V2(PageSize::Absolute(page_size)),
+            version: Version::V2(page_size),
             overflow: None,
         }
     }
