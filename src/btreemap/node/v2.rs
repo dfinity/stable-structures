@@ -1,10 +1,20 @@
-//! # V2 Node
-//! V2 nodes improve on V1 nodes in the following ways:
+//! Node V2
 //!
-//! 1. Support for both bounded and unbounded types
-//! 2. Smaller memory footprint
+//! A v2 node is an iteration on a v1 node. Compared to a v1 node, it adds
+//! support for both bounded and unbounded types, as well as a smaller memory
+//! footprint.
 //!
-//! ## Memory Layout
+//! # Memory Layout
+//!
+//! To support unbounded types, v2 nodes rely on the concept of a page. A page
+//! is a fixed-size chunk of memory. V2 nodes are variable in size and can span
+//! multiple pages if required. There are two types of pages:
+//!
+//! 1. Initial Page
+//! 2. Overflow pages
+//!
+//! ## Initial Page Memory Layout
+//!
 //! ```text
 //! ---------------------------------------- <-- Header
 //! Magic "BTN"             ↕ 3 bytes
@@ -37,16 +47,10 @@
 //! ----------------------------------------
 //! ```
 //!
-//! ## Entries
-//! An entry consists of a key and a value, both which are variable-sized blobs.
-//!
-//! TODO If the value is fixed, then the size isn't stored.
-//! Otherwise, the size is stored.
-//!
-//! ## Children
-//! TODO
-//!
 //! ## Overflow Page Memory Layout
+//!
+//! If the data to be stored in the initial page layout is larger than the page size,
+//! then overflow pages are used.
 //!
 //! ```text
 //! ----------------------------------------
@@ -57,6 +61,13 @@
 //! Page contents
 //! ----------------------------------------
 //! ```
+//!
+//! ## Keys and Values
+//! Keys and values are both encoded in memory as blobs.
+//!
+//! If they are variable in size (i.e. their `IS_FIXED` attribute is set to false),
+//! then the size of the blob is encoded before the blob itself. Otherwise, no size
+//! information is stored.
 
 use super::*;
 use crate::btreemap::Allocator;
