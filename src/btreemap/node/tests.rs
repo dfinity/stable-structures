@@ -45,7 +45,7 @@ impl NodeV1Data {
             node.push_entry(entry);
         }
 
-        // Push the chilren
+        // Push the children
         for child in self.children() {
             node.push_child(child);
         }
