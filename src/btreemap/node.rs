@@ -24,6 +24,21 @@ pub enum Version {
     V2(PageSize),
 }
 
+impl Version {
+    fn page_size(&self) -> u32 {
+        match self{
+            Self::V2(page_size) => page_size.get(),
+            Self::V1 {
+                max_key_size,
+                max_value_size,
+            } => {
+                // Page size can be computed from the max key/value sizes.
+                v1::size_v1(*max_key_size, *max_value_size).get() as u32
+            }
+        }
+    }
+}
+
 /// The size of an individual page in the memory where nodes are stored.
 /// A node, if it's bigger than a single page, can overflow into multiple pages.
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]

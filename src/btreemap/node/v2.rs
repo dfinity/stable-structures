@@ -75,11 +75,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: PageSize) -> Node<K> {
         Node {
             address,
+            node_type,
+            version: Version::V2(page_size),
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
-            node_type,
-            version: Version::V2(page_size),
             overflow: None,
         }
     }
@@ -168,18 +168,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
-        let page_size = match self.version {
-            Version::V2(PageSize::Absolute(page_size)) => page_size,
-            Version::V2(PageSize::Kv(max_key_size, max_value_size))
-            | Version::V1 {
-                max_key_size,
-                max_value_size,
-            } => {
-                // Saving a v1 node. The size of the page can be computed from the max key/value
-                // sizes.
-                v1::size_v1(max_key_size, max_value_size).get() as u32
-            }
-        };
+        let page_size = self.version.page_size();
 
         // A buffer to serialize the node into first, then write to memory.
         let mut buf = vec![];
