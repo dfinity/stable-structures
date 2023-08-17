@@ -1,6 +1,6 @@
 use crate::{count_instructions, Random};
 use ic_cdk_macros::query;
-use ic_stable_structures::{storable::Blob, BTreeMap, BoundedStorable, DefaultMemoryImpl};
+use ic_stable_structures::{storable::Blob, BTreeMap, DefaultMemoryImpl, Storable};
 use tiny_rng::{Rand, Rng};
 
 #[query]
@@ -216,7 +216,7 @@ fn insert_blob_helper<const K: usize, const V: usize>() -> u64 {
 }
 
 // Profiles inserting a large number of random blobs into a btreemap.
-fn insert_helper<K: Clone + Ord + BoundedStorable + Random, V: BoundedStorable + Random>() -> u64 {
+fn insert_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> u64 {
     let mut btree: BTreeMap<K, V, _> = BTreeMap::new(DefaultMemoryImpl::default());
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
@@ -241,7 +241,7 @@ fn get_blob_helper<const K: usize, const V: usize>() -> u64 {
     get_helper::<Blob<K>, Blob<V>>()
 }
 
-fn get_helper<K: Clone + Ord + BoundedStorable + Random, V: BoundedStorable + Random>() -> u64 {
+fn get_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> u64 {
     let mut btree: BTreeMap<K, V, _> = BTreeMap::new(DefaultMemoryImpl::default());
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
@@ -271,7 +271,7 @@ fn remove_blob_helper<const K: usize, const V: usize>() -> u64 {
     remove_helper::<Blob<K>, Blob<V>>()
 }
 
-fn remove_helper<K: Clone + Ord + BoundedStorable + Random, V: BoundedStorable + Random>() -> u64 {
+fn remove_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> u64 {
     let mut btree: BTreeMap<K, V, _> = BTreeMap::new(DefaultMemoryImpl::default());
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);

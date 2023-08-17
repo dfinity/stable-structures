@@ -2,12 +2,12 @@ use super::{
     node::{Node, NodeType},
     BTreeMap,
 };
-use crate::{types::NULL, Address, BoundedStorable, Memory};
+use crate::{types::NULL, Address, Memory, Storable};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
 /// An indicator of the current position in the map.
-pub(crate) enum Cursor<K: BoundedStorable + Ord + Clone> {
+pub(crate) enum Cursor<K: Storable + Ord + Clone> {
     Address(Address),
     Node { node: Node<K>, next: Index },
 }
@@ -22,8 +22,8 @@ pub(crate) enum Index {
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct Iter<'a, K, V, M>
 where
-    K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    K: Storable + Ord + Clone,
+    V: Storable,
     M: Memory,
 {
     // A reference to the map being iterated on.
@@ -38,8 +38,8 @@ where
 
 impl<'a, K, V, M> Iter<'a, K, V, M>
 where
-    K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    K: Storable + Ord + Clone,
+    V: Storable,
     M: Memory,
 {
     pub(crate) fn new(map: &'a BTreeMap<K, V, M>) -> Self {
@@ -75,8 +75,8 @@ where
 
 impl<K, V, M> Iterator for Iter<'_, K, V, M>
 where
-    K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    K: Storable + Ord + Clone,
+    V: Storable,
     M: Memory,
 {
     type Item = (K, V);
