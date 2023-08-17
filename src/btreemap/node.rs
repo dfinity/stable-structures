@@ -77,10 +77,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, memory: &M, version: Version) -> Self {
         match version {
-            Version::V1 {
+            Version::V1(DerivedPageSize {
                 max_key_size,
                 max_value_size,
-            } => Self::load_v1(address, max_key_size, max_value_size, memory),
+            }) => Self::load_v1(address, max_key_size, max_value_size, memory),
             Version::V2(_) => unreachable!("Only v1 is currently supported."),
         }
     }
@@ -429,11 +429,8 @@ enum Value {
 /// Stores version-specific data.
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum Version {
-    /// V1 nodes must have bounds for the keys and values.
-    V1 {
-        max_key_size: u32,
-        max_value_size: u32,
-    },
+    /// V1 nodes have a page size derived from the max key/value sizes.
+    V1(DerivedPageSize),
     /// V2 nodes have a fixed page size.
     V2(PageSize),
 }
@@ -442,13 +439,7 @@ impl Version {
     fn page_size(&self) -> u32 {
         match self {
             Self::V2(page_size) => page_size.get(),
-            Self::V1 {
-                max_key_size,
-                max_value_size,
-            } => {
-                // Page size can be computed from the max key/value sizes.
-                v1::size_v1(*max_key_size, *max_value_size).get() as u32
-            }
+            Self::V1(page_size) => page_size.get(),
         }
     }
 }
@@ -458,17 +449,11 @@ impl Version {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub enum PageSize {
-    /// The page size is derived from the maximum sizes of the keys and values.
-    ///
     /// Derived page sizes are used when migrating nodes from v1 to v2.
     /// A migration from v1 nodes to v2 is done incrementally. Children of a v2 node
     /// may be a v1 node, and storing the maximum sizes around is necessary to be able
     /// to load v1 nodes.
-    Derived {
-        max_key_size: u32,
-        max_value_size: u32,
-    },
-
+    Derived(DerivedPageSize),
     Value(u32),
 }
 
@@ -476,10 +461,21 @@ impl PageSize {
     fn get(&self) -> u32 {
         match self {
             Self::Value(page_size) => *page_size,
-            Self::Derived {
-                max_key_size,
-                max_value_size,
-            } => v1::size_v1(*max_key_size, *max_value_size).get() as u32,
+            Self::Derived(page_size) => page_size.get(),
         }
+    }
+}
+
+/// A page size derived from the maximum sizes of the keys and values.
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
+pub struct DerivedPageSize {
+    pub max_key_size: u32,
+    pub max_value_size: u32,
+}
+
+impl DerivedPageSize {
+    // Returns the page size derived from the max key/value sizes.
+    fn get(&self) -> u32 {
+        v1::size_v1(self.max_key_size, self.max_value_size).get() as u32
     }
 }

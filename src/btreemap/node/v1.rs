@@ -52,10 +52,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
-            version: Version::V1 {
+            version: Version::V1(DerivedPageSize {
                 max_key_size,
                 max_value_size,
-            },
+            }),
             overflow: None,
         }
     }
@@ -117,10 +117,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 INTERNAL_NODE_TYPE => NodeType::Internal,
                 other => unreachable!("Unknown node type {}", other),
             },
-            version: Version::V1 {
+            version: Version::V1(DerivedPageSize {
                 max_key_size,
                 max_value_size,
-            },
+            }),
             overflow: None,
         }
     }
@@ -142,10 +142,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
 
         let (max_key_size, max_value_size) = match self.version {
-            Version::V1 {
+            Version::V1(DerivedPageSize {
                 max_key_size,
                 max_value_size,
-            } => (max_key_size, max_value_size),
+            }) => (max_key_size, max_value_size),
             Version::V2 { .. } => unreachable!("cannot save v2 node as v1."),
         };
 

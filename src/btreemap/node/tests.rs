@@ -181,10 +181,10 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
     // Reload the now v2 node and double check all the entries and children are correct.
     let node = Node::load_v2(
         node_addr,
-        PageSize::Derived {
+        PageSize::Derived(DerivedPageSize {
             max_key_size: node_data.max_key_size,
             max_value_size: node_data.max_value_size,
-        },
+        }),
         &mem,
     );
 

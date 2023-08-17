@@ -255,6 +255,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) {
         // Compute how many overflow pages are needed.
         let additional_pages_needed = if buf.len() > page_size {
+            debug_assert!(page_size >= PAGE_OVERFLOW_DATA_OFFSET.into());
             let overflow_page_capacity = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
             let overflow_data_len = buf.len() - page_size;
 
