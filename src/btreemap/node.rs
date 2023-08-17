@@ -462,8 +462,8 @@ pub enum PageSize {
     ///
     /// Derived page sizes are used when migrating nodes from v1 to v2.
     /// A migration from v1 nodes to v2 is done incrementally. Children of a v2 node
-    /// may be a v1 node, and keeping the maximum sizes around is necessary to store
-    /// to be able to load v1 nodes.
+    /// may be a v1 node, and storing the maximum sizes around is necessary to be able
+    /// to load v1 nodes.
     Derived {
         max_key_size: u32,
         max_value_size: u32,
