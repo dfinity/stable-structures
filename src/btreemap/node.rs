@@ -24,6 +24,7 @@ const INTERNAL_NODE_TYPE: u8 = 1;
 const U32_SIZE: Bytes = Bytes::new(4);
 
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
+#[cfg_attr(test, derive(test_strategy::Arbitrary))]
 pub enum NodeType {
     Leaf,
     Internal,
@@ -32,18 +33,7 @@ pub enum NodeType {
 pub type Entry<K> = (K, Vec<u8>);
 
 /// A node of a B-Tree.
-///
-/// The node is stored in stable memory with the following layout:
-///
-///    |  NodeHeader  |  Entries (keys and values) |  Children  |
-///
-/// Each node contains up to `CAPACITY` entries, each entry contains:
-///     - size of key (4 bytes)
-///     - key (`max_key_size` bytes)
-///     - size of value (4 bytes)
-///     - value (`max_value_size` bytes)
-///
-/// Each node can contain up to `CAPACITY + 1` children, each child is 8 bytes.
+/// See `v1.rs` for more details on the memory layout.
 #[derive(Debug)]
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
@@ -67,15 +57,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_key_size: u32,
         max_value_size: u32,
     ) -> Node<K> {
-        Node {
-            address,
-            keys: vec![],
-            encoded_values: RefCell::default(),
-            children: vec![],
-            node_type,
-            max_key_size,
-            max_value_size,
-        }
+        Node::new_v1(address, node_type, max_key_size, max_value_size)
     }
 
     /// Loads a node from memory at the given address.
@@ -86,7 +68,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_value_size: u32,
     ) -> Self {
         // NOTE: new versions of `Node` will be introduced.
-        Self::load_v1(address, memory, max_key_size, max_value_size)
+        Self::load_v1(address, max_key_size, max_value_size, memory)
     }
 
     /// Saves the node to memory.
@@ -371,16 +353,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///
     /// See the documentation of [`Node`] for the memory layout.
     pub fn size(max_key_size: u32, max_value_size: u32) -> Bytes {
-        let max_key_size = Bytes::from(max_key_size);
-        let max_value_size = Bytes::from(max_value_size);
-
-        let node_header_size = NodeHeader::size();
-        let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
-        let child_size = Address::size();
-
-        node_header_size
-            + Bytes::from(CAPACITY as u64) * entry_size
-            + Bytes::from((CAPACITY + 1) as u64) * child_size
+        v1::size_v1(max_key_size, max_value_size)
     }
 
     /// Returns true if the node is at the minimum required size, false otherwise.
