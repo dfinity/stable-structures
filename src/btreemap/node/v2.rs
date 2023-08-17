@@ -192,9 +192,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
-        assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
-
         let page_size = self.version.page_size();
+        assert!(page_size >= MINIMUM_PAGE_SIZE);
+        assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
 
         // A buffer to serialize the node into first, then write to memory.
         let mut buf = vec![];
@@ -369,7 +369,7 @@ fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8>
         memory.read(overflow_address.get(), &mut overflow_buf);
 
         // Validate the magic of the overflow.
-        assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad magic.");
+        assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad overflow magic.");
 
         // Read the next address
         overflow_address = address_from_slice(&overflow_buf, PAGE_OVERFLOW_NEXT_OFFSET);
@@ -382,18 +382,26 @@ fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8>
 }
 
 fn read_u16_from_slice(slice: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes((&slice[offset..offset + 2]).try_into().unwrap())
+    u16::from_le_bytes(
+        (&slice[offset..offset + 2])
+            .try_into()
+            .expect("unable to read u16 from slice"),
+    )
 }
 
 fn read_u64_from_slice(slice: &[u8], offset: usize) -> u64 {
-    u64::from_le_bytes((&slice[offset..offset + 8]).try_into().unwrap())
+    u64::from_le_bytes(
+        (&slice[offset..offset + 8])
+            .try_into()
+            .expect("unable to read u64 from slice"),
+    )
 }
 
 fn read_u32_from_slice(slice: &[u8], offset: Bytes) -> u32 {
     u32::from_le_bytes(
         (&slice[offset.get() as usize..offset.get() as usize + 4])
             .try_into()
-            .unwrap(),
+            .expect("unable to read u32 from slice"),
     )
 }
 

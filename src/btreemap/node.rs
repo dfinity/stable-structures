@@ -56,6 +56,9 @@ pub struct Node<K: Storable + Ord + Clone> {
     children: Vec<Address>,
     node_type: NodeType,
     version: Version,
+
+    // The address of the overflow page.
+    // In V2, a node can span multiple pages if it exceeds a certain size.
     #[allow(dead_code)]
     overflow: Option<Address>,
 }
@@ -73,14 +76,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, memory: &M, version: Version) -> Self {
-        if let Version::V1 {
-            max_key_size,
-            max_value_size,
-        } = version
-        {
-            Self::load_v1(address, max_key_size, max_value_size, memory)
-        } else {
-            unreachable!("Only v1 is currently supported.");
+        match version {
+            Version::V1 {
+                max_key_size,
+                max_value_size,
+            } => Self::load_v1(address, max_key_size, max_value_size, memory),
+            Version::V2(_) => unreachable!("Only v1 is currently supported."),
         }
     }
 
