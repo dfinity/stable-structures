@@ -91,6 +91,7 @@ impl NodeV2Data {
         for child in self.children() {
             node.push_child(child);
         }
+
         node
     }
 
@@ -98,7 +99,7 @@ impl NodeV2Data {
         match self.node_type {
             // A leaf node doesn't have any children.
             NodeType::Leaf => vec![],
-            // An internal node has # entries + 1 children.
+            // An internal node has entries.len() + 1 children.
             // Here we generate a list of addresses.
             NodeType::Internal => (0..=self.entries.len())
                 .map(|i| Address::from(i as u64))
@@ -132,7 +133,7 @@ fn saving_and_loading_v1_preserves_data(node_data: NodeV1Data) {
 }
 
 #[proptest]
-fn saving_and_loading_v2(node_data: NodeV2Data) {
+fn saving_and_loading_v2_preserves_data(node_data: NodeV2Data) {
     let mem = make_memory();
     let allocator_addr = Address::from(0);
     let mut allocator = Allocator::new(
