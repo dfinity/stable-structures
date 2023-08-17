@@ -1,5 +1,5 @@
 use crate::base_vec::{BaseVec, InitError};
-use crate::storable::BoundedStorable;
+use crate::storable::Storable;
 use crate::{GrowFailed, Memory};
 use std::fmt;
 
@@ -12,7 +12,7 @@ const MAGIC: [u8; 3] = *b"SMH"; // Short for "stable min heap".
 // NB. Contrary to [std::collections::BinaryHeap], this heap is a min-heap (smallest items come first).
 // Motivation: max heaps are helpful for sorting, but most daily programming tasks require min
 // heaps.
-pub struct MinHeap<T: BoundedStorable + PartialOrd, M: Memory>(BaseVec<T, M>);
+pub struct MinHeap<T: Storable + PartialOrd, M: Memory>(BaseVec<T, M>);
 
 // Note: Heap Invariant
 // ~~~~~~~~~~~~~~~~~~~~
@@ -22,7 +22,7 @@ pub struct MinHeap<T: BoundedStorable + PartialOrd, M: Memory>(BaseVec<T, M>);
 
 impl<T, M> MinHeap<T, M>
 where
-    T: BoundedStorable + PartialOrd,
+    T: Storable + PartialOrd,
     M: Memory,
 {
     /// Creates a new empty heap in the specified memory,
@@ -200,7 +200,7 @@ fn is_less<T: PartialOrd>(x: &T, y: &T) -> bool {
 
 impl<T, M> fmt::Debug for MinHeap<T, M>
 where
-    T: BoundedStorable + PartialOrd + fmt::Debug,
+    T: Storable + PartialOrd + fmt::Debug,
     M: Memory,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -1,5 +1,5 @@
 use super::{InitError, Vec as StableVec};
-use crate::storable::{BoundedStorable, Storable};
+use crate::storable::{Bound, Storable};
 use crate::vec_mem::VectorMemory as M;
 use crate::{GrowFailed, Memory};
 use proptest::collection::vec as pvec;
@@ -19,11 +19,11 @@ impl<const N: u32> Storable for UnfixedU64<N> {
         assert!(bytes.len() == 8);
         Self(u64::from_bytes(bytes))
     }
-}
 
-impl<const N: u32> BoundedStorable for UnfixedU64<N> {
-    const MAX_SIZE: u32 = N;
-    const IS_FIXED_SIZE: bool = false;
+    const BOUND: Bound = Bound::Bounded {
+        max_size: N,
+        is_fixed_size: false,
+    };
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -77,7 +77,7 @@ proptest! {
     }
 }
 
-fn check_push_pop_model<T: BoundedStorable + Debug + Clone + PartialEq>(
+fn check_push_pop_model<T: Storable + Debug + Clone + PartialEq>(
     ops: Vec<Operation<T>>,
 ) -> Result<(), TestCaseError> {
     let mut v = Vec::new();
