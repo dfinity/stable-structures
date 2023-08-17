@@ -49,11 +49,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
         Node {
             address,
             node_type,
-            max_key_size,
-            max_value_size,
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
+            version: Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }),
+            overflow: None,
         }
     }
 
@@ -114,8 +117,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 INTERNAL_NODE_TYPE => NodeType::Internal,
                 other => unreachable!("Unknown node type {}", other),
             },
-            max_key_size,
-            max_value_size,
+            version: Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }),
+            overflow: None,
         }
     }
 
@@ -134,6 +140,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Assert entries are sorted in strictly increasing order.
         assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
+
+        let (max_key_size, max_value_size) = match self.version {
+            Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }) => (max_key_size, max_value_size),
+            Version::V2 { .. } => unreachable!("cannot save v2 node as v1."),
+        };
 
         let header = NodeHeader {
             magic: *MAGIC,
@@ -164,7 +178,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the key.
             write(memory, (self.address + offset).get(), key_bytes.borrow());
-            offset += Bytes::from(self.max_key_size);
+            offset += Bytes::from(max_key_size);
 
             // Write the size of the value.
             let value = self.value(idx, memory);
@@ -173,7 +187,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the value.
             write(memory, (self.address + offset).get(), &value);
-            offset += Bytes::from(self.max_value_size);
+            offset += Bytes::from(max_value_size);
         }
 
         // Write the children

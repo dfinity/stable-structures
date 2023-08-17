@@ -11,6 +11,10 @@ use std::cell::{Ref, RefCell};
 mod tests;
 mod v1;
 
+// V2 nodes are currently only used in tests.
+#[allow(dead_code)]
+mod v2;
+
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
 const B: usize = 6;
@@ -33,7 +37,13 @@ pub enum NodeType {
 pub type Entry<K> = (K, Vec<u8>);
 
 /// A node of a B-Tree.
-/// See `v1.rs` for more details on the memory layout.
+///
+/// There are two versions of a `Node`:
+///
+/// 1. `V1`, which supports only bounded types.
+/// 2. `V2`, which supports both bounded and unbounded types.
+///
+/// See `v1.rs` and `v2.rs` for more details.
 #[derive(Debug)]
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
@@ -45,8 +55,12 @@ pub struct Node<K: Storable + Ord + Clone> {
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
     node_type: NodeType,
-    max_key_size: u32,
-    max_value_size: u32,
+    version: Version,
+
+    // The address of the overflow page.
+    // In V2, a node can span multiple pages if it exceeds a certain size.
+    #[allow(dead_code)]
+    overflow: Option<Address>,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -61,14 +75,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a node from memory at the given address.
-    pub fn load<M: Memory>(
-        address: Address,
-        memory: &M,
-        max_key_size: u32,
-        max_value_size: u32,
-    ) -> Self {
-        // NOTE: new versions of `Node` will be introduced.
-        Self::load_v1(address, max_key_size, max_value_size, memory)
+    pub fn load<M: Memory>(address: Address, memory: &M, version: Version) -> Self {
+        match version {
+            Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }) => Self::load_v1(address, max_key_size, max_value_size, memory),
+            Version::V2(_) => unreachable!("Only v1 is currently supported."),
+        }
     }
 
     /// Saves the node to memory.
@@ -103,8 +117,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                         .last()
                         .expect("An internal node must have children."),
                     memory,
-                    self.max_key_size,
-                    self.max_value_size,
+                    self.version,
                 );
                 last_child.get_max(memory)
             }
@@ -123,8 +136,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     // NOTE: an internal node must have children, so this access is safe.
                     self.children[0],
                     memory,
-                    self.max_key_size,
-                    self.max_value_size,
+                    self.version,
                 );
                 first_child.get_min(memory)
             }
@@ -412,4 +424,58 @@ enum Value {
 
     // The value's offset in the node.
     ByRef(Bytes),
+}
+
+/// Stores version-specific data.
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
+pub enum Version {
+    /// V1 nodes have a page size derived from the max key/value sizes.
+    V1(DerivedPageSize),
+    /// V2 nodes have a fixed page size.
+    V2(PageSize),
+}
+
+impl Version {
+    fn page_size(&self) -> u32 {
+        match self {
+            Self::V2(page_size) => page_size.get(),
+            Self::V1(page_size) => page_size.get(),
+        }
+    }
+}
+
+/// The size of an individual page in the memory where nodes are stored.
+/// A node, if it's bigger than a single page, overflows into multiple pages.
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
+pub enum PageSize {
+    /// Derived page sizes are used when migrating nodes from v1 to v2.
+    /// A migration from v1 nodes to v2 is done incrementally. Children of a v2 node
+    /// may be a v1 node, and storing the maximum sizes around is necessary to be able
+    /// to load v1 nodes.
+    Derived(DerivedPageSize),
+    Value(u32),
+}
+
+impl PageSize {
+    fn get(&self) -> u32 {
+        match self {
+            Self::Value(page_size) => *page_size,
+            Self::Derived(page_size) => page_size.get(),
+        }
+    }
+}
+
+/// A page size derived from the maximum sizes of the keys and values.
+#[derive(Debug, PartialEq, Copy, Clone, Eq)]
+pub struct DerivedPageSize {
+    pub max_key_size: u32,
+    pub max_value_size: u32,
+}
+
+impl DerivedPageSize {
+    // Returns the page size derived from the max key/value sizes.
+    fn get(&self) -> u32 {
+        v1::size_v1(self.max_key_size, self.max_value_size).get() as u32
+    }
 }
