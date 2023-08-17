@@ -190,10 +190,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
 /// Returns the size of a v1 node in bytes.
 pub(super) fn size_v1(max_key_size: u32, max_value_size: u32) -> Bytes {
+    let node_header_size = NodeHeader::size();
     let max_key_size = Bytes::from(max_key_size);
     let max_value_size = Bytes::from(max_value_size);
-
-    let node_header_size = NodeHeader::size();
     let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
     let child_size = Address::size();
 
