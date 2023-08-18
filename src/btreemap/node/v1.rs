@@ -1,12 +1,71 @@
+//! Node V1
+//!
+//! A v1 node is the first node layout, with fixed node sizes and support for
+//! bounded types only.
+//!
+//! # Memory Layout
+//!
+//! ```text
+//! ---------------------------------------- <-- Header
+//! Magic "BTN"             ↕ 3 bytes
+//! ----------------------------------------
+//! Layout version (2)      ↕ 1 byte
+//! ----------------------------------------
+//! Node type               ↕ 1 byte
+//! ----------------------------------------
+//! # Entries (k)           ↕ 2 bytes
+//! ---------------------------------------- <-- Entries (upto `CAPACITY` entries)
+//! Key(0)
+//! ----------------------------------------
+//! Value(0)
+//! ----------------------------------------
+//! Key(1) size             ↕ 4 bytes
+//! ----------------------------------------
+//! Key(1)                  ↕ `max_key_size` bytes
+//! ----------------------------------------
+//! Value(1) size           ↕ 4 bytes
+//! ----------------------------------------
+//! Value(1)                ↕ `max_value_size` bytes
+//! ----------------------------------------
+//! ...
+//! ---------------------------------------- <-- Children (upto `CAPACITY + 1` children)
+//! Child(0) address        ↕ 8 bytes
+//! ----------------------------------------
+//! ...
+//! ----------------------------------------
+//! Child(k + 1) address    ↕ 8 bytes
+//! ----------------------------------------
+//! ```
 use super::*;
 
 impl<K: Storable + Ord + Clone> Node<K> {
-    /// Loads a node from memory at the given address.
-    pub(super) fn load_v1<M: Memory>(
+    /// Creates a new v1 node at the given address.
+    pub(super) fn new_v1(
         address: Address,
-        memory: &M,
+        node_type: NodeType,
         max_key_size: u32,
         max_value_size: u32,
+    ) -> Node<K> {
+        Node {
+            address,
+            node_type,
+            keys: vec![],
+            encoded_values: RefCell::default(),
+            children: vec![],
+            version: Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }),
+            overflow: None,
+        }
+    }
+
+    /// Loads a v1 node from memory at the given address.
+    pub(super) fn load_v1<M: Memory>(
+        address: Address,
+        max_key_size: u32,
+        max_value_size: u32,
+        memory: &M,
     ) -> Self {
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
@@ -58,8 +117,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 INTERNAL_NODE_TYPE => NodeType::Internal,
                 other => unreachable!("Unknown node type {}", other),
             },
-            max_key_size,
-            max_value_size,
+            version: Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }),
+            overflow: None,
         }
     }
 
@@ -78,6 +140,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Assert entries are sorted in strictly increasing order.
         assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
+
+        let (max_key_size, max_value_size) = match self.version {
+            Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }) => (max_key_size, max_value_size),
+            Version::V2 { .. } => unreachable!("cannot save v2 node as v1."),
+        };
 
         let header = NodeHeader {
             magic: *MAGIC,
@@ -108,7 +178,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the key.
             write(memory, (self.address + offset).get(), key_bytes.borrow());
-            offset += Bytes::from(self.max_key_size);
+            offset += Bytes::from(max_key_size);
 
             // Write the size of the value.
             let value = self.value(idx, memory);
@@ -117,7 +187,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the value.
             write(memory, (self.address + offset).get(), &value);
-            offset += Bytes::from(self.max_value_size);
+            offset += Bytes::from(max_value_size);
         }
 
         // Write the children
@@ -130,4 +200,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Address::size();
         }
     }
+}
+
+/// Returns the size of a v1 node in bytes.
+pub(super) fn size_v1(max_key_size: u32, max_value_size: u32) -> Bytes {
+    let node_header_size = NodeHeader::size();
+    let max_key_size = Bytes::from(max_key_size);
+    let max_value_size = Bytes::from(max_value_size);
+    let entry_size = U32_SIZE + max_key_size + max_value_size + U32_SIZE;
+    let child_size = Address::size();
+
+    node_header_size
+        + Bytes::from(CAPACITY as u64) * entry_size
+        + Bytes::from((CAPACITY + 1) as u64) * child_size
 }

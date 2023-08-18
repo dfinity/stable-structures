@@ -28,15 +28,12 @@
 //! ```
 //!
 //! The `SLOT_SIZE` constant depends on the item type. If the item
-//! type sets the `BoundedStorable::IS_FIXED_SIZE` flag, the
-//! `SLOT_SIZE` is equal to `BoundedStorable::MAX_SIZE`.  Otherwise,
-//! the `SLOT_SIZE` is `BoundedStorable::MAX_SIZE` plus the number of
-//! bytes required to represent integers up to
-//! `BoundedStorable::MAX_SIZE`.
-use crate::storable::bytes_to_store_size;
+//! type is fixed in size, the `SLOT_SIZE` is equal to the max size.
+//! Otherwise, the `SLOT_SIZE` is the max size plus the number of
+//! bytes required to represent integers up to that max size.
+use crate::storable::{bounds, bytes_to_store_size};
 use crate::{
-    read_u32, read_u64, safe_write, write_u32, write_u64, Address, BoundedStorable, GrowFailed,
-    Memory,
+    read_u32, read_u64, safe_write, write_u32, write_u64, Address, GrowFailed, Memory, Storable,
 };
 use std::borrow::{Borrow, Cow};
 use std::fmt;
@@ -66,8 +63,8 @@ pub enum InitError {
     /// memory layout.
     IncompatibleVersion(u8),
     /// The vector type is not compatible with the current vector
-    /// layout: MAX_SIZE and/or IS_FIXED_SIZE differ from the original
-    /// initialization parameters.
+    /// layout: the type's bounds differ from the original initialization
+    /// parameters.
     IncompatibleElementType,
     /// Failed to allocate memory for the vector.
     OutOfMemory,
@@ -85,7 +82,7 @@ impl fmt::Display for InitError {
                 "unsupported layout version {version}; supported version numbers are 1..={LAYOUT_VERSION}"
             ),
             Self::IncompatibleElementType =>
-                write!(fmt, "either MAX_SIZE or IS_FIXED_SIZE of the element type do not match the persisted vector attributes"),
+                write!(fmt, "the bounds (either max_size or is_fixed_size) of the element type do not match the persisted vector attributes"),
             Self::OutOfMemory => write!(fmt, "failed to allocate memory for vector metadata"),
         }
     }
@@ -93,24 +90,26 @@ impl fmt::Display for InitError {
 
 impl std::error::Error for InitError {}
 
-pub struct BaseVec<T: BoundedStorable, M: Memory> {
+pub struct BaseVec<T: Storable, M: Memory> {
     memory: M,
     _marker: PhantomData<T>,
 }
 
-impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
+impl<T: Storable, M: Memory> BaseVec<T, M> {
     /// Creates a new empty vector in the specified memory,
     /// overwriting any data structures the memory might have
     /// contained previously.
     ///
     /// Complexity: O(1)
     pub fn new(memory: M, magic: [u8; 3]) -> Result<Self, GrowFailed> {
+        let t_bounds = bounds::<T>();
+
         let header = HeaderV1 {
             magic,
             version: LAYOUT_VERSION,
             len: 0,
-            max_size: T::MAX_SIZE,
-            is_fixed_size: T::IS_FIXED_SIZE,
+            max_size: t_bounds.max_size,
+            is_fixed_size: t_bounds.is_fixed_size,
         };
         Self::write_header(&header, &memory)?;
         Ok(Self {
@@ -139,7 +138,8 @@ impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
         if header.version != LAYOUT_VERSION {
             return Err(InitError::IncompatibleVersion(header.version));
         }
-        if header.max_size != T::MAX_SIZE || header.is_fixed_size != T::IS_FIXED_SIZE {
+        let t_bounds = bounds::<T>();
+        if header.max_size != t_bounds.max_size || header.is_fixed_size != t_bounds.is_fixed_size {
             return Err(InitError::IncompatibleElementType);
         }
 
@@ -170,7 +170,7 @@ impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
 
     /// Sets the item at the specified index to the specified value.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     ///
     /// PRECONDITION: index < self.len()
     pub fn set(&self, index: u64, item: &T) {
@@ -186,7 +186,7 @@ impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
 
     /// Returns the item at the specified index.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn get(&self, index: u64) -> Option<T> {
         if index < self.len() {
             Some(self.read_entry(index))
@@ -197,7 +197,7 @@ impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
 
     /// Adds a new item at the end of the vector.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
         let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
@@ -212,7 +212,7 @@ impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
 
     /// Removes the item at the end of the vector.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn pop(&self) -> Option<T> {
         let len = self.len();
         if len == 0 {
@@ -253,14 +253,15 @@ impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
 
     /// Writes the size of the item at the specified offset.
     fn write_entry_size(&self, offset: u64, size: u32) -> Result<u64, GrowFailed> {
-        debug_assert!(size <= T::MAX_SIZE);
+        let t_bounds = bounds::<T>();
+        debug_assert!(size <= t_bounds.max_size);
 
-        if T::IS_FIXED_SIZE {
+        if t_bounds.is_fixed_size {
             Ok(offset)
-        } else if T::MAX_SIZE <= u8::MAX as u32 {
+        } else if t_bounds.max_size <= u8::MAX as u32 {
             safe_write(&self.memory, offset, &[size as u8; 1])?;
             Ok(offset + 1)
-        } else if T::MAX_SIZE <= u16::MAX as u32 {
+        } else if t_bounds.max_size <= u16::MAX as u32 {
             safe_write(&self.memory, offset, &(size as u16).to_le_bytes())?;
             Ok(offset + 2)
         } else {
@@ -271,13 +272,14 @@ impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
 
     /// Reads the size of the entry at the specified offset.
     fn read_entry_size(&self, offset: u64) -> (u64, usize) {
-        if T::IS_FIXED_SIZE {
-            (offset, T::MAX_SIZE as usize)
-        } else if T::MAX_SIZE <= u8::MAX as u32 {
+        let t_bounds = bounds::<T>();
+        if t_bounds.is_fixed_size {
+            (offset, t_bounds.max_size as usize)
+        } else if t_bounds.max_size <= u8::MAX as u32 {
             let mut size = [0u8; 1];
             self.memory.read(offset, &mut size);
             (offset + 1, size[0] as usize)
-        } else if T::MAX_SIZE <= u16::MAX as u32 {
+        } else if t_bounds.max_size <= u16::MAX as u32 {
             let mut size = [0u8; 2];
             self.memory.read(offset, &mut size);
             (offset + 2, u16::from_le_bytes(size) as usize)
@@ -326,19 +328,20 @@ impl<T: BoundedStorable, M: Memory> BaseVec<T, M> {
     }
 }
 
-impl<T: BoundedStorable + fmt::Debug, M: Memory> fmt::Debug for BaseVec<T, M> {
+impl<T: Storable + fmt::Debug, M: Memory> fmt::Debug for BaseVec<T, M> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.to_vec().fmt(fmt)
     }
 }
 
-fn slot_size<T: BoundedStorable>() -> u32 {
-    T::MAX_SIZE + bytes_to_store_size::<T>()
+fn slot_size<T: Storable>() -> u32 {
+    let t_bounds = bounds::<T>();
+    t_bounds.max_size + bytes_to_store_size(&t_bounds)
 }
 
 pub struct Iter<'a, T, M>
 where
-    T: BoundedStorable,
+    T: Storable,
     M: Memory,
 {
     vec: &'a BaseVec<T, M>,
@@ -348,7 +351,7 @@ where
 
 impl<T, M> Iterator for Iter<'_, T, M>
 where
-    T: BoundedStorable,
+    T: Storable,
     M: Memory,
 {
     type Item = T;

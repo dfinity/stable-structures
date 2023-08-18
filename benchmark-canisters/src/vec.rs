@@ -1,7 +1,7 @@
 use crate::{count_instructions, Random};
 use ic_cdk_macros::query;
 use ic_stable_structures::storable::Blob;
-use ic_stable_structures::{BoundedStorable, DefaultMemoryImpl, StableVec};
+use ic_stable_structures::{DefaultMemoryImpl, StableVec, Storable};
 use tiny_rng::{Rand, Rng};
 
 #[query]
@@ -78,7 +78,7 @@ fn vec_insert_blob<const N: usize>() -> u64 {
     vec_insert::<Blob<N>>()
 }
 
-fn vec_insert<T: BoundedStorable + Random>() -> u64 {
+fn vec_insert<T: Storable + Random>() -> u64 {
     let num_items = 10_000;
     let svec: StableVec<T, _> = StableVec::new(DefaultMemoryImpl::default()).unwrap();
 
@@ -100,7 +100,7 @@ fn vec_get_blob<const N: usize>() -> u64 {
     vec_get::<Blob<N>>()
 }
 
-fn vec_get<T: BoundedStorable + Random>() -> u64 {
+fn vec_get<T: Storable + Random>() -> u64 {
     let num_items = 10_000;
     let svec: StableVec<T, _> = StableVec::new(DefaultMemoryImpl::default()).unwrap();
 

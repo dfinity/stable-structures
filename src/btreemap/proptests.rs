@@ -1,4 +1,4 @@
-use crate::BTreeMap;
+use crate::{btreemap::test::b, storable::Blob, BTreeMap};
 use proptest::collection::btree_set as pset;
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
@@ -9,24 +9,26 @@ fn make_memory() -> Rc<RefCell<Vec<u8>>> {
     Rc::new(RefCell::new(Vec::new()))
 }
 
+fn arb_blob() -> impl Strategy<Value = Blob<10>> {
+    pvec(0..u8::MAX, 0..10).prop_map(|v| Blob::<10>::try_from(v.as_slice()).unwrap())
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
     #[test]
-    fn insert(
-        keys in pset(pvec(0..u8::MAX, 0..10), 1000..10_000),
-    ) {
+    fn insert(keys in pset(arb_blob(), 1000..10_000)) {
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
 
         for key in keys.iter() {
-            assert_eq!(btree.insert(key.clone(), key.clone()), None);
+            assert_eq!(btree.insert(*key, *key), None);
         }
 
         for key in keys.into_iter() {
             // Assert we retrieved the old value correctly.
-            assert_eq!(btree.insert(key.clone(), vec![]), Some(key.clone()));
+            assert_eq!(btree.insert(key, b(&[])), Some(key));
             // Assert we retrieved the new value correctly.
-            assert_eq!(btree.get(&key), Some(vec![]));
+            assert_eq!(btree.get(&key), Some(b(&[])));
         }
     }
 

@@ -2,7 +2,7 @@
 
 use crate::base_vec::BaseVec;
 pub use crate::base_vec::InitError;
-use crate::storable::BoundedStorable;
+use crate::storable::Storable;
 use crate::{GrowFailed, Memory};
 use std::fmt;
 
@@ -12,9 +12,9 @@ mod tests;
 const MAGIC: [u8; 3] = *b"SVC"; // Short for "stable vector".
 
 /// An implementation of growable arrays in stable memory.
-pub struct Vec<T: BoundedStorable, M: Memory>(BaseVec<T, M>);
+pub struct Vec<T: Storable, M: Memory>(BaseVec<T, M>);
 
-impl<T: BoundedStorable, M: Memory> Vec<T, M> {
+impl<T: Storable, M: Memory> Vec<T, M> {
     /// Creates a new empty vector in the specified memory,
     /// overwriting any data structures the memory might have
     /// contained previously.
@@ -55,7 +55,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
 
     /// Sets the item at the specified index to the specified value.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     ///
     /// PRECONDITION: index < self.len()
     pub fn set(&self, index: u64, item: &T) {
@@ -64,21 +64,21 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
 
     /// Returns the item at the specified index.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn get(&self, index: u64) -> Option<T> {
         self.0.get(index)
     }
 
     /// Adds a new item at the end of the vector.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
         self.0.push(item)
     }
 
     /// Removes the item at the end of the vector.
     ///
-    /// Complexity: O(T::MAX_SIZE)
+    /// Complexity: O(max_size(T))
     pub fn pop(&self) -> Option<T> {
         self.0.pop()
     }
@@ -93,7 +93,7 @@ impl<T: BoundedStorable, M: Memory> Vec<T, M> {
     }
 }
 
-impl<T: BoundedStorable + fmt::Debug, M: Memory> fmt::Debug for Vec<T, M> {
+impl<T: Storable + fmt::Debug, M: Memory> fmt::Debug for Vec<T, M> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(fmt)
     }
