@@ -40,11 +40,10 @@ use super::*;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v1 node at the given address.
-    pub(super) fn new_v1(
+    pub fn new_v1(
         address: Address,
         node_type: NodeType,
-        max_key_size: u32,
-        max_value_size: u32,
+        page_size: DerivedPageSize,
     ) -> Node<K> {
         Node {
             address,
@@ -52,10 +51,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
-            version: Version::V1(DerivedPageSize {
-                max_key_size,
-                max_value_size,
-            }),
+            version: Version::V1(page_size),
             overflow: None,
         }
     }

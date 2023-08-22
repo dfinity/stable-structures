@@ -37,8 +37,10 @@ impl NodeV1Data {
         let mut node = Node::new_v1(
             address,
             self.node_type,
-            self.max_key_size,
-            self.max_value_size,
+            DerivedPageSize {
+                max_key_size: self.max_key_size,
+                max_value_size: self.max_value_size,
+            },
         );
 
         // Push the entries

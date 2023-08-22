@@ -1,4 +1,5 @@
 use crate::{
+    btreemap::Allocator,
     read_struct, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
@@ -64,16 +65,6 @@ pub struct Node<K: Storable + Ord + Clone> {
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
-    /// Creates a new node at the given address.
-    pub fn new(
-        address: Address,
-        node_type: NodeType,
-        max_key_size: u32,
-        max_value_size: u32,
-    ) -> Node<K> {
-        Node::new_v1(address, node_type, max_key_size, max_value_size)
-    }
-
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, memory: &M, version: Version) -> Self {
         match version {
@@ -81,14 +72,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             }) => Self::load_v1(address, max_key_size, max_value_size, memory),
-            Version::V2(_) => unreachable!("Only v1 is currently supported."),
+            Version::V2(page_size) => Self::load_v2(address, page_size, memory),
         }
     }
 
     /// Saves the node to memory.
-    pub fn save<M: Memory>(&self, memory: &M) {
-        // NOTE: new versions of `Node` will be introduced.
-        self.save_v1(memory)
+    pub fn save<M: Memory>(&self, allocator: &mut Allocator<M>) {
+        match self.version {
+            Version::V1(_) => self.save_v1(allocator.memory()),
+            Version::V2(_) => self.save_v2(allocator),
+        }
     }
 
     /// Returns the address of the node.
@@ -436,10 +429,10 @@ pub enum Version {
 }
 
 impl Version {
-    fn page_size(&self) -> u32 {
+    pub fn page_size(&self) -> PageSize {
         match self {
-            Self::V2(page_size) => page_size.get(),
-            Self::V1(page_size) => page_size.get(),
+            Self::V1(page_size) => PageSize::Derived(*page_size),
+            Self::V2(page_size) => *page_size,
         }
     }
 }
@@ -458,7 +451,7 @@ pub enum PageSize {
 }
 
 impl PageSize {
-    fn get(&self) -> u32 {
+    pub fn get(&self) -> u32 {
         match self {
             Self::Value(page_size) => *page_size,
             Self::Derived(page_size) => page_size.get(),
