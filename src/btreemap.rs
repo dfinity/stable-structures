@@ -113,6 +113,28 @@ where
         }
     }
 
+    /// Initializes a v2 `BTreeMap`.
+    ///
+    /// This is currently exposed only for beta-testing purposes and will be removed in favor of
+    /// using BTreeMap::init directly once V2 is tested well enough.
+    pub fn init_v2(memory: M) -> Self {
+        if memory.size() == 0 {
+            // Memory is empty. Create a new map.
+            return BTreeMap::new(memory);
+        }
+
+        // Check if the magic in the memory corresponds to a BTreeMap.
+        let mut dst = vec![0; 3];
+        memory.read(0, &mut dst);
+        if dst != MAGIC {
+            // No BTreeMap found. Create a new instance.
+            BTreeMap::new_v2(memory)
+        } else {
+            // The memory already contains a BTreeMap. Load it.
+            BTreeMap::load(memory)
+        }
+    }
+
     /// Creates a new instance a `BTreeMap`.
     ///
     /// The given `memory` is assumed to be exclusively reserved for this data
