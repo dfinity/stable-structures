@@ -40,11 +40,7 @@ use super::*;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v1 node at the given address.
-    pub fn new_v1(
-        address: Address,
-        node_type: NodeType,
-        page_size: DerivedPageSize,
-    ) -> Node<K> {
+    pub fn new_v1(address: Address, node_type: NodeType, page_size: DerivedPageSize) -> Node<K> {
         Node {
             address,
             node_type,
