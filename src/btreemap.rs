@@ -1221,7 +1221,7 @@ mod test {
     }
 
     // A test runner that runs the test using both V1 and V2 btrees.
-    fn btree_test<K, V, R, F>(f: F)
+    pub fn btree_test<K, V, R, F>(f: F)
     where
         K: Storable + Ord + Clone,
         V: Storable,
