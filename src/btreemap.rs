@@ -147,7 +147,7 @@ where
         btree
     }
 
-    /// Create a V2 of the BTree.
+    /// Create a v2 instance of the BTree.
     /// This is currently exposed only for beta-testing purposes and will be removed in favor of
     /// using BTreeMap::new directly once V2 is tested well enough.
     pub fn new_v2(memory: M) -> Self {
@@ -227,7 +227,8 @@ where
                 }
             }
             LAYOUT_VERSION_2 => {
-                // FIXME: deal with derived page size.
+                // TODO: Handle derived page sizes.
+
                 // Deserialize the fields
                 BTreeHeader {
                     version: Version::V2(PageSize::Value(u32::from_le_bytes(
