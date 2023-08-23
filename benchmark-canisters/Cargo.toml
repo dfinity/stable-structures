@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 ic-cdk = "0.6.8"
 ic-cdk-macros = "0.6.8"
-ic-stable-structures = { path = "../" }
+ic-stable-structures = { path = "../", features = ["profiler"] }
+profiler = { path = "../profiler" }
 tiny-rng = "0.2.0"
