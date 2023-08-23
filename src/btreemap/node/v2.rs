@@ -370,19 +370,21 @@ fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8>
 
     // Append overflow pages, if any.
     let mut overflow_address = address_from_slice(&buf, OVERFLOW_ADDRESS_OFFSET);
-    while overflow_address != NULL {
-        // Read the overflow.
+    if overflow_address != NULL {
         let mut overflow_buf = vec![0; page_size as usize];
-        memory.read(overflow_address.get(), &mut overflow_buf);
+        while overflow_address != NULL {
+            // Read the overflow.
+            memory.read(overflow_address.get(), &mut overflow_buf);
 
-        // Validate the magic of the overflow.
-        assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad overflow magic.");
+            // Validate the magic of the overflow.
+            assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad overflow magic.");
 
-        // Read the next address
-        overflow_address = address_from_slice(&overflow_buf, PAGE_OVERFLOW_NEXT_OFFSET);
+            // Read the next address
+            overflow_address = address_from_slice(&overflow_buf, PAGE_OVERFLOW_NEXT_OFFSET);
 
-        // Append its data to the buffer.
-        buf.extend_from_slice(&overflow_buf[PAGE_OVERFLOW_DATA_OFFSET.get() as usize..]);
+            // Append its data to the buffer.
+            buf.extend_from_slice(&overflow_buf[PAGE_OVERFLOW_DATA_OFFSET.get() as usize..]);
+        }
     }
 
     buf
