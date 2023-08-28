@@ -170,18 +170,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the values
         for _ in 0..num_entries {
-            // Load the value's size.
+            // Load the values lazily.
             encoded_values.push(Value::ByRef(Bytes::from(offset.get())));
             let value_size = read_u32(&reader, offset) as usize;
-            offset += U32_SIZE;
-
-            // Load the value.
-            // TODO: Read values lazily.
-            //encoded_values.push(Value::ByVal(
-            //    node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
-            //));
-
-            offset += Bytes::from(value_size as u64);
+            offset += U32_SIZE + Bytes::from(value_size as u64);
         }
 
         Self {
