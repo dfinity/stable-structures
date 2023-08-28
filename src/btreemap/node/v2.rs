@@ -132,6 +132,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut offset = ENTRIES_OFFSET;
         let mut children = vec![];
         if node_type == NodeType::Internal {
+            #[cfg(feature = "profiler")]
+            let _p = profiler::profile("load_children");
             // The number of children is equal to the number of entries + 1.
             for _ in 0..num_entries + 1 {
                 let child = address_from_slice(&node_buf, offset);
@@ -144,36 +146,43 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut keys = Vec::with_capacity(num_entries);
         let mut encoded_values = Vec::with_capacity(num_entries);
         let mut buf = vec![];
-        for _ in 0..num_entries {
-            // Load the key's size.
-            // TODO: store the size in a more efficient way.
-            // TODO: don't store the size if the key is fixed.
-            let key_size = read_u32_from_slice(&node_buf, offset) as usize;
-            offset += U32_SIZE;
+        {
+            #[cfg(feature = "profiler")]
+            let _p = profiler::profile("load_keys");
+            for _ in 0..num_entries {
+                // Load the key's size.
+                // TODO: store the size in a more efficient way.
+                // TODO: don't store the size if the key is fixed.
+                let key_size = read_u32_from_slice(&node_buf, offset) as usize;
+                offset += U32_SIZE;
 
-            // Load the key.
-            buf.resize(key_size, 0);
-            let key = K::from_bytes(Cow::Borrowed(
-                &node_buf[offset.get() as usize..offset.get() as usize + key_size],
-            ));
-            offset += Bytes::from(key_size as u64);
-            keys.push(key);
+                // Load the key.
+                buf.resize(key_size, 0);
+                let key = K::from_bytes(Cow::Borrowed(
+                    &node_buf[offset.get() as usize..offset.get() as usize + key_size],
+                ));
+                offset += Bytes::from(key_size as u64);
+                keys.push(key);
+            }
         }
 
         // Load the values
-        for _ in 0..num_entries {
-            // Load the value's size.
-            let value_size = read_u32_from_slice(&node_buf, offset) as usize;
-            offset += U32_SIZE;
+        {
+            #[cfg(feature = "profiler")]
+            let _p = profiler::profile("load_values");
+            for _ in 0..num_entries {
+                // Load the value's size.
+                let value_size = read_u32_from_slice(&node_buf, offset) as usize;
+                offset += U32_SIZE;
 
-            // Load the value.
-            // TODO: Read values lazily.
-            buf.resize(value_size, 0);
-            encoded_values.push(Value::ByVal(
-                node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
-            ));
+                // Load the value.
+                // TODO: Read values lazily.
+                encoded_values.push(Value::ByVal(
+                    node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
+                ));
 
-            offset += Bytes::from(value_size as u64);
+                offset += Bytes::from(value_size as u64);
+            }
         }
 
         let original_overflow_address = address_from_slice(&node_buf, OVERFLOW_ADDRESS_OFFSET);
@@ -364,6 +373,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
 // Reads the entirety of the node, including all its overflows, into a buffer.
 fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8> {
+    #[cfg(feature = "profiler")]
+    let _p = profiler::profile("read_node");
+
     // Read the first page of the node.
     let mut buf = vec![0; page_size as usize];
     memory.read(address.get(), &mut buf);
