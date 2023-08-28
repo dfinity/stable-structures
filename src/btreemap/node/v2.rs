@@ -79,8 +79,6 @@ use std::cmp::min;
 
 // Initial page
 const LAYOUT_VERSION_2: u8 = 2;
-const NODE_TYPE_OFFSET: usize = 4;
-const NUM_ENTRIES_OFFSET: usize = 5;
 const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET: Bytes = Bytes::new(15);
 
@@ -116,27 +114,36 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let _p = profiler::profile("node_load_v2");
 
         // Load the node, including any overflows, into a buffer.
-        let (node_buf, overflow_addresses) = read_node(address, page_size.get(), memory);
+        let overflow_addresses = read_overflow_addresses(address, memory);
+
+        let reader = NodeReader {
+            address: address,
+            overflows: overflow_addresses.clone(),
+            page_size: page_size,
+            memory,
+        };
+
+        let mut offset = Address::from(0);
+
+        let header: NodeHeader = read_struct(Address::from(0), &reader);
 
         // Load the node type.
-        let node_type = match node_buf[NODE_TYPE_OFFSET] {
+        let node_type = match header.node_type {
             LEAF_NODE_TYPE => NodeType::Leaf,
             INTERNAL_NODE_TYPE => NodeType::Internal,
             other => unreachable!("Unknown node type {}", other),
         };
 
         // Load the number of entries
-        let num_entries = read_u16_from_slice(&node_buf, NUM_ENTRIES_OFFSET) as usize;
+        let num_entries = header.num_entries as usize;
 
         // Load children if this is an internal node.
-        let mut offset = ENTRIES_OFFSET;
+        offset += ENTRIES_OFFSET;
         let mut children = vec![];
         if node_type == NodeType::Internal {
-            #[cfg(feature = "profiler")]
-            let _p = profiler::profile("load_children");
             // The number of children is equal to the number of entries + 1.
             for _ in 0..num_entries + 1 {
-                let child = address_from_slice(&node_buf, offset);
+                let child = Address::from(read_u64(&reader, offset));
                 offset += Address::size();
                 children.push(child);
             }
@@ -146,44 +153,35 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut keys = Vec::with_capacity(num_entries);
         let mut encoded_values = Vec::with_capacity(num_entries);
         let mut buf = vec![];
-        {
-            #[cfg(feature = "profiler")]
-            let _p = profiler::profile("load_keys");
-            for _ in 0..num_entries {
-                // Load the key's size.
-                // TODO: store the size in a more efficient way.
-                // TODO: don't store the size if the key is fixed.
-                let key_size = read_u32_from_slice(&node_buf, offset) as usize;
-                offset += U32_SIZE;
+        for _ in 0..num_entries {
+            // Load the key's size.
+            // TODO: store the size in a more efficient way.
+            // TODO: don't store the size if the key is fixed.
+            let key_size = read_u32(&reader, offset) as usize;
+            offset += U32_SIZE;
 
-                // Load the key.
-                buf.resize(key_size, 0);
-                let key = K::from_bytes(Cow::Borrowed(
-                    &node_buf[offset.get() as usize..offset.get() as usize + key_size],
-                ));
-                offset += Bytes::from(key_size as u64);
-                keys.push(key);
-            }
+            // Load the key.
+            buf.resize(key_size, 0);
+            reader.read(offset.get(), &mut buf);
+            let key = K::from_bytes(Cow::Borrowed(&buf));
+            offset += Bytes::from(key_size as u64);
+            keys.push(key);
         }
 
         // Load the values
-        {
-            #[cfg(feature = "profiler")]
-            let _p = profiler::profile("load_values");
-            for _ in 0..num_entries {
-                // Load the value's size.
-                encoded_values.push(Value::ByRef(offset));
-                let value_size = read_u32_from_slice(&node_buf, offset) as usize;
-                offset += U32_SIZE;
+        for _ in 0..num_entries {
+            // Load the value's size.
+            encoded_values.push(Value::ByRef(Bytes::from(offset.get())));
+            let value_size = read_u32(&reader, offset) as usize;
+            offset += U32_SIZE;
 
-                // Load the value.
-                // TODO: Read values lazily.
-                //encoded_values.push(Value::ByVal(
-                //    node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
-                //));
+            // Load the value.
+            // TODO: Read values lazily.
+            //encoded_values.push(Value::ByVal(
+            //    node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
+            //));
 
-                offset += Bytes::from(value_size as u64);
-            }
+            offset += Bytes::from(value_size as u64);
         }
 
         Self {
@@ -342,89 +340,22 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         addresses
     }
-
-    /*fn get_overflow_addresses<M: Memory>(&self, memory: &M) -> Vec<Address> {
-        let mut overflow_addresses = vec![];
-        let mut next = self.overflow;
-        while let Some(overflow_address) = next {
-            overflow_addresses.push(overflow_address);
-
-            // Load next overflow address.
-            let maybe_next = Address::from(read_u64(
-                memory,
-                overflow_address + PAGE_OVERFLOW_NEXT_OFFSET,
-            ));
-
-            if maybe_next == crate::types::NULL {
-                next = None;
-            } else {
-                next = Some(maybe_next);
-            }
-        }
-
-        overflow_addresses
-    }*/
 }
 
-// Reads the entirety of the node, including all its overflows, into a buffer.
-fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> (Vec<u8>, Vec<Address>) {
-    #[cfg(feature = "profiler")]
-    let _p = profiler::profile("read_node");
-
-    // Read the first page of the node.
-    let mut buf = vec![0; page_size as usize];
-    memory.read(address.get(), &mut buf);
-
+fn read_overflow_addresses<M: Memory>(address: Address, memory: &M) -> Vec<Address> {
     let mut overflow_addresses = vec![];
+    let mut overflow_address = Address::from(read_u64(memory, address + OVERFLOW_ADDRESS_OFFSET));
+    while overflow_address != NULL {
+        overflow_addresses.push(overflow_address);
 
-    // Append overflow pages, if any.
-    let mut overflow_address = address_from_slice(&buf, OVERFLOW_ADDRESS_OFFSET);
-    if overflow_address != NULL {
-        let mut overflow_buf = vec![0; page_size as usize];
-        while overflow_address != NULL {
-            overflow_addresses.push(overflow_address);
+        overflow_address = Address::from(read_u64(
+            memory,
+            overflow_address + PAGE_OVERFLOW_NEXT_OFFSET,
+        ));
 
-            // Read the overflow.
-            memory.read(overflow_address.get(), &mut overflow_buf);
-
-            // Validate the magic of the overflow.
-            assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad overflow magic.");
-
-            // Read the next address
-            overflow_address = address_from_slice(&overflow_buf, PAGE_OVERFLOW_NEXT_OFFSET);
-
-            // Append its data to the buffer.
-            buf.extend_from_slice(&overflow_buf[PAGE_OVERFLOW_DATA_OFFSET.get() as usize..]);
-        }
+        // TODO: Validate the magic of the overflow.
+        //assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad overflow magic.");
     }
 
-    (buf, overflow_addresses)
-}
-
-fn read_u16_from_slice(slice: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes(
-        (&slice[offset..offset + 2])
-            .try_into()
-            .expect("unable to read u16 from slice"),
-    )
-}
-
-fn read_u64_from_slice(slice: &[u8], offset: usize) -> u64 {
-    u64::from_le_bytes(
-        (&slice[offset..offset + 8])
-            .try_into()
-            .expect("unable to read u64 from slice"),
-    )
-}
-
-fn read_u32_from_slice(slice: &[u8], offset: Bytes) -> u32 {
-    u32::from_le_bytes(
-        (&slice[offset.get() as usize..offset.get() as usize + 4])
-            .try_into()
-            .expect("unable to read u32 from slice"),
-    )
-}
-
-fn address_from_slice(slice: &[u8], offset: Bytes) -> Address {
-    Address::from(read_u64_from_slice(slice, offset.get() as usize))
+    overflow_addresses
 }
