@@ -120,7 +120,7 @@ where
     pub fn init_v2(memory: M) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
-            return BTreeMap::new(memory);
+            return BTreeMap::new_v2(memory);
         }
 
         // Check if the magic in the memory corresponds to a BTreeMap.
