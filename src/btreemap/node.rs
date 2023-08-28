@@ -165,6 +165,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             let mut values = self.encoded_values.borrow_mut();
 
             if let Value::ByRef(offset) = values[idx] {
+                // Value isn't loaded yet.
                 let reader = NodeReader {
                     address: self.address,
                     overflows: self.overflows.clone().unwrap_or_default(),
@@ -172,7 +173,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     memory,
                 };
 
-                // Value isn't loaded yet.
                 let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
                 let mut value = vec![0; value_len];
                 reader.read((offset + U32_SIZE).get(), &mut value);
