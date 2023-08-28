@@ -48,7 +48,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             encoded_values: RefCell::default(),
             children: vec![],
             version: Version::V1(page_size),
-            overflow: None,
+            overflows: None,
         }
     }
 
@@ -120,7 +120,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_key_size,
                 max_value_size,
             }),
-            overflow: None,
+            overflows: None,
         }
     }
 

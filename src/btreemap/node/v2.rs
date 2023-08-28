@@ -87,7 +87,7 @@ const ENTRIES_OFFSET: Bytes = Bytes::new(15);
 // Overflow page
 const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
-const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
+pub const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
 
 // The minimum size a page can have.
 // Rationale: a page size needs to at least store the header (15 bytes) + all the children
@@ -106,7 +106,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
-            overflow: None,
+            overflows: None,
         }
     }
 
@@ -116,7 +116,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let _p = profiler::profile("node_load_v2");
 
         // Load the node, including any overflows, into a buffer.
-        let node_buf = read_node(address, page_size.get(), memory);
+        let (node_buf, overflow_addresses) = read_node(address, page_size.get(), memory);
 
         // Load the node type.
         let node_type = match node_buf[NODE_TYPE_OFFSET] {
@@ -172,20 +172,19 @@ impl<K: Storable + Ord + Clone> Node<K> {
             let _p = profiler::profile("load_values");
             for _ in 0..num_entries {
                 // Load the value's size.
+                encoded_values.push(Value::ByRef(offset));
                 let value_size = read_u32_from_slice(&node_buf, offset) as usize;
                 offset += U32_SIZE;
 
                 // Load the value.
                 // TODO: Read values lazily.
-                encoded_values.push(Value::ByVal(
-                    node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
-                ));
+                //encoded_values.push(Value::ByVal(
+                //    node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
+                //));
 
                 offset += Bytes::from(value_size as u64);
             }
         }
-
-        let original_overflow_address = address_from_slice(&node_buf, OVERFLOW_ADDRESS_OFFSET);
 
         Self {
             address,
@@ -194,11 +193,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             children,
             node_type,
             version: Version::V2(page_size),
-            overflow: if original_overflow_address == crate::types::NULL {
-                None
-            } else {
-                Some(original_overflow_address)
-            },
+            overflows: Some(overflow_addresses),
         }
     }
 
@@ -332,7 +327,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         allocator: &mut Allocator<M>,
     ) -> Vec<Address> {
         // Fetch the overflow page addresses of this node.
-        let mut addresses = self.get_overflow_addresses(allocator.memory());
+        let mut addresses = self.overflows.clone().unwrap_or_default();
 
         // If there are too many overflow addresses, deallocate some until we've reached
         // the number we need.
@@ -348,7 +343,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         addresses
     }
 
-    fn get_overflow_addresses<M: Memory>(&self, memory: &M) -> Vec<Address> {
+    /*fn get_overflow_addresses<M: Memory>(&self, memory: &M) -> Vec<Address> {
         let mut overflow_addresses = vec![];
         let mut next = self.overflow;
         while let Some(overflow_address) = next {
@@ -368,11 +363,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         overflow_addresses
-    }
+    }*/
 }
 
 // Reads the entirety of the node, including all its overflows, into a buffer.
-fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8> {
+fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> (Vec<u8>, Vec<Address>) {
     #[cfg(feature = "profiler")]
     let _p = profiler::profile("read_node");
 
@@ -380,11 +375,15 @@ fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8>
     let mut buf = vec![0; page_size as usize];
     memory.read(address.get(), &mut buf);
 
+    let mut overflow_addresses = vec![];
+
     // Append overflow pages, if any.
     let mut overflow_address = address_from_slice(&buf, OVERFLOW_ADDRESS_OFFSET);
     if overflow_address != NULL {
         let mut overflow_buf = vec![0; page_size as usize];
         while overflow_address != NULL {
+            overflow_addresses.push(overflow_address);
+
             // Read the overflow.
             memory.read(overflow_address.get(), &mut overflow_buf);
 
@@ -399,7 +398,7 @@ fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8>
         }
     }
 
-    buf
+    (buf, overflow_addresses)
 }
 
 fn read_u16_from_slice(slice: &[u8], offset: usize) -> u16 {

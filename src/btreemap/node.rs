@@ -8,13 +8,13 @@ use crate::{
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
 
+mod reader;
 #[cfg(test)]
 mod tests;
 mod v1;
-
-// V2 nodes are currently only used in tests.
-#[allow(dead_code)]
 mod v2;
+
+use reader::NodeReader;
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
@@ -60,8 +60,7 @@ pub struct Node<K: Storable + Ord + Clone> {
 
     // The address of the overflow page.
     // In V2, a node can span multiple pages if it exceeds a certain size.
-    #[allow(dead_code)]
-    overflow: Option<Address>,
+    overflows: Option<Vec<Address>>,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -166,11 +165,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
             let mut values = self.encoded_values.borrow_mut();
 
             if let Value::ByRef(offset) = values[idx] {
+                let reader = NodeReader {
+                    address: self.address,
+                    overflows: self.overflows.clone().unwrap_or_default(),
+                    page_size: self.page_size(),
+                    memory,
+                };
+
                 // Value isn't loaded yet.
-                let value_address = self.address + offset;
-                let value_len = read_u32(memory, value_address) as usize;
+                let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
                 let mut value = vec![0; value_len];
-                memory.read((value_address + U32_SIZE).get(), &mut value);
+                reader.read((offset + U32_SIZE).get(), &mut value);
 
                 // Cache the value internally.
                 values[idx] = Value::ByVal(value);
@@ -185,6 +190,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 unreachable!("value must have been loaded already.");
             }
         })
+    }
+
+    fn page_size(&self) -> PageSize {
+        self.version.page_size()
     }
 
     /// Returns a reference to the key at the specified index.
