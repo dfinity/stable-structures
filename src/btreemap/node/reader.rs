@@ -2,8 +2,57 @@ use super::*;
 use crate::btreemap::node::v2::PAGE_OVERFLOW_DATA_OFFSET;
 use std::cmp::min;
 
+/// A `NodeReader` simulates the node as a memory.
+pub struct NodeReader<'a, M: Memory> {
+    pub address: Address,
+    pub overflows: Vec<Address>,
+    pub page_size: PageSize,
+    pub memory: &'a M,
+}
+
+impl<'a, M: Memory> Memory for NodeReader<'a, M> {
+    fn size(&self) -> u64 {
+        panic!("");
+    }
+
+    fn grow(&self, _: u64) -> i64 {
+        panic!("");
+    }
+
+    fn read(&self, offset: u64, dst: &mut [u8]) {
+        if (offset + dst.len() as u64) < self.page_size.get() as u64 {
+            self.memory.read(self.address.get() + offset, dst);
+            return;
+        }
+
+        let iter = NodeIterator {
+            virtual_segment: Segment {
+                address: Address::from(offset),
+                length: Bytes::from(dst.len() as u64),
+            },
+            address: self.address,
+            overflows: &self.overflows,
+            page_size: Bytes::from(self.page_size.get()),
+        };
+
+        let mut bytes_read = 0;
+        for Segment { address, length } in iter {
+            self.memory.read(
+                address.get(),
+                &mut dst[bytes_read as usize..(bytes_read + length.get()) as usize],
+            );
+
+            bytes_read += length.get();
+        }
+    }
+
+    fn write(&self, _: u64, _: &[u8]) {
+        panic!("out of bounds")
+    }
+}
+
 #[derive(Debug)]
-pub struct Segment {
+struct Segment {
     pub address: Address,
     pub length: Bytes,
 }
@@ -77,53 +126,5 @@ impl Iterator for NodeIterator<'_> {
             address: real_address,
             length: bytes_in_segment,
         })
-    }
-}
-
-pub struct NodeReader<'a, M: Memory> {
-    pub address: Address,
-    pub overflows: Vec<Address>,
-    pub page_size: PageSize,
-    pub memory: &'a M,
-}
-
-impl<'a, M: Memory> Memory for NodeReader<'a, M> {
-    fn size(&self) -> u64 {
-        panic!("");
-    }
-
-    fn grow(&self, _: u64) -> i64 {
-        panic!("");
-    }
-
-    fn read(&self, offset: u64, dst: &mut [u8]) {
-        if (offset + dst.len() as u64) < self.page_size.get() as u64 {
-            self.memory.read(self.address.get() + offset, dst);
-            return;
-        }
-
-        let iter = NodeIterator {
-            virtual_segment: Segment {
-                address: Address::from(offset),
-                length: Bytes::from(dst.len() as u64),
-            },
-            address: self.address,
-            overflows: &self.overflows,
-            page_size: Bytes::from(self.page_size.get()),
-        };
-
-        let mut bytes_read = 0;
-        for Segment { address, length } in iter {
-            self.memory.read(
-                address.get(),
-                &mut dst[bytes_read as usize..(bytes_read + length.get()) as usize],
-            );
-
-            bytes_read += length.get();
-        }
-    }
-
-    fn write(&self, _: u64, _: &[u8]) {
-        panic!("out of bounds")
     }
 }
