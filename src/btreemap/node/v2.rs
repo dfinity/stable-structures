@@ -196,12 +196,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(page_size >= MINIMUM_PAGE_SIZE);
         assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
 
-        // We should never be saving an empty node.
-       // assert!(!self.keys.is_empty() || !self.children.is_empty());
-
-        // Assert entries are sorted in strictly increasing order.
-        //assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
-
         // A buffer to serialize the node into first, then write to memory.
         let mut buf = vec![];
         buf.extend_from_slice(MAGIC);
