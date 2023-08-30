@@ -118,7 +118,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let reader = NodeReader {
             address,
-            overflows: overflow_addresses.clone(),
+            overflows: &overflow_addresses,
             page_size,
             memory,
         };

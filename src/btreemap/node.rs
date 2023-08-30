@@ -168,7 +168,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 // Value isn't loaded yet.
                 let reader = NodeReader {
                     address: self.address,
-                    overflows: self.overflows.clone(),
+                    overflows: &self.overflows,
                     page_size: self.page_size(),
                     memory,
                 };

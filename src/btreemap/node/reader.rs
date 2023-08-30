@@ -5,7 +5,7 @@ use std::cmp::min;
 /// A `NodeReader` simulates the node as a memory.
 pub struct NodeReader<'a, M: Memory> {
     pub address: Address,
-    pub overflows: Vec<Address>,
+    pub overflows: &'a [Address],
     pub page_size: PageSize,
     pub memory: &'a M,
 }
