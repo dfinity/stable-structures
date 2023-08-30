@@ -1,4 +1,4 @@
-use core::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign, Rem};
+use core::ops::{Add, AddAssign, Div, Mul, Rem, Sub, SubAssign};
 
 pub const NULL: Address = Address(0);
 
