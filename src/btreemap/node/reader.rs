@@ -2,7 +2,8 @@ use super::*;
 use crate::btreemap::node::v2::PAGE_OVERFLOW_DATA_OFFSET;
 use std::cmp::min;
 
-/// A `NodeReader` simulates the node as a memory.
+/// A `NodeReader` abstracts the `Node` as a single contiguous memory, even though internally
+/// it can be composed of multiple pages.
 pub struct NodeReader<'a, M: Memory> {
     pub address: Address,
     pub overflows: &'a [Address],
@@ -11,27 +12,19 @@ pub struct NodeReader<'a, M: Memory> {
 }
 
 impl<'a, M: Memory> Memory for NodeReader<'a, M> {
-    fn size(&self) -> u64 {
-        panic!("");
-    }
-
-    fn grow(&self, _: u64) -> i64 {
-        panic!("");
-    }
-
     fn read(&self, offset: u64, dst: &mut [u8]) {
         if (offset + dst.len() as u64) < self.page_size.get() as u64 {
             self.memory.read(self.address.get() + offset, dst);
             return;
         }
 
-        let iter = NodeIterator {
-            virtual_segment: VirtualSegment {
+        let iter = NodeIterator::new(
+            VirtualSegment {
                 address: Address::from(offset),
                 length: Bytes::from(dst.len() as u64),
             },
-            page_size: Bytes::from(self.page_size.get()),
-        };
+            Bytes::from(self.page_size.get()),
+        );
 
         let mut bytes_read = 0;
         for RealSegment {
@@ -57,7 +50,15 @@ impl<'a, M: Memory> Memory for NodeReader<'a, M> {
     }
 
     fn write(&self, _: u64, _: &[u8]) {
-        panic!("out of bounds")
+        unreachable!("NodeReader does not call write")
+    }
+
+    fn size(&self) -> u64 {
+        unreachable!("NodeReader does not call size")
+    }
+
+    fn grow(&self, _: u64) -> i64 {
+        unreachable!("NodeReader does not call grow")
     }
 }
 
@@ -73,9 +74,47 @@ struct RealSegment {
     length: Bytes,
 }
 
+// An iterator that maps a segment of a node into segments of its underlying memory.
+//
+// A segment in a node can map to multiple segments of memory. Here's an example:
+//
+// Node
+// --------------------------------------------------------
+//          (A) ---------- SEGMENT ---------- (B)
+// --------------------------------------------------------
+// ↑               ↑               ↑               ↑
+// Page 0        Page 1          Page 2          Page 3
+//
+// The [`Node`] is internally divided into fixed-size pages. In the node's virtual
+// address space, all these pages are consecutive, but in the underlying memory this may not
+// be the case.
+//
+// A virtual segment would first be split at the page boundaries. The example virtual segment
+// above would be split into the following segments:
+//
+//    (A, end of page 0)
+//    (start of page 1, end of page 1)
+//    (start of page 2, B)
+//
+// Each of the segments above can then be translated into the real address space by looking up
+// the pages' addresses in the underlying memory.
 struct NodeIterator {
     virtual_segment: VirtualSegment,
     page_size: Bytes,
+
+    // The amount of data that can be stored in an overflow page.
+    overflow_page_capacity: Bytes,
+}
+
+impl NodeIterator {
+    #[inline]
+    fn new(virtual_segment: VirtualSegment, page_size: Bytes) -> Self {
+        Self {
+            virtual_segment,
+            page_size,
+            overflow_page_capacity: page_size - PAGE_OVERFLOW_DATA_OFFSET,
+        }
+    }
 }
 
 impl Iterator for NodeIterator {
@@ -87,58 +126,40 @@ impl Iterator for NodeIterator {
             return None;
         }
 
-        // Map the virtual segment's address to a real address.
         let offset = Bytes::from(self.virtual_segment.address.get());
 
-        let segment = if offset < self.page_size {
-            // The address is in the initial page.
-
-            // Compute how many bytes are in this real segment.
-            let bytes_in_segment = {
-                let end_page_offset = self.page_size;
-
-                // Write up to either the end of the page, or the end of the segment.
-                min(end_page_offset - offset, self.virtual_segment.length)
-            };
-
-            RealSegment {
-                page_idx: 0,
-                offset,
-                length: bytes_in_segment,
-            }
+        // Compute the page where the segment begins.
+        let page_idx = if offset < self.page_size {
+            0 // The segment begins in in the initial page.
         } else {
-            // The amount of data that can be stored in an overflow page.
-            let overflow_data_size = self.page_size - PAGE_OVERFLOW_DATA_OFFSET;
+            // The segment begins in an overflow page.
+            ((offset - self.page_size) / self.overflow_page_capacity).get() + 1
+        };
 
-            // The offset is in the overflows.
-            let overflow_idx =
-                ((offset - self.page_size).get() as usize) / (overflow_data_size.get() as usize);
+        // Compute the length of the next real segment.
+        // The length of the real segment is either up to the end of the page, or the end of the
+        // virtual segment, whichever is smaller.
+        let length = {
+            let page_end = self.page_size + self.overflow_page_capacity * page_idx;
+            min(page_end - offset, self.virtual_segment.length)
+        };
 
-            let offset_in_overflow =
-                ((offset - self.page_size).get() as usize) % (overflow_data_size.get() as usize);
-
-            let overflow_page_end_offset =
-                self.page_size + Bytes::from((overflow_idx + 1) as u64) * overflow_data_size;
-
-            // Compute how many bytes are in this real segment.
-            let bytes_in_segment = {
-                let end_page_offset = overflow_page_end_offset;
-
-                // Write up to either the end of the page, or the end of the segment.
-                min(end_page_offset - offset, self.virtual_segment.length)
-            };
-
-            RealSegment {
-                page_idx: overflow_idx + 1,
-                offset: PAGE_OVERFLOW_DATA_OFFSET + Bytes::new(offset_in_overflow as u64),
-                length: bytes_in_segment,
-            }
+        // Compute the offset within the page.
+        let offset = if offset < self.page_size {
+            offset
+        } else {
+            // The offset is in the overflow pages.
+            PAGE_OVERFLOW_DATA_OFFSET + (offset - self.page_size) % self.overflow_page_capacity
         };
 
         // Update the virtual segment to exclude the portion we're about to return.
-        self.virtual_segment.length -= segment.length;
-        self.virtual_segment.address += segment.length;
+        self.virtual_segment.length -= length;
+        self.virtual_segment.address += length;
 
-        Some(segment)
+        Some(RealSegment {
+            page_idx: page_idx as usize,
+            offset,
+            length,
+        })
     }
 }

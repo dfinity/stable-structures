@@ -85,7 +85,7 @@ const ENTRIES_OFFSET: Bytes = Bytes::new(15);
 // Overflow page
 const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
-pub const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
+pub(super) const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
 
 // The minimum size a page can have.
 // Rationale: a page size needs to at least store the header (15 bytes) + all the children

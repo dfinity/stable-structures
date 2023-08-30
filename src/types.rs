@@ -1,4 +1,4 @@
-use core::ops::{Add, AddAssign, Mul, Sub, SubAssign};
+use core::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign, Rem};
 
 pub const NULL: Address = Address(0);
 
@@ -48,18 +48,27 @@ impl AddAssign<Bytes> for Address {
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct Bytes(u64);
 
-impl<I: Into<u64>> From<I> for Bytes {
-    fn from(bytes: I) -> Self {
-        Self(bytes.into())
+impl From<u64> for Bytes {
+    fn from(bytes: u64) -> Self {
+        Self(bytes)
     }
 }
 
-// `From<usize>` is unimplemented as it would conflict
-// with the `From` trait above.
-#[allow(clippy::from_over_into)]
-impl Into<usize> for Bytes {
-    fn into(self) -> usize {
-        self.0 as usize
+impl From<usize> for Bytes {
+    fn from(bytes: usize) -> Self {
+        Self(bytes as u64)
+    }
+}
+
+impl From<u32> for Bytes {
+    fn from(bytes: u32) -> Self {
+        Self(bytes as u64)
+    }
+}
+
+impl From<u16> for Bytes {
+    fn from(bytes: u16) -> Self {
+        Self(bytes as u64)
     }
 }
 
@@ -84,6 +93,22 @@ impl Mul<Bytes> for Bytes {
 
     fn mul(self, bytes: Bytes) -> Self {
         Self(self.0 * bytes.0)
+    }
+}
+
+impl Div<Bytes> for Bytes {
+    type Output = Self;
+
+    fn div(self, bytes: Bytes) -> Self {
+        Self(self.0 / bytes.0)
+    }
+}
+
+impl Rem<Bytes> for Bytes {
+    type Output = Self;
+
+    fn rem(self, bytes: Bytes) -> Self {
+        Self(self.0 % bytes.0)
     }
 }
 
