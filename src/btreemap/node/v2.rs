@@ -104,7 +104,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
-            overflows: None,
+            overflows: Vec::with_capacity(0),
         }
     }
 
@@ -183,7 +183,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             children,
             node_type,
             version: Version::V2(page_size),
-            overflows: Some(overflow_addresses),
+            overflows: overflow_addresses,
         }
     }
 
@@ -317,7 +317,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         allocator: &mut Allocator<M>,
     ) -> Vec<Address> {
         // Fetch the overflow page addresses of this node.
-        let mut addresses = self.overflows.clone().unwrap_or_default();
+        let mut addresses = self.overflows.clone();
 
         // If there are too many overflow addresses, deallocate some until we've reached
         // the number we need.

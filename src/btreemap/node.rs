@@ -60,7 +60,7 @@ pub struct Node<K: Storable + Ord + Clone> {
 
     // The address of the overflow page.
     // In V2, a node can span multiple pages if it exceeds a certain size.
-    overflows: Option<Vec<Address>>,
+    overflows: Vec<Address>,
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -168,7 +168,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 // Value isn't loaded yet.
                 let reader = NodeReader {
                     address: self.address,
-                    overflows: self.overflows.clone().unwrap_or_default(),
+                    overflows: self.overflows.clone(),
                     page_size: self.page_size(),
                     memory,
                 };
