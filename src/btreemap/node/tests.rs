@@ -201,11 +201,7 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
 fn growing_and_shrinking_entries_does_not_leak_memory() {
     let mem = make_memory();
     let allocator_addr = Address::from(0);
-    let mut allocator = Allocator::new(
-        mem.clone(),
-        allocator_addr,
-        PageSize::Value(500).get().into(),
-    );
+    let mut allocator = Allocator::new(mem, allocator_addr, PageSize::Value(500).get().into());
 
     let mut node = Node::new_v2(allocator_addr, NodeType::Leaf, PageSize::Value(500));
 
