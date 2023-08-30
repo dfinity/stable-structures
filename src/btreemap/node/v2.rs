@@ -114,11 +114,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let _p = profiler::profile("node_load_v2");
 
         // Load the node, including any overflows, into a buffer.
-        let overflow_addresses = read_overflow_addresses(address, memory);
+        let overflows = read_overflows(address, memory);
 
         let reader = NodeReader {
             address,
-            overflows: &overflow_addresses,
+            overflows: &overflows,
             page_size,
             memory,
         };
@@ -183,7 +183,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             children,
             node_type,
             version: Version::V2(page_size),
-            overflows: overflow_addresses,
+            overflows: overflows,
         }
     }
 
@@ -266,17 +266,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         // Retrieve the addresses for the overflow pages, making the necessary allocations.
-        let overflow_addresses = self.reallocate_overflow_pages(additional_pages_needed, allocator);
+        let overflows = self.reallocate_overflow_pages(additional_pages_needed, allocator);
 
         // Write the first page
         let memory = allocator.memory();
         memory.write(self.address.get(), &buf[..min(page_size, buf.len())]);
-        if !overflow_addresses.is_empty() {
+        if !overflows.is_empty() {
             // Write the next overflow address to the first page.
             write_u64(
                 memory,
                 self.address + OVERFLOW_ADDRESS_OFFSET,
-                overflow_addresses[0].get(),
+                overflows[0].get(),
             );
         }
 
@@ -293,17 +293,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
             }
 
             // Write magic and next address
-            memory.write(overflow_addresses[i].get(), &OVERFLOW_MAGIC[..]);
-            let next_address = overflow_addresses.get(i + 1).unwrap_or(&NULL);
+            memory.write(overflows[i].get(), &OVERFLOW_MAGIC[..]);
+            let next_address = overflows.get(i + 1).unwrap_or(&NULL);
             write_u64(
                 memory,
-                overflow_addresses[i] + PAGE_OVERFLOW_NEXT_OFFSET,
+                overflows[i] + PAGE_OVERFLOW_NEXT_OFFSET,
                 next_address.get(),
             );
 
             // Write the overflow page contents
             memory.write(
-                (overflow_addresses[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
+                (overflows[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
                 &buf[start_idx..end_idx],
             );
 
@@ -334,20 +334,22 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 }
 
-fn read_overflow_addresses<M: Memory>(address: Address, memory: &M) -> Vec<Address> {
-    let mut overflow_addresses = vec![];
-    let mut overflow_address = Address::from(read_u64(memory, address + OVERFLOW_ADDRESS_OFFSET));
-    while overflow_address != NULL {
-        overflow_addresses.push(overflow_address);
-
-        overflow_address = Address::from(read_u64(
-            memory,
-            overflow_address + PAGE_OVERFLOW_NEXT_OFFSET,
-        ));
-
-        // TODO: Validate the magic of the overflow.
-        //assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad overflow magic.");
+fn read_overflows<M: Memory>(address: Address, memory: &M) -> Vec<Address> {
+    #[repr(C, packed)]
+    struct OverflowPageHeader {
+        magic: [u8; 3],
+        next: Address,
     }
 
-    overflow_addresses
+    let mut overflows = vec![];
+    let mut overflow = Address::from(read_u64(memory, address + OVERFLOW_ADDRESS_OFFSET));
+    while overflow != NULL {
+        overflows.push(overflow);
+
+        let header: OverflowPageHeader = read_struct(overflow, memory);
+        assert_eq!(&header.magic, OVERFLOW_MAGIC, "Bad overflow magic.");
+        overflow = header.next;
+    }
+
+    overflows
 }
