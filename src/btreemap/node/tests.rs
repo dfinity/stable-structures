@@ -201,16 +201,16 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
 fn growing_and_shrinking_entries_does_not_leak_memory() {
     let mem = make_memory();
     let allocator_addr = Address::from(0);
-    let mut allocator = Allocator::new(mem.clone(), allocator_addr, PageSize::Value(500).get().into());
-
-    let mut node = Node::new_v2(
+    let mut allocator = Allocator::new(
+        mem.clone(),
         allocator_addr,
-        NodeType::Leaf,
-        PageSize::Value(500),
+        PageSize::Value(500).get().into(),
     );
 
+    let mut node = Node::new_v2(allocator_addr, NodeType::Leaf, PageSize::Value(500));
+
     // Insert an entry substantially larger than the page size and save it.
-    node.push_entry((vec![1,2,3], vec![0; 10000]));
+    node.push_entry((vec![1, 2, 3], vec![0; 10000]));
     node.save(&mut allocator);
 
     let num_allocated_chunks = allocator.num_allocated_chunks();
@@ -219,20 +219,20 @@ fn growing_and_shrinking_entries_does_not_leak_memory() {
     assert!(num_allocated_chunks > 1);
 
     // Swap the value with a different one that is equal in length.
-    node.swap_entry(0, (vec![1,2,3], vec![1; 10000]), allocator.memory());
+    node.swap_entry(0, (vec![1, 2, 3], vec![1; 10000]), allocator.memory());
     node.save(&mut allocator);
 
     // The number of allocated chunks hasn't changed.
     assert_eq!(num_allocated_chunks, allocator.num_allocated_chunks());
 
     // Swap the value with a much longer value.
-    node.swap_entry(0, (vec![1,2,3], vec![2; 20000]), allocator.memory());
+    node.swap_entry(0, (vec![1, 2, 3], vec![2; 20000]), allocator.memory());
     node.save(&mut allocator);
     // More chunks are allocated to accommodate the longer value.
     assert!(num_allocated_chunks < allocator.num_allocated_chunks());
 
     // Swap the value with one that is similar in size to the original value.
-    node.swap_entry(0, (vec![1,2,3], vec![3; 10000]), allocator.memory());
+    node.swap_entry(0, (vec![1, 2, 3], vec![3; 10000]), allocator.memory());
     node.save(&mut allocator);
     // The extra chunks are deallocated and we're back to the original number of chunks.
     assert_eq!(num_allocated_chunks, allocator.num_allocated_chunks());
