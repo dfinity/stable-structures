@@ -146,7 +146,7 @@ fn saving_and_loading_v2_preserves_data(node_data: NodeV2Data) {
 
     // Create a new node and save it into memory.
     let node_addr = allocator.allocate();
-    let node = node_data.get(node_addr);
+    let mut node = node_data.get(node_addr);
     node.save_v2(&mut allocator);
 
     // Reload the node and double check all the entries and children are correct.
@@ -172,7 +172,7 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
     node.save_v1(allocator.memory());
 
     // Reload the v1 node and save it as v2.
-    let node = Node::<Vec<u8>>::load_v1(
+    let mut node = Node::<Vec<u8>>::load_v1(
         node_addr,
         node_data.max_key_size,
         node_data.max_value_size,
@@ -195,4 +195,45 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
         node.entries(&mem),
         node_data.entries.into_iter().collect::<Vec<_>>()
     );
+}
+
+#[test]
+fn growing_and_shrinking_entries_does_not_leak_memory() {
+    let mem = make_memory();
+    let allocator_addr = Address::from(0);
+    let mut allocator = Allocator::new(mem.clone(), allocator_addr, PageSize::Value(500).get().into());
+
+    let mut node = Node::new_v2(
+        allocator_addr,
+        NodeType::Leaf,
+        PageSize::Value(500),
+    );
+
+    // Insert an entry substantially larger than the page size and save it.
+    node.push_entry((vec![1,2,3], vec![0; 10000]));
+    node.save(&mut allocator);
+
+    let num_allocated_chunks = allocator.num_allocated_chunks();
+
+    // The node is more than one page.
+    assert!(num_allocated_chunks > 1);
+
+    // Swap the value with a different one that is equal in length.
+    node.swap_entry(0, (vec![1,2,3], vec![1; 10000]), allocator.memory());
+    node.save(&mut allocator);
+
+    // The number of allocated chunks hasn't changed.
+    assert_eq!(num_allocated_chunks, allocator.num_allocated_chunks());
+
+    // Swap the value with a much longer value.
+    node.swap_entry(0, (vec![1,2,3], vec![2; 20000]), allocator.memory());
+    node.save(&mut allocator);
+    // More chunks are allocated to accommodate the longer value.
+    assert!(num_allocated_chunks < allocator.num_allocated_chunks());
+
+    // Swap the value with one that is similar in size to the original value.
+    node.swap_entry(0, (vec![1,2,3], vec![3; 10000]), allocator.memory());
+    node.save(&mut allocator);
+    // The extra chunks are deallocated and we're back to the original number of chunks.
+    assert_eq!(num_allocated_chunks, allocator.num_allocated_chunks());
 }
