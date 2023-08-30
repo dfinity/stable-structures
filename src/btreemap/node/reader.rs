@@ -85,12 +85,11 @@ struct RealSegment {
 // ↑               ↑               ↑               ↑
 // Page 0        Page 1          Page 2          Page 3
 //
-// The [`Node`] is internally divided into fixed-size pages. In the node's virtual
-// address space, all these pages are consecutive, but in the underlying memory this may not
-// be the case.
+// The [`Node`] is internally divided into fixed-size pages. In the node's virtual address space,
+// all these pages are consecutive, but in the underlying memory this may not be the case.
 //
-// A virtual segment would first be split at the page boundaries. The example virtual segment
-// above would be split into the following segments:
+// A virtual segment would be split at the page boundaries. The example virtual segment
+// above would be split into the following "real" segments:
 //
 //    (A, end of page 0)
 //    (start of page 1, end of page 1)

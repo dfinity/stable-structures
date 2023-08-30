@@ -183,7 +183,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             children,
             node_type,
             version: Version::V2(page_size),
-            overflows: overflows,
+            overflows,
         }
     }
 
