@@ -177,7 +177,7 @@ struct Args {
 
 fn read_current_results() -> BTreeMap<String, BenchResult> {
     // Create a path to the desired file
-    let mut file = match File::open(&benchmarks_dir().join(RESULTS_FILE)) {
+    let mut file = match File::open(benchmarks_dir().join(RESULTS_FILE)) {
         Err(_) => {
             // No current results found.
             return BTreeMap::new();
@@ -218,9 +218,9 @@ fn main() {
             }
         }
 
-        println!("");
+        println!();
         println!("---------------------------------------------------");
-        println!("");
+        println!();
 
         let output = Command::new("bash")
             .current_dir(benchmarks_dir())
@@ -252,7 +252,7 @@ fn main() {
     // Persist the result if requested.
     if args.persist {
         // Open a file in write-only mode, returns `io::Result<File>`
-        let mut file = File::create(&benchmarks_dir().join(RESULTS_FILE)).unwrap();
+        let mut file = File::create(benchmarks_dir().join(RESULTS_FILE)).unwrap();
         file.write_all(serde_yaml::to_string(&results).unwrap().as_bytes())
             .unwrap();
         println!("Successfully persisted results to {}", RESULTS_FILE);
