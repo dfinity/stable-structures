@@ -1,39 +1,39 @@
+use candid::CandidType;
 use ic_stable_structures::storable::{Blob, Bound, Storable};
+use maplit::btreemap;
+use serde::Deserialize;
+use std::collections::BTreeMap;
 use tiny_rng::{Rand, Rng};
 
 mod btreemap;
 mod memory_manager;
 mod vec;
 
-/// Returns the number of instructions consumed by the given function.
-pub(crate) fn count_instructions<R>(f: impl FnOnce() -> R) -> u64 {
+#[derive(Debug, PartialEq, Deserialize, CandidType)]
+pub struct BenchResult {
+    measurements: BTreeMap<String, u64>,
+}
+
+/// Benchmarks the given function.
+pub(crate) fn benchmark<R>(f: impl FnOnce() -> R) -> BenchResult {
     let start = ic_cdk::api::performance_counter(0);
     profiler::reset();
     f();
     let total_instructions = ic_cdk::api::performance_counter(0) - start;
 
-    let profiling_results: std::collections::BTreeMap<_, _> = profiler::get_results()
-        .into_iter()
-        .map(|(k, v)| {
-            (
-                k,
-                format!("{} ({}%)", format_num(v), ((v * 100) / total_instructions)),
-            )
-        })
-        .collect();
-    ic_cdk::api::print(&format!("{:#?}", profiling_results));
-    total_instructions
-}
+    let mut measurements = btreemap! {
+        "instructions".to_string() => total_instructions,
+        "stable_memory_size".to_string() => ic_cdk::api::stable::stable64_size()
+    };
 
-fn format_num(num: u64) -> String {
-    num.to_string()
-        .as_bytes()
-        .rchunks(3)
-        .rev()
-        .map(std::str::from_utf8)
-        .collect::<Result<Vec<&str>, _>>()
-        .unwrap()
-        .join("_")
+    let mut profiling_results: std::collections::BTreeMap<_, _> = profiler::get_results()
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
+
+    measurements.append(&mut profiling_results);
+
+    BenchResult { measurements }
 }
 
 const fn max_size<A: Storable>() -> u32 {
