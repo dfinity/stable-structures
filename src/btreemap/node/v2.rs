@@ -73,8 +73,11 @@
 
 use super::*;
 use crate::btreemap::Allocator;
-use crate::types::NULL;
 use crate::write_u64;
+use crate::{
+    storable::{is_fixed_size, max_size},
+    types::NULL,
+};
 use std::cmp::min;
 
 // Initial page
@@ -155,16 +158,21 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut buf = vec![];
         for _ in 0..num_entries {
             // Load the key's size.
-            // TODO: store the size in a more efficient way.
-            // TODO: don't store the size if the key is fixed.
-            let key_size = read_u32(&reader, offset) as usize;
-            offset += U32_SIZE;
+            let key_size = if is_fixed_size::<K>() {
+                // Key is fixed in size. The size of the key is always its max size.
+                max_size::<K>()
+            } else {
+                // Key is not fixed in size. Read the size from memory.
+                let value = read_u32(&reader, offset);
+                offset += U32_SIZE;
+                value
+            };
 
             // Load the key.
-            buf.resize(key_size, 0);
+            buf.resize(key_size as usize, 0);
             reader.read(offset.get(), &mut buf);
             let key = K::from_bytes(Cow::Borrowed(&buf));
-            offset += Bytes::from(key_size as u64);
+            offset += Bytes::from(key_size);
             keys.push(key);
         }
 
@@ -224,9 +232,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Write the keys.
         for key in self.keys.iter() {
-            // Write the size of the key.
             let key_bytes = key.to_bytes();
-            buf.extend_from_slice(&(key_bytes.len() as u32).to_le_bytes());
+
+            // Write the size of the key if it isn't fixed in size.
+            if !is_fixed_size::<K>() {
+                buf.extend_from_slice(&(key_bytes.len() as u32).to_le_bytes());
+            }
 
             // Write the key.
             buf.extend_from_slice(key_bytes.borrow());
