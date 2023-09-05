@@ -28,7 +28,7 @@ mod allocator;
 mod iter;
 mod node;
 use crate::{
-    storable::max_size,
+    storable::{max_size, Bound as StorableBound},
     types::{Address, NULL},
     Memory, Storable,
 };
@@ -173,9 +173,21 @@ where
     /// This is currently exposed only for beta-testing purposes and will be removed in favor of
     /// using BTreeMap::new directly once V2 is tested well enough.
     pub fn new_v2(memory: M) -> Self {
-        // TODO: replace this page size with a more clever heuristic if the keys/values
-        // have certain types.
-        let page_size = PageSize::Value(500);
+        let page_size = match (K::BOUND, V::BOUND) {
+            // The keys and values are both bounded. Use the same page size as V1.
+            (
+                StorableBound::Bounded {
+                    max_size: max_key_size,
+                    ..
+                },
+                StorableBound::Bounded {
+                    max_size: max_value_size,
+                    ..
+                },
+            ) => PageSize::Value(Node::<K>::size(max_key_size, max_value_size).get() as u32),
+            // Use a default page size.
+            _ => PageSize::Value(500),
+        };
 
         let btree = Self {
             root_addr: NULL,
