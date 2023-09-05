@@ -1,5 +1,5 @@
 [package]
-name = "benchmarks"
+name = "profiler"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,3 @@ edition = "2021"
 
 [dependencies]
 ic-cdk = "0.6.8"
-ic-cdk-macros = "0.6.8"
-ic-stable-structures = { path = "../", features = ["profiler"] }
-profiler = { path = "../profiler" }
-tiny-rng = "0.2.0"

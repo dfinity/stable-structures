@@ -4,7 +4,7 @@
 set -euo pipefail
 
 BENCH_NAME=$1
-FILE=mktemp
+FILE=$(mktemp)
 
 if ! type "drun" > /dev/null; then
   echo "drun is not installed. Please add drun to your path from commit d35535c96184be039aaa31f68b48bbe45909494e."
