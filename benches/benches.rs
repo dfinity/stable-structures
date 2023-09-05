@@ -177,40 +177,73 @@ pub fn criterion_benchmark(c: &mut Criterion<Instructions>) {
 
     // BTree benchmarks
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_4_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_4_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_16_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_16_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_32_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_32_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_64_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_64_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_128_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_128_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_256_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_256_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_512_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_512_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_u64_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_blob_8");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_u64_blob_8_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_insert_blob_8_u64_v2");
 
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_4_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_4_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_16_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_16_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_32_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_32_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_64_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_64_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_128_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_128_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_u64_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_blob_8");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_u64_blob_8_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_8_u64_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_256_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_256_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_512_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_get_blob_512_1024_v2");
 
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_4_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_4_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_16_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_16_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_32_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_32_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_64_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_64_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_128_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_128_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_256_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_256_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_512_1024");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_512_1024_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_u64_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_blob_8");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_u64_blob_8_v2");
     bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_u64");
+    bench_function(c, *BENCHMARK_CANISTER, "btreemap_remove_blob_8_u64_v2");
 
     // Vec benchmarks
     bench_function(c, *BENCHMARK_CANISTER, "vec_insert_blob_4");

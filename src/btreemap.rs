@@ -35,7 +35,7 @@ use crate::{
 use allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
-use node::{DerivedPageSize, Entry, Node, NodeType, Version};
+use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
@@ -45,6 +45,7 @@ mod proptests;
 
 const MAGIC: &[u8; 3] = b"BTR";
 const LAYOUT_VERSION: u8 = 1;
+const LAYOUT_VERSION_2: u8 = 2;
 /// The sum of all the header fields, i.e. size of a packed header.
 const PACKED_HEADER_SIZE: usize = 28;
 /// The offset where the allocator begins.
@@ -64,11 +65,7 @@ where
     // is set to NULL.
     root_addr: Address,
 
-    // The maximum size a key can have.
-    max_key_size: u32,
-
-    // The maximum size a value can have.
-    max_value_size: u32,
+    version: Version,
 
     // An allocator used for managing memory and allocating nodes.
     allocator: Allocator<M>,
@@ -81,11 +78,8 @@ where
 }
 
 /// The packed header size must be <= ALLOCATOR_OFFSET.
-struct BTreeHeaderV1 {
-    magic: [u8; 3],
-    version: u8,
-    max_key_size: u32,
-    max_value_size: u32,
+struct BTreeHeader {
+    version: Version,
     root_addr: Address,
     length: u64,
     // Reserved bytes for future extensions
@@ -119,6 +113,28 @@ where
         }
     }
 
+    /// Initializes a v2 `BTreeMap`.
+    ///
+    /// This is currently exposed only for beta-testing purposes and will be removed in favor of
+    /// using BTreeMap::init directly once V2 is tested well enough.
+    pub fn init_v2(memory: M) -> Self {
+        if memory.size() == 0 {
+            // Memory is empty. Create a new map.
+            return BTreeMap::new_v2(memory);
+        }
+
+        // Check if the magic in the memory corresponds to a BTreeMap.
+        let mut dst = vec![0; 3];
+        memory.read(0, &mut dst);
+        if dst != MAGIC {
+            // No BTreeMap found. Create a new instance.
+            BTreeMap::new_v2(memory)
+        } else {
+            // The memory already contains a BTreeMap. Load it.
+            BTreeMap::load(memory)
+        }
+    }
+
     /// Creates a new instance a `BTreeMap`.
     ///
     /// The given `memory` is assumed to be exclusively reserved for this data
@@ -141,8 +157,34 @@ where
                 Address::from(ALLOCATOR_OFFSET as u64),
                 Node::<K>::size(max_key_size, max_value_size),
             ),
-            max_key_size,
-            max_value_size,
+            version: Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }),
+            length: 0,
+            _phantom: PhantomData,
+        };
+
+        btree.save();
+        btree
+    }
+
+    /// Create a v2 instance of the BTree.
+    /// This is currently exposed only for beta-testing purposes and will be removed in favor of
+    /// using BTreeMap::new directly once V2 is tested well enough.
+    pub fn new_v2(memory: M) -> Self {
+        // TODO: replace this page size with a more clever heuristic if the keys/values
+        // have certain types.
+        let page_size = PageSize::Value(500);
+
+        let btree = Self {
+            root_addr: NULL,
+            allocator: Allocator::new(
+                memory,
+                Address::from(ALLOCATOR_OFFSET as u64),
+                page_size.get().into(),
+            ),
+            version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
         };
@@ -155,43 +197,72 @@ where
     pub fn load(memory: M) -> Self {
         // Read the header from memory.
         let header = Self::read_header(&memory);
-        assert_eq!(&header.magic, MAGIC, "Bad magic.");
-        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
-        let expected_key_size = header.max_key_size;
-        assert!(
-            max_size::<K>() <= expected_key_size,
-            "max_key_size must be <= {expected_key_size}"
-        );
-        let expected_value_size = header.max_value_size;
-        assert!(
-            max_size::<V>() <= expected_value_size,
-            "max_value_size must be <= {expected_value_size}"
-        );
+
+        match header.version {
+            Version::V1(DerivedPageSize {
+                max_key_size: expected_key_size,
+                max_value_size: expected_value_size,
+            }) => {
+                assert!(
+                    max_size::<K>() <= expected_key_size,
+                    "max_key_size must be <= {expected_key_size}"
+                );
+
+                assert!(
+                    max_size::<V>() <= expected_value_size,
+                    "max_value_size must be <= {expected_value_size}"
+                );
+            }
+            Version::V2 { .. } => {
+                // Nothing to assert.
+            }
+        }
 
         let allocator_addr = Address::from(ALLOCATOR_OFFSET as u64);
         Self {
             root_addr: header.root_addr,
             allocator: Allocator::load(memory, allocator_addr),
-            max_key_size: header.max_key_size,
-            max_value_size: header.max_value_size,
+            version: header.version,
             length: header.length,
             _phantom: PhantomData,
         }
     }
 
     /// Reads the header from the specified memory.
-    fn read_header(memory: &M) -> BTreeHeaderV1 {
+    fn read_header(memory: &M) -> BTreeHeader {
         // Read the header
         let mut buf = [0; PACKED_HEADER_SIZE];
         memory.read(0, &mut buf);
-        // Deserialize the fields
-        BTreeHeaderV1 {
-            magic: buf[0..3].try_into().unwrap(),
-            version: buf[3],
-            max_key_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
-            max_value_size: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
-            root_addr: Address::from(u64::from_le_bytes(buf[12..20].try_into().unwrap())),
-            length: u64::from_le_bytes(buf[20..28].try_into().unwrap()),
+
+        assert_eq!(&buf[0..3], MAGIC, "Bad magic.");
+
+        match buf[3] {
+            LAYOUT_VERSION => {
+                // Deserialize the fields
+                BTreeHeader {
+                    version: Version::V1(DerivedPageSize {
+                        max_key_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+                        max_value_size: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
+                    }),
+                    root_addr: Address::from(u64::from_le_bytes(buf[12..20].try_into().unwrap())),
+                    length: u64::from_le_bytes(buf[20..28].try_into().unwrap()),
+                }
+            }
+            LAYOUT_VERSION_2 => {
+                // TODO: Handle derived page sizes.
+
+                // Deserialize the fields
+                BTreeHeader {
+                    version: Version::V2(PageSize::Value(u32::from_le_bytes(
+                        buf[4..8].try_into().unwrap(),
+                    ))),
+                    root_addr: Address::from(u64::from_le_bytes(buf[12..20].try_into().unwrap())),
+                    length: u64::from_le_bytes(buf[20..28].try_into().unwrap()),
+                }
+            }
+            version => {
+                panic!("Unsupported version: {version}.");
+            }
         }
     }
 
@@ -208,19 +279,29 @@ where
         let key_bytes = key.to_bytes();
         let value_bytes = value.to_bytes();
 
-        assert!(
-            key_bytes.len() <= self.max_key_size as usize,
-            "Key is too large. Expected <= {} bytes, found {} bytes",
-            self.max_key_size,
-            key_bytes.len()
-        );
+        match self.version {
+            Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }) => {
+                assert!(
+                    key_bytes.len() <= max_key_size as usize,
+                    "Key is too large. Expected <= {} bytes, found {} bytes",
+                    max_key_size,
+                    key_bytes.len()
+                );
 
-        assert!(
-            value_bytes.len() <= self.max_value_size as usize,
-            "Value is too large. Expected <= {} bytes, found {} bytes",
-            self.max_value_size,
-            value_bytes.len()
-        );
+                assert!(
+                    value_bytes.len() <= max_value_size as usize,
+                    "Value is too large. Expected <= {} bytes, found {} bytes",
+                    max_value_size,
+                    value_bytes.len()
+                );
+            }
+            Version::V2 { .. } => {
+                // Nothing to assert.
+            }
+        }
 
         let value = value_bytes.to_vec();
 
@@ -238,7 +319,7 @@ where
             if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                root.save(self.memory());
+                root.save(self.allocator_mut());
                 return Some(V::from_bytes(Cow::Owned(previous_value)));
             }
 
@@ -284,7 +365,7 @@ where
                 // Overwrite it and return the previous value.
                 let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
 
-                node.save(self.memory());
+                node.save(self.allocator_mut());
                 Some(previous_value)
             }
             Err(idx) => {
@@ -295,7 +376,7 @@ where
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
                         node.insert_entry(idx, (key, value));
-                        node.save(self.memory());
+                        node.save(self.allocator_mut());
 
                         // Update the length.
                         self.length += 1;
@@ -315,7 +396,7 @@ where
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) =
                                     child.swap_entry(idx, (key, value), self.memory());
-                                child.save(self.memory());
+                                child.save(self.allocator_mut());
                                 return Some(previous_value);
                             }
 
@@ -373,9 +454,9 @@ where
 
         node.insert_entry(full_child_idx, (median_key, median_value));
 
-        sibling.save(self.memory());
-        full_child.save(self.memory());
-        node.save(self.memory());
+        sibling.save(self.allocator_mut());
+        full_child.save(self.allocator_mut());
+        node.save(self.allocator_mut());
     }
 
     /// Returns the value associated with the given key if it exists.
@@ -457,6 +538,10 @@ where
         self.allocator.memory()
     }
 
+    fn allocator_mut(&mut self) -> &mut Allocator<M> {
+        &mut self.allocator
+    }
+
     /// Removes a key from the map, returning the previous value at the key if it exists.
     pub fn remove(&mut self, key: &K) -> Option<V> {
         if self.root_addr == NULL {
@@ -498,7 +583,7 @@ where
                             self.allocator.deallocate(node.address());
                             self.root_addr = NULL;
                         } else {
-                            node.save(self.memory());
+                            node.save(self.allocator_mut());
                         }
 
                         self.save();
@@ -543,7 +628,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
 
                             // Save the parent node.
-                            node.save(self.memory());
+                            node.save(self.allocator_mut());
                             return Some(old_value);
                         }
 
@@ -578,7 +663,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, successor, self.memory());
 
                             // Save the parent node.
-                            node.save(self.memory());
+                            node.save(self.allocator_mut());
                             return Some(old_value);
                         }
 
@@ -627,8 +712,8 @@ where
                             self.save();
                         }
 
-                        node.save(self.memory());
-                        new_child.save(self.memory());
+                        node.save(self.allocator_mut());
+                        new_child.save(self.allocator_mut());
 
                         // Recursively delete the key.
                         self.remove_helper(new_child, key)
@@ -708,9 +793,9 @@ where
                                     assert_eq!(child.node_type(), NodeType::Leaf);
                                 }
 
-                                left_sibling.save(self.memory());
-                                child.save(self.memory());
-                                node.save(self.memory());
+                                left_sibling.save(self.allocator_mut());
+                                child.save(self.allocator_mut());
+                                node.save(self.allocator_mut());
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -763,9 +848,9 @@ where
                                     }
                                 }
 
-                                right_sibling.save(self.memory());
-                                child.save(self.memory());
-                                node.save(self.memory());
+                                right_sibling.save(self.allocator_mut());
+                                child.save(self.allocator_mut());
+                                node.save(self.allocator_mut());
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -793,7 +878,7 @@ where
                                     self.save();
                                 }
                             } else {
-                                node.save(self.memory());
+                                node.save(self.allocator_mut());
                             }
 
                             return self.remove_helper(left_sibling, key);
@@ -821,7 +906,7 @@ where
                                     self.save();
                                 }
                             } else {
-                                node.save(self.memory());
+                                node.save(self.allocator_mut());
                             }
 
                             return self.remove_helper(right_sibling, key);
@@ -1033,38 +1118,26 @@ where
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         let source_address = source.address();
         into.merge(source, median, self.memory());
-        into.save(self.memory());
+        into.save(self.allocator_mut());
         self.allocator.deallocate(source_address);
         into
     }
 
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
-        Node::new(
-            self.allocator.allocate(),
-            node_type,
-            self.max_key_size,
-            self.max_value_size,
-        )
+        match self.version {
+            Version::V1(page_size) => Node::new_v1(self.allocator.allocate(), node_type, page_size),
+            Version::V2(page_size) => Node::new_v2(self.allocator.allocate(), node_type, page_size),
+        }
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
-        Node::load(
-            address,
-            self.memory(),
-            Version::V1(DerivedPageSize {
-                max_key_size: self.max_key_size,
-                max_value_size: self.max_value_size,
-            }),
-        )
+        Node::load(address, self.memory(), self.version)
     }
 
     // Saves the map to memory.
     fn save(&self) {
-        let header = BTreeHeaderV1 {
-            magic: *MAGIC,
-            version: LAYOUT_VERSION,
-            max_key_size: self.max_key_size,
-            max_value_size: self.max_value_size,
+        let header = BTreeHeader {
+            version: self.version,
             root_addr: self.root_addr,
             length: self.length,
         };
@@ -1073,13 +1146,24 @@ where
     }
 
     /// Write the layout header to the memory.
-    fn write_header(header: &BTreeHeaderV1, memory: &M) {
+    fn write_header(header: &BTreeHeader, memory: &M) {
         // Serialize the header
         let mut buf = [0; PACKED_HEADER_SIZE];
-        buf[0..3].copy_from_slice(&header.magic);
-        buf[3] = header.version;
-        buf[4..8].copy_from_slice(&header.max_key_size.to_le_bytes());
-        buf[8..12].copy_from_slice(&header.max_value_size.to_le_bytes());
+        buf[0..3].copy_from_slice(MAGIC.as_slice());
+        match header.version {
+            Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }) => {
+                buf[3] = LAYOUT_VERSION;
+                buf[4..8].copy_from_slice(&max_key_size.to_le_bytes());
+                buf[8..12].copy_from_slice(&max_value_size.to_le_bytes());
+            }
+            Version::V2(page_size) => {
+                buf[3] = LAYOUT_VERSION_2;
+                buf[4..8].copy_from_slice(&(page_size.get()).to_le_bytes());
+            }
+        };
         buf[12..20].copy_from_slice(&header.root_addr.get().to_le_bytes());
         buf[20..28].copy_from_slice(&header.length.to_le_bytes());
         // Write the header
@@ -1116,7 +1200,10 @@ impl std::fmt::Display for InsertError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storable::{Blob, Bound as StorableBound};
+    use crate::{
+        storable::{Blob, Bound as StorableBound},
+        VectorMemory,
+    };
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -1133,585 +1220,588 @@ mod test {
         Blob::<10>::try_from(x).unwrap()
     }
 
+    // A test runner that runs the test using both V1 and V2 btrees.
+    pub fn btree_test<K, V, R, F>(f: F)
+    where
+        K: Storable + Ord + Clone,
+        V: Storable,
+        F: Fn(BTreeMap<K, V, VectorMemory>) -> R,
+    {
+        // Run the test with the V1 btree.
+        let mem = make_memory();
+        let btree = BTreeMap::new(mem);
+        f(btree);
+
+        // Run the test with the V2 btree.
+        let mem = make_memory();
+        let btree = BTreeMap::new_v2(mem);
+        f(btree);
+    }
+
     #[test]
     fn init_preserves_data() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::init(mem.clone());
-        assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-        assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
 
-        // Reload the btree
-        let btree = BTreeMap::init(mem);
+            // Reload the btree
+            let btree = BTreeMap::init(btree.into_memory());
 
-        // Data still exists.
-        assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            // Data still exists.
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+        });
     }
 
     #[test]
     fn insert_get() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-
-        assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-        assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+        });
     }
 
     #[test]
     fn insert_overwrites_previous_value() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-
-        assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-        assert_eq!(
-            btree.insert(b(&[1, 2, 3]), b(&[7, 8, 9])),
-            Some(b(&[4, 5, 6]))
-        );
-        assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[7, 8, 9])));
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(
+                btree.insert(b(&[1, 2, 3]), b(&[7, 8, 9])),
+                Some(b(&[4, 5, 6]))
+            );
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[7, 8, 9])));
+        });
     }
 
     #[test]
     fn insert_get_multiple() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-
-        assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-        assert_eq!(btree.insert(b(&[4, 5]), b(&[7, 8, 9, 10])), None);
-        assert_eq!(btree.insert(b(&[]), b(&[11])), None);
-        assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
-        assert_eq!(btree.get(&b(&[4, 5])), Some(b(&[7, 8, 9, 10])));
-        assert_eq!(btree.get(&b(&[])), Some(b(&[11])));
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.insert(b(&[4, 5]), b(&[7, 8, 9, 10])), None);
+            assert_eq!(btree.insert(b(&[]), b(&[11])), None);
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.get(&b(&[4, 5])), Some(b(&[7, 8, 9, 10])));
+            assert_eq!(btree.get(&b(&[])), Some(b(&[11])));
+        });
     }
 
     #[test]
     fn insert_overwrite_median_key_in_full_child_node() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 1..=17 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
 
-        for i in 1..=17 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
 
-        // The result should look like this:
-        //                [6]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(6)]);
+            assert_eq!(root.children_len(), 2);
 
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![e(6)]);
-        assert_eq!(root.children_len(), 2);
+            // The right child should now be full, with the median key being "12"
+            let right_child = btree.load_node(root.child(1));
+            assert!(right_child.is_full());
+            let median_index = right_child.entries_len() / 2;
+            assert_eq!(right_child.key(median_index), &b(&[12]));
 
-        // The right child should now be full, with the median key being "12"
-        let right_child = btree.load_node(root.child(1));
-        assert!(right_child.is_full());
-        let median_index = right_child.entries_len() / 2;
-        assert_eq!(right_child.key(median_index), &b(&[12]));
+            // Overwrite the value of the median key.
+            assert_eq!(btree.insert(b(&[12]), b(&[1, 2, 3])), Some(b(&[])));
 
-        // Overwrite the median key.
-        assert_eq!(btree.insert(b(&[12]), b(&[1, 2, 3])), Some(b(&[])));
+            // The value is overwritten successfully.
+            assert_eq!(btree.get(&b(&[12])), Some(b(&[1, 2, 3])));
 
-        // The key is overwritten successfully.
-        assert_eq!(btree.get(&b(&[12])), Some(b(&[1, 2, 3])));
-
-        // The child has not been split and is still full.
-        let right_child = btree.load_node(root.child(1));
-        assert_eq!(right_child.node_type(), NodeType::Leaf);
-        assert!(right_child.is_full());
+            // The child has not been split and is still full.
+            let right_child = btree.load_node(root.child(1));
+            assert_eq!(right_child.node_type(), NodeType::Leaf);
+            assert!(right_child.is_full());
+        });
     }
 
     #[test]
     fn insert_overwrite_key_in_full_root_node() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
 
-        for i in 1..=11 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
+            // We now have a root that is full and looks like this:
+            //
+            // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+            let root = btree.load_node(btree.root_addr);
+            assert!(root.is_full());
 
-        // We now have a root that is full and looks like this:
-        //
-        // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-        let root = btree.load_node(btree.root_addr);
-        assert!(root.is_full());
+            // Overwrite an element in the root. It should NOT cause the node to be split.
+            assert_eq!(btree.insert(b(&[6]), b(&[4, 5, 6])), Some(b(&[])));
 
-        // Overwrite an element in the root. It should NOT cause the node to be split.
-        assert_eq!(btree.insert(b(&[6]), b(&[4, 5, 6])), Some(b(&[])));
-
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Leaf);
-        assert_eq!(btree.get(&b(&[6])), Some(b(&[4, 5, 6])));
-        assert_eq!(root.entries_len(), 11);
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Leaf);
+            assert_eq!(btree.get(&b(&[6])), Some(b(&[4, 5, 6])));
+            assert_eq!(root.entries_len(), 11);
+        });
     }
 
     #[test]
     fn allocations() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-
-        // Insert entries until the root node is full.
-        let mut i = 0;
-        loop {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-            let root = btree.load_node(btree.root_addr);
-            if root.is_full() {
-                break;
+        btree_test(|mut btree| {
+            // Insert entries until the root node is full.
+            let mut i = 0;
+            loop {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+                let root = btree.load_node(btree.root_addr);
+                if root.is_full() {
+                    break;
+                }
+                i += 1;
             }
-            i += 1;
-        }
 
-        // Only need a single allocation to store up to `CAPACITY` elements.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+            // Only need a single allocation to store up to `CAPACITY` elements.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
 
-        assert_eq!(btree.insert(b(&[255]), b(&[])), None);
+            assert_eq!(btree.insert(b(&[255]), b(&[])), None);
 
-        // The node had to be split into three nodes.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+            // The node had to be split into three nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+        });
     }
 
     #[test]
     fn allocations_2() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        btree_test(|mut btree| {
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
-        assert_eq!(btree.insert(b(&[]), b(&[])), None);
-        assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+            assert_eq!(btree.insert(b(&[]), b(&[])), None);
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
 
-        assert_eq!(btree.remove(&b(&[])), Some(b(&[])));
-        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+            assert_eq!(btree.remove(&b(&[])), Some(b(&[])));
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
     }
 
     #[test]
     fn insert_same_key_multiple() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-
-        assert_eq!(btree.insert(b(&[1]), b(&[2])), None);
-
-        for i in 2..10 {
-            assert_eq!(btree.insert(b(&[1]), b(&[i + 1])), Some(b(&[i])));
-        }
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1]), b(&[2])), None);
+            for i in 2..10 {
+                assert_eq!(btree.insert(b(&[1]), b(&[i + 1])), Some(b(&[i])));
+            }
+            assert_eq!(btree.get(&b(&[1])), Some(b(&[10])));
+        });
     }
 
     #[test]
     fn insert_split_node() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
 
-        for i in 1..=11 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
+            // Should now split a node.
+            assert_eq!(btree.insert(b(&[12]), b(&[])), None);
 
-        // Should now split a node.
-        assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-        // The result should look like this:
-        //                [6]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
-
-        for i in 1..=12 {
-            assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-        }
+            for i in 1..=12 {
+                assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
+            }
+        });
     }
 
     #[test]
     fn insert_split_multiple_nodes() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
+            // Should now split a node.
+            assert_eq!(btree.insert(b(&[12]), b(&[])), None);
 
-        for i in 1..=11 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
-        // Should now split a node.
-        assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-        // The result should look like this:
-        //                [6]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(6)]);
+            assert_eq!(root.children_len(), 2);
 
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![e(6)]);
-        assert_eq!(root.children_len(), 2);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(3), e(4), e(5)]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![e(1), e(2), e(3), e(4), e(5)]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(7), e(8), e(9), e(10), e(11), e(12)]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![e(7), e(8), e(9), e(10), e(11), e(12)]
-        );
+            for i in 1..=12 {
+                assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
+            }
 
-        for i in 1..=12 {
-            assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-        }
+            // Insert more to cause more splitting.
+            assert_eq!(btree.insert(b(&[13]), b(&[])), None);
+            assert_eq!(btree.insert(b(&[14]), b(&[])), None);
+            assert_eq!(btree.insert(b(&[15]), b(&[])), None);
+            assert_eq!(btree.insert(b(&[16]), b(&[])), None);
+            assert_eq!(btree.insert(b(&[17]), b(&[])), None);
+            // Should cause another split
+            assert_eq!(btree.insert(b(&[18]), b(&[])), None);
 
-        // Insert more to cause more splitting.
-        assert_eq!(btree.insert(b(&[13]), b(&[])), None);
-        assert_eq!(btree.insert(b(&[14]), b(&[])), None);
-        assert_eq!(btree.insert(b(&[15]), b(&[])), None);
-        assert_eq!(btree.insert(b(&[16]), b(&[])), None);
-        assert_eq!(btree.insert(b(&[17]), b(&[])), None);
-        // Should cause another split
-        assert_eq!(btree.insert(b(&[18]), b(&[])), None);
+            for i in 1..=18 {
+                assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
+            }
 
-        for i in 1..=18 {
-            assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-        }
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(6), e(12)],);
+            assert_eq!(root.children_len(), 3);
 
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![e(6), e(12)],);
-        assert_eq!(root.children_len(), 3);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(3), e(4), e(5)]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![e(1), e(2), e(3), e(4), e(5)]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(7), e(8), e(9), e(10), e(11)]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![e(7), e(8), e(9), e(10), e(11)]
-        );
-
-        let child_2 = btree.load_node(root.child(2));
-        assert_eq!(child_2.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_2.entries(btree.memory()),
-            vec![e(13), e(14), e(15), e(16), e(17), e(18)]
-        );
+            let child_2 = btree.load_node(root.child(2));
+            assert_eq!(child_2.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_2.entries(btree.memory()),
+                vec![e(13), e(14), e(15), e(16), e(17), e(18)]
+            );
+        });
     }
 
     #[test]
     fn remove_simple() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
-
-        assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-        assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
-        assert_eq!(btree.remove(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
-        assert_eq!(btree.get(&b(&[1, 2, 3])), None);
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.remove(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.get(&b(&[1, 2, 3])), None);
+        });
     }
 
     #[test]
     fn remove_case_2a_and_2c() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem.clone());
+        btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
+            // Should now split a node.
+            assert_eq!(btree.insert(b(&[0]), b(&[])), None);
 
-        for i in 1..=11 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
-        // Should now split a node.
-        assert_eq!(btree.insert(b(&[0]), b(&[])), None);
+            // The result should look like this:
+            //                    [6]
+            //                   /   \
+            // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
 
-        // The result should look like this:
-        //                    [6]
-        //                   /   \
-        // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
+            for i in 0..=11 {
+                assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
+            }
 
-        for i in 0..=11 {
-            assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-        }
+            // Remove node 6. Triggers case 2.a
+            assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
 
-        // Remove node 6. Triggers case 2.a
-        assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
+            // The result should look like this:
+            //                [5]
+            //               /   \
+            // [0, 1, 2, 3, 4]   [7, 8, 9, 10, 11]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(5)]);
+            assert_eq!(root.children_len(), 2);
 
-        // The result should look like this:
-        //                [5]
-        //               /   \
-        // [0, 1, 2, 3, 4]   [7, 8, 9, 10, 11]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![e(5)]);
-        assert_eq!(root.children_len(), 2);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(0), e(1), e(2), e(3), e(4)]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![e(0), e(1), e(2), e(3), e(4)]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(7), e(8), e(9), e(10), e(11)]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![e(7), e(8), e(9), e(10), e(11)]
-        );
+            // There are three allocated nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
 
-        // There are three allocated nodes.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+            // Remove node 5. Triggers case 2c
+            assert_eq!(btree.remove(&b(&[5])), Some(b(&[])));
 
-        // Remove node 5. Triggers case 2c
-        assert_eq!(btree.remove(&b(&[5])), Some(b(&[])));
+            // Reload the btree to verify that we saved it correctly.
+            let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(btree.into_memory());
 
-        // Reload the btree to verify that we saved it correctly.
-        let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(mem);
+            // The result should look like this:
+            // [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![e(0), e(1), e(2), e(3), e(4), e(7), e(8), e(9), e(10), e(11)]
+            );
 
-        // The result should look like this:
-        // [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(
-            root.entries(btree.memory()),
-            vec![e(0), e(1), e(2), e(3), e(4), e(7), e(8), e(9), e(10), e(11)]
-        );
-
-        // There is only one node allocated.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+            // There is only one node allocated.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+        });
     }
 
     #[test]
     fn remove_case_2b() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
+            // Should now split a node.
+            assert_eq!(btree.insert(b(&[12]), b(&[])), None);
 
-        for i in 1..=11 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
-        // Should now split a node.
-        assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-        // The result should look like this:
-        //                [6]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+            for i in 1..=12 {
+                assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
+            }
 
-        for i in 1..=12 {
-            assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-        }
+            // Remove node 6. Triggers case 2.b
+            assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
 
-        // Remove node 6. Triggers case 2.b
-        assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
+            // The result should look like this:
+            //                [7]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(7)]);
+            assert_eq!(root.children_len(), 2);
 
-        // The result should look like this:
-        //                [7]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![e(7)]);
-        assert_eq!(root.children_len(), 2);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(3), e(4), e(5)]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![e(1), e(2), e(3), e(4), e(5)]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(8), e(9), e(10), e(11), e(12)]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![e(8), e(9), e(10), e(11), e(12)]
-        );
-
-        // Remove node 7. Triggers case 2.c
-        assert_eq!(btree.remove(&b(&[7])), Some(b(&[])));
-        // The result should look like this:
-        //
-        // [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Leaf);
-        assert_eq!(
-            root.entries(btree.memory()),
-            vec![
-                e(1),
-                e(2),
-                e(3),
-                e(4),
-                e(5),
-                e(8),
-                e(9),
-                e(10),
-                e(11),
-                e(12)
-            ]
-        );
+            // Remove node 7. Triggers case 2.c
+            assert_eq!(btree.remove(&b(&[7])), Some(b(&[])));
+            // The result should look like this:
+            //
+            // [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Leaf);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![
+                    e(1),
+                    e(2),
+                    e(3),
+                    e(4),
+                    e(5),
+                    e(8),
+                    e(9),
+                    e(10),
+                    e(11),
+                    e(12)
+                ]
+            );
+        });
     }
 
     #[test]
     fn remove_case_3a_right() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
 
-        for i in 1..=11 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
+            // Should now split a node.
+            assert_eq!(btree.insert(b(&[12]), b(&[])), None);
 
-        // Should now split a node.
-        assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-        // The result should look like this:
-        //                [6]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+            // Remove node 3. Triggers case 3.a
+            assert_eq!(btree.remove(&b(&[3])), Some(b(&[])));
 
-        // Remove node 3. Triggers case 3.a
-        assert_eq!(btree.remove(&b(&[3])), Some(b(&[])));
+            // The result should look like this:
+            //                [7]
+            //               /   \
+            // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(7)]);
+            assert_eq!(root.children_len(), 2);
 
-        // The result should look like this:
-        //                [7]
-        //               /   \
-        // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![e(7)]);
-        assert_eq!(root.children_len(), 2);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(4), e(5), e(6)]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![e(1), e(2), e(4), e(5), e(6)]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(8), e(9), e(10), e(11), e(12)]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![e(8), e(9), e(10), e(11), e(12)]
-        );
-
-        // There are three allocated nodes.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+            // There are three allocated nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+        });
     }
 
     #[test]
     fn remove_case_3a_left() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
+            // Should now split a node.
+            assert_eq!(btree.insert(b(&[0]), b(&[])), None);
 
-        for i in 1..=11 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
-        // Should now split a node.
-        assert_eq!(btree.insert(b(&[0]), b(&[])), None);
+            // The result should look like this:
+            //                   [6]
+            //                  /   \
+            // [0, 1, 2, 3, 4, 5]   [7, 8, 9, 10, 11]
 
-        // The result should look like this:
-        //                   [6]
-        //                  /   \
-        // [0, 1, 2, 3, 4, 5]   [7, 8, 9, 10, 11]
+            // Remove node 8. Triggers case 3.a left
+            assert_eq!(btree.remove(&b(&[8])), Some(b(&[])));
 
-        // Remove node 8. Triggers case 3.a left
-        assert_eq!(btree.remove(&b(&[8])), Some(b(&[])));
+            // The result should look like this:
+            //                [5]
+            //               /   \
+            // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(5)]);
+            assert_eq!(root.children_len(), 2);
 
-        // The result should look like this:
-        //                [5]
-        //               /   \
-        // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![e(5)]);
-        assert_eq!(root.children_len(), 2);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(0), e(1), e(2), e(3), e(4)]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![e(0), e(1), e(2), e(3), e(4)]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(6), e(7), e(9), e(10), e(11)]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![e(6), e(7), e(9), e(10), e(11)]
-        );
-
-        // There are three allocated nodes.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+            // There are three allocated nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+        });
     }
 
     #[test]
     fn remove_case_3b_merge_into_right() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem.clone());
+        btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
+            // Should now split a node.
+            assert_eq!(btree.insert(b(&[12]), b(&[])), None);
 
-        for i in 1..=11 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
-        // Should now split a node.
-        assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-        // The result should look like this:
-        //                [6]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+            for i in 1..=12 {
+                assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
+            }
 
-        for i in 1..=12 {
-            assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-        }
+            // Remove node 6. Triggers case 2.b
+            assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
+            // The result should look like this:
+            //                [7]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(7)]);
+            assert_eq!(root.children_len(), 2);
 
-        // Remove node 6. Triggers case 2.b
-        assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
-        // The result should look like this:
-        //                [7]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![e(7)]);
-        assert_eq!(root.children_len(), 2);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(3), e(4), e(5)]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![e(1), e(2), e(3), e(4), e(5)]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(8), e(9), e(10), e(11), e(12)]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![e(8), e(9), e(10), e(11), e(12)]
-        );
+            // There are three allocated nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
 
-        // There are three allocated nodes.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+            // Remove node 3. Triggers case 3.b
+            assert_eq!(btree.remove(&b(&[3])), Some(b(&[])));
 
-        // Remove node 3. Triggers case 3.b
-        assert_eq!(btree.remove(&b(&[3])), Some(b(&[])));
+            // Reload the btree to verify that we saved it correctly.
+            let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(btree.into_memory());
 
-        // Reload the btree to verify that we saved it correctly.
-        let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(mem);
+            // The result should look like this:
+            //
+            // [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Leaf);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![
+                    e(1),
+                    e(2),
+                    e(4),
+                    e(5),
+                    e(7),
+                    e(8),
+                    e(9),
+                    e(10),
+                    e(11),
+                    e(12)
+                ]
+            );
 
-        // The result should look like this:
-        //
-        // [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Leaf);
-        assert_eq!(
-            root.entries(btree.memory()),
-            vec![
-                e(1),
-                e(2),
-                e(4),
-                e(5),
-                e(7),
-                e(8),
-                e(9),
-                e(10),
-                e(11),
-                e(12)
-            ]
-        );
-
-        // There is only one allocated node remaining.
-        assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+            // There is only one allocated node remaining.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+        });
     }
 
     #[test]
@@ -1856,490 +1946,500 @@ mod test {
 
     #[test]
     fn reloading() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem.clone());
+        btree_test(|mut btree| {
+            // The btree is initially empty.
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
 
-        // The btree is initially empty.
-        assert_eq!(btree.len(), 0);
-        assert!(btree.is_empty());
+            // Add an entry into the btree.
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.len(), 1);
+            assert!(!btree.is_empty());
 
-        // Add an entry into the btree.
-        assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-        assert_eq!(btree.len(), 1);
-        assert!(!btree.is_empty());
+            // Reload the btree. The element should still be there, and `len()`
+            // should still be `1`.
+            let btree = BTreeMap::load(btree.into_memory());
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.len(), 1);
+            assert!(!btree.is_empty());
 
-        // Reload the btree. The element should still be there, and `len()`
-        // should still be `1`.
-        let btree = BTreeMap::load(mem.clone());
-        assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
-        assert_eq!(btree.len(), 1);
-        assert!(!btree.is_empty());
+            // Remove an element. Length should be zero.
+            let mut btree = BTreeMap::load(btree.into_memory());
+            assert_eq!(btree.remove(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
 
-        // Remove an element. Length should be zero.
-        let mut btree = BTreeMap::load(mem.clone());
-        assert_eq!(btree.remove(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
-        assert_eq!(btree.len(), 0);
-        assert!(btree.is_empty());
-
-        // Reload. Btree should still be empty.
-        let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(mem);
-        assert_eq!(btree.get(&b(&[1, 2, 3])), None);
-        assert_eq!(btree.len(), 0);
-        assert!(btree.is_empty());
+            // Reload. Btree should still be empty.
+            let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(btree.into_memory());
+            assert_eq!(btree.get(&b(&[1, 2, 3])), None);
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
+        });
     }
 
     #[test]
     fn len() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 0..1000u32 {
+                assert_eq!(btree.insert(b(i.to_le_bytes().as_slice()), b(&[])), None);
+            }
 
-        for i in 0..1000u32 {
-            assert_eq!(btree.insert(b(i.to_le_bytes().as_slice()), b(&[])), None);
-        }
+            assert_eq!(btree.len(), 1000);
+            assert!(!btree.is_empty());
 
-        assert_eq!(btree.len(), 1000);
-        assert!(!btree.is_empty());
+            for i in 0..1000u32 {
+                assert_eq!(btree.remove(&b(i.to_le_bytes().as_slice())), Some(b(&[])));
+            }
 
-        for i in 0..1000u32 {
-            assert_eq!(btree.remove(&b(i.to_le_bytes().as_slice())), Some(b(&[])));
-        }
-
-        assert_eq!(btree.len(), 0);
-        assert!(btree.is_empty());
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
+        });
     }
 
     #[test]
     fn contains_key() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            // Insert even numbers from 0 to 1000.
+            for i in (0..1000u32).step_by(2) {
+                assert_eq!(btree.insert(b(i.to_le_bytes().as_slice()), b(&[])), None);
+            }
 
-        // Insert even numbers from 0 to 1000.
-        for i in (0..1000u32).step_by(2) {
-            assert_eq!(btree.insert(b(i.to_le_bytes().as_slice()), b(&[])), None);
-        }
-
-        // Contains key should return true on all the even numbers and false on all the odd
-        // numbers.
-        for i in 0..1000u32 {
-            assert_eq!(
-                btree.contains_key(&b(i.to_le_bytes().as_slice())),
-                i % 2 == 0
-            );
-        }
+            // Contains key should return true on all the even numbers and false on all the odd
+            // numbers.
+            for i in 0..1000u32 {
+                assert_eq!(
+                    btree.contains_key(&b(i.to_le_bytes().as_slice())),
+                    i % 2 == 0
+                );
+            }
+        });
     }
 
     #[test]
     fn range_empty() {
-        let mem = make_memory();
-        let btree = BTreeMap::<Blob<10>, Blob<10>, _>::new(mem);
-
-        // Test prefixes that don't exist in the map.
-        assert_eq!(btree.range(b(&[0])..).collect::<Vec<_>>(), vec![]);
-        assert_eq!(btree.range(b(&[1, 2, 3, 4])..).collect::<Vec<_>>(), vec![]);
+        btree_test(|btree| {
+            // Test prefixes that don't exist in the map.
+            assert_eq!(
+                btree
+                    .range(b(&[0])..)
+                    .collect::<Vec<(Blob<10>, Blob<10>)>>(),
+                vec![]
+            );
+            assert_eq!(btree.range(b(&[1, 2, 3, 4])..).collect::<Vec<_>>(), vec![]);
+        });
     }
 
     // Tests the case where the prefix is larger than all the entries in a leaf node.
     #[test]
     fn range_leaf_prefix_greater_than_all_entries() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            btree.insert(b(&[0]), b(&[]));
 
-        btree.insert(b(&[0]), b(&[]));
-
-        // Test a prefix that's larger than the value in the leaf node. Should be empty.
-        assert_eq!(btree.range(b(&[1])..).collect::<Vec<_>>(), vec![]);
+            // Test a prefix that's larger than the value in the leaf node. Should be empty.
+            assert_eq!(btree.range(b(&[1])..).collect::<Vec<_>>(), vec![]);
+        });
     }
 
     // Tests the case where the prefix is larger than all the entries in an internal node.
     #[test]
     fn range_internal_prefix_greater_than_all_entries() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            for i in 1..=12 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
 
-        for i in 1..=12 {
-            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-        }
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-        // The result should look like this:
-        //                [6]
-        //               /   \
-        // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
-
-        // Test a prefix that's larger than the value in the internal node.
-        assert_eq!(
-            btree.range(b(&[7])..b(&[8])).collect::<Vec<_>>(),
-            vec![(b(&[7]), b(&[]))]
-        );
+            // Test a prefix that's larger than the key in the internal node.
+            assert_eq!(
+                btree.range(b(&[7])..b(&[8])).collect::<Vec<_>>(),
+                vec![(b(&[7]), b(&[]))]
+            );
+        });
     }
 
     #[test]
     fn range_various_prefixes() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            btree.insert(b(&[0, 1]), b(&[]));
+            btree.insert(b(&[0, 2]), b(&[]));
+            btree.insert(b(&[0, 3]), b(&[]));
+            btree.insert(b(&[0, 4]), b(&[]));
+            btree.insert(b(&[1, 1]), b(&[]));
+            btree.insert(b(&[1, 2]), b(&[]));
+            btree.insert(b(&[1, 3]), b(&[]));
+            btree.insert(b(&[1, 4]), b(&[]));
+            btree.insert(b(&[2, 1]), b(&[]));
+            btree.insert(b(&[2, 2]), b(&[]));
+            btree.insert(b(&[2, 3]), b(&[]));
+            btree.insert(b(&[2, 4]), b(&[]));
 
-        btree.insert(b(&[0, 1]), b(&[]));
-        btree.insert(b(&[0, 2]), b(&[]));
-        btree.insert(b(&[0, 3]), b(&[]));
-        btree.insert(b(&[0, 4]), b(&[]));
-        btree.insert(b(&[1, 1]), b(&[]));
-        btree.insert(b(&[1, 2]), b(&[]));
-        btree.insert(b(&[1, 3]), b(&[]));
-        btree.insert(b(&[1, 4]), b(&[]));
-        btree.insert(b(&[2, 1]), b(&[]));
-        btree.insert(b(&[2, 2]), b(&[]));
-        btree.insert(b(&[2, 3]), b(&[]));
-        btree.insert(b(&[2, 4]), b(&[]));
+            // The result should look like this:
+            //                                         [(1, 2)]
+            //                                         /     \
+            // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 1)]       [(1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4)]
 
-        // The result should look like this:
-        //                                         [(1, 2)]
-        //                                         /     \
-        // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 1)]       [(1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4)]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![(b(&[1, 2]), vec![])]);
+            assert_eq!(root.children_len(), 2);
 
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![(b(&[1, 2]), vec![])]);
-        assert_eq!(root.children_len(), 2);
+            // Tests a prefix that's smaller than the key in the internal node.
+            assert_eq!(
+                btree.range(b(&[0])..b(&[1])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[0, 1]), b(&[])),
+                    (b(&[0, 2]), b(&[])),
+                    (b(&[0, 3]), b(&[])),
+                    (b(&[0, 4]), b(&[])),
+                ]
+            );
 
-        // Tests a prefix that's smaller than the value in the internal node.
-        assert_eq!(
-            btree.range(b(&[0])..b(&[1])).collect::<Vec<_>>(),
-            vec![
-                (b(&[0, 1]), b(&[])),
-                (b(&[0, 2]), b(&[])),
-                (b(&[0, 3]), b(&[])),
-                (b(&[0, 4]), b(&[])),
-            ]
-        );
+            // Tests a prefix that crosses several nodes.
+            assert_eq!(
+                btree.range(b(&[1])..b(&[2])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[1, 1]), b(&[])),
+                    (b(&[1, 2]), b(&[])),
+                    (b(&[1, 3]), b(&[])),
+                    (b(&[1, 4]), b(&[])),
+                ]
+            );
 
-        // Tests a prefix that crosses several nodes.
-        assert_eq!(
-            btree.range(b(&[1])..b(&[2])).collect::<Vec<_>>(),
-            vec![
-                (b(&[1, 1]), b(&[])),
-                (b(&[1, 2]), b(&[])),
-                (b(&[1, 3]), b(&[])),
-                (b(&[1, 4]), b(&[])),
-            ]
-        );
-
-        // Tests a prefix that's larger than the value in the internal node.
-        assert_eq!(
-            btree.range(b(&[2])..b(&[3])).collect::<Vec<_>>(),
-            vec![
-                (b(&[2, 1]), b(&[])),
-                (b(&[2, 2]), b(&[])),
-                (b(&[2, 3]), b(&[])),
-                (b(&[2, 4]), b(&[])),
-            ]
-        );
+            // Tests a prefix that's larger than the key in the internal node.
+            assert_eq!(
+                btree.range(b(&[2])..b(&[3])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[2, 1]), b(&[])),
+                    (b(&[2, 2]), b(&[])),
+                    (b(&[2, 3]), b(&[])),
+                    (b(&[2, 4]), b(&[])),
+                ]
+            );
+        });
     }
 
     #[test]
     fn range_various_prefixes_2() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            btree.insert(b(&[0, 1]), b(&[]));
+            btree.insert(b(&[0, 2]), b(&[]));
+            btree.insert(b(&[0, 3]), b(&[]));
+            btree.insert(b(&[0, 4]), b(&[]));
+            btree.insert(b(&[1, 2]), b(&[]));
+            btree.insert(b(&[1, 4]), b(&[]));
+            btree.insert(b(&[1, 6]), b(&[]));
+            btree.insert(b(&[1, 8]), b(&[]));
+            btree.insert(b(&[1, 10]), b(&[]));
+            btree.insert(b(&[2, 1]), b(&[]));
+            btree.insert(b(&[2, 2]), b(&[]));
+            btree.insert(b(&[2, 3]), b(&[]));
+            btree.insert(b(&[2, 4]), b(&[]));
+            btree.insert(b(&[2, 5]), b(&[]));
+            btree.insert(b(&[2, 6]), b(&[]));
+            btree.insert(b(&[2, 7]), b(&[]));
+            btree.insert(b(&[2, 8]), b(&[]));
+            btree.insert(b(&[2, 9]), b(&[]));
 
-        btree.insert(b(&[0, 1]), b(&[]));
-        btree.insert(b(&[0, 2]), b(&[]));
-        btree.insert(b(&[0, 3]), b(&[]));
-        btree.insert(b(&[0, 4]), b(&[]));
-        btree.insert(b(&[1, 2]), b(&[]));
-        btree.insert(b(&[1, 4]), b(&[]));
-        btree.insert(b(&[1, 6]), b(&[]));
-        btree.insert(b(&[1, 8]), b(&[]));
-        btree.insert(b(&[1, 10]), b(&[]));
-        btree.insert(b(&[2, 1]), b(&[]));
-        btree.insert(b(&[2, 2]), b(&[]));
-        btree.insert(b(&[2, 3]), b(&[]));
-        btree.insert(b(&[2, 4]), b(&[]));
-        btree.insert(b(&[2, 5]), b(&[]));
-        btree.insert(b(&[2, 6]), b(&[]));
-        btree.insert(b(&[2, 7]), b(&[]));
-        btree.insert(b(&[2, 8]), b(&[]));
-        btree.insert(b(&[2, 9]), b(&[]));
+            // The result should look like this:
+            //                                         [(1, 4), (2, 3)]
+            //                                         /      |       \
+            // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2)]       |        [(2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9)]
+            //                                                |
+            //                             [(1, 6), (1, 8), (1, 10), (2, 1), (2, 2)]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![(b(&[1, 4]), vec![]), (b(&[2, 3]), vec![])]
+            );
+            assert_eq!(root.children_len(), 3);
 
-        // The result should look like this:
-        //                                         [(1, 4), (2, 3)]
-        //                                         /      |       \
-        // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2)]       |        [(2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9)]
-        //                                                |
-        //                             [(1, 6), (1, 8), (1, 10), (2, 1), (2, 2)]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(
-            root.entries(btree.memory()),
-            vec![(b(&[1, 4]), vec![]), (b(&[2, 3]), vec![])]
-        );
-        assert_eq!(root.children_len(), 3);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![
+                    (b(&[0, 1]), vec![]),
+                    (b(&[0, 2]), vec![]),
+                    (b(&[0, 3]), vec![]),
+                    (b(&[0, 4]), vec![]),
+                    (b(&[1, 2]), vec![]),
+                ]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![
-                (b(&[0, 1]), vec![]),
-                (b(&[0, 2]), vec![]),
-                (b(&[0, 3]), vec![]),
-                (b(&[0, 4]), vec![]),
-                (b(&[1, 2]), vec![]),
-            ]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![
+                    (b(&[1, 6]), vec![]),
+                    (b(&[1, 8]), vec![]),
+                    (b(&[1, 10]), vec![]),
+                    (b(&[2, 1]), vec![]),
+                    (b(&[2, 2]), vec![]),
+                ]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![
-                (b(&[1, 6]), vec![]),
-                (b(&[1, 8]), vec![]),
-                (b(&[1, 10]), vec![]),
-                (b(&[2, 1]), vec![]),
-                (b(&[2, 2]), vec![]),
-            ]
-        );
+            let child_2 = btree.load_node(root.child(2));
+            assert_eq!(
+                child_2.entries(btree.memory()),
+                vec![
+                    (b(&[2, 4]), vec![]),
+                    (b(&[2, 5]), vec![]),
+                    (b(&[2, 6]), vec![]),
+                    (b(&[2, 7]), vec![]),
+                    (b(&[2, 8]), vec![]),
+                    (b(&[2, 9]), vec![]),
+                ]
+            );
 
-        let child_2 = btree.load_node(root.child(2));
-        assert_eq!(
-            child_2.entries(btree.memory()),
-            vec![
-                (b(&[2, 4]), vec![]),
-                (b(&[2, 5]), vec![]),
-                (b(&[2, 6]), vec![]),
-                (b(&[2, 7]), vec![]),
-                (b(&[2, 8]), vec![]),
-                (b(&[2, 9]), vec![]),
-            ]
-        );
+            // Tests a prefix that doesn't exist, but is in the middle of the root node.
+            assert_eq!(
+                btree.range(b(&[1, 5])..b(&[1, 6])).collect::<Vec<_>>(),
+                vec![]
+            );
 
-        // Tests a prefix that doesn't exist, but is in the middle of the root node.
-        assert_eq!(
-            btree.range(b(&[1, 5])..b(&[1, 6])).collect::<Vec<_>>(),
-            vec![]
-        );
+            // Tests a prefix beginning in the middle of the tree and crossing several nodes.
+            assert_eq!(
+                btree.range(b(&[1, 5])..=b(&[2, 6])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[1, 6]), b(&[])),
+                    (b(&[1, 8]), b(&[])),
+                    (b(&[1, 10]), b(&[])),
+                    (b(&[2, 1]), b(&[])),
+                    (b(&[2, 2]), b(&[])),
+                    (b(&[2, 3]), b(&[])),
+                    (b(&[2, 4]), b(&[])),
+                    (b(&[2, 5]), b(&[])),
+                    (b(&[2, 6]), b(&[])),
+                ]
+            );
 
-        // Tests a prefix that crosses several nodes.
-        assert_eq!(
-            btree.range(b(&[1])..b(&[2])).collect::<Vec<_>>(),
-            vec![
-                (b(&[1, 2]), b(&[])),
-                (b(&[1, 4]), b(&[])),
-                (b(&[1, 6]), b(&[])),
-                (b(&[1, 8]), b(&[])),
-                (b(&[1, 10]), b(&[])),
-            ]
-        );
+            // Tests a prefix that crosses several nodes.
+            assert_eq!(
+                btree.range(b(&[1])..b(&[2])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[1, 2]), b(&[])),
+                    (b(&[1, 4]), b(&[])),
+                    (b(&[1, 6]), b(&[])),
+                    (b(&[1, 8]), b(&[])),
+                    (b(&[1, 10]), b(&[])),
+                ]
+            );
 
-        // Tests a prefix that starts from a leaf node, then iterates through the root and right
-        // sibling.
-        assert_eq!(
-            btree.range(b(&[2])..).collect::<Vec<_>>(),
-            vec![
-                (b(&[2, 1]), b(&[])),
-                (b(&[2, 2]), b(&[])),
-                (b(&[2, 3]), b(&[])),
-                (b(&[2, 4]), b(&[])),
-                (b(&[2, 5]), b(&[])),
-                (b(&[2, 6]), b(&[])),
-                (b(&[2, 7]), b(&[])),
-                (b(&[2, 8]), b(&[])),
-                (b(&[2, 9]), b(&[])),
-            ]
-        );
+            // Tests a prefix that starts from a leaf node, then iterates through the root and right
+            // sibling.
+            assert_eq!(
+                btree.range(b(&[2])..).collect::<Vec<_>>(),
+                vec![
+                    (b(&[2, 1]), b(&[])),
+                    (b(&[2, 2]), b(&[])),
+                    (b(&[2, 3]), b(&[])),
+                    (b(&[2, 4]), b(&[])),
+                    (b(&[2, 5]), b(&[])),
+                    (b(&[2, 6]), b(&[])),
+                    (b(&[2, 7]), b(&[])),
+                    (b(&[2, 8]), b(&[])),
+                    (b(&[2, 9]), b(&[])),
+                ]
+            );
+        });
     }
 
     #[test]
     fn range_large() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::<Blob<10>, Blob<10>, _>::new(mem);
+        btree_test(|mut btree| {
+            // Insert 1000 elements with prefix 0 and another 1000 elements with prefix 1.
+            for prefix in 0..=1 {
+                for i in 0..1000u32 {
+                    assert_eq!(
+                        btree.insert(
+                            // The key is the prefix followed by the integer's encoding.
+                            // The encoding is big-endian so that the byte representation of the
+                            // integers are sorted.
+                            b([vec![prefix], i.to_be_bytes().to_vec()]
+                                .into_iter()
+                                .flatten()
+                                .collect::<Vec<_>>()
+                                .as_slice()),
+                            b(&[])
+                        ),
+                        None
+                    );
+                }
+            }
 
-        // Insert 1000 elements with prefix 0 and another 1000 elements with prefix 1.
-        for prefix in 0..=1 {
-            for i in 0..1000u32 {
-                assert_eq!(
-                    btree.insert(
-                        // The key is the prefix followed by the integer's encoding.
-                        // The encoding is big-endian so that the byte representation of the
-                        // integers are sorted.
-                        b([vec![prefix], i.to_be_bytes().to_vec()]
+            // Getting the range with a prefix should return all 1000 elements with that prefix.
+            for prefix in 0..=1 {
+                let mut i: u32 = 0;
+                for (key, _) in btree.range(b(&[prefix])..b(&[prefix + 1])) {
+                    assert_eq!(
+                        key,
+                        b(&[vec![prefix], i.to_be_bytes().to_vec()]
                             .into_iter()
                             .flatten()
-                            .collect::<Vec<_>>()
-                            .as_slice()),
-                        b(&[])
-                    ),
-                    None
-                );
+                            .collect::<Vec<_>>())
+                    );
+                    i += 1;
+                }
+                assert_eq!(i, 1000);
             }
-        }
-
-        // Getting the range with a prefix should return all 1000 elements with that prefix.
-        for prefix in 0..=1 {
-            let mut i: u32 = 0;
-            for (key, _) in btree.range(b(&[prefix])..b(&[prefix + 1])) {
-                assert_eq!(
-                    key,
-                    b(&[vec![prefix], i.to_be_bytes().to_vec()]
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<_>>())
-                );
-                i += 1;
-            }
-            assert_eq!(i, 1000);
-        }
+        });
     }
 
     #[test]
     fn range_various_prefixes_with_offset() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            btree.insert(b(&[0, 1]), b(&[]));
+            btree.insert(b(&[0, 2]), b(&[]));
+            btree.insert(b(&[0, 3]), b(&[]));
+            btree.insert(b(&[0, 4]), b(&[]));
+            btree.insert(b(&[1, 1]), b(&[]));
+            btree.insert(b(&[1, 2]), b(&[]));
+            btree.insert(b(&[1, 3]), b(&[]));
+            btree.insert(b(&[1, 4]), b(&[]));
+            btree.insert(b(&[2, 1]), b(&[]));
+            btree.insert(b(&[2, 2]), b(&[]));
+            btree.insert(b(&[2, 3]), b(&[]));
+            btree.insert(b(&[2, 4]), b(&[]));
 
-        btree.insert(b(&[0, 1]), b(&[]));
-        btree.insert(b(&[0, 2]), b(&[]));
-        btree.insert(b(&[0, 3]), b(&[]));
-        btree.insert(b(&[0, 4]), b(&[]));
-        btree.insert(b(&[1, 1]), b(&[]));
-        btree.insert(b(&[1, 2]), b(&[]));
-        btree.insert(b(&[1, 3]), b(&[]));
-        btree.insert(b(&[1, 4]), b(&[]));
-        btree.insert(b(&[2, 1]), b(&[]));
-        btree.insert(b(&[2, 2]), b(&[]));
-        btree.insert(b(&[2, 3]), b(&[]));
-        btree.insert(b(&[2, 4]), b(&[]));
+            // The result should look like this:
+            //                                         [(1, 2)]
+            //                                         /     \
+            // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 1)]       [(1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4)]
 
-        // The result should look like this:
-        //                                         [(1, 2)]
-        //                                         /     \
-        // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 1)]       [(1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4)]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![(b(&[1, 2]), vec![])]);
+            assert_eq!(root.children_len(), 2);
 
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.entries(btree.memory()), vec![(b(&[1, 2]), vec![])]);
-        assert_eq!(root.children_len(), 2);
+            assert_eq!(
+                btree.range(b(&[0])..b(&[1])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[0, 1]), b(&[])),
+                    (b(&[0, 2]), b(&[])),
+                    (b(&[0, 3]), b(&[])),
+                    (b(&[0, 4]), b(&[])),
+                ]
+            );
 
-        assert_eq!(
-            btree.range(b(&[0])..b(&[1])).collect::<Vec<_>>(),
-            vec![
-                (b(&[0, 1]), b(&[])),
-                (b(&[0, 2]), b(&[])),
-                (b(&[0, 3]), b(&[])),
-                (b(&[0, 4]), b(&[])),
-            ]
-        );
+            // Tests an offset that has a keys somewhere in the range of keys of an internal node.
+            assert_eq!(
+                btree.range(b(&[1, 3])..b(&[2])).collect::<Vec<_>>(),
+                vec![(b(&[1, 3]), b(&[])), (b(&[1, 4]), b(&[])),]
+            );
 
-        // Tests a offset that has a value somewhere in the range of values of an internal node.
-        assert_eq!(
-            btree.range(b(&[1, 3])..b(&[2])).collect::<Vec<_>>(),
-            vec![(b(&[1, 3]), b(&[])), (b(&[1, 4]), b(&[])),]
-        );
-
-        // Tests a offset that's larger than the value in the internal node.
-        assert_eq!(btree.range(b(&[2, 5])..).collect::<Vec<_>>(), vec![]);
+            // Tests an offset that's larger than the key in the internal node.
+            assert_eq!(btree.range(b(&[2, 5])..).collect::<Vec<_>>(), vec![]);
+        });
     }
 
     #[test]
     fn range_various_prefixes_with_offset_2() {
-        let mem = make_memory();
-        let mut btree = BTreeMap::new(mem);
+        btree_test(|mut btree| {
+            btree.insert(b(&[0, 1]), b(&[]));
+            btree.insert(b(&[0, 2]), b(&[]));
+            btree.insert(b(&[0, 3]), b(&[]));
+            btree.insert(b(&[0, 4]), b(&[]));
+            btree.insert(b(&[1, 2]), b(&[]));
+            btree.insert(b(&[1, 4]), b(&[]));
+            btree.insert(b(&[1, 6]), b(&[]));
+            btree.insert(b(&[1, 8]), b(&[]));
+            btree.insert(b(&[1, 10]), b(&[]));
+            btree.insert(b(&[2, 1]), b(&[]));
+            btree.insert(b(&[2, 2]), b(&[]));
+            btree.insert(b(&[2, 3]), b(&[]));
+            btree.insert(b(&[2, 4]), b(&[]));
+            btree.insert(b(&[2, 5]), b(&[]));
+            btree.insert(b(&[2, 6]), b(&[]));
+            btree.insert(b(&[2, 7]), b(&[]));
+            btree.insert(b(&[2, 8]), b(&[]));
+            btree.insert(b(&[2, 9]), b(&[]));
 
-        btree.insert(b(&[0, 1]), b(&[]));
-        btree.insert(b(&[0, 2]), b(&[]));
-        btree.insert(b(&[0, 3]), b(&[]));
-        btree.insert(b(&[0, 4]), b(&[]));
-        btree.insert(b(&[1, 2]), b(&[]));
-        btree.insert(b(&[1, 4]), b(&[]));
-        btree.insert(b(&[1, 6]), b(&[]));
-        btree.insert(b(&[1, 8]), b(&[]));
-        btree.insert(b(&[1, 10]), b(&[]));
-        btree.insert(b(&[2, 1]), b(&[]));
-        btree.insert(b(&[2, 2]), b(&[]));
-        btree.insert(b(&[2, 3]), b(&[]));
-        btree.insert(b(&[2, 4]), b(&[]));
-        btree.insert(b(&[2, 5]), b(&[]));
-        btree.insert(b(&[2, 6]), b(&[]));
-        btree.insert(b(&[2, 7]), b(&[]));
-        btree.insert(b(&[2, 8]), b(&[]));
-        btree.insert(b(&[2, 9]), b(&[]));
+            // The result should look like this:
+            //                                         [(1, 4), (2, 3)]
+            //                                         /      |       \
+            // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2)]       |        [(2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9)]
+            //                                                |
+            //                             [(1, 6), (1, 8), (1, 10), (2, 1), (2, 2)]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![(b(&[1, 4]), vec![]), (b(&[2, 3]), vec![])]
+            );
+            assert_eq!(root.children_len(), 3);
 
-        // The result should look like this:
-        //                                         [(1, 4), (2, 3)]
-        //                                         /      |       \
-        // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2)]       |        [(2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9)]
-        //                                                |
-        //                             [(1, 6), (1, 8), (1, 10), (2, 1), (2, 2)]
-        let root = btree.load_node(btree.root_addr);
-        assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(
-            root.entries(btree.memory()),
-            vec![(b(&[1, 4]), vec![]), (b(&[2, 3]), vec![])]
-        );
-        assert_eq!(root.children_len(), 3);
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![
+                    (b(&[0, 1]), vec![]),
+                    (b(&[0, 2]), vec![]),
+                    (b(&[0, 3]), vec![]),
+                    (b(&[0, 4]), vec![]),
+                    (b(&[1, 2]), vec![]),
+                ]
+            );
 
-        let child_0 = btree.load_node(root.child(0));
-        assert_eq!(child_0.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_0.entries(btree.memory()),
-            vec![
-                (b(&[0, 1]), vec![]),
-                (b(&[0, 2]), vec![]),
-                (b(&[0, 3]), vec![]),
-                (b(&[0, 4]), vec![]),
-                (b(&[1, 2]), vec![]),
-            ]
-        );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![
+                    (b(&[1, 6]), vec![]),
+                    (b(&[1, 8]), vec![]),
+                    (b(&[1, 10]), vec![]),
+                    (b(&[2, 1]), vec![]),
+                    (b(&[2, 2]), vec![]),
+                ]
+            );
 
-        let child_1 = btree.load_node(root.child(1));
-        assert_eq!(child_1.node_type(), NodeType::Leaf);
-        assert_eq!(
-            child_1.entries(btree.memory()),
-            vec![
-                (b(&[1, 6]), vec![]),
-                (b(&[1, 8]), vec![]),
-                (b(&[1, 10]), vec![]),
-                (b(&[2, 1]), vec![]),
-                (b(&[2, 2]), vec![]),
-            ]
-        );
+            let child_2 = btree.load_node(root.child(2));
+            assert_eq!(
+                child_2.entries(btree.memory()),
+                vec![
+                    (b(&[2, 4]), vec![]),
+                    (b(&[2, 5]), vec![]),
+                    (b(&[2, 6]), vec![]),
+                    (b(&[2, 7]), vec![]),
+                    (b(&[2, 8]), vec![]),
+                    (b(&[2, 9]), vec![]),
+                ]
+            );
 
-        let child_2 = btree.load_node(root.child(2));
-        assert_eq!(
-            child_2.entries(btree.memory()),
-            vec![
-                (b(&[2, 4]), vec![]),
-                (b(&[2, 5]), vec![]),
-                (b(&[2, 6]), vec![]),
-                (b(&[2, 7]), vec![]),
-                (b(&[2, 8]), vec![]),
-                (b(&[2, 9]), vec![]),
-            ]
-        );
+            // Tests a offset that crosses several nodes.
+            assert_eq!(
+                btree.range(b(&[1, 4])..b(&[2])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[1, 4]), b(&[])),
+                    (b(&[1, 6]), b(&[])),
+                    (b(&[1, 8]), b(&[])),
+                    (b(&[1, 10]), b(&[])),
+                ]
+            );
 
-        // Tests a offset that crosses several nodes.
-        assert_eq!(
-            btree.range(b(&[1, 4])..b(&[2])).collect::<Vec<_>>(),
-            vec![
-                (b(&[1, 4]), b(&[])),
-                (b(&[1, 6]), b(&[])),
-                (b(&[1, 8]), b(&[])),
-                (b(&[1, 10]), b(&[])),
-            ]
-        );
-
-        // Tests a offset that starts from a leaf node, then iterates through the root and right
-        // sibling.
-        assert_eq!(
-            btree.range(b(&[2, 2])..b(&[3])).collect::<Vec<_>>(),
-            vec![
-                (b(&[2, 2]), b(&[])),
-                (b(&[2, 3]), b(&[])),
-                (b(&[2, 4]), b(&[])),
-                (b(&[2, 5]), b(&[])),
-                (b(&[2, 6]), b(&[])),
-                (b(&[2, 7]), b(&[])),
-                (b(&[2, 8]), b(&[])),
-                (b(&[2, 9]), b(&[])),
-            ]
-        );
+            // Tests a offset that starts from a leaf node, then iterates through the root and right
+            // sibling.
+            assert_eq!(
+                btree.range(b(&[2, 2])..b(&[3])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[2, 2]), b(&[])),
+                    (b(&[2, 3]), b(&[])),
+                    (b(&[2, 4]), b(&[])),
+                    (b(&[2, 5]), b(&[])),
+                    (b(&[2, 6]), b(&[])),
+                    (b(&[2, 7]), b(&[])),
+                    (b(&[2, 8]), b(&[])),
+                    (b(&[2, 9]), b(&[])),
+                ]
+            );
+        });
     }
 
     #[test]
@@ -2380,86 +2480,85 @@ mod test {
 
     #[test]
     fn bruteforce_range_search() {
-        use super::BTreeMap as StableBTreeMap;
-        use std::collections::BTreeMap;
+        btree_test(|mut stable_map| {
+            use std::collections::BTreeMap;
+            const NKEYS: u64 = 60;
+            let mut std_map = BTreeMap::new();
 
-        const NKEYS: u64 = 60;
-
-        let mut std_map = BTreeMap::new();
-        let mut stable_map = StableBTreeMap::new(make_memory());
-
-        for k in 0..NKEYS {
-            std_map.insert(k, k);
-            stable_map.insert(k, k);
-        }
-
-        assert_eq!(
-            std_map.range(..).map(|(k, v)| (*k, *v)).collect::<Vec<_>>(),
-            stable_map.range(..).collect::<Vec<_>>()
-        );
-
-        for l in 0..=NKEYS {
-            assert_eq!(
-                std_map
-                    .range(l..)
-                    .map(|(k, v)| (*k, *v))
-                    .collect::<Vec<_>>(),
-                stable_map.range(l..).collect::<Vec<_>>()
-            );
+            for k in 0..NKEYS {
+                std_map.insert(k, k);
+                stable_map.insert(k, k);
+            }
 
             assert_eq!(
-                std_map
-                    .range(..l)
-                    .map(|(k, v)| (*k, *v))
-                    .collect::<Vec<_>>(),
-                stable_map.range(..l).collect::<Vec<_>>()
+                std_map.range(..).map(|(k, v)| (*k, *v)).collect::<Vec<_>>(),
+                stable_map.range(..).collect::<Vec<_>>()
             );
 
-            assert_eq!(
-                std_map
-                    .range(..=l)
-                    .map(|(k, v)| (*k, *v))
-                    .collect::<Vec<_>>(),
-                stable_map.range(..=l).collect::<Vec<_>>()
-            );
+            for l in 0..=NKEYS {
+                assert_eq!(
+                    std_map
+                        .range(l..)
+                        .map(|(k, v)| (*k, *v))
+                        .collect::<Vec<_>>(),
+                    stable_map.range(l..).collect::<Vec<_>>()
+                );
 
-            for r in l + 1..=NKEYS {
-                for lbound in [Bound::Included(l), Bound::Excluded(l)] {
-                    for rbound in [Bound::Included(r), Bound::Excluded(r)] {
-                        let range = (lbound, rbound);
-                        assert_eq!(
-                            std_map
-                                .range(range)
-                                .map(|(k, v)| (*k, *v))
-                                .collect::<Vec<_>>(),
-                            stable_map.range(range).collect::<Vec<_>>(),
-                            "range: {range:?}"
-                        );
+                assert_eq!(
+                    std_map
+                        .range(..l)
+                        .map(|(k, v)| (*k, *v))
+                        .collect::<Vec<_>>(),
+                    stable_map.range(..l).collect::<Vec<_>>()
+                );
+
+                assert_eq!(
+                    std_map
+                        .range(..=l)
+                        .map(|(k, v)| (*k, *v))
+                        .collect::<Vec<_>>(),
+                    stable_map.range(..=l).collect::<Vec<_>>()
+                );
+
+                for r in l + 1..=NKEYS {
+                    for lbound in [Bound::Included(l), Bound::Excluded(l)] {
+                        for rbound in [Bound::Included(r), Bound::Excluded(r)] {
+                            let range = (lbound, rbound);
+                            assert_eq!(
+                                std_map
+                                    .range(range)
+                                    .map(|(k, v)| (*k, *v))
+                                    .collect::<Vec<_>>(),
+                                stable_map.range(range).collect::<Vec<_>>(),
+                                "range: {range:?}"
+                            );
+                        }
                     }
                 }
             }
-        }
+        });
     }
 
     #[test]
     fn test_iter_upper_bound() {
-        let mut stable_map = super::BTreeMap::new(make_memory());
-        for k in 0..100u64 {
-            stable_map.insert(k, ());
-            for i in 0..=k {
+        btree_test(|mut btree| {
+            for k in 0..100u64 {
+                btree.insert(k, ());
+                for i in 0..=k {
+                    assert_eq!(
+                        Some((i, ())),
+                        btree.iter_upper_bound(&(i + 1)).next(),
+                        "failed to get an upper bound for key {}",
+                        i + 1
+                    );
+                }
                 assert_eq!(
-                    Some((i, ())),
-                    stable_map.iter_upper_bound(&(i + 1)).next(),
-                    "failed to get an upper bound for key {}",
-                    i + 1
+                    None,
+                    btree.iter_upper_bound(&0).next(),
+                    "key 0 must not have an upper bound"
                 );
             }
-            assert_eq!(
-                None,
-                stable_map.iter_upper_bound(&0).next(),
-                "key 0 must not have an upper bound"
-            );
-        }
+        });
     }
 
     #[test]
@@ -2566,11 +2665,11 @@ mod test {
         let packed_mem = make_memory();
         crate::write_struct(&packed_header, Address::from(0), &packed_mem);
 
-        let v1_header = BTreeHeaderV1 {
-            magic: *MAGIC,
-            version: LAYOUT_VERSION,
-            max_key_size: 0x12345678,
-            max_value_size: 0x87654321,
+        let v1_header = BTreeHeader {
+            version: Version::V1(DerivedPageSize {
+                max_key_size: 0x12345678,
+                max_value_size: 0x87654321,
+            }),
             root_addr: Address::from(0xDEADBEEF),
             length: 0xA1B2D3C4,
         };
@@ -2582,10 +2681,19 @@ mod test {
 
         let packed_header: BTreePackedHeader = crate::read_struct(Address::from(0), &v1_mem);
         let v1_header = BTreeMap::<Vec<_>, Vec<_>, RefCell<Vec<_>>>::read_header(&v1_mem);
-        assert!(packed_header.magic == v1_header.magic);
-        assert!(packed_header.version == v1_header.version);
-        assert!(packed_header.max_key_size == v1_header.max_key_size);
-        assert!(packed_header.max_value_size == v1_header.max_value_size);
+        assert!(packed_header.magic == *MAGIC);
+        assert!(packed_header.version == LAYOUT_VERSION);
+        match v1_header.version {
+            Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }) => {
+                assert!(packed_header.max_key_size == max_key_size);
+                assert!(packed_header.max_value_size == max_value_size);
+            }
+            _ => unreachable!("version must be v1"),
+        };
+
         assert!(packed_header.root_addr == v1_header.root_addr);
         assert!(packed_header.length == v1_header.length);
     }

@@ -96,7 +96,7 @@ const MINIMUM_PAGE_SIZE: u32 = 128;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v2 node at the given address.
-    pub(super) fn new_v2(address: Address, node_type: NodeType, page_size: PageSize) -> Node<K> {
+    pub fn new_v2(address: Address, node_type: NodeType, page_size: PageSize) -> Node<K> {
         assert!(page_size.get() >= MINIMUM_PAGE_SIZE);
 
         Node {
@@ -192,7 +192,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
-        let page_size = self.version.page_size();
+        let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
         assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
 
