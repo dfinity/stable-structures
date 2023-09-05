@@ -76,7 +76,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Saves the node to memory.
-    pub fn save<M: Memory>(&self, allocator: &mut Allocator<M>) {
+    pub fn save<M: Memory>(&mut self, allocator: &mut Allocator<M>) {
         match self.version {
             Version::V1(_) => self.save_v1(allocator.memory()),
             Version::V2(_) => self.save_v2(allocator),

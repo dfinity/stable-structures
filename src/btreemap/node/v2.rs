@@ -188,7 +188,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     // Saves the node to memory.
-    pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
+    pub(super) fn save_v2<M: Memory>(&mut self, allocator: &mut Allocator<M>) {
         #[cfg(feature = "profiler")]
         let _p = profiler::profile("node_save_v2");
 
@@ -248,13 +248,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     // Writes a buffer into pages of the given page size.
     // Pages can be allocated and deallocated as needed.
     fn write_paginated<M: Memory>(
-        &self,
+        &mut self,
         buf: Vec<u8>,
         allocator: &mut Allocator<M>,
         page_size: usize,
     ) {
         // Compute how many overflow pages are needed.
-        let additional_pages_needed = if buf.len() > page_size {
+        let overflow_pages_needed = if buf.len() > page_size {
             debug_assert!(page_size >= PAGE_OVERFLOW_DATA_OFFSET.get() as usize);
             let overflow_page_capacity = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
             let overflow_data_len = buf.len() - page_size;
@@ -266,17 +266,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         // Retrieve the addresses for the overflow pages, making the necessary allocations.
-        let overflows = self.reallocate_overflow_pages(additional_pages_needed, allocator);
+        self.reallocate_overflow_pages(overflow_pages_needed, allocator);
 
         // Write the first page
         let memory = allocator.memory();
         memory.write(self.address.get(), &buf[..min(page_size, buf.len())]);
-        if !overflows.is_empty() {
+        if !self.overflows.is_empty() {
             // Write the next overflow address to the first page.
             write_u64(
                 memory,
                 self.address + OVERFLOW_ADDRESS_OFFSET,
-                overflows[0].get(),
+                self.overflows[0].get(),
             );
         }
 
@@ -293,17 +293,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
             }
 
             // Write magic and next address
-            memory.write(overflows[i].get(), &OVERFLOW_MAGIC[..]);
-            let next_address = overflows.get(i + 1).unwrap_or(&NULL);
+            memory.write(self.overflows[i].get(), &OVERFLOW_MAGIC[..]);
+            let next_address = self.overflows.get(i + 1).unwrap_or(&NULL);
             write_u64(
                 memory,
-                overflows[i] + PAGE_OVERFLOW_NEXT_OFFSET,
+                self.overflows[i] + PAGE_OVERFLOW_NEXT_OFFSET,
                 next_address.get(),
             );
 
             // Write the overflow page contents
             memory.write(
-                (overflows[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
+                (self.overflows[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
                 &buf[start_idx..end_idx],
             );
 
@@ -312,25 +312,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     fn reallocate_overflow_pages<M: Memory>(
-        &self,
+        &mut self,
         num_overflow_pages: usize,
         allocator: &mut Allocator<M>,
-    ) -> Vec<Address> {
-        // Fetch the overflow page addresses of this node.
-        let mut addresses = self.overflows.clone();
-
+    ) {
         // If there are too many overflow addresses, deallocate some until we've reached
         // the number we need.
-        while addresses.len() > num_overflow_pages {
-            allocator.deallocate(addresses.pop().unwrap());
+        while self.overflows.len() > num_overflow_pages {
+            allocator.deallocate(self.overflows.pop().unwrap());
         }
 
         // Allocate more pages to accommodate the number requested, if needed.
-        while addresses.len() < num_overflow_pages {
-            addresses.push(allocator.allocate());
+        while self.overflows.len() < num_overflow_pages {
+            self.overflows.push(allocator.allocate());
         }
-
-        addresses
     }
 }
 
