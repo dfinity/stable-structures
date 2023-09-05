@@ -11,26 +11,41 @@ keywords = ["internet-computer", "dfinity", "stable-structures"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 repository = "https://github.com/dfinity/stable-structures"
 
+# There are no benchmarks in the library itself, so by default it's turned off
+# to avoid having `cargo bench` look for benchmarks there.
+[lib]
+bench = false
+
 [dependencies]
 # An optional dependency to profile parts of the code.
 profiler = { path = "./profiler", optional = true }
 
 [dev-dependencies]
-criterion = "0.4.0"
-ic-cdk = "0.6.8"
-ic-cdk-macros = "0.6.8"
+candid.workspace = true 
+clap = { version = "4.0.11", features = ["derive"] }
+colored = "2.0.4"
+hex = "0.4.3"
+ic-cdk.workspace = true
+ic-cdk-macros.workspace = true
 lazy_static = "1.4.0"
 maplit = "1.0.2"
 proptest = "1"
+serde = "1.0"
+serde_yaml = "0.9"
 tempfile = "3.3.0"
 test-strategy = "0.3.1"
 
 [[bench]]
-name = "benches"
+name = "benchmarks"
 harness = false
-path = "benches/benches.rs"
+path = "benchmarks/benchmark.rs"
 
 [workspace]
 members = [
   "benchmark-canisters"
 ]
+
+[workspace.dependencies]
+candid = "0.9.5"
+ic-cdk = "0.10.0"
+ic-cdk-macros = "0.7.1"

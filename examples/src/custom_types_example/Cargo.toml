@@ -7,9 +7,9 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-candid = "0.8.4"
-ic-cdk = "0.6.10"
-ic-cdk-macros = "0.6.10"
+candid.workspace = true
+ic-cdk.workspace = true
+ic-cdk-macros.workspace = true
 ic-stable-structures = { path = "../../../" }
 serde = "1.0.132"
 

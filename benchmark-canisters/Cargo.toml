@@ -6,8 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ic-cdk = "0.6.8"
-ic-cdk-macros = "0.6.8"
+candid.workspace = true
+ic-cdk.workspace = true
+ic-cdk-macros.workspace = true
 ic-stable-structures = { path = "../", features = ["profiler"] }
+maplit = "1.0.2"
 profiler = { path = "../profiler" }
+serde = "1.0"
 tiny-rng = "0.2.0"

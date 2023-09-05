@@ -20,5 +20,4 @@ EOF
 # Run the benchmarks, decode the output.
 drun $FILE --instruction-limit 99999999999999 \
     | awk '{ print $3 }' \
-    | grep "44.*" -o \
-    | xargs didc decode
+    | grep "44.*" -o
