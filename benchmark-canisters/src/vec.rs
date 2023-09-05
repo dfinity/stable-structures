@@ -1,107 +1,118 @@
-use crate::count_instructions;
-use ic_cdk_macros::{query, update};
+use crate::{benchmark, BenchResult, Random};
+use ic_cdk_macros::query;
 use ic_stable_structures::storable::Blob;
-use ic_stable_structures::{DefaultMemoryImpl, StableVec};
+use ic_stable_structures::{DefaultMemoryImpl, StableVec, Storable};
 use tiny_rng::{Rand, Rng};
 
-#[update]
-pub fn vec_insert_blob_4() -> u64 {
+#[query]
+pub fn vec_insert_blob_4() -> BenchResult {
     vec_insert_blob::<4>()
 }
 
-#[update]
-pub fn vec_insert_blob_8() -> u64 {
+#[query]
+pub fn vec_insert_blob_8() -> BenchResult {
     vec_insert_blob::<8>()
 }
 
-#[update]
-pub fn vec_insert_blob_16() -> u64 {
+#[query]
+pub fn vec_insert_blob_16() -> BenchResult {
     vec_insert_blob::<16>()
 }
 
-#[update]
-pub fn vec_insert_blob_32() -> u64 {
+#[query]
+pub fn vec_insert_blob_32() -> BenchResult {
     vec_insert_blob::<32>()
 }
 
-#[update]
-pub fn vec_insert_blob_64() -> u64 {
+#[query]
+pub fn vec_insert_blob_64() -> BenchResult {
     vec_insert_blob::<64>()
 }
 
-#[update]
-pub fn vec_insert_blob_128() -> u64 {
+#[query]
+pub fn vec_insert_blob_128() -> BenchResult {
     vec_insert_blob::<128>()
 }
 
 #[query]
-pub fn vec_get_blob_4() -> u64 {
+pub fn vec_insert_u64() -> BenchResult {
+    vec_insert::<u64>()
+}
+
+#[query]
+pub fn vec_get_blob_4() -> BenchResult {
     vec_get_blob::<4>()
 }
 
 #[query]
-pub fn vec_get_blob_8() -> u64 {
+pub fn vec_get_blob_8() -> BenchResult {
     vec_get_blob::<8>()
 }
 
 #[query]
-pub fn vec_get_blob_16() -> u64 {
+pub fn vec_get_blob_16() -> BenchResult {
     vec_get_blob::<16>()
 }
 
 #[query]
-pub fn vec_get_blob_32() -> u64 {
+pub fn vec_get_blob_32() -> BenchResult {
     vec_get_blob::<32>()
 }
 
 #[query]
-pub fn vec_get_blob_64() -> u64 {
+pub fn vec_get_blob_64() -> BenchResult {
     vec_get_blob::<64>()
 }
 
 #[query]
-pub fn vec_get_blob_128() -> u64 {
+pub fn vec_get_blob_128() -> BenchResult {
     vec_get_blob::<128>()
 }
 
-fn vec_insert_blob<const N: usize>() -> u64 {
+#[query]
+pub fn vec_get_u64() -> BenchResult {
+    vec_get::<u64>()
+}
+
+fn vec_insert_blob<const N: usize>() -> BenchResult {
+    vec_insert::<Blob<N>>()
+}
+
+fn vec_insert<T: Storable + Random>() -> BenchResult {
     let num_items = 10_000;
-    let svec: StableVec<Blob<N>, _> = StableVec::new(DefaultMemoryImpl::default()).unwrap();
+    let svec: StableVec<T, _> = StableVec::new(DefaultMemoryImpl::default()).unwrap();
 
     let mut rng = Rng::from_seed(0);
     let mut random_items = Vec::with_capacity(num_items);
 
     for _ in 0..num_items {
-        let key_size = rng.rand_u32() % (N as u32 + 1);
-        random_items.push(Blob::try_from(random_vec(&mut rng, key_size).as_slice()).unwrap());
+        random_items.push(T::random(&mut rng));
     }
 
-    count_instructions(|| {
+    benchmark(|| {
         for item in random_items.iter() {
             svec.push(item).unwrap();
         }
     })
 }
 
-fn vec_get_blob<const N: usize>() -> u64 {
+fn vec_get_blob<const N: usize>() -> BenchResult {
+    vec_get::<Blob<N>>()
+}
+
+fn vec_get<T: Storable + Random>() -> BenchResult {
     let num_items = 10_000;
-    let svec: StableVec<Blob<N>, _> = StableVec::new(DefaultMemoryImpl::default()).unwrap();
+    let svec: StableVec<T, _> = StableVec::new(DefaultMemoryImpl::default()).unwrap();
 
     let mut rng = Rng::from_seed(0);
 
     for _ in 0..num_items {
-        let key_size = rng.rand_u32() % (N as u32 + 1);
-        svec.push(&Blob::try_from(random_vec(&mut rng, key_size).as_slice()).unwrap())
-            .unwrap();
+        svec.push(&T::random(&mut rng)).unwrap();
     }
 
-    count_instructions(|| {
+    benchmark(|| {
         for i in 0..num_items {
             svec.get(i as u64).unwrap();
         }
     })
-}
-
-fn random_vec(rng: &mut Rng, len: u32) -> Vec<u8> {
-    rng.iter(Rand::rand_u8).take(len as usize).collect()
 }

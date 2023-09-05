@@ -1,0 +1,430 @@
+btreemap_get_blob_128_1024:
+  measurements:
+    instructions: 1034873732
+    node_load_v1: 839537545
+    stable_memory_size: 261
+btreemap_get_blob_128_1024_v2:
+  measurements:
+    instructions: 1140125094
+    node_load_v2: 934905286
+    stable_memory_size: 261
+btreemap_get_blob_16_1024:
+  measurements:
+    instructions: 552797054
+    node_load_v1: 383794822
+    stable_memory_size: 216
+btreemap_get_blob_16_1024_v2:
+  measurements:
+    instructions: 637342608
+    node_load_v2: 465254171
+    stable_memory_size: 216
+btreemap_get_blob_256_1024:
+  measurements:
+    instructions: 1522425699
+    node_load_v1: 1301924960
+    stable_memory_size: 293
+btreemap_get_blob_256_1024_v2:
+  measurements:
+    instructions: 1628302523
+    node_load_v2: 1394112219
+    stable_memory_size: 293
+btreemap_get_blob_32_1024:
+  measurements:
+    instructions: 590548544
+    node_load_v1: 410436451
+    stable_memory_size: 231
+btreemap_get_blob_32_1024_v2:
+  measurements:
+    instructions: 679613322
+    node_load_v2: 496693827
+    stable_memory_size: 231
+btreemap_get_blob_4_1024:
+  measurements:
+    instructions: 400793962
+    node_load_v1: 259275488
+    stable_memory_size: 124
+btreemap_get_blob_4_1024_v2:
+  measurements:
+    instructions: 480203368
+    node_load_v2: 330322469
+    stable_memory_size: 124
+btreemap_get_blob_512_1024:
+  measurements:
+    instructions: 2488047274
+    node_load_v1: 2219164452
+    stable_memory_size: 352
+btreemap_get_blob_512_1024_v2:
+  measurements:
+    instructions: 2596114579
+    node_load_v2: 2313465392
+    stable_memory_size: 352
+btreemap_get_blob_64_1024:
+  measurements:
+    instructions: 813453365
+    node_load_v1: 627796876
+    stable_memory_size: 246
+btreemap_get_blob_64_1024_v2:
+  measurements:
+    instructions: 902885879
+    node_load_v2: 709865203
+    stable_memory_size: 246
+btreemap_get_blob_8_1024:
+  measurements:
+    instructions: 472796168
+    node_load_v1: 304258691
+    stable_memory_size: 184
+btreemap_get_blob_8_1024_v2:
+  measurements:
+    instructions: 549578755
+    node_load_v2: 372505911
+    stable_memory_size: 184
+btreemap_get_blob_8_u64:
+  measurements:
+    instructions: 425316314
+    node_load_v1: 294602061
+    stable_memory_size: 7
+btreemap_get_blob_8_u64_v2:
+  measurements:
+    instructions: 511811809
+    node_load_v2: 375109699
+    stable_memory_size: 7
+btreemap_get_u64_blob_8:
+  measurements:
+    instructions: 408411616
+    node_load_v1: 292395667
+    stable_memory_size: 8
+btreemap_get_u64_blob_8_v2:
+  measurements:
+    instructions: 497211198
+    node_load_v2: 375785579
+    stable_memory_size: 8
+btreemap_get_u64_u64:
+  measurements:
+    instructions: 411475261
+    node_load_v1: 290922161
+    stable_memory_size: 8
+btreemap_get_u64_u64_v2:
+  measurements:
+    instructions: 502047891
+    node_load_v2: 374516606
+    stable_memory_size: 8
+btreemap_insert_blob_128_1024:
+  measurements:
+    instructions: 1729218836
+    node_load_v1: 818923030
+    node_save_v1: 424573804
+    stable_memory_size: 261
+btreemap_insert_blob_128_1024_v2:
+  measurements:
+    instructions: 2230792804
+    node_load_v2: 917590146
+    node_save_v2: 814310656
+    stable_memory_size: 261
+btreemap_insert_blob_16_1024:
+  measurements:
+    instructions: 1176339774
+    node_load_v1: 362914338
+    node_save_v1: 403464072
+    stable_memory_size: 216
+btreemap_insert_blob_16_1024_v2:
+  measurements:
+    instructions: 1588335231
+    node_load_v2: 441254310
+    node_save_v2: 740158362
+    stable_memory_size: 216
+btreemap_insert_blob_256_1024:
+  measurements:
+    instructions: 2254727249
+    node_load_v1: 1272224795
+    node_save_v1: 430174789
+    stable_memory_size: 293
+btreemap_insert_blob_256_1024_v2:
+  measurements:
+    instructions: 2794558823
+    node_load_v2: 1369703148
+    node_save_v2: 852071559
+    stable_memory_size: 293
+btreemap_insert_blob_32_1024:
+  measurements:
+    instructions: 1223520399
+    node_load_v1: 390780802
+    node_save_v1: 415826600
+    stable_memory_size: 231
+btreemap_insert_blob_32_1024_v2:
+  measurements:
+    instructions: 1655819621
+    node_load_v2: 478615810
+    node_save_v2: 769212087
+    stable_memory_size: 231
+btreemap_insert_blob_4_1024:
+  measurements:
+    instructions: 937911500
+    node_load_v1: 246219371
+    node_save_v1: 370094431
+    stable_memory_size: 124
+btreemap_insert_blob_4_1024_v2:
+  measurements:
+    instructions: 1284969178
+    node_load_v2: 303477959
+    node_save_v2: 661401273
+    stable_memory_size: 124
+btreemap_insert_blob_512_1024:
+  measurements:
+    instructions: 3305714425
+    node_load_v1: 2162164471
+    node_save_v1: 447463180
+    stable_memory_size: 352
+btreemap_insert_blob_512_1024_v2:
+  measurements:
+    instructions: 3902113417
+    node_load_v2: 2250813152
+    node_save_v2: 953704203
+    stable_memory_size: 352
+btreemap_insert_blob_64_1024:
+  measurements:
+    instructions: 1463074780
+    node_load_v1: 595998298
+    node_save_v1: 418743231
+    stable_memory_size: 246
+btreemap_insert_blob_64_1024_v2:
+  measurements:
+    instructions: 1928853480
+    node_load_v2: 693292109
+    node_save_v2: 785502958
+    stable_memory_size: 246
+btreemap_insert_blob_8_1024:
+  measurements:
+    instructions: 1083903932
+    node_load_v1: 286595797
+    node_save_v1: 394314301
+    stable_memory_size: 184
+btreemap_insert_blob_8_1024_v2:
+  measurements:
+    instructions: 1458659305
+    node_load_v2: 345782957
+    node_save_v2: 711905405
+    stable_memory_size: 184
+btreemap_insert_blob_8_u64:
+  measurements:
+    instructions: 683653736
+    node_load_v1: 277937358
+    node_save_v1: 189388784
+    stable_memory_size: 7
+btreemap_insert_blob_8_u64_v2:
+  measurements:
+    instructions: 798771895
+    node_load_v2: 355776871
+    node_save_v2: 229763111
+    stable_memory_size: 7
+btreemap_insert_u64_blob_8:
+  measurements:
+    instructions: 749102343
+    node_load_v1: 276866073
+    node_save_v1: 255664450
+    stable_memory_size: 8
+btreemap_insert_u64_blob_8_v2:
+  measurements:
+    instructions: 844729023
+    node_load_v2: 352662064
+    node_save_v2: 279505924
+    stable_memory_size: 8
+btreemap_insert_u64_u64:
+  measurements:
+    instructions: 770747817
+    node_load_v1: 274520203
+    node_save_v1: 266527196
+    stable_memory_size: 8
+btreemap_insert_u64_u64_v2:
+  measurements:
+    instructions: 882470036
+    node_load_v2: 353294827
+    node_save_v2: 303717955
+    stable_memory_size: 8
+btreemap_remove_blob_128_1024:
+  measurements:
+    instructions: 2235246436
+    node_load_v1: 922607545
+    node_save_v1: 716920195
+    stable_memory_size: 261
+btreemap_remove_blob_128_1024_v2:
+  measurements:
+    instructions: 3031365790
+    node_load_v2: 1030753598
+    node_save_v2: 1412273798
+    stable_memory_size: 261
+btreemap_remove_blob_16_1024:
+  measurements:
+    instructions: 1543627134
+    node_load_v1: 420249550
+    node_save_v1: 654430779
+    stable_memory_size: 216
+btreemap_remove_blob_16_1024_v2:
+  measurements:
+    instructions: 2218517983
+    node_load_v2: 515183518
+    node_save_v2: 1243892246
+    stable_memory_size: 216
+btreemap_remove_blob_256_1024:
+  measurements:
+    instructions: 2837883032
+    node_load_v1: 1421754484
+    node_save_v1: 722710062
+    stable_memory_size: 293
+btreemap_remove_blob_256_1024_v2:
+  measurements:
+    instructions: 3696397635
+    node_load_v2: 1529774315
+    node_save_v2: 1475117328
+    stable_memory_size: 293
+btreemap_remove_blob_32_1024:
+  measurements:
+    instructions: 1621477283
+    node_load_v1: 443614945
+    node_save_v1: 681136613
+    stable_memory_size: 231
+btreemap_remove_blob_32_1024_v2:
+  measurements:
+    instructions: 2327658289
+    node_load_v2: 547179493
+    node_save_v2: 1296028720
+    stable_memory_size: 231
+btreemap_remove_blob_4_1024:
+  measurements:
+    instructions: 1005364504
+    node_load_v1: 269171795
+    node_save_v1: 421165272
+    stable_memory_size: 124
+btreemap_remove_blob_4_1024_v2:
+  measurements:
+    instructions: 1417618922
+    node_load_v2: 335189257
+    node_save_v2: 771242703
+    stable_memory_size: 124
+btreemap_remove_blob_512_1024:
+  measurements:
+    instructions: 4122982771
+    node_load_v1: 2441544783
+    node_save_v1: 765030850
+    stable_memory_size: 352
+btreemap_remove_blob_512_1024_v2:
+  measurements:
+    instructions: 5148905304
+    node_load_v2: 2552732859
+    node_save_v2: 1679801019
+    stable_memory_size: 352
+btreemap_remove_blob_64_1024:
+  measurements:
+    instructions: 1915721639
+    node_load_v1: 675469604
+    node_save_v1: 700312977
+    stable_memory_size: 246
+btreemap_remove_blob_64_1024_v2:
+  measurements:
+    instructions: 2663877098
+    node_load_v2: 784395656
+    node_save_v2: 1347977662
+    stable_memory_size: 246
+btreemap_remove_blob_8_1024:
+  measurements:
+    instructions: 1299223631
+    node_load_v1: 325916114
+    node_save_v1: 562174712
+    stable_memory_size: 184
+btreemap_remove_blob_8_1024_v2:
+  measurements:
+    instructions: 1841961743
+    node_load_v2: 392612578
+    node_save_v2: 1045529346
+    stable_memory_size: 184
+btreemap_remove_blob_8_u64:
+  measurements:
+    instructions: 902589320
+    node_load_v1: 318747944
+    node_save_v1: 302202576
+    stable_memory_size: 7
+btreemap_remove_blob_8_u64_v2:
+  measurements:
+    instructions: 1038915212
+    node_load_v2: 398338926
+    node_save_v2: 361390361
+    stable_memory_size: 7
+btreemap_remove_u64_blob_8:
+  measurements:
+    instructions: 1071557151
+    node_load_v1: 313757215
+    node_save_v1: 457702957
+    stable_memory_size: 8
+btreemap_remove_u64_blob_8_v2:
+  measurements:
+    instructions: 1170805275
+    node_load_v2: 399013499
+    node_save_v2: 471450420
+    stable_memory_size: 8
+btreemap_remove_u64_u64:
+  measurements:
+    instructions: 1108822010
+    node_load_v1: 314148033
+    node_save_v1: 483110284
+    stable_memory_size: 8
+btreemap_remove_u64_u64_v2:
+  measurements:
+    instructions: 1230856323
+    node_load_v2: 403733744
+    node_save_v2: 515182286
+    stable_memory_size: 8
+memory_manager_baseline:
+  measurements:
+    instructions: 1176576551
+    stable_memory_size: 8000
+memory_manager_overhead:
+  measurements:
+    instructions: 1182012269
+    stable_memory_size: 8321
+vec_get_blob_128:
+  measurements:
+    instructions: 25331980
+    stable_memory_size: 20
+vec_get_blob_16:
+  measurements:
+    instructions: 14914959
+    stable_memory_size: 3
+vec_get_blob_32:
+  measurements:
+    instructions: 15584015
+    stable_memory_size: 6
+vec_get_blob_4:
+  measurements:
+    instructions: 10027133
+    stable_memory_size: 1
+vec_get_blob_8:
+  measurements:
+    instructions: 11988806
+    stable_memory_size: 2
+vec_get_u64:
+  measurements:
+    instructions: 11430290
+    stable_memory_size: 2
+vec_insert_blob_128:
+  measurements:
+    instructions: 6109513
+    stable_memory_size: 20
+vec_insert_blob_16:
+  measurements:
+    instructions: 5186050
+    stable_memory_size: 3
+vec_insert_blob_32:
+  measurements:
+    instructions: 5394984
+    stable_memory_size: 6
+vec_insert_blob_4:
+  measurements:
+    instructions: 5187495
+    stable_memory_size: 1
+vec_insert_blob_8:
+  measurements:
+    instructions: 5216814
+    stable_memory_size: 2
+vec_insert_u64:
+  measurements:
+    instructions: 12149357
+    stable_memory_size: 2

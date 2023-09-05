@@ -2,12 +2,12 @@ use super::{
     node::{Node, NodeType},
     BTreeMap,
 };
-use crate::{types::NULL, Address, BoundedStorable, Memory};
+use crate::{types::NULL, Address, Memory, Storable};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
 /// An indicator of the current position in the map.
-pub(crate) enum Cursor<K: BoundedStorable + Ord + Clone> {
+pub(crate) enum Cursor<K: Storable + Ord + Clone> {
     Address(Address),
     Node { node: Node<K>, next: Index },
 }
@@ -22,8 +22,8 @@ pub(crate) enum Index {
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 pub struct Iter<'a, K, V, M>
 where
-    K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    K: Storable + Ord + Clone,
+    V: Storable,
     M: Memory,
 {
     // A reference to the map being iterated on.
@@ -38,8 +38,8 @@ where
 
 impl<'a, K, V, M> Iter<'a, K, V, M>
 where
-    K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    K: Storable + Ord + Clone,
+    V: Storable,
     M: Memory,
 {
     pub(crate) fn new(map: &'a BTreeMap<K, V, M>) -> Self {
@@ -75,8 +75,8 @@ where
 
 impl<K, V, M> Iterator for Iter<'_, K, V, M>
 where
-    K: BoundedStorable + Ord + Clone,
-    V: BoundedStorable,
+    K: Storable + Ord + Clone,
+    V: Storable,
     M: Memory,
 {
     type Item = (K, V);
@@ -88,7 +88,7 @@ where
                     // Load the node at the given address, and add it to the cursors.
                     let node = self.map.load_node(address);
                     self.cursors.push(Cursor::Node {
-                        next: match node.node_type {
+                        next: match node.node_type() {
                             // Iterate on internal nodes starting from the first child.
                             NodeType::Internal => Index::Child(0),
                             // Iterate on leaf nodes starting from the first entry.
@@ -104,10 +104,7 @@ where
                 node,
                 next: Index::Child(child_idx),
             }) => {
-                let child_address = *node
-                    .children
-                    .get(child_idx)
-                    .expect("Iterating over children went out of bounds.");
+                let child_address = node.child(child_idx);
 
                 // After iterating on the child, iterate on the next _entry_ in this node.
                 // The entry immediately after the child has the same index as the child's.
@@ -126,16 +123,16 @@ where
                 node,
                 next: Index::Entry(entry_idx),
             }) => {
-                if entry_idx >= node.keys.len() {
+                if entry_idx >= node.entries_len() {
                     // No more entries to iterate on in this node.
                     return self.next();
                 }
 
-                let (key, encoded_value) = node.entry(entry_idx);
+                let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
-                    next: match node.node_type {
+                    next: match node.node_type() {
                         // If this is an internal node, add the next child to the cursors.
                         NodeType::Internal => Index::Child(entry_idx + 1),
                         // If this is a leaf node, add the next entry to the cursors.
@@ -164,7 +161,6 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::btreemap::node::CAPACITY;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -177,7 +173,7 @@ mod test {
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
 
-        for i in 0..CAPACITY as u8 {
+        for i in 0..10u8 {
             btree.insert(i, i + 1);
         }
 
@@ -188,7 +184,7 @@ mod test {
             i += 1;
         }
 
-        assert_eq!(i, CAPACITY as u8);
+        assert_eq!(i, 10u8);
     }
 
     #[test]

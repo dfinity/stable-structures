@@ -1,12 +1,12 @@
 {
-  "dfx": "0.12.1",
+  "dfx": "0.14.3",
   "canisters": {
     "benchmarks": {
       "candid": "candid.did",
       "package": "benchmarks",
       "type": "custom",
       "build": "bash build.sh",
-      "wasm": "./target/wasm32-unknown-unknown/release/benchmarks.wasm.gz"
+      "wasm": "../target/wasm32-unknown-unknown/release/benchmarks.wasm.gz"
     }
   },
   "defaults": {
@@ -17,4 +17,3 @@
   },
   "version": 1
 }
-

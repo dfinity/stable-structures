@@ -1,5 +1,5 @@
 {
-  "dfx": "0.11.2",
+  "dfx": "0.14.3",
   "canisters": {
     "quick_start": {
       "candid": "src/quick_start/candid.did",
@@ -20,18 +20,17 @@
       "candid": "src/custom_types_example/candid.did",
       "package": "custom_types_example",
       "type": "rust"
+    },
+    "task_timer": {
+      "candid": "src/task_timer/candid.did",
+      "package": "task_timer",
+      "type": "rust"
     }
   },
   "defaults": {
     "build": {
       "args": "",
       "packtool": ""
-    }
-  },
-  "networks": {
-    "local": {
-      "bind": "127.0.0.1:8000",
-      "type": "ephemeral"
     }
   },
   "version": 1

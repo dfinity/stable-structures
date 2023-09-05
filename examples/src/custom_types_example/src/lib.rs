@@ -1,6 +1,8 @@
 use candid::{CandidType, Decode, Deserialize, Encode};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::{BoundedStorable, DefaultMemoryImpl, StableBTreeMap, Storable};
+use ic_stable_structures::{
+    storable::Bound, DefaultMemoryImpl, StableBTreeMap, Storable,
+};
 use std::{borrow::Cow, cell::RefCell};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
@@ -14,7 +16,7 @@ struct UserProfile {
 }
 
 // For a type to be used in a `StableBTreeMap`, it needs to implement the `Storable`
-// and `BoundedStorable` traits, which specify how the type can be serialized/deserialized.
+// trait, which specifies how the type can be serialized/deserialized.
 //
 // In this example, we're using candid to serialize/deserialize the struct, but you
 // can use anything as long as you're maintaining backward-compatibility. The
@@ -31,11 +33,11 @@ impl Storable for UserProfile {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
-}
 
-impl BoundedStorable for UserProfile {
-    const MAX_SIZE: u32 = MAX_VALUE_SIZE;
-    const IS_FIXED_SIZE: bool = false;
+    const BOUND: Bound = Bound::Bounded {
+        max_size: MAX_VALUE_SIZE,
+        is_fixed_size: false,
+    };
 }
 
 thread_local! {

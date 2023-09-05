@@ -8,8 +8,7 @@ pushd "$SCRIPT_DIR"
 # Run dfx stop if we run into errors.
 trap "dfx stop" ERR EXIT
 
-rm -rf .dfx
-dfx start --background
+dfx start --background --clean
 
 # Deploys the examples.
 dfx deploy

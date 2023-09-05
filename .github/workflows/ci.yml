@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [ 1.67.0 ]
+        rust: [ 1.72.0 ]
 
     steps:
       - uses: actions/checkout@v2
@@ -93,7 +93,7 @@ jobs:
       - name: Install DFX
         run: |
           wget --output-document install-dfx.sh "https://internetcomputer.org/install.sh"
-          DFX_VERSION=${DFX_VERSION:=0.11.2} bash install-dfx.sh < <(yes Y)
+          DFX_VERSION=${DFX_VERSION:=0.14.3} bash install-dfx.sh < <(yes Y)
           rm install-dfx.sh
           dfx cache install
           echo "$HOME/bin" >> $GITHUB_PATH

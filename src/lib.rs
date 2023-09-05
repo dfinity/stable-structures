@@ -1,12 +1,5 @@
-//! # Stable Structures for the Internet Computer
-//!
-//! This library is a collection of data structures for developing canisters on the
-//! [Internet Computer](https://internetcomputer.org/).
-//!
-//! The data stuctures are designed to directly use stable memory as the backing store, allowing
-//! them to grow to GiBs in size without the need for `pre_upgrade`/`post_upgrade` hooks.
-extern crate core;
-
+#![doc = include_str!("../README.md")]
+mod base_vec;
 pub mod btreemap;
 pub mod cell;
 pub use cell::{Cell as StableCell, Cell};
@@ -16,12 +9,14 @@ mod ic0_memory; // Memory API for canisters.
 pub mod log;
 pub use log::{Log as StableLog, Log};
 pub mod memory_manager;
+pub mod min_heap;
 pub mod reader;
 pub mod storable;
 #[cfg(test)]
 mod tests;
 mod types;
 pub mod vec;
+pub use min_heap::{MinHeap, MinHeap as StableMinHeap};
 pub use vec::{Vec as StableVec, Vec};
 pub mod vec_mem;
 pub mod writer;
@@ -31,7 +26,7 @@ pub use file_mem::FileMemory;
 pub use ic0_memory::Ic0StableMemory;
 use std::error;
 use std::fmt::{Display, Formatter};
-pub use storable::{BoundedStorable, Storable};
+pub use storable::Storable;
 use types::Address;
 pub use vec_mem::VectorMemory;
 
@@ -42,6 +37,9 @@ pub type DefaultMemoryImpl = Ic0StableMemory;
 pub type DefaultMemoryImpl = VectorMemory;
 
 const WASM_PAGE_SIZE: u64 = 65536;
+
+/// The maximum number of stable memory pages a canister can address.
+pub const MAX_PAGES: u64 = u64::MAX / WASM_PAGE_SIZE;
 
 pub trait Memory {
     /// Returns the current size of the stable memory in WebAssembly
@@ -181,7 +179,7 @@ pub struct RestrictedMemory<M: Memory> {
 
 impl<M: Memory> RestrictedMemory<M> {
     pub fn new(memory: M, page_range: core::ops::Range<u64>) -> Self {
-        assert!(page_range.end < u64::MAX / WASM_PAGE_SIZE);
+        assert!(page_range.end <= MAX_PAGES);
         Self { memory, page_range }
     }
 }

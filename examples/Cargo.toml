@@ -4,4 +4,10 @@ members = [
     "src/vecs_and_strings",
     "src/custom_types_example",
     "src/quick_start",
+    "src/task_timer",
 ]
+
+[workspace.dependencies]
+candid = "0.9.5"
+ic-cdk = "0.10.0"
+ic-cdk-macros = "0.7.1"

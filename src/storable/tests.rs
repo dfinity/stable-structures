@@ -25,4 +25,14 @@ proptest! {
         let tuple = (x, bytes);
         prop_assert_eq!(tuple, Storable::from_bytes(tuple.to_bytes()));
     }
+
+    #[test]
+    fn f64_roundtrip(v in any::<f64>()) {
+        prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
+    }
+
+    #[test]
+    fn f32_roundtrip(v in any::<f32>()) {
+        prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
+    }
 }
