@@ -79,15 +79,13 @@ use std::cmp::min;
 
 // Initial page
 const LAYOUT_VERSION_2: u8 = 2;
-const NODE_TYPE_OFFSET: usize = 4;
-const NUM_ENTRIES_OFFSET: usize = 5;
 const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET: Bytes = Bytes::new(15);
 
 // Overflow page
 const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
 const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
-const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
+pub(super) const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
 
 // The minimum size a page can have.
 // Rationale: a page size needs to at least store the header (15 bytes) + all the children
@@ -106,7 +104,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             keys: vec![],
             encoded_values: RefCell::default(),
             children: vec![],
-            overflow: None,
+            overflows: Vec::with_capacity(0),
         }
     }
 
@@ -116,25 +114,36 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let _p = profiler::profile("node_load_v2");
 
         // Load the node, including any overflows, into a buffer.
-        let node_buf = read_node(address, page_size.get(), memory);
+        let overflows = read_overflows(address, memory);
+
+        let reader = NodeReader {
+            address,
+            overflows: &overflows,
+            page_size,
+            memory,
+        };
+
+        let mut offset = Address::from(0);
+
+        let header: NodeHeader = read_struct(Address::from(0), &reader);
 
         // Load the node type.
-        let node_type = match node_buf[NODE_TYPE_OFFSET] {
+        let node_type = match header.node_type {
             LEAF_NODE_TYPE => NodeType::Leaf,
             INTERNAL_NODE_TYPE => NodeType::Internal,
             other => unreachable!("Unknown node type {}", other),
         };
 
         // Load the number of entries
-        let num_entries = read_u16_from_slice(&node_buf, NUM_ENTRIES_OFFSET) as usize;
+        let num_entries = header.num_entries as usize;
 
         // Load children if this is an internal node.
-        let mut offset = ENTRIES_OFFSET;
+        offset += ENTRIES_OFFSET;
         let mut children = vec![];
         if node_type == NodeType::Internal {
             // The number of children is equal to the number of entries + 1.
             for _ in 0..num_entries + 1 {
-                let child = address_from_slice(&node_buf, offset);
+                let child = Address::from(read_u64(&reader, offset));
                 offset += Address::size();
                 children.push(child);
             }
@@ -148,35 +157,24 @@ impl<K: Storable + Ord + Clone> Node<K> {
             // Load the key's size.
             // TODO: store the size in a more efficient way.
             // TODO: don't store the size if the key is fixed.
-            let key_size = read_u32_from_slice(&node_buf, offset) as usize;
+            let key_size = read_u32(&reader, offset) as usize;
             offset += U32_SIZE;
 
             // Load the key.
             buf.resize(key_size, 0);
-            let key = K::from_bytes(Cow::Borrowed(
-                &node_buf[offset.get() as usize..offset.get() as usize + key_size],
-            ));
+            reader.read(offset.get(), &mut buf);
+            let key = K::from_bytes(Cow::Borrowed(&buf));
             offset += Bytes::from(key_size as u64);
             keys.push(key);
         }
 
         // Load the values
         for _ in 0..num_entries {
-            // Load the value's size.
-            let value_size = read_u32_from_slice(&node_buf, offset) as usize;
-            offset += U32_SIZE;
-
-            // Load the value.
-            // TODO: Read values lazily.
-            buf.resize(value_size, 0);
-            encoded_values.push(Value::ByVal(
-                node_buf[offset.get() as usize..offset.get() as usize + value_size].to_vec(),
-            ));
-
-            offset += Bytes::from(value_size as u64);
+            // Load the values lazily.
+            encoded_values.push(Value::ByRef(Bytes::from(offset.get())));
+            let value_size = read_u32(&reader, offset) as usize;
+            offset += U32_SIZE + Bytes::from(value_size as u64);
         }
-
-        let original_overflow_address = address_from_slice(&node_buf, OVERFLOW_ADDRESS_OFFSET);
 
         Self {
             address,
@@ -185,11 +183,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             children,
             node_type,
             version: Version::V2(page_size),
-            overflow: if original_overflow_address == crate::types::NULL {
-                None
-            } else {
-                Some(original_overflow_address)
-            },
+            overflows,
         }
     }
 
@@ -272,17 +266,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         // Retrieve the addresses for the overflow pages, making the necessary allocations.
-        let overflow_addresses = self.reallocate_overflow_pages(additional_pages_needed, allocator);
+        let overflows = self.reallocate_overflow_pages(additional_pages_needed, allocator);
 
         // Write the first page
         let memory = allocator.memory();
         memory.write(self.address.get(), &buf[..min(page_size, buf.len())]);
-        if !overflow_addresses.is_empty() {
+        if !overflows.is_empty() {
             // Write the next overflow address to the first page.
             write_u64(
                 memory,
                 self.address + OVERFLOW_ADDRESS_OFFSET,
-                overflow_addresses[0].get(),
+                overflows[0].get(),
             );
         }
 
@@ -299,17 +293,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
             }
 
             // Write magic and next address
-            memory.write(overflow_addresses[i].get(), &OVERFLOW_MAGIC[..]);
-            let next_address = overflow_addresses.get(i + 1).unwrap_or(&NULL);
+            memory.write(overflows[i].get(), &OVERFLOW_MAGIC[..]);
+            let next_address = overflows.get(i + 1).unwrap_or(&NULL);
             write_u64(
                 memory,
-                overflow_addresses[i] + PAGE_OVERFLOW_NEXT_OFFSET,
+                overflows[i] + PAGE_OVERFLOW_NEXT_OFFSET,
                 next_address.get(),
             );
 
             // Write the overflow page contents
             memory.write(
-                (overflow_addresses[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
+                (overflows[i] + PAGE_OVERFLOW_DATA_OFFSET).get(),
                 &buf[start_idx..end_idx],
             );
 
@@ -323,7 +317,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         allocator: &mut Allocator<M>,
     ) -> Vec<Address> {
         // Fetch the overflow page addresses of this node.
-        let mut addresses = self.get_overflow_addresses(allocator.memory());
+        let mut addresses = self.overflows.clone();
 
         // If there are too many overflow addresses, deallocate some until we've reached
         // the number we need.
@@ -338,80 +332,24 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         addresses
     }
-
-    fn get_overflow_addresses<M: Memory>(&self, memory: &M) -> Vec<Address> {
-        let mut overflow_addresses = vec![];
-        let mut next = self.overflow;
-        while let Some(overflow_address) = next {
-            overflow_addresses.push(overflow_address);
-
-            // Load next overflow address.
-            let maybe_next = Address::from(read_u64(
-                memory,
-                overflow_address + PAGE_OVERFLOW_NEXT_OFFSET,
-            ));
-
-            if maybe_next == crate::types::NULL {
-                next = None;
-            } else {
-                next = Some(maybe_next);
-            }
-        }
-
-        overflow_addresses
-    }
 }
 
-// Reads the entirety of the node, including all its overflows, into a buffer.
-fn read_node<M: Memory>(address: Address, page_size: u32, memory: &M) -> Vec<u8> {
-    // Read the first page of the node.
-    let mut buf = vec![0; page_size as usize];
-    memory.read(address.get(), &mut buf);
-
-    // Append overflow pages, if any.
-    let mut overflow_address = address_from_slice(&buf, OVERFLOW_ADDRESS_OFFSET);
-    while overflow_address != NULL {
-        // Read the overflow.
-        let mut overflow_buf = vec![0; page_size as usize];
-        memory.read(overflow_address.get(), &mut overflow_buf);
-
-        // Validate the magic of the overflow.
-        assert_eq!(&overflow_buf[0..3], OVERFLOW_MAGIC, "Bad overflow magic.");
-
-        // Read the next address
-        overflow_address = address_from_slice(&overflow_buf, PAGE_OVERFLOW_NEXT_OFFSET);
-
-        // Append its data to the buffer.
-        buf.extend_from_slice(&overflow_buf[PAGE_OVERFLOW_DATA_OFFSET.get() as usize..]);
+fn read_overflows<M: Memory>(address: Address, memory: &M) -> Vec<Address> {
+    #[repr(C, packed)]
+    struct OverflowPageHeader {
+        magic: [u8; 3],
+        next: Address,
     }
 
-    buf
-}
+    let mut overflows = vec![];
+    let mut overflow = Address::from(read_u64(memory, address + OVERFLOW_ADDRESS_OFFSET));
+    while overflow != NULL {
+        overflows.push(overflow);
 
-fn read_u16_from_slice(slice: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes(
-        (&slice[offset..offset + 2])
-            .try_into()
-            .expect("unable to read u16 from slice"),
-    )
-}
+        let header: OverflowPageHeader = read_struct(overflow, memory);
+        assert_eq!(&header.magic, OVERFLOW_MAGIC, "Bad overflow magic.");
+        overflow = header.next;
+    }
 
-fn read_u64_from_slice(slice: &[u8], offset: usize) -> u64 {
-    u64::from_le_bytes(
-        (&slice[offset..offset + 8])
-            .try_into()
-            .expect("unable to read u64 from slice"),
-    )
-}
-
-fn read_u32_from_slice(slice: &[u8], offset: Bytes) -> u32 {
-    u32::from_le_bytes(
-        (&slice[offset.get() as usize..offset.get() as usize + 4])
-            .try_into()
-            .expect("unable to read u32 from slice"),
-    )
-}
-
-fn address_from_slice(slice: &[u8], offset: Bytes) -> Address {
-    Address::from(read_u64_from_slice(slice, offset.get() as usize))
+    overflows
 }

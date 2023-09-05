@@ -207,7 +207,7 @@ pub fn btreemap_remove_blob_4_1024() -> u64 {
 
 #[query]
 pub fn btreemap_remove_blob_4_1024_v2() -> u64 {
-    remove_blob_helper::<4, 1024>()
+    remove_blob_helper_v2::<4, 1024>()
 }
 
 #[query]
@@ -217,7 +217,7 @@ pub fn btreemap_remove_blob_8_1024() -> u64 {
 
 #[query]
 pub fn btreemap_remove_blob_8_1024_v2() -> u64 {
-    remove_blob_helper::<8, 1024>()
+    remove_blob_helper_v2::<8, 1024>()
 }
 
 #[query]
