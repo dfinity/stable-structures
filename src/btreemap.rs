@@ -2108,6 +2108,53 @@ mod test {
             );
 
             // Tests a prefix that's larger than the key in the internal node.
+            assert_eq!(
+                btree.range(b(&[2])..b(&[3])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[2, 1]), b(&[])),
+                    (b(&[2, 2]), b(&[])),
+                    (b(&[2, 3]), b(&[])),
+                    (b(&[2, 4]), b(&[])),
+                ]
+            );
+        });
+    }
+
+    #[test]
+    fn range_various_prefixes_2() {
+        btree_test(|mut btree| {
+            btree.insert(b(&[0, 1]), b(&[]));
+            btree.insert(b(&[0, 2]), b(&[]));
+            btree.insert(b(&[0, 3]), b(&[]));
+            btree.insert(b(&[0, 4]), b(&[]));
+            btree.insert(b(&[1, 2]), b(&[]));
+            btree.insert(b(&[1, 4]), b(&[]));
+            btree.insert(b(&[1, 6]), b(&[]));
+            btree.insert(b(&[1, 8]), b(&[]));
+            btree.insert(b(&[1, 10]), b(&[]));
+            btree.insert(b(&[2, 1]), b(&[]));
+            btree.insert(b(&[2, 2]), b(&[]));
+            btree.insert(b(&[2, 3]), b(&[]));
+            btree.insert(b(&[2, 4]), b(&[]));
+            btree.insert(b(&[2, 5]), b(&[]));
+            btree.insert(b(&[2, 6]), b(&[]));
+            btree.insert(b(&[2, 7]), b(&[]));
+            btree.insert(b(&[2, 8]), b(&[]));
+            btree.insert(b(&[2, 9]), b(&[]));
+
+            // The result should look like this:
+            //                                         [(1, 4), (2, 3)]
+            //                                         /      |       \
+            // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 2)]       |        [(2, 4), (2, 5), (2, 6), (2, 7), (2, 8), (2, 9)]
+            //                                                |
+            //                             [(1, 6), (1, 8), (1, 10), (2, 1), (2, 2)]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![(b(&[1, 4]), vec![]), (b(&[2, 3]), vec![])]
+            );
+            assert_eq!(root.children_len(), 3);
             let child_0 = btree.load_node(root.child(0));
             assert_eq!(child_0.node_type(), NodeType::Leaf);
             assert_eq!(
