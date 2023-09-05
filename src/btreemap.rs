@@ -1309,8 +1309,6 @@ mod test {
 
             // Overwrite the value of the median key.
             assert_eq!(btree.insert(b(&[12]), b(&[1, 2, 3])), Some(b(&[])));
-
-            // The value is overwritten successfully.
             assert_eq!(btree.get(&b(&[12])), Some(b(&[1, 2, 3])));
 
             // The child has not been split and is still full.
@@ -2157,7 +2155,6 @@ mod test {
                 vec![(b(&[1, 4]), vec![]), (b(&[2, 3]), vec![])]
             );
             assert_eq!(root.children_len(), 3);
-
             let child_0 = btree.load_node(root.child(0));
             assert_eq!(child_0.node_type(), NodeType::Leaf);
             assert_eq!(

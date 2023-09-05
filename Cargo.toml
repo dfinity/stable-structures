@@ -11,6 +11,10 @@ keywords = ["internet-computer", "dfinity", "stable-structures"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 repository = "https://github.com/dfinity/stable-structures"
 
+[dependencies]
+# An optional dependency to profile parts of the code.
+profiler = { path = "./profiler", optional = true }
+
 [dev-dependencies]
 criterion = "0.4.0"
 ic-cdk = "0.6.8"

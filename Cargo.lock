@@ -68,6 +68,7 @@ dependencies = [
  "ic-cdk",
  "ic-cdk-macros",
  "ic-stable-structures",
+ "profiler",
  "tiny-rng",
 ]
 
@@ -566,6 +567,7 @@ dependencies = [
  "ic-cdk-macros",
  "lazy_static",
  "maplit",
+ "profiler",
  "proptest",
  "tempfile",
  "test-strategy",
@@ -966,6 +968,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6aeca18b86b413c660b781aa319e4e2648a3e6f9eadc9b47e9038e6fe9f3451b"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "profiler"
+version = "0.1.0"
+dependencies = [
+ "ic-cdk",
 ]
 
 [[package]]

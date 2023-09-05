@@ -112,6 +112,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Loads a v2 node from memory at the given address.
     pub(super) fn load_v2<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
+        #[cfg(feature = "profiler")]
+        let _p = profiler::profile("node_load_v2");
+
         // Load the node, including any overflows, into a buffer.
         let node_buf = read_node(address, page_size.get(), memory);
 
@@ -192,6 +195,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&self, allocator: &mut Allocator<M>) {
+        #[cfg(feature = "profiler")]
+        let _p = profiler::profile("node_save_v2");
+
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
         assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
@@ -255,7 +261,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) {
         // Compute how many overflow pages are needed.
         let additional_pages_needed = if buf.len() > page_size {
-            debug_assert!(page_size >= PAGE_OVERFLOW_DATA_OFFSET.into());
+            debug_assert!(page_size >= PAGE_OVERFLOW_DATA_OFFSET.get() as usize);
             let overflow_page_capacity = page_size - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
             let overflow_data_len = buf.len() - page_size;
 

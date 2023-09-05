@@ -59,6 +59,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_value_size: u32,
         memory: &M,
     ) -> Self {
+        #[cfg(feature = "profiler")]
+        let _p = profiler::profile("node_load_v1");
+
         // Load the header.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
@@ -118,6 +121,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     pub(super) fn save_v1<M: Memory>(&self, memory: &M) {
+        #[cfg(feature = "profiler")]
+        let _p = profiler::profile("node_save_v1");
+
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());

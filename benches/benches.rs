@@ -144,6 +144,10 @@ fn execution_instructions(arguments: ExecutionArguments) -> u64 {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(output.status.success(), "{stdout}\n{stderr}");
 
+    // Output logs from the canister as it contains profiling data.
+    println!();
+    println!("{stderr}");
+
     // Convert result formatted as "(1_000_000 : nat64)" to u64.
     let result = stdout
         .trim()
