@@ -11,10 +11,7 @@ thread_local! {
 /// Instructions are counted and recorded under the given name until the
 /// `Profile` object returned is dropped.
 pub fn profile(name: &'static str) -> Profile {
-    Profile {
-        name,
-        start_instructions: instruction_count(),
-    }
+    Profile::new(name)
 }
 
 /// Clears all profiling data.
@@ -33,7 +30,7 @@ pub struct Profile {
 }
 
 impl Profile {
-    pub fn new(name: &'static str) -> Self {
+    fn new(name: &'static str) -> Self {
         Self {
             name,
             start_instructions: instruction_count(),
