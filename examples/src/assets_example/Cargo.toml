@@ -1,0 +1,15 @@
+[package]
+name = "assets_example"
+version = "0.2.0"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid.workspace = true
+ic-cdk.workspace = true
+ic-cdk-macros.workspace = true
+ic-stable-structures = { path = "../../../" }
+serde = "1.0.132"
+

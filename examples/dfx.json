@@ -1,6 +1,11 @@
 {
   "dfx": "0.14.3",
   "canisters": {
+    "assets_example": {
+      "candid": "src/assets_example/candid.did",
+      "package": "assets_example",
+      "type": "rust"
+    },
     "quick_start": {
       "candid": "src/quick_start/candid.did",
       "package": "quick_start",
