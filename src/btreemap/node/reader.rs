@@ -11,13 +11,19 @@ pub struct NodeReader<'a, M: Memory> {
     pub memory: &'a M,
 }
 
+// Note: The `Memory` interface is implemented so that helper methods such `read_u32`,
+// `read_struct`, etc. can be used with a `NodeReader` directly.
 impl<'a, M: Memory> Memory for NodeReader<'a, M> {
     fn read(&self, offset: u64, dst: &mut [u8]) {
+        // If the read is only in the initial page, then read it directly in one go.
+        // This is a performance enhancement to avoid the cost of creating a `NodeIterator`.
         if (offset + dst.len() as u64) < self.page_size.get() as u64 {
             self.memory.read(self.address.get() + offset, dst);
             return;
         }
 
+        // The read is split across several pages. Create a `NodeIterator` to to read from
+        // each of the individual pages.
         let iter = NodeIterator::new(
             VirtualSegment {
                 address: Address::from(offset),
@@ -50,15 +56,15 @@ impl<'a, M: Memory> Memory for NodeReader<'a, M> {
     }
 
     fn write(&self, _: u64, _: &[u8]) {
-        unreachable!("NodeReader does not call write")
+        unreachable!("NodeReader does not support write")
     }
 
     fn size(&self) -> u64 {
-        unreachable!("NodeReader does not call size")
+        unreachable!("NodeReader does not support size")
     }
 
     fn grow(&self, _: u64) -> i64 {
-        unreachable!("NodeReader does not call grow")
+        unreachable!("NodeReader does not support grow")
     }
 }
 
@@ -129,7 +135,7 @@ impl Iterator for NodeIterator {
 
         // Compute the page where the segment begins.
         let page_idx = if offset < self.page_size {
-            0 // The segment begins in in the initial page.
+            0 // The segment begins in the initial page.
         } else {
             // The segment begins in an overflow page.
             ((offset - self.page_size) / self.overflow_page_capacity).get() + 1

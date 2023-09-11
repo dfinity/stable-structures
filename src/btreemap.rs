@@ -120,7 +120,7 @@ where
     pub fn init_v2(memory: M) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
-            return BTreeMap::new(memory);
+            return BTreeMap::new_v2(memory);
         }
 
         // Check if the magic in the memory corresponds to a BTreeMap.
@@ -1319,10 +1319,8 @@ mod test {
             let median_index = right_child.entries_len() / 2;
             assert_eq!(right_child.key(median_index), &b(&[12]));
 
-            // Overwrite the median key.
+            // Overwrite the value of the median key.
             assert_eq!(btree.insert(b(&[12]), b(&[1, 2, 3])), Some(b(&[])));
-
-            // The key is overwritten successfully.
             assert_eq!(btree.get(&b(&[12])), Some(b(&[1, 2, 3])));
 
             // The child has not been split and is still full.
@@ -1396,10 +1394,10 @@ mod test {
     fn insert_same_key_multiple() {
         btree_test(|mut btree| {
             assert_eq!(btree.insert(b(&[1]), b(&[2])), None);
-
             for i in 2..10 {
                 assert_eq!(btree.insert(b(&[1]), b(&[i + 1])), Some(b(&[i])));
             }
+            assert_eq!(btree.get(&b(&[1])), Some(b(&[10])));
         });
     }
 
@@ -2065,7 +2063,7 @@ mod test {
             //               /   \
             // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-            // Test a prefix that's larger than the value in the internal node.
+            // Test a prefix that's larger than the key in the internal node.
             assert_eq!(
                 btree.range(b(&[7])..b(&[8])).collect::<Vec<_>>(),
                 vec![(b(&[7]), b(&[]))]
@@ -2099,7 +2097,7 @@ mod test {
             assert_eq!(root.entries(btree.memory()), vec![(b(&[1, 2]), vec![])]);
             assert_eq!(root.children_len(), 2);
 
-            // Tests a prefix that's smaller than the value in the internal node.
+            // Tests a prefix that's smaller than the key in the internal node.
             assert_eq!(
                 btree.range(b(&[0])..b(&[1])).collect::<Vec<_>>(),
                 vec![
@@ -2121,7 +2119,7 @@ mod test {
                 ]
             );
 
-            // Tests a prefix that's larger than the value in the internal node.
+            // Tests a prefix that's larger than the key in the internal node.
             assert_eq!(
                 btree.range(b(&[2])..b(&[3])).collect::<Vec<_>>(),
                 vec![
@@ -2169,7 +2167,6 @@ mod test {
                 vec![(b(&[1, 4]), vec![]), (b(&[2, 3]), vec![])]
             );
             assert_eq!(root.children_len(), 3);
-
             let child_0 = btree.load_node(root.child(0));
             assert_eq!(child_0.node_type(), NodeType::Leaf);
             assert_eq!(
@@ -2213,6 +2210,22 @@ mod test {
             assert_eq!(
                 btree.range(b(&[1, 5])..b(&[1, 6])).collect::<Vec<_>>(),
                 vec![]
+            );
+
+            // Tests a prefix beginning in the middle of the tree and crossing several nodes.
+            assert_eq!(
+                btree.range(b(&[1, 5])..=b(&[2, 6])).collect::<Vec<_>>(),
+                vec![
+                    (b(&[1, 6]), b(&[])),
+                    (b(&[1, 8]), b(&[])),
+                    (b(&[1, 10]), b(&[])),
+                    (b(&[2, 1]), b(&[])),
+                    (b(&[2, 2]), b(&[])),
+                    (b(&[2, 3]), b(&[])),
+                    (b(&[2, 4]), b(&[])),
+                    (b(&[2, 5]), b(&[])),
+                    (b(&[2, 6]), b(&[])),
+                ]
             );
 
             // Tests a prefix that crosses several nodes.
@@ -2323,13 +2336,13 @@ mod test {
                 ]
             );
 
-            // Tests a offset that has a value somewhere in the range of values of an internal node.
+            // Tests an offset that has a keys somewhere in the range of keys of an internal node.
             assert_eq!(
                 btree.range(b(&[1, 3])..b(&[2])).collect::<Vec<_>>(),
                 vec![(b(&[1, 3]), b(&[])), (b(&[1, 4]), b(&[])),]
             );
 
-            // Tests a offset that's larger than the value in the internal node.
+            // Tests an offset that's larger than the key in the internal node.
             assert_eq!(btree.range(b(&[2, 5])..).collect::<Vec<_>>(), vec![]);
         });
     }

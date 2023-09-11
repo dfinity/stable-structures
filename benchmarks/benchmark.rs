@@ -1,4 +1,5 @@
 //! A script for running benchmarks on a canister.
+//! To run this script, run `cargo bench`.
 use candid::{CandidType, Decode};
 use clap::Parser;
 use colored::Colorize;

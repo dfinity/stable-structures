@@ -12,7 +12,7 @@ include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 repository = "https://github.com/dfinity/stable-structures"
 
 # There are no benchmarks in the library itself, so by default it's turned off
-# to avoid having `cargo bench` looks for benchmarks there.
+# to avoid having `cargo bench` look for benchmarks there.
 [lib]
 bench = false
 
