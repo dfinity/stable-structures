@@ -199,6 +199,26 @@ pub fn btreemap_insert_blob_8_u64_v2() -> BenchResult {
     insert_helper::<Blob<8>, u64>(btree)
 }
 
+#[query]
+pub fn btreemap_insert_10mib_values() -> BenchResult {
+    let mut btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+
+    // Insert 200 10MiB values.
+    let mut rng = Rng::from_seed(0);
+    let mut values = vec![];
+    for _ in 0..200 {
+        values.push(rng.iter(Rand::rand_u8).take(10 * 1024).collect::<Vec<_>>());
+    }
+
+    benchmark(|| {
+        let mut i = 0u64;
+        for value in values.into_iter() {
+            btree.insert(i, value);
+            i += 1;
+        }
+    })
+}
+
 /// Benchmarks removing keys from a BTreeMap.
 #[query]
 pub fn btreemap_remove_blob_4_1024() -> BenchResult {

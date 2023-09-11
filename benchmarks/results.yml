@@ -108,6 +108,12 @@ btreemap_get_u64_u64_v2:
     instructions: 469869216
     node_load_v2: 341278594
     stable_memory_size: 8
+btreemap_insert_10mib_values:
+  measurements:
+    instructions: 278228334
+    node_load_v2: 10377468
+    node_save_v2: 245958554
+    stable_memory_size: 33
 btreemap_insert_blob_128_1024:
   measurements:
     instructions: 1730313092

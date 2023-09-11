@@ -186,7 +186,7 @@ where
                 },
             ) => PageSize::Value(Node::<K>::size(max_key_size, max_value_size).get() as u32),
             // Use a default page size.
-            _ => PageSize::Value(500),
+            _ => PageSize::Value(1024),
         };
 
         let btree = Self {
