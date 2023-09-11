@@ -46,10 +46,13 @@ mod proptests;
 const MAGIC: &[u8; 3] = b"BTR";
 const LAYOUT_VERSION: u8 = 1;
 const LAYOUT_VERSION_2: u8 = 2;
-/// The sum of all the header fields, i.e. size of a packed header.
+// The sum of all the header fields, i.e. size of a packed header.
 const PACKED_HEADER_SIZE: usize = 28;
-/// The offset where the allocator begins.
+// The offset where the allocator begins.
 const ALLOCATOR_OFFSET: usize = 52;
+
+// The default page size to use in BTreeMap V2.
+const DEFAULT_PAGE_SIZE: u32 = 1024;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -186,7 +189,7 @@ where
                 },
             ) => PageSize::Value(Node::<K>::size(max_key_size, max_value_size).get() as u32),
             // Use a default page size.
-            _ => PageSize::Value(1024),
+            _ => PageSize::Value(DEFAULT_PAGE_SIZE),
         };
 
         let btree = Self {
