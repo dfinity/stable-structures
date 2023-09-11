@@ -51,7 +51,7 @@ const PACKED_HEADER_SIZE: usize = 28;
 // The offset where the allocator begins.
 const ALLOCATOR_OFFSET: usize = 52;
 
-// The default page size to use in BTreeMap V2.
+// The default page size to use in BTreeMap V2 in bytes.
 const DEFAULT_PAGE_SIZE: u32 = 1024;
 
 /// A "stable" map based on a B-tree.
