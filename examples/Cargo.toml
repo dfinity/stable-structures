@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "src/assets_example",
     "src/basic_example",
     "src/vecs_and_strings",
     "src/custom_types_example",
