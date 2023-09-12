@@ -78,7 +78,7 @@ impl Storable for StorablePrincipal {
     }
     const BOUND: Bound = Bound::Bounded {
         max_size: 29,
-        is_fixed_size: true,
+        is_fixed_size: false,
     };
 }
 
