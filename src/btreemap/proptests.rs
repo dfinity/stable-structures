@@ -91,6 +91,8 @@ fn insert_stable_principal() {
         assert_eq!(key1, key2);
 
         btree.insert(key1.clone(), ());
+
+        assert_eq!(btree.len(), 1);
         assert!(btree.contains_key(&key1));
     });
 }
