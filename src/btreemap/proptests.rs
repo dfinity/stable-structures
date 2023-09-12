@@ -1,7 +1,9 @@
 use crate::{
     btreemap::test::{b, btree_test},
-    storable::Blob,
+    storable::{Blob, Bound},
+    Storable,
 };
+use candid::Principal;
 use proptest::collection::btree_set as pset;
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
@@ -61,4 +63,34 @@ proptest! {
             Ok(())
         });
     }
+}
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct StorablePrincipal(pub Principal);
+
+impl Storable for StorablePrincipal {
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        self.0.as_ref().into()
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Self(Principal::from_slice(bytes.as_ref()))
+    }
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 29,
+        is_fixed_size: true,
+    };
+}
+
+#[test]
+fn insert_stable_principal() {
+    btree_test(|mut btree| {
+        let key1 = StorablePrincipal(candid::Principal::management_canister());
+        let key2 = StorablePrincipal::from_bytes(key1.to_bytes());
+
+        assert_eq!(key1, key2);
+
+        btree.insert(key1.clone(), ());
+        assert!(btree.contains_key(&key1));
+    });
 }
