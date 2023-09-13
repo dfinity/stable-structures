@@ -36,3 +36,11 @@ proptest! {
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
 }
+
+#[test]
+fn principal_roundtrip() {
+    let p = Principal::from_text("a4tbr-q4aaa-aaaaa-qaafq-cai").unwrap();
+    let bytes = p.to_bytes();
+    assert!(bytes.len() <= 29);
+    assert_eq!(p, Storable::from_bytes(bytes));
+}

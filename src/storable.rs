@@ -3,6 +3,8 @@ use std::cmp::{Ordering, Reverse};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
+use candid::Principal;
+
 #[cfg(test)]
 mod tests;
 
@@ -418,6 +420,21 @@ where
             }
             _ => Bound::Unbounded,
         }
+    };
+}
+
+impl Storable for Principal {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(self.as_slice().to_vec())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::try_from(bytes.as_ref()).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 29,
+        is_fixed_size: false,
     };
 }
 
