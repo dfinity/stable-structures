@@ -35,6 +35,31 @@ proptest! {
     fn f32_roundtrip(v in any::<f32>()) {
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
+
+    #[test]
+    fn optional_f64_roundtrip(v in any::<f64>()) {
+        let opt_v= Some(v);
+        prop_assert_eq!(Some(v), Storable::from_bytes(opt_v.to_bytes()));
+    }
+
+    #[test]
+    fn optional_string_roundtrip(v in any::<String>()) {
+        let opt_str= Some(v.clone());
+        prop_assert_eq!(opt_str.clone(), Storable::from_bytes(opt_str.to_bytes()));
+    }
+
+    #[test]
+    fn optional_tuple_roundtrip(x in any::<u64>(), y in uniform20(any::<u8>())) {
+        let opt_tuple= Some((x,y));
+        prop_assert_eq!(opt_tuple.clone(), Storable::from_bytes(opt_tuple.to_bytes()));
+    }
+
+    #[test]
+    fn optional_tuple_variable_width_u8_roundtrip(x in any::<u64>(), v in pvec(any::<u8>(), 0..40)) {
+        let bytes = Blob::<48>::try_from(&v[..]).unwrap();
+        let opt_tuple = Some((x, bytes));
+        prop_assert_eq!(opt_tuple, Storable::from_bytes(opt_tuple.to_bytes()));
+    }
 }
 
 #[test]

@@ -470,6 +470,40 @@ where
     };
 }
 
+impl<T: Storable> Storable for Option<T> {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        match self {
+            Some(t) => {
+                let mut bytes = t.to_bytes().into_owned();
+                bytes.insert(0, 1);
+                Cow::Owned(bytes)
+            }
+            None => Cow::Borrowed(&[0]),
+        }
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        match bytes[0] {
+            0 => None,
+            1 => Some(T::from_bytes(Cow::Borrowed(&bytes[1..]))),
+            _ => panic!("Invalid Option encoding."),
+        }
+    }
+
+    const BOUND: Bound = {
+        match T::BOUND {
+            Bound::Bounded {
+                max_size,
+                is_fixed_size,
+            } => Bound::Bounded {
+                max_size: max_size + 1,
+                is_fixed_size,
+            },
+            Bound::Unbounded => Bound::Unbounded,
+        }
+    };
+}
+
 pub(crate) struct Bounds {
     pub max_size: u32,
     pub is_fixed_size: bool,
