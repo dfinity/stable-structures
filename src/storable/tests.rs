@@ -37,9 +37,8 @@ proptest! {
     }
 
     #[test]
-    fn optional_f64_roundtrip(v in any::<f64>()) {
-        let opt_v= Some(v);
-        prop_assert_eq!(Some(v), Storable::from_bytes(opt_v.to_bytes()));
+    fn optional_f64_roundtrip(v in proptest::option::of(any::<f64>())) {
+        prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
 
     #[test]
