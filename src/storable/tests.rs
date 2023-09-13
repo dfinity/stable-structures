@@ -35,4 +35,11 @@ proptest! {
     fn f32_roundtrip(v in any::<f32>()) {
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
+
+    #[test]
+    fn nat_roundtrip(x in any::<u64>()) {
+        let nat = Nat::from(x);
+        prop_assert_eq!(nat.clone(), Nat::from_bytes(nat.to_bytes()));
+    }
+
 }

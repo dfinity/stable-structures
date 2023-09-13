@@ -3,6 +3,8 @@ use std::cmp::{Ordering, Reverse};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
+use candid::Nat;
+
 #[cfg(test)]
 mod tests;
 
@@ -419,6 +421,20 @@ where
             _ => Bound::Unbounded,
         }
     };
+}
+
+impl Storable for Nat {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let mut w = Vec::new();
+        self.encode(&mut w).unwrap();
+        Cow::Owned(w)
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::decode(&mut bytes.as_ref()).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
 }
 
 pub(crate) struct Bounds {
