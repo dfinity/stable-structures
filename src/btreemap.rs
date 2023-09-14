@@ -196,7 +196,7 @@ where
                 // maximum size with little performance difference but with a significant storage
                 // saving. We round the 8/11 to be 3/4.
                 PageSize::Value((max_node_size * 3 / 4) as u32)
-            },
+            }
             // Use a default page size.
             _ => PageSize::Value(DEFAULT_PAGE_SIZE),
         };
