@@ -49,7 +49,7 @@ proptest! {
     #[test]
     fn optional_tuple_roundtrip(x in proptest::option::of(any::<u64>()), y in uniform20(any::<u8>())) {
         let opt_tuple= if x.is_some() { Some((x.unwrap(),y))} else { None };
-        prop_assert_eq!(opt_tuple.clone(), Storable::from_bytes(opt_tuple.to_bytes()));
+        prop_assert_eq!(opt_tuple, Storable::from_bytes(opt_tuple.to_bytes()));
     }
 
     #[test]
