@@ -24,7 +24,7 @@ lazy_static::lazy_static! {
         "memory_manager_overhead",
 
         // BTree benchmarks
-        //"btreemap_insert_10mib_values",
+        "btreemap_insert_10mib_values",
         "btreemap_insert_blob_4_1024",
         "btreemap_insert_blob_4_1024_v2",
         "btreemap_insert_blob_8_1024",

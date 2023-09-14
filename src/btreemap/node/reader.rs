@@ -214,7 +214,6 @@ impl<'a, M: Memory> Memory for NodeWriter<'a, M> {
             } else {
                 if self.overflows.len() < page_idx {
                     panic!("shouldn't happen");
-
                 }
 
                 write(

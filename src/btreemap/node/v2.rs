@@ -268,7 +268,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         offset += NodeHeader::size();
         // Add a null overflow address. This might get overwritten later in case the node
         // does overflow.
-        //writer.write(offset.get(), &[0; 8]);
+        write_u64(
+            &writer,
+            offset,
+            self.overflows.get(0).unwrap_or(&Address::from(0)).get(),
+        );
         offset += Bytes::from(8u64);
 
         // A buffer to serialize the node into first, then write to memory.
