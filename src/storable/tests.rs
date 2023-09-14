@@ -47,9 +47,8 @@ proptest! {
     }
 
     #[test]
-    fn optional_tuple_roundtrip(x in proptest::option::of(any::<u64>()), y in uniform20(any::<u8>())) {
-        let opt_tuple= if x.is_some() { Some((x.unwrap(),y))} else { None };
-        prop_assert_eq!(opt_tuple, Storable::from_bytes(opt_tuple.to_bytes()));
+    fn optional_tuple_roundtrip(v in proptest::option::of((any::<u64>(), uniform20(any::<u8>())))) {
+        prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
 
     #[test]
