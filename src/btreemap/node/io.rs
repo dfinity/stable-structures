@@ -175,7 +175,7 @@ pub struct NodeWriterContext<'a> {
     pub page_size: PageSize,
 }
 
-pub fn write_node<M: Memory>(
+pub fn write<M: Memory>(
     offset: Address,
     src: &[u8],
     allocator: &Allocator<M>,
@@ -185,7 +185,7 @@ pub fn write_node<M: Memory>(
     let memory = allocator.memory();
 
     if (offset + src.len() as u64) < ctx.page_size.get() as u64 {
-        write(memory, ctx.address.get() + offset, src);
+        crate::write(memory, ctx.address.get() + offset, src);
         return;
     }
 
@@ -205,7 +205,7 @@ pub fn write_node<M: Memory>(
     } in iter
     {
         if page_idx == 0 {
-            write(
+            crate::write(
                 memory,
                 (ctx.address + offset).get(),
                 &src[bytes_written as usize..(bytes_written + length.get()) as usize],
@@ -215,7 +215,7 @@ pub fn write_node<M: Memory>(
                 panic!("shouldn't happen");
             }
 
-            write(
+            crate::write(
                 memory,
                 (ctx.overflows[page_idx - 1] + offset).get(),
                 &src[bytes_written as usize..(bytes_written + length.get()) as usize],
@@ -232,7 +232,7 @@ pub fn write_u32<M: Memory>(
     allocator: &Allocator<M>,
     ctx: &NodeWriterContext,
 ) {
-    write_node(offset, &val.to_le_bytes(), allocator, ctx);
+    write(offset, &val.to_le_bytes(), allocator, ctx);
 }
 
 pub fn write_u64<M: Memory>(
@@ -241,7 +241,7 @@ pub fn write_u64<M: Memory>(
     allocator: &Allocator<M>,
     ctx: &NodeWriterContext,
 ) {
-    write_node(offset, &val.to_le_bytes(), allocator, ctx);
+    write(offset, &val.to_le_bytes(), allocator, ctx);
 }
 
 pub fn write_struct<T, M: Memory>(
@@ -254,5 +254,5 @@ pub fn write_struct<T, M: Memory>(
         core::slice::from_raw_parts(t as *const _ as *const u8, core::mem::size_of::<T>())
     };
 
-    write_node(addr, slice, allocator, ctx)
+    write(addr, slice, allocator, ctx)
 }

@@ -297,7 +297,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             }
 
             // Write the key.
-            io::write_node(offset, key_bytes.borrow(), allocator, &write_ctx);
+            io::write(offset, key_bytes.borrow(), allocator, &write_ctx);
             offset += Bytes::from(key_bytes.len());
         }
 
@@ -309,7 +309,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += U32_SIZE;
 
             // Write the value.
-            io::write_node(offset, &value, allocator, &write_ctx);
+            io::write(offset, &value, allocator, &write_ctx);
             offset += Bytes::from(value.len());
         }
     }
