@@ -3,7 +3,7 @@ use crate::btreemap::allocator::Allocator;
 use crate::btreemap::node::v2::{
     OVERFLOW_ADDRESS_OFFSET, OVERFLOW_MAGIC, PAGE_OVERFLOW_DATA_OFFSET, PAGE_OVERFLOW_NEXT_OFFSET,
 };
-use crate::types::NULL;
+use crate::{types::NULL, write_u64};
 use std::cmp::min;
 
 /// A `NodeReader` abstracts the `Node` as a single contiguous memory, even though internally
@@ -173,12 +173,14 @@ impl Iterator for NodeIterator {
     }
 }
 
+/// A `NodeWriter` abstracts the `Node` into a single contiguous memory, allocating
+/// and deallocating pages as needed to fit the data being written.
 pub struct NodeWriter<'a, M: Memory> {
     address: Address,
-    overflows: Vec<Address>,
     page_size: PageSize,
-    max_offset: u64,
+    overflows: Vec<Address>,
     allocator: &'a mut Allocator<M>,
+    max_offset: u64,
 }
 
 impl<'a, M: Memory> NodeWriter<'a, M> {
@@ -206,6 +208,7 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         self.allocator.memory()
     }
 
+    /// Writes `src` to the node at the provided `offset`.
     pub fn write(&mut self, offset: Address, src: &[u8]) {
         let offset = offset.get();
         let end_offset = offset + src.len() as u64;
@@ -215,7 +218,7 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         }
 
         if end_offset < self.page_size.get() as u64 {
-            crate::write(self.allocator.memory(), self.address.get() + offset, src);
+            write(self.allocator.memory(), self.address.get() + offset, src);
             return;
         }
 
@@ -235,46 +238,17 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         } in iter
         {
             if page_idx == 0 {
-                crate::write(
+                write(
                     self.allocator.memory(),
                     (self.address + offset).get(),
                     &src[bytes_written as usize..(bytes_written + length.get()) as usize],
                 );
             } else {
                 if self.overflows.len() < page_idx {
-                    // Create new overflow page.
-                    let new_page = self.allocator.allocate();
-                    self.allocator
-                        .memory()
-                        .write(new_page.get(), &OVERFLOW_MAGIC[..]);
-                    crate::write_u64(
-                        self.allocator.memory(),
-                        new_page + PAGE_OVERFLOW_NEXT_OFFSET,
-                        NULL.get(),
-                    );
-
-                    // Let the previous overflow page point to this one.
-                    match self.overflows.last() {
-                        Some(prev_overflow) => {
-                            crate::write_u64(
-                                self.allocator.memory(),
-                                *prev_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
-                                new_page.get(),
-                            );
-                        }
-                        None => {
-                            crate::write_u64(
-                                self.allocator.memory(),
-                                self.address + OVERFLOW_ADDRESS_OFFSET,
-                                new_page.get(),
-                            );
-                        }
-                    }
-
-                    self.overflows.push(new_page);
+                    self.allocate_new_page();
                 }
 
-                crate::write(
+                write(
                     self.allocator.memory(),
                     (self.overflows[page_idx - 1] + offset).get(),
                     &src[bytes_written as usize..(bytes_written + length.get()) as usize],
@@ -299,6 +273,41 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         };
 
         self.write(addr, slice)
+    }
+
+    // Allocates a new page and appends it to the node's overflows.
+    fn allocate_new_page(&mut self) {
+        let new_page = self.allocator.allocate();
+        self.allocator
+            .memory()
+            .write(new_page.get(), &OVERFLOW_MAGIC[..]);
+        write_u64(
+            self.allocator.memory(),
+            new_page + PAGE_OVERFLOW_NEXT_OFFSET,
+            NULL.get(),
+        );
+
+        // Let the previous overflow page point to this one.
+        match self.overflows.last() {
+            Some(prev_overflow) => {
+                // There is a previous overflow. Update its next offset.
+                write_u64(
+                    self.allocator.memory(),
+                    *prev_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
+                    new_page.get(),
+                );
+            }
+            None => {
+                // There is no previous overflow. Update the overflow address of the initial node.
+                write_u64(
+                    self.allocator.memory(),
+                    self.address + OVERFLOW_ADDRESS_OFFSET,
+                    new_page.get(),
+                );
+            }
+        }
+
+        self.overflows.push(new_page);
     }
 
     fn deallocate_unused(&mut self) {
