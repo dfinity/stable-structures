@@ -475,7 +475,7 @@ impl<T: Storable> Storable for Option<T> {
         match self {
             Some(t) => {
                 let mut bytes = t.to_bytes().into_owned();
-                bytes.insert(0, 1);
+                bytes.push(1);
                 Cow::Owned(bytes)
             }
             None => Cow::Borrowed(&[0]),
@@ -483,10 +483,16 @@ impl<T: Storable> Storable for Option<T> {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        match bytes[0] {
+        match bytes.len() {
             0 => None,
-            1 => Some(T::from_bytes(Cow::Borrowed(&bytes[1..]))),
-            _ => panic!("Invalid Option encoding."),
+            1 => {
+                assert_eq!(bytes[0], 0, "Invalid Option encoding");
+                None
+            }
+            _ => {
+                assert_eq!(bytes[bytes.len() - 1], 1, "Invalid Option encoding");
+                Some(T::from_bytes(Cow::Borrowed(&bytes[0..bytes.len() - 1])))
+            }
         }
     }
 
