@@ -483,15 +483,13 @@ impl<T: Storable> Storable for Option<T> {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        match bytes.len() {
-            0 => None,
-            1 => {
-                assert_eq!(bytes[0], 0, "Invalid Option encoding");
-                None
-            }
-            _ => {
-                assert_eq!(bytes[bytes.len() - 1], 1, "Invalid Option encoding");
-                Some(T::from_bytes(Cow::Borrowed(&bytes[0..bytes.len() - 1])))
+        match bytes.split_last() {
+            Some((&last, bytes)) => match last == 0 {
+                true => None,
+                false => Some(T::from_bytes(Cow::Borrowed(bytes))),
+            },
+            None => {
+                panic!("Invalid Option encoding");
             }
         }
     }
