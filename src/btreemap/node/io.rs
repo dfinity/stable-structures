@@ -178,7 +178,7 @@ pub struct NodeWriterContext<'a> {
 pub fn write<M: Memory>(
     offset: Address,
     src: &[u8],
-    allocator: &Allocator<M>,
+    allocator: &mut Allocator<M>,
     ctx: &NodeWriterContext,
 ) {
     let offset = offset.get();
@@ -229,7 +229,7 @@ pub fn write<M: Memory>(
 pub fn write_u32<M: Memory>(
     offset: Address,
     val: u32,
-    allocator: &Allocator<M>,
+    allocator: &mut Allocator<M>,
     ctx: &NodeWriterContext,
 ) {
     write(offset, &val.to_le_bytes(), allocator, ctx);
@@ -238,7 +238,7 @@ pub fn write_u32<M: Memory>(
 pub fn write_u64<M: Memory>(
     offset: Address,
     val: u64,
-    allocator: &Allocator<M>,
+    allocator: &mut Allocator<M>,
     ctx: &NodeWriterContext,
 ) {
     write(offset, &val.to_le_bytes(), allocator, ctx);
@@ -247,7 +247,7 @@ pub fn write_u64<M: Memory>(
 pub fn write_struct<T, M: Memory>(
     t: &T,
     addr: Address,
-    allocator: &Allocator<M>,
+    allocator: &mut Allocator<M>,
     ctx: &NodeWriterContext,
 ) {
     let slice = unsafe {
