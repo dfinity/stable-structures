@@ -1,5 +1,11 @@
 use super::*;
-use crate::btreemap::Allocator;
+use crate::{
+    btreemap::{
+        node::v2::{OVERFLOW_ADDRESS_OFFSET, PAGE_OVERFLOW_NEXT_OFFSET},
+        Allocator,
+    },
+    types::NULL,
+};
 use proptest::collection::btree_map as pmap;
 use proptest::collection::vec as pvec;
 use std::cell::RefCell;
@@ -203,11 +209,7 @@ fn growing_and_shrinking_entries_does_not_leak_memory() {
     let allocator_addr = Address::from(0);
     let mut allocator = Allocator::new(mem, allocator_addr, PageSize::Value(500).get().into());
 
-    let mut node = Node::new_v2(
-        allocator.allocate(),
-        NodeType::Leaf,
-        PageSize::Value(500),
-    );
+    let mut node = Node::new_v2(allocator.allocate(), NodeType::Leaf, PageSize::Value(500));
 
     // Insert an entry substantially larger than the page size and save it.
     node.push_entry((vec![1, 2, 3], vec![0; 10000]));
@@ -239,45 +241,51 @@ fn growing_and_shrinking_entries_does_not_leak_memory() {
 }
 
 #[test]
-fn growing_and_shrinking_2() {
+fn overflows_end_with_null_after_nodes_growing_and_shrinking() {
     let mem = make_memory();
     let allocator_addr = Address::from(0);
-    let mut allocator = Allocator::new(mem.clone(), allocator_addr, PageSize::Value(500).get().into());
+    let page_size = PageSize::Value(500);
+    let mut allocator = Allocator::new(mem.clone(), allocator_addr, page_size.get().into());
 
     let node_addr = allocator.allocate();
-    let mut node = Node::new_v2(
-        node_addr,
-        NodeType::Leaf,
-        PageSize::Value(500),
+    let mut node = Node::new_v2(node_addr, NodeType::Leaf, page_size);
+
+    // Insert an entry larger than the page size and save it.
+    node.push_entry((vec![1, 2, 3], vec![13; 1000]));
+    node.save(&mut allocator);
+
+    // Expect two overflow pages.
+    assert_eq!(node.overflows().len(), 2);
+
+    // The last overflow page should point to NULL.
+    assert_eq!(
+        read_u64(&mem, node.overflows()[1] + PAGE_OVERFLOW_NEXT_OFFSET),
+        NULL.get()
     );
 
-    // Insert an entry substantially larger than the page size and save it.
-    node.push_entry((vec![1, 2, 3], vec![0; 10000]));
+    // Replace the entry with a smaller value such that only one overflow page is needed.
+    node.swap_entry(0, (vec![1, 2, 3], vec![7; 500]), allocator.memory());
     node.save(&mut allocator);
 
-    let num_allocated_chunks = allocator.num_allocated_chunks();
+    // Expect one overflow page.
+    assert_eq!(node.overflows().len(), 1);
 
-    // The node is more than one page.
-    assert!(num_allocated_chunks > 1);
-
-    // Swap the value with a much smaller value.
-    node.swap_entry(0, (vec![1, 2, 3], vec![4, 5, 6]), allocator.memory());
-    node.save(&mut allocator);
-
-    let mut node2: Node<Vec<u8>> = Node::new_v2(
-        allocator.allocate(),
-        NodeType::Leaf,
-        PageSize::Value(500),
+    // The last overflow page should point to NULL.
+    assert_eq!(
+        read_u64(&mem, node.overflows()[0] + PAGE_OVERFLOW_NEXT_OFFSET),
+        NULL.get()
     );
 
-    node2.push_entry((vec![1], vec![2]));
-    node2.save(&mut allocator);
-
-    let mut node = Node::load_v2(node_addr, PageSize::Value(500), &mem);
-
-    // Swap the value with one that is similar in size to the original value.
-    node.swap_entry(0, (vec![1, 2, 3], vec![3; 10000]), allocator.memory());
+    // Replace the entry with a smaller value such that no overflow pages are needed.
+    node.swap_entry(0, (vec![1, 2, 3], vec![]), allocator.memory());
     node.save(&mut allocator);
-    // The extra chunks are deallocated and we're back to the original number of chunks.
-//    assert_eq!(num_allocated_chunks, allocator.num_allocated_chunks());
+
+    // Expect no overflow pages.
+    assert_eq!(node.overflows().len(), 0);
+
+    // The initial page should point to NULL as it's overflow page.
+    assert_eq!(
+        read_u64(&mem, node_addr + OVERFLOW_ADDRESS_OFFSET),
+        NULL.get()
+    );
 }

@@ -181,7 +181,7 @@ pub struct NodeWriter<'a, M: Memory> {
     overflows: Vec<Address>,
     allocator: &'a mut Allocator<M>,
 
-    // The maximum offset accessed while writing to memory.
+    // The maximum offset accessed while writing to the node.
     max_offset: u64,
 }
 
@@ -214,13 +214,15 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
 
     /// Writes `src` to the node at the provided `offset`.
     pub fn write(&mut self, offset: Address, src: &[u8]) {
+        // Update the max offset.
         let offset = offset.get();
         let end_offset = offset + src.len() as u64;
-
         if end_offset > self.max_offset {
             self.max_offset = end_offset;
         }
 
+        // If the write is only in the initial page, then write it directly in one go.
+        // This is a performance enhancement to avoid the cost of creating a `NodeIterator`.
         if end_offset < self.page_size.get() as u64 {
             write(self.allocator.memory(), self.address.get() + offset, src);
             return;
@@ -242,12 +244,14 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         } in iter
         {
             if page_idx == 0 {
+                // Write to the initial page.
                 write(
                     self.allocator.memory(),
                     (self.address + offset).get(),
                     &src[bytes_written as usize..(bytes_written + length.get()) as usize],
                 );
             } else {
+                // Write to an overflow page, allocating it if it doesn't already exist.
                 if self.overflows.len() < page_idx {
                     self.allocate_new_page();
                 }

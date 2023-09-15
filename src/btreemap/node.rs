@@ -348,6 +348,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .collect()
     }
 
+    #[cfg(test)]
+    pub fn overflows(&self) -> &[Address] {
+        &self.overflows
+    }
+
     /// Returns the number of entries in the node.
     pub fn entries_len(&self) -> usize {
         self.keys.len()
