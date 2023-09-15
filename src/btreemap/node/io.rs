@@ -201,6 +201,8 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         }
     }
 
+    /// Finished the writing process by returning the node's overflow pages.
+    /// Any unused pages are deallocated to prevent memory leaks.
     pub fn finish(mut self) -> Vec<Address> {
         self.deallocate_unused_pages();
         self.overflows

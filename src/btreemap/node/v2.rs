@@ -199,8 +199,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         #[cfg(feature = "profiler")]
         let _p = profiler::profile("node_save_v2");
 
-        // TODO: add assertions.
-
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
         assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
@@ -211,15 +209,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
             self.value(i, allocator.memory());
         }
 
-        let mut offset = Address::from(0);
-
+        // Initialize a NodeWriter. The NodeWriter takes care of allocating/deallocating
+        // overflow pages as needed.
         let mut writer = NodeWriter::new(
             self.address,
-            self.overflows.clone(), // TODO: add test when this is taken
+            self.overflows.clone(),
             self.page_size(),
             allocator,
         );
 
+        // Write the header of the initial page.
+        let mut offset = Address::from(0);
         let header = NodeHeader {
             magic: *MAGIC,
             version: LAYOUT_VERSION_2,
@@ -231,13 +231,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         writer.write_struct(&header, offset);
-
         offset += NodeHeader::size();
-        // Add a null overflow address. This might get overwritten later in case the node
-        // does overflow.
+
+        // Add a null overflow address.
+        // This might get overwritten later in case the node does overflow.
         writer.write_u64(
             offset,
-            self.overflows.get(0).unwrap_or(&Address::from(0)).get(),
+            self.overflows.get(0).unwrap_or(&NULL).get(),
         );
         offset += Bytes::from(8u64);
 
