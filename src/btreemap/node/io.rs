@@ -1,5 +1,8 @@
 use super::*;
-use crate::btreemap::node::v2::PAGE_OVERFLOW_DATA_OFFSET;
+use crate::btreemap::node::v2::{
+    OVERFLOW_ADDRESS_OFFSET, OVERFLOW_MAGIC, PAGE_OVERFLOW_DATA_OFFSET, PAGE_OVERFLOW_NEXT_OFFSET,
+};
+use crate::types::NULL;
 use std::cmp::min;
 
 /// A `NodeReader` abstracts the `Node` as a single contiguous memory, even though internally
@@ -169,23 +172,28 @@ impl Iterator for NodeIterator {
     }
 }
 
-pub struct NodeWriterContext<'a> {
+pub struct NodeWriterContext {
     pub address: Address,
-    pub overflows: &'a [Address],
+    pub overflows: Vec<Address>,
     pub page_size: PageSize,
+    pub max_offset: u64,
 }
 
 pub fn write<M: Memory>(
     offset: Address,
     src: &[u8],
     allocator: &mut Allocator<M>,
-    ctx: &NodeWriterContext,
+    ctx: &mut NodeWriterContext,
 ) {
     let offset = offset.get();
-    let memory = allocator.memory();
+    let end_offset = offset + src.len() as u64;
 
-    if (offset + src.len() as u64) < ctx.page_size.get() as u64 {
-        crate::write(memory, ctx.address.get() + offset, src);
+    if end_offset > ctx.max_offset {
+        ctx.max_offset = end_offset;
+    }
+
+    if end_offset < ctx.page_size.get() as u64 {
+        crate::write(allocator.memory(), ctx.address.get() + offset, src);
         return;
     }
 
@@ -206,17 +214,46 @@ pub fn write<M: Memory>(
     {
         if page_idx == 0 {
             crate::write(
-                memory,
+                allocator.memory(),
                 (ctx.address + offset).get(),
                 &src[bytes_written as usize..(bytes_written + length.get()) as usize],
             );
         } else {
             if ctx.overflows.len() < page_idx {
-                panic!("shouldn't happen");
+                // Create new overflow page.
+                let new_page = allocator.allocate();
+                allocator
+                    .memory()
+                    .write(new_page.get(), &OVERFLOW_MAGIC[..]);
+                crate::write_u64(
+                    allocator.memory(),
+                    new_page + PAGE_OVERFLOW_NEXT_OFFSET,
+                    NULL.get(),
+                );
+
+                // Let the previous overflow page point to this one.
+                match ctx.overflows.last() {
+                    Some(prev_overflow) => {
+                        crate::write_u64(
+                            allocator.memory(),
+                            *prev_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
+                            new_page.get(),
+                        );
+                    }
+                    None => {
+                        crate::write_u64(
+                            allocator.memory(),
+                            ctx.address + OVERFLOW_ADDRESS_OFFSET,
+                            new_page.get(),
+                        );
+                    }
+                }
+
+                ctx.overflows.push(new_page);
             }
 
             crate::write(
-                memory,
+                allocator.memory(),
                 (ctx.overflows[page_idx - 1] + offset).get(),
                 &src[bytes_written as usize..(bytes_written + length.get()) as usize],
             );
@@ -230,7 +267,7 @@ pub fn write_u32<M: Memory>(
     offset: Address,
     val: u32,
     allocator: &mut Allocator<M>,
-    ctx: &NodeWriterContext,
+    ctx: &mut NodeWriterContext,
 ) {
     write(offset, &val.to_le_bytes(), allocator, ctx);
 }
@@ -239,7 +276,7 @@ pub fn write_u64<M: Memory>(
     offset: Address,
     val: u64,
     allocator: &mut Allocator<M>,
-    ctx: &NodeWriterContext,
+    ctx: &mut NodeWriterContext,
 ) {
     write(offset, &val.to_le_bytes(), allocator, ctx);
 }
@@ -248,11 +285,31 @@ pub fn write_struct<T, M: Memory>(
     t: &T,
     addr: Address,
     allocator: &mut Allocator<M>,
-    ctx: &NodeWriterContext,
+    ctx: &mut NodeWriterContext,
 ) {
     let slice = unsafe {
         core::slice::from_raw_parts(t as *const _ as *const u8, core::mem::size_of::<T>())
     };
 
     write(addr, slice, allocator, ctx)
+}
+
+pub fn deallocate_unused<M: Memory>(ctx: &mut NodeWriterContext, allocator: &mut Allocator<M>) {
+    // Compute how many overflow pages are needed.
+    let overflow_pages_needed = if ctx.max_offset as u32 > ctx.page_size.get() {
+        //debug_assert!(page_size >= PAGE_OVERFLOW_DATA_OFFSET.get() as usize);
+        let overflow_page_capacity =
+            ctx.page_size.get() as usize - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
+        let overflow_data_len = ctx.max_offset as usize - ctx.page_size.get() as usize;
+
+        // Ceiling division
+        (overflow_data_len + overflow_page_capacity - 1) / overflow_page_capacity
+    } else {
+        0
+    };
+
+    // TODO: set the last next address to NULL.
+    while ctx.overflows.len() > overflow_pages_needed {
+        allocator.deallocate(ctx.overflows.pop().unwrap());
+    }
 }

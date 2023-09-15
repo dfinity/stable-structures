@@ -73,7 +73,6 @@
 
 use super::*;
 use crate::btreemap::Allocator;
-use crate::write_u64;
 use crate::{
     btreemap::node::io,
     storable::{is_fixed_size, max_size},
@@ -82,12 +81,12 @@ use crate::{
 
 // Initial page
 const LAYOUT_VERSION_2: u8 = 2;
-const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
+pub(super) const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET: Bytes = Bytes::new(15);
 
 // Overflow page
-const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
-const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
+pub(super) const OVERFLOW_MAGIC: &[u8; 3] = b"NOF";
+pub(super) const PAGE_OVERFLOW_NEXT_OFFSET: Bytes = Bytes::new(3);
 pub(super) const PAGE_OVERFLOW_DATA_OFFSET: Bytes = Bytes::new(11);
 
 // The minimum size a page can have.
@@ -206,51 +205,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(page_size >= MINIMUM_PAGE_SIZE);
         assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
 
-        let mut node_size = 0;
-        node_size += NodeHeader::size().get() + 8 + self.children.len() as u64 * 8;
-
-        let keys: Vec<_> = self.keys.iter().map(|key| key.to_bytes()).collect();
-        for key in keys {
-            if !is_fixed_size::<K>() {
-                node_size += 4;
-            }
-            node_size += key.len() as u64;
-        }
-
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
         let memory = allocator.memory();
-        // TODO: this is inefficient.
-        let values: Vec<_> = (0..self.keys.len())
-            .map(|i| self.value(i, memory).len())
-            .collect();
-
-        for value_len in values {
-            node_size += value_len as u64 + 4;
+        for i in 0..self.keys.len() {
+            self.value(i, memory);
         }
-
-        // Compute how many overflow pages are needed.
-        let overflow_pages_needed = if node_size as u32 > page_size {
-            //debug_assert!(page_size >= PAGE_OVERFLOW_DATA_OFFSET.get() as usize);
-            let overflow_page_capacity =
-                page_size as usize - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
-            let overflow_data_len = node_size as usize - page_size as usize;
-
-            // Ceiling division
-            (overflow_data_len + overflow_page_capacity - 1) / overflow_page_capacity
-        } else {
-            0
-        };
-
-        // Retrieve the addresses for the overflow pages, making the necessary allocations.
-        self.reallocate_overflow_pages(overflow_pages_needed, allocator);
 
         let mut offset = Address::from(0);
 
-        let write_ctx = io::NodeWriterContext {
+        let mut write_ctx = io::NodeWriterContext {
             address: self.address,
             page_size: self.page_size(),
-            overflows: &self.overflows,
+            overflows: self.overflows.clone(),
+            max_offset: 0, // TODO: this should be internal
         };
 
         let header = NodeHeader {
@@ -263,7 +231,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             num_entries: self.keys.len() as u16,
         };
 
-        io::write_struct(&header, offset, allocator, &write_ctx);
+        io::write_struct(&header, offset, allocator, &mut write_ctx);
 
         offset += NodeHeader::size();
         // Add a null overflow address. This might get overwritten later in case the node
@@ -273,16 +241,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset,
             self.overflows.get(0).unwrap_or(&Address::from(0)).get(),
             allocator,
-            &write_ctx,
+            &mut write_ctx,
         );
         offset += Bytes::from(8u64);
 
-        // A buffer to serialize the node into first, then write to memory.
-        //let mut buf = vec![];
-
         // Write the children
         for child in self.children.iter() {
-            io::write_u64(offset, child.get(), allocator, &write_ctx);
+            io::write_u64(offset, child.get(), allocator, &mut write_ctx);
             offset += Address::size();
         }
 
@@ -292,12 +257,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the size of the key if it isn't fixed in size.
             if !is_fixed_size::<K>() {
-                io::write_u32(offset, key_bytes.len() as u32, allocator, &write_ctx);
+                io::write_u32(offset, key_bytes.len() as u32, allocator, &mut write_ctx);
                 offset += U32_SIZE;
             }
 
             // Write the key.
-            io::write(offset, key_bytes.borrow(), allocator, &write_ctx);
+            io::write(offset, key_bytes.borrow(), allocator, &mut write_ctx);
             offset += Bytes::from(key_bytes.len());
         }
 
@@ -305,66 +270,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
         for idx in 0..self.entries_len() {
             // Write the size of the value.
             let value = self.value(idx, allocator.memory());
-            io::write_u32(offset, value.len() as u32, allocator, &write_ctx);
+            io::write_u32(offset, value.len() as u32, allocator, &mut write_ctx);
             offset += U32_SIZE;
 
             // Write the value.
-            io::write(offset, &value, allocator, &write_ctx);
+            io::write(offset, &value, allocator, &mut write_ctx);
             offset += Bytes::from(value.len());
         }
-    }
 
-    fn reallocate_overflow_pages<M: Memory>(
-        &mut self,
-        num_overflow_pages: usize,
-        allocator: &mut Allocator<M>,
-    ) {
-        // Set the next address to null. This may get overwritten later.
-        write_u64(
-            allocator.memory(),
-            self.address + OVERFLOW_ADDRESS_OFFSET,
-            NULL.get(),
-        );
-        // If there are too many overflow addresses, deallocate some until we've reached
-        // the number we need.
-        // TODO: set the last next address to NULL.
-        while self.overflows.len() > num_overflow_pages {
-            allocator.deallocate(self.overflows.pop().unwrap());
-        }
-
-        // Allocate more pages to accommodate the number requested, if needed.
-        while self.overflows.len() < num_overflow_pages {
-            // Create new overflow page.
-            let new_page = allocator.allocate();
-            allocator
-                .memory()
-                .write(new_page.get(), &OVERFLOW_MAGIC[..]);
-            write_u64(
-                allocator.memory(),
-                new_page + PAGE_OVERFLOW_NEXT_OFFSET,
-                NULL.get(),
-            );
-
-            // Let the previous overflow page point to this one.
-            match self.overflows.last() {
-                Some(prev_overflow) => {
-                    write_u64(
-                        allocator.memory(),
-                        *prev_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
-                        new_page.get(),
-                    );
-                }
-                None => {
-                    write_u64(
-                        allocator.memory(),
-                        self.address + OVERFLOW_ADDRESS_OFFSET,
-                        new_page.get(),
-                    );
-                }
-            }
-
-            self.overflows.push(new_page);
-        }
+        io::deallocate_unused(&mut write_ctx, allocator);
+        self.overflows = write_ctx.overflows;
     }
 }
 

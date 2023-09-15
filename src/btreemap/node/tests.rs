@@ -203,7 +203,11 @@ fn growing_and_shrinking_entries_does_not_leak_memory() {
     let allocator_addr = Address::from(0);
     let mut allocator = Allocator::new(mem, allocator_addr, PageSize::Value(500).get().into());
 
-    let mut node = Node::new_v2(allocator_addr, NodeType::Leaf, PageSize::Value(500));
+    let mut node = Node::new_v2(
+        allocator.allocate(),
+        NodeType::Leaf,
+        PageSize::Value(500),
+    );
 
     // Insert an entry substantially larger than the page size and save it.
     node.push_entry((vec![1, 2, 3], vec![0; 10000]));
