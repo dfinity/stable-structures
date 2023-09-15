@@ -8,13 +8,13 @@ use crate::{
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
 
-mod reader;
+mod io;
 #[cfg(test)]
 mod tests;
 mod v1;
 mod v2;
 
-use reader::NodeReader;
+use io::NodeReader;
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.

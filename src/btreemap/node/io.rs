@@ -169,7 +169,7 @@ impl Iterator for NodeIterator {
     }
 }
 
-pub struct NodeWriter2<'a> {
+pub struct NodeWriterContext<'a> {
     pub address: Address,
     pub overflows: &'a [Address],
     pub page_size: PageSize,
@@ -179,7 +179,7 @@ pub fn write_node<M: Memory>(
     offset: Address,
     src: &[u8],
     allocator: &Allocator<M>,
-    ctx: &NodeWriter2,
+    ctx: &NodeWriterContext,
 ) {
     let offset = offset.get();
     let memory = allocator.memory();
@@ -230,7 +230,7 @@ pub fn write_u32<M: Memory>(
     offset: Address,
     val: u32,
     allocator: &Allocator<M>,
-    ctx: &NodeWriter2,
+    ctx: &NodeWriterContext,
 ) {
     write_node(offset, &val.to_le_bytes(), allocator, ctx);
 }
@@ -239,7 +239,7 @@ pub fn write_u64<M: Memory>(
     offset: Address,
     val: u64,
     allocator: &Allocator<M>,
-    ctx: &NodeWriter2,
+    ctx: &NodeWriterContext,
 ) {
     write_node(offset, &val.to_le_bytes(), allocator, ctx);
 }
@@ -248,7 +248,7 @@ pub fn write_struct<T, M: Memory>(
     t: &T,
     addr: Address,
     allocator: &Allocator<M>,
-    ctx: &NodeWriter2,
+    ctx: &NodeWriterContext,
 ) {
     let slice = unsafe {
         core::slice::from_raw_parts(t as *const _ as *const u8, core::mem::size_of::<T>())
