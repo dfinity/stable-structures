@@ -214,12 +214,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let mut offset = Address::from(0);
 
-        let mut write_ctx = io::NodeWriterContext {
-            address: self.address,
-            page_size: self.page_size(),
-            overflows: self.overflows.clone(),
-            max_offset: 0, // TODO: this should be internal
-        };
+        let mut write_ctx = io::NodeWriterContext::new(
+            self.address,
+            std::mem::take(&mut self.overflows),
+            self.page_size(),
+        );
 
         let header = NodeHeader {
             magic: *MAGIC,
@@ -236,7 +235,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         offset += NodeHeader::size();
         // Add a null overflow address. This might get overwritten later in case the node
         // does overflow.
-
         io::write_u64(
             offset,
             self.overflows.get(0).unwrap_or(&Address::from(0)).get(),
@@ -278,14 +276,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Bytes::from(value.len());
         }
 
-        io::deallocate_unused(&mut write_ctx, allocator);
-        self.overflows = write_ctx.overflows;
+        self.overflows = write_ctx.finish(allocator);
     }
 }
 
 fn read_overflows<M: Memory>(address: Address, memory: &M) -> Vec<Address> {
     #[repr(C, packed)]
-    #[derive(Debug)]
     struct OverflowPageHeader {
         magic: [u8; 3],
         next: Address,

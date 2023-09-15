@@ -1,4 +1,5 @@
 use super::*;
+use crate::btreemap::allocator::Allocator;
 use crate::btreemap::node::v2::{
     OVERFLOW_ADDRESS_OFFSET, OVERFLOW_MAGIC, PAGE_OVERFLOW_DATA_OFFSET, PAGE_OVERFLOW_NEXT_OFFSET,
 };
@@ -173,10 +174,26 @@ impl Iterator for NodeIterator {
 }
 
 pub struct NodeWriterContext {
-    pub address: Address,
-    pub overflows: Vec<Address>,
-    pub page_size: PageSize,
-    pub max_offset: u64,
+    address: Address,
+    overflows: Vec<Address>,
+    page_size: PageSize,
+    max_offset: u64,
+}
+
+impl NodeWriterContext {
+    pub fn new(address: Address, overflows: Vec<Address>, page_size: PageSize) -> Self {
+        Self {
+            address,
+            overflows,
+            page_size,
+            max_offset: 0,
+        }
+    }
+
+    pub fn finish<M: Memory>(mut self, allocator: &mut Allocator<M>) -> Vec<Address> {
+        deallocate_unused(&mut self, allocator);
+        self.overflows
+    }
 }
 
 pub fn write<M: Memory>(
@@ -294,7 +311,7 @@ pub fn write_struct<T, M: Memory>(
     write(addr, slice, allocator, ctx)
 }
 
-pub fn deallocate_unused<M: Memory>(ctx: &mut NodeWriterContext, allocator: &mut Allocator<M>) {
+fn deallocate_unused<M: Memory>(ctx: &mut NodeWriterContext, allocator: &mut Allocator<M>) {
     // Compute how many overflow pages are needed.
     let overflow_pages_needed = if ctx.max_offset as u32 > ctx.page_size.get() {
         //debug_assert!(page_size >= PAGE_OVERFLOW_DATA_OFFSET.get() as usize);
