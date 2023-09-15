@@ -180,6 +180,8 @@ pub struct NodeWriter<'a, M: Memory> {
     page_size: PageSize,
     overflows: Vec<Address>,
     allocator: &'a mut Allocator<M>,
+
+    // The maximum offset accessed while writing to memory.
     max_offset: u64,
 }
 
@@ -200,7 +202,7 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
     }
 
     pub fn finish(mut self) -> Vec<Address> {
-        self.deallocate_unused();
+        self.deallocate_unused_pages();
         self.overflows
     }
 
@@ -310,7 +312,8 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         self.overflows.push(new_page);
     }
 
-    fn deallocate_unused(&mut self) {
+    // Deallocates all the unused pages to avoid memory leaks.
+    fn deallocate_unused_pages(&mut self) {
         // Compute how many overflow pages are needed.
         let overflow_pages_needed = if self.max_offset as u32 > self.page_size.get() {
             let overflow_page_capacity =
@@ -323,9 +326,32 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
             0
         };
 
-        // TODO: set the last next address to NULL.
+        // There cannot be a case where we require more pages than what we currently have.
+        assert!(overflow_pages_needed <= self.overflows.len());
+
+        // Deallocate all the unused pages.
         while self.overflows.len() > overflow_pages_needed {
             self.allocator.deallocate(self.overflows.pop().unwrap());
+        }
+
+        // Let the last overflow page point to NULL.
+        match self.overflows.last() {
+            Some(last_overflow) => {
+                // There is a previous overflow. Update its next offset.
+                write_u64(
+                    self.allocator.memory(),
+                    *last_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
+                    NULL.get(),
+                );
+            }
+            None => {
+                // There is no previous overflow. Update the overflow address of the initial node.
+                write_u64(
+                    self.allocator.memory(),
+                    self.address + OVERFLOW_ADDRESS_OFFSET,
+                    NULL.get(),
+                );
+            }
         }
     }
 }

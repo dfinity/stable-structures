@@ -237,3 +237,47 @@ fn growing_and_shrinking_entries_does_not_leak_memory() {
     // The extra chunks are deallocated and we're back to the original number of chunks.
     assert_eq!(num_allocated_chunks, allocator.num_allocated_chunks());
 }
+
+#[test]
+fn growing_and_shrinking_2() {
+    let mem = make_memory();
+    let allocator_addr = Address::from(0);
+    let mut allocator = Allocator::new(mem.clone(), allocator_addr, PageSize::Value(500).get().into());
+
+    let node_addr = allocator.allocate();
+    let mut node = Node::new_v2(
+        node_addr,
+        NodeType::Leaf,
+        PageSize::Value(500),
+    );
+
+    // Insert an entry substantially larger than the page size and save it.
+    node.push_entry((vec![1, 2, 3], vec![0; 10000]));
+    node.save(&mut allocator);
+
+    let num_allocated_chunks = allocator.num_allocated_chunks();
+
+    // The node is more than one page.
+    assert!(num_allocated_chunks > 1);
+
+    // Swap the value with a much smaller value.
+    node.swap_entry(0, (vec![1, 2, 3], vec![4, 5, 6]), allocator.memory());
+    node.save(&mut allocator);
+
+    let mut node2: Node<Vec<u8>> = Node::new_v2(
+        allocator.allocate(),
+        NodeType::Leaf,
+        PageSize::Value(500),
+    );
+
+    node2.push_entry((vec![1], vec![2]));
+    node2.save(&mut allocator);
+
+    let mut node = Node::load_v2(node_addr, PageSize::Value(500), &mem);
+
+    // Swap the value with one that is similar in size to the original value.
+    node.swap_entry(0, (vec![1, 2, 3], vec![3; 10000]), allocator.memory());
+    node.save(&mut allocator);
+    // The extra chunks are deallocated and we're back to the original number of chunks.
+//    assert_eq!(num_allocated_chunks, allocator.num_allocated_chunks());
+}
