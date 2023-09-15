@@ -207,9 +207,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
-        let memory = allocator.memory();
         for i in 0..self.keys.len() {
-            self.value(i, memory);
+            self.value(i, allocator.memory());
         }
 
         let mut offset = Address::from(0);
@@ -218,6 +217,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             self.address,
             std::mem::take(&mut self.overflows),
             self.page_size(),
+            allocator,
         );
 
         let header = NodeHeader {
@@ -230,7 +230,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             num_entries: self.keys.len() as u16,
         };
 
-        io::write_struct(&header, offset, allocator, &mut write_ctx);
+        io::write_struct(&header, offset, &mut write_ctx);
 
         offset += NodeHeader::size();
         // Add a null overflow address. This might get overwritten later in case the node
@@ -238,14 +238,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         io::write_u64(
             offset,
             self.overflows.get(0).unwrap_or(&Address::from(0)).get(),
-            allocator,
             &mut write_ctx,
         );
         offset += Bytes::from(8u64);
 
         // Write the children
         for child in self.children.iter() {
-            io::write_u64(offset, child.get(), allocator, &mut write_ctx);
+            io::write_u64(offset, child.get(), &mut write_ctx);
             offset += Address::size();
         }
 
@@ -255,28 +254,28 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the size of the key if it isn't fixed in size.
             if !is_fixed_size::<K>() {
-                io::write_u32(offset, key_bytes.len() as u32, allocator, &mut write_ctx);
+                io::write_u32(offset, key_bytes.len() as u32, &mut write_ctx);
                 offset += U32_SIZE;
             }
 
             // Write the key.
-            io::write(offset, key_bytes.borrow(), allocator, &mut write_ctx);
+            io::write(offset, key_bytes.borrow(), &mut write_ctx);
             offset += Bytes::from(key_bytes.len());
         }
 
         // Write the values.
         for idx in 0..self.entries_len() {
             // Write the size of the value.
-            let value = self.value(idx, allocator.memory());
-            io::write_u32(offset, value.len() as u32, allocator, &mut write_ctx);
+            let value = self.value(idx, write_ctx.memory());
+            io::write_u32(offset, value.len() as u32, &mut write_ctx);
             offset += U32_SIZE;
 
             // Write the value.
-            io::write(offset, &value, allocator, &mut write_ctx);
+            io::write(offset, &value, &mut write_ctx);
             offset += Bytes::from(value.len());
         }
 
-        self.overflows = write_ctx.finish(allocator);
+        self.overflows = write_ctx.finish();
     }
 }
 
