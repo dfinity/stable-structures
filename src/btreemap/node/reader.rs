@@ -169,77 +169,90 @@ impl Iterator for NodeIterator {
     }
 }
 
-/// TODO
-pub struct NodeWriter<'a, M: Memory> {
+pub struct NodeWriter2<'a> {
     pub address: Address,
     pub overflows: &'a [Address],
     pub page_size: PageSize,
-    pub allocator: &'a Allocator<M>,
 }
 
-impl<'a, M: Memory> Memory for NodeWriter<'a, M> {
-    fn read(&self, _: u64, _: &mut [u8]) {
-        unreachable!("NodeWriter does not call read")
+pub fn write_node<M: Memory>(
+    offset: Address,
+    src: &[u8],
+    allocator: &Allocator<M>,
+    ctx: &NodeWriter2,
+) {
+    let offset = offset.get();
+    let memory = allocator.memory();
+
+    if (offset + src.len() as u64) < ctx.page_size.get() as u64 {
+        write(memory, ctx.address.get() + offset, src);
+        return;
     }
 
-    fn write(&self, offset: u64, src: &[u8]) {
-        let memory = self.allocator.memory();
+    let iter = NodeIterator::new(
+        VirtualSegment {
+            address: Address::from(offset),
+            length: Bytes::from(src.len() as u64),
+        },
+        Bytes::from(ctx.page_size.get()),
+    );
 
-        if (offset + src.len() as u64) < self.page_size.get() as u64 {
-            write(memory, self.address.get() + offset, src);
-            return;
-        }
-
-        let iter = NodeIterator::new(
-            VirtualSegment {
-                address: Address::from(offset),
-                length: Bytes::from(src.len() as u64),
-            },
-            Bytes::from(self.page_size.get()),
-        );
-
-        let mut bytes_written = 0;
-        for RealSegment {
-            page_idx,
-            offset,
-            length,
-        } in iter
-        {
-            if page_idx == 0 {
-                write(
-                    memory,
-                    (self.address + offset).get(),
-                    &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-                );
-            } else {
-                if self.overflows.len() < page_idx {
-                    panic!("shouldn't happen");
-                }
-
-                write(
-                    memory,
-                    (self.overflows[page_idx - 1] + offset).get(),
-                    &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-                );
+    let mut bytes_written = 0;
+    for RealSegment {
+        page_idx,
+        offset,
+        length,
+    } in iter
+    {
+        if page_idx == 0 {
+            write(
+                memory,
+                (ctx.address + offset).get(),
+                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
+            );
+        } else {
+            if ctx.overflows.len() < page_idx {
+                panic!("shouldn't happen");
             }
 
-            bytes_written += length.get();
+            write(
+                memory,
+                (ctx.overflows[page_idx - 1] + offset).get(),
+                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
+            );
         }
+
+        bytes_written += length.get();
     }
+}
 
-    fn size(&self) -> u64 {
-        100 // FIXME
-    }
+pub fn write_u32<M: Memory>(
+    offset: Address,
+    val: u32,
+    allocator: &Allocator<M>,
+    ctx: &NodeWriter2,
+) {
+    write_node(offset, &val.to_le_bytes(), allocator, ctx);
+}
 
-    fn grow(&self, _: u64) -> i64 {
-        unreachable!("NodeReader does not call grow")
-    }
+pub fn write_u64<M: Memory>(
+    offset: Address,
+    val: u64,
+    allocator: &Allocator<M>,
+    ctx: &NodeWriter2,
+) {
+    write_node(offset, &val.to_le_bytes(), allocator, ctx);
+}
 
-    /*fn add_overflow_page(&mut self) {
-        let new_page = allocator.allocate();
+pub fn write_struct<T, M: Memory>(
+    t: &T,
+    addr: Address,
+    allocator: &Allocator<M>,
+    ctx: &NodeWriter2,
+) {
+    let slice = unsafe {
+        core::slice::from_raw_parts(t as *const _ as *const u8, core::mem::size_of::<T>())
+    };
 
-        // TODO: set the header of the overflow page.
-
-        // Make the previous page point to the new page.
-    }*/
+    write_node(addr, slice, allocator, ctx)
 }

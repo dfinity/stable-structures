@@ -72,12 +72,19 @@
 //! Wasm pages.
 
 use super::*;
-use crate::btreemap::{node::reader::NodeWriter, Allocator};
+use crate::btreemap::Allocator;
 use crate::write_u64;
 use crate::{
+    btreemap::node::reader::{
+        write_node, write_struct, write_u32 as write_u32_new, write_u64 as write_u64_new,
+        NodeWriter2,
+    },
     storable::{is_fixed_size, max_size},
     types::NULL,
 };
+
+//mod writer;
+//use writer::{
 
 // Initial page
 const LAYOUT_VERSION_2: u8 = 2;
@@ -246,11 +253,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let mut offset = Address::from(0);
 
-        let writer = NodeWriter {
+        let write_ctx = NodeWriter2 {
             address: self.address,
             page_size: self.page_size(),
             overflows: &self.overflows,
-            allocator,
         };
 
         let header = NodeHeader {
@@ -263,15 +269,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
             num_entries: self.keys.len() as u16,
         };
 
-        write_struct(&header, offset, &writer);
+        write_struct(&header, offset, allocator, &write_ctx);
 
         offset += NodeHeader::size();
         // Add a null overflow address. This might get overwritten later in case the node
         // does overflow.
-        write_u64(
-            &writer,
+
+        write_u64_new(
             offset,
             self.overflows.get(0).unwrap_or(&Address::from(0)).get(),
+            allocator,
+            &write_ctx,
         );
         offset += Bytes::from(8u64);
 
@@ -280,7 +288,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Write the children
         for child in self.children.iter() {
-            write_u64(&writer, offset, child.get());
+            write_u64_new(offset, child.get(), allocator, &write_ctx);
             offset += Address::size();
         }
 
@@ -290,12 +298,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the size of the key if it isn't fixed in size.
             if !is_fixed_size::<K>() {
-                write_u32(&writer, offset, key_bytes.len() as u32);
+                write_u32_new(offset, key_bytes.len() as u32, allocator, &write_ctx);
                 offset += U32_SIZE;
             }
 
             // Write the key.
-            write(&writer, offset.get(), key_bytes.borrow());
+            write_node(offset, key_bytes.borrow(), allocator, &write_ctx);
             offset += Bytes::from(key_bytes.len());
         }
 
@@ -303,11 +311,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         for idx in 0..self.entries_len() {
             // Write the size of the value.
             let value = self.value(idx, allocator.memory());
-            write_u32(&writer, offset, value.len() as u32);
+            write_u32_new(offset, value.len() as u32, allocator, &write_ctx);
             offset += U32_SIZE;
 
             // Write the value.
-            write(&writer, offset.get(), &value);
+            write_node(offset, &value, allocator, &write_ctx);
             offset += Bytes::from(value.len());
         }
     }
