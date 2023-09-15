@@ -368,10 +368,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.keys.binary_search(key)
     }
 
-    /// Returns the size of a node in bytes.
+    /// Returns the maximum size a node can be if it has bounded keys and values.
     ///
     /// See the documentation of [`Node`] for the memory layout.
-    pub fn size(max_key_size: u32, max_value_size: u32) -> Bytes {
+    pub fn max_size(max_key_size: u32, max_value_size: u32) -> Bytes {
         v1::size_v1(max_key_size, max_value_size)
     }
 
