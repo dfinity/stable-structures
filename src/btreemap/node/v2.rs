@@ -74,7 +74,7 @@
 use super::*;
 use crate::btreemap::Allocator;
 use crate::{
-    btreemap::node::io,
+    btreemap::node::io::NodeWriter,
     storable::{is_fixed_size, max_size},
     types::NULL,
 };
@@ -213,9 +213,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let mut offset = Address::from(0);
 
-        let mut write_ctx = io::NodeWriter::new(
+        let mut writer = NodeWriter::new(
             self.address,
-            self.overflows.clone(),
+            self.overflows.clone(), // TODO: add test when this is taken
             self.page_size(),
             allocator,
         );
@@ -230,12 +230,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
             num_entries: self.keys.len() as u16,
         };
 
-        write_ctx.write_struct(&header, offset);
+        writer.write_struct(&header, offset);
 
         offset += NodeHeader::size();
         // Add a null overflow address. This might get overwritten later in case the node
         // does overflow.
-        write_ctx.write_u64(
+        writer.write_u64(
             offset,
             self.overflows.get(0).unwrap_or(&Address::from(0)).get(),
         );
@@ -243,7 +243,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Write the children
         for child in self.children.iter() {
-            write_ctx.write_u64(offset, child.get());
+            writer.write_u64(offset, child.get());
             offset += Address::size();
         }
 
@@ -253,28 +253,28 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the size of the key if it isn't fixed in size.
             if !is_fixed_size::<K>() {
-                write_ctx.write_u32(offset, key_bytes.len() as u32);
+                writer.write_u32(offset, key_bytes.len() as u32);
                 offset += U32_SIZE;
             }
 
             // Write the key.
-            write_ctx.write(offset, key_bytes.borrow());
+            writer.write(offset, key_bytes.borrow());
             offset += Bytes::from(key_bytes.len());
         }
 
         // Write the values.
         for idx in 0..self.entries_len() {
             // Write the size of the value.
-            let value = self.value(idx, write_ctx.memory());
-            write_ctx.write_u32(offset, value.len() as u32);
+            let value = self.value(idx, writer.memory());
+            writer.write_u32(offset, value.len() as u32);
             offset += U32_SIZE;
 
             // Write the value.
-            write_ctx.write(offset, &value);
+            writer.write(offset, &value);
             offset += Bytes::from(value.len());
         }
 
-        self.overflows = write_ctx.finish();
+        self.overflows = writer.finish();
     }
 }
 
