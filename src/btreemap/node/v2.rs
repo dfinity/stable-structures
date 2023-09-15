@@ -213,9 +213,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let mut offset = Address::from(0);
 
-        let mut write_ctx = io::NodeWriterContext::new(
+        let mut write_ctx = io::NodeWriter::new(
             self.address,
-            std::mem::take(&mut self.overflows),
+            self.overflows.clone(),
             self.page_size(),
             allocator,
         );
@@ -230,21 +230,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
             num_entries: self.keys.len() as u16,
         };
 
-        io::write_struct(&header, offset, &mut write_ctx);
+        write_ctx.write_struct(&header, offset);
 
         offset += NodeHeader::size();
         // Add a null overflow address. This might get overwritten later in case the node
         // does overflow.
-        io::write_u64(
+        write_ctx.write_u64(
             offset,
             self.overflows.get(0).unwrap_or(&Address::from(0)).get(),
-            &mut write_ctx,
         );
         offset += Bytes::from(8u64);
 
         // Write the children
         for child in self.children.iter() {
-            io::write_u64(offset, child.get(), &mut write_ctx);
+            write_ctx.write_u64(offset, child.get());
             offset += Address::size();
         }
 
@@ -254,12 +253,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Write the size of the key if it isn't fixed in size.
             if !is_fixed_size::<K>() {
-                io::write_u32(offset, key_bytes.len() as u32, &mut write_ctx);
+                write_ctx.write_u32(offset, key_bytes.len() as u32);
                 offset += U32_SIZE;
             }
 
             // Write the key.
-            io::write(offset, key_bytes.borrow(), &mut write_ctx);
+            write_ctx.write(offset, key_bytes.borrow());
             offset += Bytes::from(key_bytes.len());
         }
 
@@ -267,11 +266,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         for idx in 0..self.entries_len() {
             // Write the size of the value.
             let value = self.value(idx, write_ctx.memory());
-            io::write_u32(offset, value.len() as u32, &mut write_ctx);
+            write_ctx.write_u32(offset, value.len() as u32);
             offset += U32_SIZE;
 
             // Write the value.
-            io::write(offset, &value, &mut write_ctx);
+            write_ctx.write(offset, &value);
             offset += Bytes::from(value.len());
         }
 

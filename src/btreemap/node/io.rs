@@ -173,7 +173,7 @@ impl Iterator for NodeIterator {
     }
 }
 
-pub struct NodeWriterContext<'a, M: Memory> {
+pub struct NodeWriter<'a, M: Memory> {
     address: Address,
     overflows: Vec<Address>,
     page_size: PageSize,
@@ -181,7 +181,7 @@ pub struct NodeWriterContext<'a, M: Memory> {
     allocator: &'a mut Allocator<M>,
 }
 
-impl<'a, M: Memory> NodeWriterContext<'a, M> {
+impl<'a, M: Memory> NodeWriter<'a, M> {
     pub fn new(
         address: Address,
         overflows: Vec<Address>,
@@ -198,126 +198,125 @@ impl<'a, M: Memory> NodeWriterContext<'a, M> {
     }
 
     pub fn finish(mut self) -> Vec<Address> {
-        deallocate_unused(&mut self);
+        self.deallocate_unused();
         self.overflows
     }
 
     pub fn memory(&self) -> &M {
         self.allocator.memory()
     }
-}
 
-pub fn write<M: Memory>(offset: Address, src: &[u8], ctx: &mut NodeWriterContext<M>) {
-    let offset = offset.get();
-    let end_offset = offset + src.len() as u64;
+    pub fn write(&mut self, offset: Address, src: &[u8]) {
+        let offset = offset.get();
+        let end_offset = offset + src.len() as u64;
 
-    if end_offset > ctx.max_offset {
-        ctx.max_offset = end_offset;
-    }
-
-    if end_offset < ctx.page_size.get() as u64 {
-        crate::write(ctx.allocator.memory(), ctx.address.get() + offset, src);
-        return;
-    }
-
-    let iter = NodeIterator::new(
-        VirtualSegment {
-            address: Address::from(offset),
-            length: Bytes::from(src.len() as u64),
-        },
-        Bytes::from(ctx.page_size.get()),
-    );
-
-    let mut bytes_written = 0;
-    for RealSegment {
-        page_idx,
-        offset,
-        length,
-    } in iter
-    {
-        if page_idx == 0 {
-            crate::write(
-                ctx.allocator.memory(),
-                (ctx.address + offset).get(),
-                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-            );
-        } else {
-            if ctx.overflows.len() < page_idx {
-                // Create new overflow page.
-                let new_page = ctx.allocator.allocate();
-                ctx.allocator
-                    .memory()
-                    .write(new_page.get(), &OVERFLOW_MAGIC[..]);
-                crate::write_u64(
-                    ctx.allocator.memory(),
-                    new_page + PAGE_OVERFLOW_NEXT_OFFSET,
-                    NULL.get(),
-                );
-
-                // Let the previous overflow page point to this one.
-                match ctx.overflows.last() {
-                    Some(prev_overflow) => {
-                        crate::write_u64(
-                            ctx.allocator.memory(),
-                            *prev_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
-                            new_page.get(),
-                        );
-                    }
-                    None => {
-                        crate::write_u64(
-                            ctx.allocator.memory(),
-                            ctx.address + OVERFLOW_ADDRESS_OFFSET,
-                            new_page.get(),
-                        );
-                    }
-                }
-
-                ctx.overflows.push(new_page);
-            }
-
-            crate::write(
-                ctx.allocator.memory(),
-                (ctx.overflows[page_idx - 1] + offset).get(),
-                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-            );
+        if end_offset > self.max_offset {
+            self.max_offset = end_offset;
         }
 
-        bytes_written += length.get();
+        if end_offset < self.page_size.get() as u64 {
+            crate::write(self.allocator.memory(), self.address.get() + offset, src);
+            return;
+        }
+
+        let iter = NodeIterator::new(
+            VirtualSegment {
+                address: Address::from(offset),
+                length: Bytes::from(src.len() as u64),
+            },
+            Bytes::from(self.page_size.get()),
+        );
+
+        let mut bytes_written = 0;
+        for RealSegment {
+            page_idx,
+            offset,
+            length,
+        } in iter
+        {
+            if page_idx == 0 {
+                crate::write(
+                    self.allocator.memory(),
+                    (self.address + offset).get(),
+                    &src[bytes_written as usize..(bytes_written + length.get()) as usize],
+                );
+            } else {
+                if self.overflows.len() < page_idx {
+                    // Create new overflow page.
+                    let new_page = self.allocator.allocate();
+                    self.allocator
+                        .memory()
+                        .write(new_page.get(), &OVERFLOW_MAGIC[..]);
+                    crate::write_u64(
+                        self.allocator.memory(),
+                        new_page + PAGE_OVERFLOW_NEXT_OFFSET,
+                        NULL.get(),
+                    );
+
+                    // Let the previous overflow page point to this one.
+                    match self.overflows.last() {
+                        Some(prev_overflow) => {
+                            crate::write_u64(
+                                self.allocator.memory(),
+                                *prev_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
+                                new_page.get(),
+                            );
+                        }
+                        None => {
+                            crate::write_u64(
+                                self.allocator.memory(),
+                                self.address + OVERFLOW_ADDRESS_OFFSET,
+                                new_page.get(),
+                            );
+                        }
+                    }
+
+                    self.overflows.push(new_page);
+                }
+
+                crate::write(
+                    self.allocator.memory(),
+                    (self.overflows[page_idx - 1] + offset).get(),
+                    &src[bytes_written as usize..(bytes_written + length.get()) as usize],
+                );
+            }
+
+            bytes_written += length.get();
+        }
     }
-}
 
-pub fn write_u32<M: Memory>(offset: Address, val: u32, ctx: &mut NodeWriterContext<M>) {
-    write(offset, &val.to_le_bytes(), ctx);
-}
+    pub fn write_u32(&mut self, offset: Address, val: u32) {
+        self.write(offset, &val.to_le_bytes());
+    }
 
-pub fn write_u64<M: Memory>(offset: Address, val: u64, ctx: &mut NodeWriterContext<M>) {
-    write(offset, &val.to_le_bytes(), ctx);
-}
+    pub fn write_u64(&mut self, offset: Address, val: u64) {
+        self.write(offset, &val.to_le_bytes());
+    }
 
-pub fn write_struct<T, M: Memory>(t: &T, addr: Address, ctx: &mut NodeWriterContext<M>) {
-    let slice = unsafe {
-        core::slice::from_raw_parts(t as *const _ as *const u8, core::mem::size_of::<T>())
-    };
+    pub fn write_struct<T>(&mut self, t: &T, addr: Address) {
+        let slice = unsafe {
+            core::slice::from_raw_parts(t as *const _ as *const u8, core::mem::size_of::<T>())
+        };
 
-    write(addr, slice, ctx)
-}
+        self.write(addr, slice)
+    }
 
-fn deallocate_unused<M: Memory>(ctx: &mut NodeWriterContext<M>) {
-    // Compute how many overflow pages are needed.
-    let overflow_pages_needed = if ctx.max_offset as u32 > ctx.page_size.get() {
-        //debug_assert!(page_size >= PAGE_OVERFLOW_DATA_OFFSET.get() as usize);
-        let overflow_page_capacity =
-            ctx.page_size.get() as usize - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
-        let overflow_data_len = ctx.max_offset as usize - ctx.page_size.get() as usize;
+    fn deallocate_unused(&mut self) {
+        // Compute how many overflow pages are needed.
+        let overflow_pages_needed = if self.max_offset as u32 > self.page_size.get() {
+            let overflow_page_capacity =
+                self.page_size.get() as usize - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
+            let overflow_data_len = self.max_offset as usize - self.page_size.get() as usize;
 
-        // Ceiling division
-        (overflow_data_len + overflow_page_capacity - 1) / overflow_page_capacity
-    } else {
-        0
-    };
+            // Ceiling division
+            (overflow_data_len + overflow_page_capacity - 1) / overflow_page_capacity
+        } else {
+            0
+        };
 
-    // TODO: set the last next address to NULL.
-    while ctx.overflows.len() > overflow_pages_needed {
-        ctx.allocator.deallocate(ctx.overflows.pop().unwrap());
+        // TODO: set the last next address to NULL.
+        while self.overflows.len() > overflow_pages_needed {
+            self.allocator.deallocate(self.overflows.pop().unwrap());
+        }
     }
 }
