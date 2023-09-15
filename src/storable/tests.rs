@@ -52,7 +52,7 @@ proptest! {
     }
 
     #[test]
-    fn optional_tuple_variable_width_u8_roundtrip(v in proptest::option::of((any::<u64>(), pvec(any::<u8>(), 0..40))) {
+    fn optional_tuple_variable_width_u8_roundtrip(v in proptest::option::of((any::<u64>(), pvec(any::<u8>(), 0..40)))) {
         let v = v.map(|(n, bytes)| (n, Blob::<48>::try_from(&bytes[..]).unwrap()));
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
