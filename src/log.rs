@@ -56,7 +56,9 @@
 //! ```
 use crate::{read_u64, safe_write, write_u64, Address, GrowFailed, Memory, Storable};
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::marker::PhantomData;
+use std::thread::LocalKey;
 
 #[cfg(test)]
 mod tests;
@@ -428,7 +430,7 @@ where
 
 /// Returns an iterator over entries in the log stored in a thread-local variable.
 pub fn iter_thread_local<T, I, D>(
-    local_key: &'static std::thread::LocalKey<std::cell::RefCell<Log<T, I, D>>>,
+    local_key: &'static LocalKey<RefCell<Log<T, I, D>>>,
 ) -> ThreadLocalRefIterator<T, I, D>
 where
     T: Storable,
@@ -448,7 +450,7 @@ where
     I: Memory + 'static,
     D: Memory + 'static,
 {
-    log: &'static std::thread::LocalKey<std::cell::RefCell<Log<T, I, D>>>,
+    log: &'static LocalKey<RefCell<Log<T, I, D>>>,
     buf: Vec<u8>,
     pos: u64,
 }
