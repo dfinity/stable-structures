@@ -481,8 +481,7 @@ where
     }
 
     fn count(self) -> usize {
-        let count = self.log.with(|cell| cell.borrow().len());
-        count.saturating_sub(self.pos) as usize
+        self.size_hint().0
     }
 
     fn nth(&mut self, n: usize) -> Option<T> {
