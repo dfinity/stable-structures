@@ -8,13 +8,13 @@ use crate::{
 use std::borrow::{Borrow, Cow};
 use std::cell::{Ref, RefCell};
 
-mod reader;
+mod io;
 #[cfg(test)]
 mod tests;
 mod v1;
 mod v2;
 
-use reader::NodeReader;
+use io::NodeReader;
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
@@ -346,6 +346,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .cloned()
             .zip((0..self.keys.len()).map(|idx| self.value(idx, memory).to_vec()))
             .collect()
+    }
+
+    #[cfg(test)]
+    pub fn overflows(&self) -> &[Address] {
+        &self.overflows
     }
 
     /// Returns the number of entries in the node.

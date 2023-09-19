@@ -5,7 +5,7 @@ btreemap_get_blob_128_1024:
     stable_memory_size: 261
 btreemap_get_blob_128_1024_v2:
   measurements:
-    instructions: 1140173768
+    instructions: 1140173858
     node_load_v2: 933785784
     stable_memory_size: 196
 btreemap_get_blob_16_1024:
@@ -25,7 +25,7 @@ btreemap_get_blob_256_1024:
     stable_memory_size: 293
 btreemap_get_blob_256_1024_v2:
   measurements:
-    instructions: 1628351182
+    instructions: 1628351272
     node_load_v2: 1392993062
     stable_memory_size: 220
 btreemap_get_blob_32_1024:
@@ -95,7 +95,7 @@ btreemap_get_u64_blob_8:
     stable_memory_size: 8
 btreemap_get_u64_blob_8_v2:
   measurements:
-    instructions: 465392548
+    instructions: 465392638
     node_load_v2: 342799065
     stable_memory_size: 6
 btreemap_get_u64_u64:
@@ -105,278 +105,278 @@ btreemap_get_u64_u64:
     stable_memory_size: 8
 btreemap_get_u64_u64_v2:
   measurements:
-    instructions: 477401878
+    instructions: 477401968
     node_load_v2: 347289827
     stable_memory_size: 7
 btreemap_insert_10mib_values:
   measurements:
-    instructions: 278228334
+    instructions: 153745217
     node_load_v2: 10377468
-    node_save_v2: 245958554
+    node_save_v2: 121431267
     stable_memory_size: 33
 btreemap_insert_blob_128_1024:
   measurements:
-    instructions: 1730313092
+    instructions: 1729768012
     node_load_v1: 818923030
-    node_save_v1: 424573804
+    node_save_v1: 424336331
     stable_memory_size: 261
 btreemap_insert_blob_128_1024_v2:
   measurements:
-    instructions: 2230592033
-    node_load_v2: 916541484
-    node_save_v2: 814064656
+    instructions: 1885312232
+    node_load_v2: 916598797
+    node_save_v2: 470597559
     stable_memory_size: 196
 btreemap_insert_blob_16_1024:
   measurements:
-    instructions: 1177421502
+    instructions: 1176903332
     node_load_v1: 362914338
-    node_save_v1: 403464072
+    node_save_v1: 403232566
     stable_memory_size: 216
 btreemap_insert_blob_16_1024_v2:
   measurements:
-    instructions: 1588123192
-    node_load_v2: 440221819
-    node_save_v2: 739898082
+    instructions: 1295167866
+    node_load_v2: 440404989
+    node_save_v2: 448435449
     stable_memory_size: 162
 btreemap_insert_blob_256_1024:
   measurements:
-    instructions: 2255818313
+    instructions: 2255269553
     node_load_v1: 1272224795
-    node_save_v1: 430174789
+    node_save_v1: 429936500
     stable_memory_size: 293
 btreemap_insert_blob_256_1024_v2:
   measurements:
-    instructions: 2794429751
-    node_load_v2: 1368657545
-    node_save_v2: 851897559
+    instructions: 2415876387
+    node_load_v2: 1368714490
+    node_save_v2: 476169063
     stable_memory_size: 220
 btreemap_insert_blob_32_1024:
   measurements:
-    instructions: 1224612399
+    instructions: 1224078359
     node_load_v1: 390780802
-    node_save_v1: 415826600
+    node_save_v1: 415591575
     stable_memory_size: 231
 btreemap_insert_blob_32_1024_v2:
   measurements:
-    instructions: 1655605924
-    node_load_v2: 477569310
-    node_save_v2: 768954087
+    instructions: 1345546619
+    node_load_v2: 477582317
+    node_save_v2: 461048387
     stable_memory_size: 174
 btreemap_insert_blob_4_1024:
   measurements:
-    instructions: 938860652
+    instructions: 938459480
     node_load_v1: 246219371
-    node_save_v1: 370094431
+    node_save_v1: 369888833
     stable_memory_size: 124
 btreemap_insert_blob_4_1024_v2:
   measurements:
-    instructions: 1284860075
-    node_load_v2: 302568355
-    node_save_v2: 661255273
+    instructions: 1032956555
+    node_load_v2: 302721338
+    node_save_v2: 410342602
     stable_memory_size: 93
 btreemap_insert_blob_512_1024:
   measurements:
-    instructions: 3306816049
+    instructions: 3306266369
     node_load_v1: 2162164471
-    node_save_v1: 447463180
+    node_save_v1: 447224687
     stable_memory_size: 352
 btreemap_insert_blob_512_1024_v2:
   measurements:
-    instructions: 3902055470
-    node_load_v2: 2249757429
-    node_save_v2: 953602203
+    instructions: 3438950584
+    node_load_v2: 2249806809
+    node_save_v2: 493373365
     stable_memory_size: 264
 btreemap_insert_blob_64_1024:
   measurements:
-    instructions: 1464177820
+    instructions: 1463634810
     node_load_v1: 595998298
-    node_save_v1: 418743231
+    node_save_v1: 418506217
     stable_memory_size: 246
 btreemap_insert_blob_64_1024_v2:
   measurements:
-    instructions: 1928636138
-    node_load_v2: 692235029
-    node_save_v2: 785237958
+    instructions: 1606159890
+    node_load_v2: 692239035
+    node_save_v2: 464486004
     stable_memory_size: 184
 btreemap_insert_blob_8_1024:
   measurements:
-    instructions: 1084934108
+    instructions: 1084454578
     node_load_v1: 286595797
-    node_save_v1: 394314301
+    node_save_v1: 394091363
     stable_memory_size: 184
 btreemap_insert_blob_8_1024_v2:
   measurements:
-    instructions: 1458496280
-    node_load_v2: 344800342
-    node_save_v2: 711692000
+    instructions: 1183662633
+    node_load_v2: 344998681
+    node_save_v2: 437846838
     stable_memory_size: 139
 btreemap_insert_blob_8_u64:
   measurements:
-    instructions: 684689096
+    instructions: 684209106
     node_load_v1: 277937358
-    node_save_v1: 189388784
+    node_save_v1: 189165744
     stable_memory_size: 7
 btreemap_insert_blob_8_u64_v2:
   measurements:
-    instructions: 805533962
-    node_load_v2: 358481378
-    node_save_v2: 230438833
+    instructions: 810706169
+    node_load_v2: 358652286
+    node_save_v2: 236812122
     stable_memory_size: 5
 btreemap_insert_u64_blob_8:
   measurements:
-    instructions: 750190911
+    instructions: 749642151
     node_load_v1: 276866073
-    node_save_v1: 255664450
+    node_save_v1: 255566331
     stable_memory_size: 8
 btreemap_insert_u64_blob_8_v2:
   measurements:
-    instructions: 806917372
-    node_load_v2: 320660408
-    node_save_v2: 272412341
+    instructions: 821061744
+    node_load_v2: 320684381
+    node_save_v2: 287579894
     stable_memory_size: 6
 btreemap_insert_u64_u64:
   measurements:
-    instructions: 771845193
+    instructions: 771295973
     node_load_v1: 274520203
-    node_save_v1: 266527196
+    node_save_v1: 266429035
     stable_memory_size: 8
 btreemap_insert_u64_u64_v2:
   measurements:
-    instructions: 848175865
-    node_load_v2: 324943098
-    node_save_v2: 295936099
+    instructions: 851451139
+    node_load_v2: 324640651
+    node_save_v2: 299725270
     stable_memory_size: 7
 btreemap_remove_blob_128_1024:
   measurements:
-    instructions: 2236575844
+    instructions: 2235786044
     node_load_v1: 922607545
-    node_save_v1: 716920195
+    node_save_v1: 716437888
     stable_memory_size: 261
 btreemap_remove_blob_128_1024_v2:
   measurements:
-    instructions: 3031279182
-    node_load_v2: 1029479582
-    node_save_v2: 1412131798
+    instructions: 2433740025
+    node_load_v2: 1029552036
+    node_save_v2: 813254031
     stable_memory_size: 196
 btreemap_remove_blob_16_1024:
   measurements:
-    instructions: 1544917110
+    instructions: 1544195176
     node_load_v1: 420249550
-    node_save_v1: 654430779
+    node_save_v1: 653989748
     stable_memory_size: 216
 btreemap_remove_blob_16_1024_v2:
   measurements:
-    instructions: 2218448732
-    node_load_v2: 513947291
-    node_save_v2: 1243769246
+    instructions: 1718554037
+    node_load_v2: 514792050
+    node_save_v2: 742397634
     stable_memory_size: 162
 btreemap_remove_blob_256_1024:
   measurements:
-    instructions: 2839195280
+    instructions: 2838422216
     node_load_v1: 1421754484
-    node_save_v1: 722710062
+    node_save_v1: 722240539
     stable_memory_size: 293
 btreemap_remove_blob_256_1024_v2:
   measurements:
-    instructions: 3696334312
-    node_load_v2: 1528516744
-    node_save_v2: 1474999328
+    instructions: 3039070285
+    node_load_v2: 1528561438
+    node_save_v2: 816538911
     stable_memory_size: 220
 btreemap_remove_blob_32_1024:
   measurements:
-    instructions: 1622774819
+    instructions: 1622025795
     node_load_v1: 443614945
-    node_save_v1: 681136613
+    node_save_v1: 680680401
     stable_memory_size: 231
 btreemap_remove_blob_32_1024_v2:
   measurements:
-    instructions: 2327559094
-    node_load_v2: 545935373
-    node_save_v2: 1295876421
+    instructions: 1805280484
+    node_load_v2: 545887374
+    node_save_v2: 772783775
     stable_memory_size: 174
 btreemap_remove_blob_4_1024:
   measurements:
-    instructions: 1006445824
+    instructions: 1005989932
     node_load_v1: 269171795
-    node_save_v1: 421165272
+    node_save_v1: 420883123
     stable_memory_size: 124
 btreemap_remove_blob_4_1024_v2:
   measurements:
-    instructions: 1417601784
-    node_load_v2: 334156300
-    node_save_v2: 771175843
+    instructions: 1123652378
+    node_load_v2: 334523075
+    node_save_v2: 477239816
     stable_memory_size: 93
 btreemap_remove_blob_512_1024:
   measurements:
-    instructions: 4124317339
+    instructions: 4123516635
     node_load_v1: 2441544783
-    node_save_v1: 765030850
+    node_save_v1: 764541981
     stable_memory_size: 352
 btreemap_remove_blob_512_1024_v2:
   measurements:
-    instructions: 5148900105
-    node_load_v2: 2551454747
-    node_save_v2: 1679737551
+    instructions: 4332164229
+    node_load_v2: 2551504154
+    node_save_v2: 862833705
     stable_memory_size: 264
 btreemap_remove_blob_64_1024:
   measurements:
-    instructions: 1917032351
+    instructions: 1916261049
     node_load_v1: 675469604
-    node_save_v1: 700312977
+    node_save_v1: 699843250
     stable_memory_size: 246
 btreemap_remove_blob_64_1024_v2:
   measurements:
-    instructions: 2663779711
-    node_load_v2: 783139557
-    node_save_v2: 1347825662
+    instructions: 2111313280
+    node_load_v2: 783191220
+    node_save_v2: 794574237
     stable_memory_size: 184
 btreemap_remove_blob_8_1024:
   measurements:
-    instructions: 1300448303
+    instructions: 1299825273
     node_load_v1: 325916114
-    node_save_v1: 562174712
+    node_save_v1: 561793980
     stable_memory_size: 184
 btreemap_remove_blob_8_1024_v2:
   measurements:
-    instructions: 1841887486
-    node_load_v2: 391438934
-    node_save_v2: 1045403922
+    instructions: 1435373289
+    node_load_v2: 391933707
+    node_save_v2: 638207440
     stable_memory_size: 139
 btreemap_remove_blob_8_u64:
   measurements:
-    instructions: 903826016
+    instructions: 903169486
     node_load_v1: 318747944
-    node_save_v1: 302202576
+    node_save_v1: 301798231
     stable_memory_size: 7
 btreemap_remove_blob_8_u64_v2:
   measurements:
-    instructions: 1051368948
-    node_load_v2: 405289279
-    node_save_v2: 364434857
+    instructions: 1083124566
+    node_load_v2: 407619215
+    node_save_v2: 389394303
     stable_memory_size: 5
 btreemap_remove_u64_blob_8:
   measurements:
-    instructions: 1072866879
+    instructions: 1072102455
     node_load_v1: 313757215
-    node_save_v1: 457702957
+    node_save_v1: 457512144
     stable_memory_size: 8
 btreemap_remove_u64_blob_8_v2:
   measurements:
-    instructions: 1131312211
-    node_load_v2: 364893854
-    node_save_v2: 464658073
+    instructions: 1189636395
+    node_load_v2: 366667638
+    node_save_v2: 518185171
     stable_memory_size: 6
 btreemap_remove_u64_u64:
   measurements:
-    instructions: 1110124274
+    instructions: 1109353494
     node_load_v1: 314148033
-    node_save_v1: 483110284
+    node_save_v1: 482917665
     stable_memory_size: 8
 btreemap_remove_u64_u64_v2:
   measurements:
-    instructions: 1193726508
-    node_load_v2: 372663005
-    node_save_v2: 507231342
+    instructions: 1243004765
+    node_load_v2: 374499836
+    node_save_v2: 551307909
     stable_memory_size: 7
 memory_manager_baseline:
   measurements:
