@@ -80,7 +80,6 @@ use crate::{
 };
 
 // Initial page
-const LAYOUT_VERSION_2: u8 = 2;
 pub(super) const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
 const ENTRIES_OFFSET: Bytes = Bytes::new(15);
 
@@ -111,7 +110,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a v2 node from memory at the given address.
-    pub(super) fn load_v2<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
+    pub(super) fn load_v2<M: Memory>(
+        address: Address,
+        page_size: PageSize,
+        header: NodeHeader,
+        memory: &M,
+    ) -> Self {
         #[cfg(feature = "profiler")]
         let _p = profiler::profile("node_load_v2");
 
@@ -126,8 +130,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         let mut offset = Address::from(0);
-
-        let header: NodeHeader = read_struct(Address::from(0), &reader);
 
         // Load the node type.
         let node_type = match header.node_type {

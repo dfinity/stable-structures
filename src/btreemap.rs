@@ -1155,7 +1155,7 @@ where
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
-        Node::load(address, self.memory(), self.version)
+        Node::load(address, self.version.page_size(), self.memory())
     }
 
     // Saves the map to memory.

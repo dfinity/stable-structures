@@ -126,10 +126,12 @@ fn saving_and_loading_v1_preserves_data(node_data: NodeV1Data) {
     node.save_v1(&mem);
 
     // Load the node and double check all the entries and children are correct.
-    let node = Node::load_v1(
+    let node = Node::load(
         node_addr,
-        node_data.max_key_size,
-        node_data.max_value_size,
+        PageSize::Derived(DerivedPageSize {
+            max_key_size: node_data.max_key_size,
+            max_value_size: node_data.max_value_size,
+        }),
         &mem,
     );
 
@@ -156,7 +158,7 @@ fn saving_and_loading_v2_preserves_data(node_data: NodeV2Data) {
     node.save_v2(&mut allocator);
 
     // Reload the node and double check all the entries and children are correct.
-    let node = Node::load_v2(node_addr, PageSize::Value(node_data.page_size), &mem);
+    let node = Node::load(node_addr, PageSize::Value(node_data.page_size), &mem);
 
     assert_eq!(node.children, node_data.children());
     assert_eq!(
@@ -178,16 +180,18 @@ fn migrating_v1_nodes_to_v2(node_data: NodeV1Data) {
     node.save_v1(allocator.memory());
 
     // Reload the v1 node and save it as v2.
-    let mut node = Node::<Vec<u8>>::load_v1(
+    let mut node = Node::<Vec<u8>>::load(
         node_addr,
-        node_data.max_key_size,
-        node_data.max_value_size,
+        PageSize::Derived(DerivedPageSize {
+            max_key_size: node_data.max_key_size,
+            max_value_size: node_data.max_value_size,
+        }),
         allocator.memory(),
     );
     node.save_v2(&mut allocator);
 
     // Reload the now v2 node and double check all the entries and children are correct.
-    let node = Node::load_v2(
+    let node = Node::load(
         node_addr,
         PageSize::Derived(DerivedPageSize {
             max_key_size: node_data.max_key_size,
