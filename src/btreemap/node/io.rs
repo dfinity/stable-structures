@@ -217,9 +217,7 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         // Update the max offset.
         let offset = offset.get();
         let end_offset = offset + src.len() as u64;
-        if end_offset > self.max_offset {
-            self.max_offset = end_offset;
-        }
+        self.max_offset = std::cmp::max(self.max_offset, end_offset);
 
         // If the write is only in the initial page, then write it directly in one go.
         // This is a performance enhancement to avoid the cost of creating a `NodeIterator`.
@@ -243,25 +241,23 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
             length,
         } in iter
         {
-            if page_idx == 0 {
+            let offset = if page_idx == 0 {
                 // Write to the initial page.
-                write(
-                    self.allocator.memory(),
-                    (self.address + offset).get(),
-                    &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-                );
+                (self.address + offset).get()
             } else {
                 // Write to an overflow page, allocating it if it doesn't already exist.
                 if self.overflows.len() < page_idx {
                     self.allocate_new_page();
                 }
 
-                write(
-                    self.allocator.memory(),
-                    (self.overflows[page_idx - 1] + offset).get(),
-                    &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-                );
-            }
+                (self.overflows[page_idx - 1] + offset).get()
+            };
+
+            write(
+                self.allocator.memory(),
+                offset,
+                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
+            );
 
             bytes_written += length.get();
         }
@@ -296,24 +292,20 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         );
 
         // Let the previous overflow page point to this one.
-        match self.overflows.last() {
-            Some(prev_overflow) => {
-                // There is a previous overflow. Update its next offset.
-                write_u64(
-                    self.allocator.memory(),
-                    *prev_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
-                    new_page.get(),
-                );
-            }
-            None => {
-                // There is no previous overflow. Update the overflow address of the initial node.
-                write_u64(
-                    self.allocator.memory(),
-                    self.address + OVERFLOW_ADDRESS_OFFSET,
-                    new_page.get(),
-                );
-            }
-        }
+        write_u64(
+            self.allocator.memory(),
+            match self.overflows.last() {
+                Some(prev_overflow) => {
+                    // There is a previous overflow. Update its next offset.
+                    *prev_overflow + PAGE_OVERFLOW_NEXT_OFFSET
+                }
+                None => {
+                    // There is no previous overflow. Update the overflow address of the initial node.
+                    self.address + OVERFLOW_ADDRESS_OFFSET
+                }
+            },
+            new_page.get(),
+        );
 
         self.overflows.push(new_page);
     }
@@ -321,16 +313,9 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
     // Deallocates all the unused pages to avoid memory leaks.
     fn deallocate_unused_pages(&mut self) {
         // Compute how many overflow pages are needed.
-        let overflow_pages_needed = if self.max_offset as u32 > self.page_size.get() {
-            let overflow_page_capacity =
-                self.page_size.get() as usize - PAGE_OVERFLOW_DATA_OFFSET.get() as usize;
-            let overflow_data_len = self.max_offset as usize - self.page_size.get() as usize;
-
-            // Ceiling division
-            (overflow_data_len + overflow_page_capacity - 1) / overflow_page_capacity
-        } else {
-            0
-        };
+        let overflow_pages_needed =
+            compute_num_overflow_pages_needed(self.max_offset, self.page_size.get() as u64)
+                as usize;
 
         // There cannot be a case where we require more pages than what we currently have.
         assert!(overflow_pages_needed <= self.overflows.len());
@@ -341,23 +326,71 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         }
 
         // Let the last overflow page point to NULL.
-        match self.overflows.last() {
-            Some(last_overflow) => {
-                // There is a previous overflow. Update its next offset.
-                write_u64(
-                    self.allocator.memory(),
-                    *last_overflow + PAGE_OVERFLOW_NEXT_OFFSET,
-                    NULL.get(),
-                );
-            }
-            None => {
-                // There is no previous overflow. Update the overflow address of the initial node.
-                write_u64(
-                    self.allocator.memory(),
-                    self.address + OVERFLOW_ADDRESS_OFFSET,
-                    NULL.get(),
-                );
-            }
-        }
+        write_u64(
+            self.allocator.memory(),
+            match self.overflows.last() {
+                Some(last_overflow) => {
+                    // There is a previous overflow. Update its next offset.
+                    *last_overflow + PAGE_OVERFLOW_NEXT_OFFSET
+                }
+                None => {
+                    // There is no previous overflow. Update the overflow address of the initial node.
+                    self.address + OVERFLOW_ADDRESS_OFFSET
+                }
+            },
+            NULL.get(),
+        );
+    }
+}
+
+// Computes how many overflow pages are needed to store the given bytes.
+fn compute_num_overflow_pages_needed(size: u64, page_size: u64) -> u64 {
+    if size > page_size {
+        // The amount of data to store in the overflow pages.
+        let overflow_data_len = size - page_size;
+
+        // The amount of data that can be stored per overflow page.
+        let overflow_page_capacity = page_size - PAGE_OVERFLOW_DATA_OFFSET.get();
+
+        // Ceiling division
+        (overflow_data_len + overflow_page_capacity - 1) / overflow_page_capacity
+    } else {
+        0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn num_overflow_pages_no_overflows() {
+        assert_eq!(compute_num_overflow_pages_needed(0, 100), 0);
+    }
+
+    #[test]
+    fn num_overflow_pages_exactly_one_page() {
+        assert_eq!(compute_num_overflow_pages_needed(100, 100), 0);
+    }
+
+    #[test]
+    fn num_overflow_pages_two_pages() {
+        assert_eq!(compute_num_overflow_pages_needed(101, 100), 1);
+    }
+
+    #[test]
+    fn num_overflow_pages_exactly_two_pages() {
+        assert_eq!(
+            compute_num_overflow_pages_needed(200 - PAGE_OVERFLOW_DATA_OFFSET.get(), 100),
+            1
+        );
+    }
+
+    #[test]
+    fn num_overflow_pages_just_over_two_pages() {
+        assert_eq!(
+            compute_num_overflow_pages_needed(200 - PAGE_OVERFLOW_DATA_OFFSET.get() + 1, 100),
+            2
+        );
     }
 }
