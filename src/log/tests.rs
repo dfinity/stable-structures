@@ -1,6 +1,16 @@
-use crate::log::{InitError, Log, WriteError};
+use crate::log::{iter_thread_local, InitError, Log, WriteError};
 use crate::vec_mem::VectorMemory;
 use crate::{Memory, RestrictedMemory, WASM_PAGE_SIZE};
+use std::cell::RefCell;
+
+thread_local! {
+    static STRING_LOG: RefCell<Log<String, VectorMemory, VectorMemory>> = RefCell::new(new_string_log());
+}
+
+fn new_string_log() -> Log<String, VectorMemory, VectorMemory> {
+    Log::init(VectorMemory::default(), VectorMemory::default())
+        .expect("failed to initialize stable log")
+}
 
 #[test]
 fn test_log_construct() {
@@ -226,4 +236,45 @@ fn test_iter() {
     assert_eq!(log.iter().skip(3).count(), 0);
     assert_eq!(log.iter().skip(4).count(), 0);
     assert_eq!(log.iter().skip(usize::MAX).count(), 0);
+}
+
+#[allow(clippy::iter_nth_zero)]
+#[test]
+fn test_thread_local_iter() {
+    let new_iter = || iter_thread_local(&STRING_LOG);
+
+    assert_eq!(new_iter().next(), None);
+
+    STRING_LOG.with(|cell| {
+        *cell.borrow_mut() = new_string_log();
+        let log = cell.borrow();
+        log.append(&"apple".to_string()).unwrap();
+        log.append(&"banana".to_string()).unwrap();
+        log.append(&"cider".to_string()).unwrap();
+    });
+
+    let mut iter = new_iter();
+    assert_eq!(iter.size_hint(), (3, None));
+    assert_eq!(iter.next(), Some("apple".to_string()));
+    assert_eq!(iter.size_hint(), (2, None));
+    assert_eq!(iter.next(), Some("banana".to_string()));
+    assert_eq!(iter.size_hint(), (1, None));
+    assert_eq!(iter.next(), Some("cider".to_string()));
+    assert_eq!(iter.size_hint(), (0, None));
+    assert_eq!(iter.next(), None);
+
+    assert_eq!(new_iter().nth(0), Some("apple".to_string()));
+    assert_eq!(new_iter().nth(1), Some("banana".to_string()));
+    assert_eq!(new_iter().nth(2), Some("cider".to_string()));
+    assert_eq!(new_iter().nth(3), None);
+    assert_eq!(new_iter().nth(4), None);
+    assert_eq!(new_iter().nth(usize::MAX), None);
+
+    assert_eq!(new_iter().count(), 3);
+    assert_eq!(new_iter().skip(0).count(), 3);
+    assert_eq!(new_iter().skip(1).count(), 2);
+    assert_eq!(new_iter().skip(2).count(), 1);
+    assert_eq!(new_iter().skip(3).count(), 0);
+    assert_eq!(new_iter().skip(4).count(), 0);
+    assert_eq!(new_iter().skip(usize::MAX).count(), 0);
 }

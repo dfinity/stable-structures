@@ -56,7 +56,9 @@
 //! ```
 use crate::{read_u64, safe_write, write_u64, Address, GrowFailed, Memory, Storable};
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::marker::PhantomData;
+use std::thread::LocalKey;
 
 #[cfg(test)]
 mod tests;
@@ -418,6 +420,68 @@ where
             panic!("The number of items in the log {n} does not fit into usize");
         }
         n as usize
+    }
+
+    fn nth(&mut self, n: usize) -> Option<T> {
+        self.pos = self.pos.saturating_add(n as u64);
+        self.next()
+    }
+}
+
+/// Returns an iterator over entries in the log stored in a thread-local variable.
+pub fn iter_thread_local<T, I, D>(
+    local_key: &'static LocalKey<RefCell<Log<T, I, D>>>,
+) -> ThreadLocalRefIterator<T, I, D>
+where
+    T: Storable,
+    I: Memory,
+    D: Memory,
+{
+    ThreadLocalRefIterator {
+        log: local_key,
+        buf: vec![],
+        pos: 0,
+    }
+}
+
+pub struct ThreadLocalRefIterator<T, I, D>
+where
+    T: Storable + 'static,
+    I: Memory + 'static,
+    D: Memory + 'static,
+{
+    log: &'static LocalKey<RefCell<Log<T, I, D>>>,
+    buf: Vec<u8>,
+    pos: u64,
+}
+
+impl<T, I, D> Iterator for ThreadLocalRefIterator<T, I, D>
+where
+    T: Storable,
+    I: Memory,
+    D: Memory,
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        self.log.with(
+            |log| match log.borrow().read_entry(self.pos, &mut self.buf) {
+                Ok(()) => {
+                    self.pos = self.pos.saturating_add(1);
+                    Some(T::from_bytes(Cow::Borrowed(&self.buf)))
+                }
+                Err(NoSuchEntry) => None,
+            },
+        )
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let count = self.log.with(|cell| cell.borrow().len());
+        (count.saturating_sub(self.pos) as usize, None)
+    }
+
+    fn count(self) -> usize {
+        self.size_hint().0
     }
 
     fn nth(&mut self, n: usize) -> Option<T> {
