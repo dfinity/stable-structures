@@ -54,6 +54,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Loads a v1 node from memory at the given address.
     pub(super) fn load_v1<M: Memory>(
+        header: NodeHeader,
         address: Address,
         max_key_size: u32,
         max_value_size: u32,
@@ -61,11 +62,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) -> Self {
         #[cfg(feature = "profiler")]
         let _p = profiler::profile("node_load_v1");
-
-        // Load the header.
-        let header: NodeHeader = read_struct(address, memory);
-        assert_eq!(&header.magic, MAGIC, "Bad magic.");
-        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
         // Load the entries.
         let mut keys = Vec::with_capacity(header.num_entries as usize);
@@ -149,7 +145,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let header = NodeHeader {
             magic: *MAGIC,
-            version: LAYOUT_VERSION,
+            version: LAYOUT_VERSION_1,
             node_type: match self.node_type {
                 NodeType::Leaf => LEAF_NODE_TYPE,
                 NodeType::Internal => INTERNAL_NODE_TYPE,

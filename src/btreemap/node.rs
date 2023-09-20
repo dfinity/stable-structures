@@ -21,7 +21,8 @@ use io::NodeReader;
 const B: usize = 6;
 // The maximum number of entries per node.
 const CAPACITY: usize = 2 * B - 1;
-const LAYOUT_VERSION: u8 = 1;
+const LAYOUT_VERSION_1: u8 = 1;
+const LAYOUT_VERSION_2: u8 = 2;
 const MAGIC: &[u8; 3] = b"BTN";
 const LEAF_NODE_TYPE: u8 = 0;
 const INTERNAL_NODE_TYPE: u8 = 1;
@@ -65,13 +66,22 @@ pub struct Node<K: Storable + Ord + Clone> {
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a node from memory at the given address.
-    pub fn load<M: Memory>(address: Address, memory: &M, version: Version) -> Self {
-        match version {
-            Version::V1(DerivedPageSize {
-                max_key_size,
-                max_value_size,
-            }) => Self::load_v1(address, max_key_size, max_value_size, memory),
-            Version::V2(page_size) => Self::load_v2(address, page_size, memory),
+    pub fn load<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
+        // Load the header to determine which version the node is, then load the node accordingly.
+        let header: NodeHeader = read_struct(address, memory);
+        assert_eq!(&header.magic, MAGIC, "Bad magic.");
+        match header.version {
+            LAYOUT_VERSION_1 => match page_size {
+                PageSize::Derived(DerivedPageSize {
+                    max_key_size,
+                    max_value_size,
+                }) => Self::load_v1(header, address, max_key_size, max_value_size, memory),
+                PageSize::Value(_) => {
+                    unreachable!("Tried to load a V1 node without a derived PageSize.")
+                }
+            },
+            LAYOUT_VERSION_2 => Self::load_v2(address, page_size, header, memory),
+            unknown_version => unreachable!("Unsupported version {unknown_version}."),
         }
     }
 
@@ -108,8 +118,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
                         .children
                         .last()
                         .expect("An internal node must have children."),
+                    self.version.page_size(),
                     memory,
-                    self.version,
                 );
                 last_child.get_max(memory)
             }
@@ -127,8 +137,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 let first_child = Self::load(
                     // NOTE: an internal node must have children, so this access is safe.
                     self.children[0],
+                    self.version.page_size(),
                     memory,
-                    self.version,
                 );
                 first_child.get_min(memory)
             }
