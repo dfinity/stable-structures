@@ -170,7 +170,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Write the entries.
         for (idx, key) in self.keys.iter().enumerate() {
             // Write the size of the key.
-            let key_bytes = key.to_bytes();
+            let key_bytes = key.to_bytes_checked();
             write_u32(memory, self.address + offset, key_bytes.len() as u32);
             offset += U32_SIZE;
 
