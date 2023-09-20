@@ -149,32 +149,6 @@ where
     ///    |  BTreeHeader  |  Allocator | ... free memory for nodes |
     ///
     /// See `Allocator` for more details on its own memory layout.
-    pub fn new_v1(memory: M) -> Self {
-        let max_key_size = max_size::<K>();
-        let max_value_size = max_size::<V>();
-
-        let btree = Self {
-            root_addr: NULL,
-            allocator: Allocator::new(
-                memory,
-                Address::from(ALLOCATOR_OFFSET as u64),
-                Node::<K>::max_size(max_key_size, max_value_size),
-            ),
-            version: Version::V1(DerivedPageSize {
-                max_key_size,
-                max_value_size,
-            }),
-            length: 0,
-            _phantom: PhantomData,
-        };
-
-        btree.save();
-        btree
-    }
-
-    /// Create a v2 instance of the BTree.
-    /// This is currently exposed only for beta-testing purposes and will be removed in favor of
-    /// using BTreeMap::new directly once V2 is tested well enough.
     pub fn new(memory: M) -> Self {
         let page_size = match (K::BOUND, V::BOUND) {
             // The keys and values are both bounded.
@@ -217,6 +191,32 @@ where
         btree
     }
 
+    /// Create a v1 instance of the BTree.
+    ///
+    /// This is primarily exposed for testing and benchmarking.
+    pub fn new_v1(memory: M) -> Self {
+        let max_key_size = max_size::<K>();
+        let max_value_size = max_size::<V>();
+
+        let btree = Self {
+            root_addr: NULL,
+            allocator: Allocator::new(
+                memory,
+                Address::from(ALLOCATOR_OFFSET as u64),
+                Node::<K>::max_size(max_key_size, max_value_size),
+            ),
+            version: Version::V1(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            }),
+            length: 0,
+            _phantom: PhantomData,
+        };
+
+        btree.save();
+        btree
+    }
+
     /// Loads the map from memory.
     pub fn load(memory: M) -> Self {
         Self::load_helper(memory, true)
@@ -247,6 +247,7 @@ where
             }
         }
 
+        // Migrate to V2 if flag is enabled.
         let version = match header.version {
             Version::V1(derived_page_size) => {
                 if migrate_to_v2 {
