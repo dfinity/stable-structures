@@ -32,14 +32,14 @@ pub trait Storable {
                 assert_eq!(
                     bytes.len(),
                     max_size as usize,
-                    "expected a fixed-size element with length {} bytes, but found {}",
+                    "expected a fixed-size element with length {} bytes, but found {} bytes",
                     max_size,
                     bytes.len()
                 );
             } else {
                 assert!(
                     bytes.len() <= max_size as usize,
-                    "expected an element with length <= {} bytes, but found {}",
+                    "expected an element with length <= {} bytes, but found {} bytes",
                     max_size,
                     bytes.len()
                 );

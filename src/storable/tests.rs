@@ -74,7 +74,7 @@ fn to_bytes_checked_unbounded_element_no_panic() {
         const BOUND: Bound = Bound::Unbounded;
     }
 
-    X.to_bytes_checked();
+    assert_eq!(X.to_bytes_checked(), Cow::Borrowed(&[1, 2, 3, 4]));
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn to_bytes_checked_element_correct_size_no_panic() {
         };
     }
 
-    X.to_bytes_checked();
+    assert_eq!(X.to_bytes_checked(), Cow::Borrowed(&[1, 2, 3, 4]));
 }
 
 #[test]
@@ -138,5 +138,5 @@ fn to_bytes_checked_fixed_element_correct_size_no_panic() {
         };
     }
 
-    X.to_bytes_checked();
+    assert_eq!(X.to_bytes_checked(), Cow::Borrowed(&[1, 2, 3, 4, 5]));
 }
