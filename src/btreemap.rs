@@ -116,14 +116,13 @@ where
         }
     }
 
-    /// Initializes a v2 `BTreeMap`.
+    /// Initializes a v1 `BTreeMap`.
     ///
-    /// This is currently exposed only for beta-testing purposes and will be removed in favor of
-    /// using BTreeMap::init directly once V2 is tested well enough.
-    pub fn init_v2(memory: M) -> Self {
+    /// This is primarily exposed for testing and benchmarking.
+    pub fn init_v1(memory: M) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
-            return BTreeMap::new_v2(memory);
+            return BTreeMap::new_v1(memory);
         }
 
         // Check if the magic in the memory corresponds to a BTreeMap.
@@ -131,10 +130,11 @@ where
         memory.read(0, &mut dst);
         if dst != MAGIC {
             // No BTreeMap found. Create a new instance.
-            BTreeMap::new_v2(memory)
+            BTreeMap::new_v1(memory)
         } else {
-            // The memory already contains a BTreeMap. Load it.
-            BTreeMap::load(memory)
+            // The memory already contains a BTreeMap. Load it, making sure
+            // we don't migrate the BTreeMap to v2.
+            BTreeMap::load_helper(memory, false)
         }
     }
 
@@ -149,7 +149,7 @@ where
     ///    |  BTreeHeader  |  Allocator | ... free memory for nodes |
     ///
     /// See `Allocator` for more details on its own memory layout.
-    pub fn new(memory: M) -> Self {
+    pub fn new_v1(memory: M) -> Self {
         let max_key_size = max_size::<K>();
         let max_value_size = max_size::<V>();
 
@@ -175,7 +175,7 @@ where
     /// Create a v2 instance of the BTree.
     /// This is currently exposed only for beta-testing purposes and will be removed in favor of
     /// using BTreeMap::new directly once V2 is tested well enough.
-    pub fn new_v2(memory: M) -> Self {
+    pub fn new(memory: M) -> Self {
         let page_size = match (K::BOUND, V::BOUND) {
             // The keys and values are both bounded.
             (
@@ -219,6 +219,11 @@ where
 
     /// Loads the map from memory.
     pub fn load(memory: M) -> Self {
+        Self::load_helper(memory, true)
+    }
+
+    // Loads the map from memory, potentially migrating the map from V1 to V2.
+    fn load_helper(memory: M, migrate_to_v2: bool) -> Self {
         // Read the header from memory.
         let header = Self::read_header(&memory);
 
@@ -242,11 +247,22 @@ where
             }
         }
 
+        let version = match header.version {
+            Version::V1(derived_page_size) => {
+                if migrate_to_v2 {
+                    Version::V2(PageSize::Derived(derived_page_size))
+                } else {
+                    Version::V1(derived_page_size)
+                }
+            }
+            other => other,
+        };
+
         let allocator_addr = Address::from(ALLOCATOR_OFFSET as u64);
         Self {
             root_addr: header.root_addr,
             allocator: Allocator::load(memory, allocator_addr),
-            version: header.version,
+            version,
             length: header.length,
             _phantom: PhantomData,
         }
@@ -1226,12 +1242,18 @@ mod test {
     {
         // Run the test with the V1 btree.
         let mem = make_memory();
-        let btree = BTreeMap::new(mem);
+        let btree = BTreeMap::new_v1(mem);
+        f(btree);
+
+        // Run the test with a V2 btree that was migrated from V1.
+        let mem = make_memory();
+        let btree: BTreeMap<K, V, _> = BTreeMap::new_v1(mem);
+        let btree = BTreeMap::load_helper(btree.into_memory(), true);
         f(btree);
 
         // Run the test with the V2 btree.
         let mem = make_memory();
-        let btree = BTreeMap::new_v2(mem);
+        let btree = BTreeMap::new(mem);
         f(btree);
     }
 
@@ -2438,10 +2460,38 @@ mod test {
 
     #[test]
     #[should_panic(expected = "max_key_size must be <= 4")]
-    fn rejects_larger_key_sizes() {
+    fn v1_rejects_increases_in_max_key_size() {
         let mem = make_memory();
-        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
-        let _btree: BTreeMap<Blob<5>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init_v1(mem);
+        let _btree: BTreeMap<Blob<5>, Blob<3>, _> = BTreeMap::init_v1(btree.into_memory());
+    }
+
+    #[test]
+    fn v2_handles_increases_in_max_key_size_and_max_value_size() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init(mem);
+        btree.insert(
+            [1u8; 4].as_slice().try_into().unwrap(),
+            [1u8; 4].as_slice().try_into().unwrap(),
+        );
+
+        // Reinitialize the BTree with larger keys and value sizes.
+        let mut btree: BTreeMap<Blob<5>, Blob<5>, _> = BTreeMap::init(btree.into_memory());
+        btree.insert(
+            [2u8; 5].as_slice().try_into().unwrap(),
+            [2u8; 5].as_slice().try_into().unwrap(),
+        );
+
+        // Still able to retrieve all the entries inserted.
+        assert_eq!(
+            btree.get(&([1u8; 4].as_slice().try_into().unwrap())),
+            Some([1u8; 4].as_slice().try_into().unwrap())
+        );
+
+        assert_eq!(
+            btree.get(&([2u8; 5].as_slice().try_into().unwrap())),
+            Some([2u8; 5].as_slice().try_into().unwrap())
+        );
     }
 
     #[test]
@@ -2456,10 +2506,10 @@ mod test {
 
     #[test]
     #[should_panic(expected = "max_value_size must be <= 3")]
-    fn rejects_larger_value_sizes() {
+    fn v1_rejects_larger_value_sizes() {
         let mem = make_memory();
-        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
-        let _btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init(btree.into_memory());
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init_v1(mem);
+        let _btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init_v1(btree.into_memory());
     }
 
     #[test]
@@ -2574,74 +2624,17 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "max_key_size must be <= 0")]
-    fn panics_if_max_key_grows() {
-        let mem = make_memory();
-        let btree: BTreeMap<(), (), _> = BTreeMap::init(mem);
-        btree.save();
-
-        #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
-        struct K;
-        impl crate::Storable for K {
-            fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Borrowed(&[1])
-            }
-
-            fn from_bytes(_: Cow<[u8]>) -> Self {
-                unimplemented!();
-            }
-
-            const BOUND: StorableBound = StorableBound::Bounded {
-                max_size: 1,
-                is_fixed_size: false,
-            };
-        }
-
-        // Reload the BTree but with a key that has a larger max_size. Should panic.
-        let _: BTreeMap<K, (), _> = BTreeMap::init(btree.into_memory());
-    }
-
-    #[test]
     #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
     fn v1_panics_if_key_is_bigger_than_max_size() {
-        let mut btree = BTreeMap::init(make_memory());
+        let mut btree = BTreeMap::init_v1(make_memory());
         btree.insert(BuggyStruct, ());
     }
 
     #[test]
     #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
     fn v2_panics_if_key_is_bigger_than_max_size() {
-        let mut btree = BTreeMap::init_v2(make_memory());
+        let mut btree = BTreeMap::init(make_memory());
         btree.insert(BuggyStruct, ());
-    }
-
-    #[test]
-    #[should_panic(expected = "max_value_size must be <= 0")]
-    fn v1_panics_if_value_is_too_large() {
-        // Initialize a btreemap where the key and value both have a max size of zero.
-        let mem = make_memory();
-        let btree: BTreeMap<(), (), _> = BTreeMap::init(mem);
-        btree.save();
-
-        #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
-        struct V;
-        impl crate::Storable for V {
-            fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Borrowed(&[1])
-            }
-
-            fn from_bytes(_: Cow<[u8]>) -> Self {
-                unimplemented!();
-            }
-
-            const BOUND: StorableBound = StorableBound::Bounded {
-                max_size: 1,
-                is_fixed_size: false,
-            };
-        }
-
-        // Reload the BTree but with a value that has a larger max_size. Should panic.
-        let _: BTreeMap<(), V, _> = BTreeMap::init(btree.into_memory());
     }
 
     #[test]
@@ -2664,7 +2657,7 @@ mod test {
     #[ignore]
     fn create_btreemap_dump_file() {
         let mem = make_memory();
-        let mut btree = BTreeMap::init(mem.clone());
+        let mut btree = BTreeMap::init_v1(mem.clone());
         assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
         assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
 
@@ -2677,7 +2670,7 @@ mod test {
     #[test]
     fn produces_layout_identical_to_layout_version_1_with_packed_headers() {
         let mem = make_memory();
-        let mut btree = BTreeMap::init(mem.clone());
+        let mut btree = BTreeMap::init_v1(mem.clone());
         assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
         assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
 
