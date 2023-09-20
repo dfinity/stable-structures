@@ -2555,7 +2555,7 @@ mod test {
         });
     }
 
-    // A buggy implementation of storable where the max size is smaller than the serialized size.
+    // A buggy implementation of storable where the max_size is smaller than the serialized size.
     #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
     struct BuggyStruct;
     impl crate::Storable for BuggyStruct {
