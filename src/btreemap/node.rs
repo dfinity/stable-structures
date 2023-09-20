@@ -71,17 +71,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         match header.version {
-            LAYOUT_VERSION_1 => {
-                if let PageSize::Derived(DerivedPageSize {
+            LAYOUT_VERSION_1 => match page_size {
+                PageSize::Derived(DerivedPageSize {
                     max_key_size,
                     max_value_size,
-                }) = page_size
-                {
-                    Self::load_v1(header, address, max_key_size, max_value_size, memory)
-                } else {
+                }) => Self::load_v1(header, address, max_key_size, max_value_size, memory),
+                PageSize::Value(_) => {
                     unreachable!("Tried to load a V1 node without a derived PageSize.")
                 }
-            }
+            },
             LAYOUT_VERSION_2 => Self::load_v2(address, page_size, header, memory),
             unknown_version => unreachable!("Unsupported version {unknown_version}."),
         }
