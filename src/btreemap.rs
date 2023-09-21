@@ -1187,32 +1187,6 @@ where
     }
 }
 
-/// An error returned when inserting entries into the map.
-#[derive(Debug, PartialEq, Eq)]
-pub enum InsertError {
-    KeyTooLarge { given: usize, max: usize },
-    ValueTooLarge { given: usize, max: usize },
-}
-
-impl std::fmt::Display for InsertError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::KeyTooLarge { given, max } => {
-                write!(
-                    f,
-                    "InsertError::KeyTooLarge Expected key to be <= {max} bytes but received key with {given} bytes."
-                )
-            }
-            Self::ValueTooLarge { given, max } => {
-                write!(
-                    f,
-                    "InsertError::ValueTooLarge Expected value to be <= {max} bytes but received value with {given} bytes."
-                )
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
