@@ -2,6 +2,7 @@
 use crate::storable::Storable;
 use crate::{Memory, WASM_PAGE_SIZE};
 use std::borrow::{Borrow, Cow};
+use std::fmt;
 
 #[cfg(test)]
 mod tests;
@@ -43,6 +44,26 @@ pub enum InitError {
     },
     /// The initial value was to large to fit into the memory.
     ValueTooLarge { value_size: u64 },
+}
+
+impl fmt::Display for InitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InitError::IncompatibleVersion {
+                last_supported_version,
+                decoded_version,
+            } => write!(
+                f,
+                "Incompatible version: last supported version is {}, but the memory contains version {}",
+                last_supported_version, decoded_version
+            ),
+            InitError::ValueTooLarge { value_size } => write!(
+                f,
+                "The initial value is too large to fit into the memory: {} bytes",
+                value_size
+            ),
+        }
+    }
 }
 
 /// Indicates a failure to set cell's value.
