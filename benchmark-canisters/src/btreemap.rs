@@ -165,43 +165,43 @@ pub fn btreemap_insert_blob_1024_512_v2() -> BenchResult {
 
 #[query]
 pub fn btreemap_insert_u64_u64() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     insert_helper::<u64, u64>(btree)
 }
 
 #[query]
 pub fn btreemap_insert_u64_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     insert_helper::<u64, u64>(btree)
 }
 
 #[query]
 pub fn btreemap_insert_u64_blob_8() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     insert_helper::<u64, Blob<8>>(btree)
 }
 
 #[query]
 pub fn btreemap_insert_u64_blob_8_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     insert_helper::<u64, Blob<8>>(btree)
 }
 
 #[query]
 pub fn btreemap_insert_blob_8_u64() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     insert_helper::<Blob<8>, u64>(btree)
 }
 
 #[query]
 pub fn btreemap_insert_blob_8_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     insert_helper::<Blob<8>, u64>(btree)
 }
 
 #[query]
 pub fn btreemap_insert_10mib_values() -> BenchResult {
-    let mut btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
 
     // Insert 200 10MiB values.
     let mut rng = Rng::from_seed(0);
@@ -302,34 +302,34 @@ pub fn btreemap_remove_blob_512_1024_v2() -> BenchResult {
 
 #[query]
 pub fn btreemap_remove_u64_u64() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     remove_helper::<u64, u64>(btree)
 }
 #[query]
 pub fn btreemap_remove_u64_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     remove_helper::<u64, u64>(btree)
 }
 
 #[query]
 pub fn btreemap_remove_u64_blob_8() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     remove_helper::<u64, Blob<8>>(btree)
 }
 #[query]
 pub fn btreemap_remove_u64_blob_8_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     remove_helper::<u64, Blob<8>>(btree)
 }
 
 #[query]
 pub fn btreemap_remove_blob_8_u64() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     remove_helper::<Blob<8>, u64>(btree)
 }
 #[query]
 pub fn btreemap_remove_blob_8_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     remove_helper::<Blob<8>, u64>(btree)
 }
 
@@ -416,48 +416,48 @@ pub fn btreemap_get_blob_512_1024_v2() -> BenchResult {
 
 #[query]
 pub fn btreemap_get_u64_u64() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     get_helper::<u64, u64>(btree)
 }
 
 #[query]
 pub fn btreemap_get_u64_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     get_helper::<u64, u64>(btree)
 }
 
 #[query]
 pub fn btreemap_get_u64_blob_8() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     get_helper::<u64, Blob<8>>(btree)
 }
 
 #[query]
 pub fn btreemap_get_u64_blob_8_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     get_helper::<u64, Blob<8>>(btree)
 }
 
 #[query]
 pub fn btreemap_get_blob_8_u64() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     get_helper::<Blob<8>, u64>(btree)
 }
 
 #[query]
 pub fn btreemap_get_blob_8_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     get_helper::<Blob<8>, u64>(btree)
 }
 
 // Profiles inserting a large number of random blobs into a btreemap.
 fn insert_blob_helper<const K: usize, const V: usize>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     insert_helper::<Blob<K>, Blob<V>>(btree)
 }
 
 fn insert_blob_helper_v2<const K: usize, const V: usize>() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     insert_helper::<Blob<K>, Blob<V>>(btree)
 }
 
@@ -485,12 +485,12 @@ fn insert_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
 
 // Profiles getting a large number of random blobs from a btreemap.
 fn get_blob_helper<const K: usize, const V: usize>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     get_helper::<Blob<K>, Blob<V>>(btree)
 }
 
 fn get_blob_helper_v2<const K: usize, const V: usize>() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     get_helper::<Blob<K>, Blob<V>>(btree)
 }
 
@@ -522,12 +522,12 @@ fn get_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
 
 // Inserts a large number of random blobs into a btreemap, then profiles removing them.
 fn remove_blob_helper<const K: usize, const V: usize>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     remove_helper::<Blob<K>, Blob<V>>(btree)
 }
 
 fn remove_blob_helper_v2<const K: usize, const V: usize>() -> BenchResult {
-    let btree = BTreeMap::new_v2(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
     remove_helper::<Blob<K>, Blob<V>>(btree)
 }
 
