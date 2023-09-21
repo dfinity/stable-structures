@@ -13,7 +13,7 @@ thread_local! {
 
     // Initialize a V2 BTreeMap that supports unbounded keys and values.
     static ASSETS: RefCell<StableBTreeMap<String, Vec<u8>, Memory>> = RefCell::new(
-        StableBTreeMap::init_v2(
+        StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
         )
     );
