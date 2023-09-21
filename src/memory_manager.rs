@@ -224,6 +224,9 @@ impl<M: Memory> MemoryManager<M> {
         }
     }
 
+    /// Frees the specified memory.
+    /// Note that the underlying physical memory doesn't shrink, but the space previously
+    /// occupied by the given memory will be reused.
     pub fn free(&mut self, id: MemoryId) {
         self.inner.borrow_mut().free(id);
     }
