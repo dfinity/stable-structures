@@ -36,3 +36,107 @@ proptest! {
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
 }
+
+#[test]
+#[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+fn to_bytes_checked_element_too_long_panics() {
+    struct X;
+    impl Storable for X {
+        fn to_bytes(&self) -> Cow<[u8]> {
+            Cow::Borrowed(&[1, 2, 3, 4])
+        }
+
+        fn from_bytes(_: Cow<[u8]>) -> Self {
+            unimplemented!();
+        }
+
+        const BOUND: Bound = Bound::Bounded {
+            max_size: 1,
+            is_fixed_size: false,
+        };
+    }
+
+    X.to_bytes_checked();
+}
+
+#[test]
+fn to_bytes_checked_unbounded_element_no_panic() {
+    struct X;
+    impl Storable for X {
+        fn to_bytes(&self) -> Cow<[u8]> {
+            Cow::Borrowed(&[1, 2, 3, 4])
+        }
+
+        fn from_bytes(_: Cow<[u8]>) -> Self {
+            unimplemented!();
+        }
+
+        const BOUND: Bound = Bound::Unbounded;
+    }
+
+    assert_eq!(X.to_bytes_checked(), Cow::Borrowed(&[1, 2, 3, 4]));
+}
+
+#[test]
+fn to_bytes_checked_element_correct_size_no_panic() {
+    struct X;
+    impl Storable for X {
+        fn to_bytes(&self) -> Cow<[u8]> {
+            Cow::Borrowed(&[1, 2, 3, 4])
+        }
+
+        fn from_bytes(_: Cow<[u8]>) -> Self {
+            unimplemented!();
+        }
+
+        const BOUND: Bound = Bound::Bounded {
+            max_size: 4,
+            is_fixed_size: false,
+        };
+    }
+
+    assert_eq!(X.to_bytes_checked(), Cow::Borrowed(&[1, 2, 3, 4]));
+}
+
+#[test]
+#[should_panic(expected = "expected a fixed-size element with length 5 bytes, but found 4")]
+fn to_bytes_checked_fixed_element_wrong_size_panics() {
+    struct X;
+    impl Storable for X {
+        fn to_bytes(&self) -> Cow<[u8]> {
+            Cow::Borrowed(&[1, 2, 3, 4])
+        }
+
+        fn from_bytes(_: Cow<[u8]>) -> Self {
+            unimplemented!();
+        }
+
+        const BOUND: Bound = Bound::Bounded {
+            max_size: 5,
+            is_fixed_size: true,
+        };
+    }
+
+    X.to_bytes_checked();
+}
+
+#[test]
+fn to_bytes_checked_fixed_element_correct_size_no_panic() {
+    struct X;
+    impl Storable for X {
+        fn to_bytes(&self) -> Cow<[u8]> {
+            Cow::Borrowed(&[1, 2, 3, 4, 5])
+        }
+
+        fn from_bytes(_: Cow<[u8]>) -> Self {
+            unimplemented!();
+        }
+
+        const BOUND: Bound = Bound::Bounded {
+            max_size: 5,
+            is_fixed_size: true,
+        };
+    }
+
+    assert_eq!(X.to_bytes_checked(), Cow::Borrowed(&[1, 2, 3, 4, 5]));
+}

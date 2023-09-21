@@ -248,7 +248,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Write the keys.
         for key in self.keys.iter() {
-            let key_bytes = key.to_bytes();
+            let key_bytes = key.to_bytes_checked();
 
             // Write the size of the key if it isn't fixed in size.
             if !is_fixed_size::<K>() {

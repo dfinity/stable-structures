@@ -300,34 +300,7 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let key_bytes = key.to_bytes();
-        let value_bytes = value.to_bytes();
-
-        match self.version {
-            Version::V1(DerivedPageSize {
-                max_key_size,
-                max_value_size,
-            }) => {
-                assert!(
-                    key_bytes.len() <= max_key_size as usize,
-                    "Key is too large. Expected <= {} bytes, found {} bytes",
-                    max_key_size,
-                    key_bytes.len()
-                );
-
-                assert!(
-                    value_bytes.len() <= max_value_size as usize,
-                    "Value is too large. Expected <= {} bytes, found {} bytes",
-                    max_value_size,
-                    value_bytes.len()
-                );
-            }
-            Version::V2 { .. } => {
-                // Nothing to assert.
-            }
-        }
-
-        let value = value_bytes.to_vec();
+        let value = value.to_bytes_checked().to_vec();
 
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.
@@ -2582,56 +2555,107 @@ mod test {
         });
     }
 
+    // A buggy implementation of storable where the max_size is smaller than the serialized size.
+    #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+    struct BuggyStruct;
+    impl crate::Storable for BuggyStruct {
+        fn to_bytes(&self) -> Cow<[u8]> {
+            Cow::Borrowed(&[1, 2, 3, 4])
+        }
+
+        fn from_bytes(_: Cow<[u8]>) -> Self {
+            unimplemented!();
+        }
+
+        const BOUND: StorableBound = StorableBound::Bounded {
+            max_size: 1,
+            is_fixed_size: false,
+        };
+    }
+
     #[test]
-    #[should_panic(expected = "Key is too large. Expected <= 0 bytes, found 4 bytes")]
-    fn panics_if_key_is_too_large() {
+    #[should_panic(expected = "max_key_size must be <= 0")]
+    fn panics_if_max_key_grows() {
+        let mem = make_memory();
+        let btree: BTreeMap<(), (), _> = BTreeMap::init(mem);
+        btree.save();
+
         #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
         struct K;
         impl crate::Storable for K {
             fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Borrowed(&[1, 2, 3, 4])
+                Cow::Borrowed(&[1])
             }
 
             fn from_bytes(_: Cow<[u8]>) -> Self {
                 unimplemented!();
             }
 
-            // A buggy implementation where the max_size is smaller than what Storable::to_bytes()
-            // returns.
             const BOUND: StorableBound = StorableBound::Bounded {
-                max_size: 0,
+                max_size: 1,
                 is_fixed_size: false,
             };
         }
 
-        let mut btree: BTreeMap<K, (), _> = BTreeMap::init(make_memory());
-        btree.insert(K, ());
+        // Reload the BTree but with a key that has a larger max_size. Should panic.
+        let _: BTreeMap<K, (), _> = BTreeMap::init(btree.into_memory());
     }
 
     #[test]
-    #[should_panic(expected = "Value is too large. Expected <= 0 bytes, found 4 bytes")]
-    fn panics_if_value_is_too_large() {
+    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+    fn v1_panics_if_key_is_bigger_than_max_size() {
+        let mut btree = BTreeMap::init(make_memory());
+        btree.insert(BuggyStruct, ());
+    }
+
+    #[test]
+    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+    fn v2_panics_if_key_is_bigger_than_max_size() {
+        let mut btree = BTreeMap::init_v2(make_memory());
+        btree.insert(BuggyStruct, ());
+    }
+
+    #[test]
+    #[should_panic(expected = "max_value_size must be <= 0")]
+    fn v1_panics_if_value_is_too_large() {
+        // Initialize a btreemap where the key and value both have a max size of zero.
+        let mem = make_memory();
+        let btree: BTreeMap<(), (), _> = BTreeMap::init(mem);
+        btree.save();
+
         #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
         struct V;
         impl crate::Storable for V {
             fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Borrowed(&[1, 2, 3, 4])
+                Cow::Borrowed(&[1])
             }
 
             fn from_bytes(_: Cow<[u8]>) -> Self {
                 unimplemented!();
             }
 
-            // A buggy implementation where the max_size is smaller than what Storable::to_bytes()
-            // returns.
             const BOUND: StorableBound = StorableBound::Bounded {
-                max_size: 0,
+                max_size: 1,
                 is_fixed_size: false,
             };
         }
 
-        let mut btree: BTreeMap<(), V, _> = BTreeMap::init(make_memory());
-        btree.insert((), V);
+        // Reload the BTree but with a value that has a larger max_size. Should panic.
+        let _: BTreeMap<(), V, _> = BTreeMap::init(btree.into_memory());
+    }
+
+    #[test]
+    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+    fn v1_panics_if_value_is_bigger_than_max_size() {
+        let mut btree = BTreeMap::init(make_memory());
+        btree.insert((), BuggyStruct);
+    }
+
+    #[test]
+    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+    fn v2_panics_if_value_is_bigger_than_max_size() {
+        let mut btree = BTreeMap::init(make_memory());
+        btree.insert((), BuggyStruct);
     }
 
     // To generate the memory dump file for the current version:
