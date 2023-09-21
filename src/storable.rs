@@ -23,22 +23,20 @@ pub trait Storable {
     /// are within the element's bounds.
     fn to_bytes_checked(&self) -> Cow<[u8]> {
         let bytes = self.to_bytes();
-        if let Bound::Bounded {
-            max_size,
-            is_fixed_size,
-        } = Self::BOUND
-        {
-            if is_fixed_size {
-                assert_eq!(
-                    bytes.len(),
-                    max_size as usize,
+        let bound = Self::BOUND;
+
+        if bound.is_bounded() {
+            let max_size = bound.max_size();
+            let is_fixed_size = bound.is_fixed_size();
+
+            if is_fixed_size && !bound.verify_fixed_size(bytes.len()) {
+                panic!(
                     "expected a fixed-size element with length {} bytes, but found {} bytes",
                     max_size,
                     bytes.len()
                 );
-            } else {
-                assert!(
-                    bytes.len() <= max_size as usize,
+            } else if !bound.is_within_bounds(bytes.len()) {
+                panic!(
                     "expected an element with length <= {} bytes, but found {} bytes",
                     max_size,
                     bytes.len()
@@ -82,6 +80,35 @@ impl Bound {
             *max_size
         } else {
             panic!("Cannot get max size of unbounded type.");
+        }
+    }
+
+    /// Returns true if the type is fixed in size, false otherwise.
+    /// Panics if unbounded.
+    pub const fn is_fixed_size(&self) -> bool {
+        if let Bound::Bounded { is_fixed_size, .. } = self {
+            *is_fixed_size
+        } else {
+            panic!("Cannot get fixed size of unbounded type.");
+        }
+    }
+
+    /// Checks if the given size is within the bounds defined.
+    pub const fn is_within_bounds(&self, size: usize) -> bool {
+        match self {
+            Self::Unbounded => true,
+            Self::Bounded { max_size, .. } => size <= *max_size as usize,
+        }
+    }
+
+    /// Checks if the given size matches the fixed size defined.
+    pub const fn verify_fixed_size(&self, size: usize) -> bool {
+        match self {
+            Self::Unbounded => false,
+            Self::Bounded {
+                max_size,
+                is_fixed_size,
+            } => *is_fixed_size && size == *max_size as usize,
         }
     }
 }
