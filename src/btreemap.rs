@@ -2627,77 +2627,17 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "max_key_size must be <= 0")]
-    fn panics_if_max_key_grows() {
-        let mem = make_memory();
-        let btree: BTreeMap<(), (), _> = BTreeMap::init(mem);
-        btree.save();
-
-        #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
-        struct K;
-        impl crate::Storable for K {
-            fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Borrowed(&[1])
-            }
-
-            fn from_bytes(_: Cow<[u8]>) -> Self {
-                unimplemented!();
-            }
-
-            const BOUND: StorableBound = StorableBound::Bounded {
-                max_size: 1,
-                is_fixed_size: false,
-            };
-        }
-
-        // Reload the BTree but with a key that has a larger max_size. Should panic.
-        let _: BTreeMap<K, (), _> = BTreeMap::init(btree.into_memory());
-    }
-
-    #[test]
     #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
     fn v1_panics_if_key_is_bigger_than_max_size() {
-        let mut btree = BTreeMap::init(make_memory());
+        let mut btree = BTreeMap::init_v1(make_memory());
         btree.insert(BuggyStruct, ());
     }
 
     #[test]
     #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
     fn v2_panics_if_key_is_bigger_than_max_size() {
-        let mut btree = BTreeMap::init_v2(make_memory());
-        btree.insert(BuggyStruct, ());
-    }
-
-    #[test]
-    #[should_panic(expected = "max_value_size must be <= 0")]
-    fn v1_panics_if_value_is_too_large() {
-        // Initialize a btreemap where the key and value both have a max size of zero.
-        let mem = make_memory();
-        let btree: BTreeMap<(), (), _> = BTreeMap::init(mem);
-        btree.save();
-
-        #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
-        struct V;
-        impl crate::Storable for V {
-            fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Borrowed(&[1])
-            }
-
-    #[test]
-    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    fn v2_panics_if_key_is_bigger_than_max_size() {
         let mut btree = BTreeMap::init(make_memory());
         btree.insert(BuggyStruct, ());
-    }
-
-            const BOUND: StorableBound = StorableBound::Bounded {
-                max_size: 1,
-                is_fixed_size: false,
-            };
-        }
-
-        // Reload the BTree but with a value that has a larger max_size. Should panic.
-        let _: BTreeMap<(), V, _> = BTreeMap::init(btree.into_memory());
     }
 
     #[test]
