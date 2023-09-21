@@ -57,6 +57,7 @@
 use crate::{read_u64, safe_write, write_u64, Address, GrowFailed, Memory, Storable};
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::fmt;
 use std::marker::PhantomData;
 use std::thread::LocalKey;
 
@@ -96,6 +97,30 @@ pub enum InitError {
         decoded_version: u8,
     },
     InvalidIndex,
+}
+
+impl fmt::Display for InitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InitError::IncompatibleDataVersion {
+                last_supported_version,
+                decoded_version,
+            } => write!(
+                f,
+                "Incompatible data version: last supported version is {}, but decoded version is {}",
+                last_supported_version, decoded_version
+            ),
+            InitError::IncompatibleIndexVersion {
+                last_supported_version,
+                decoded_version,
+            } => write!(
+                f,
+                "Incompatible index version: last supported version is {}, but decoded version is {}",
+                last_supported_version, decoded_version
+            ),
+            InitError::InvalidIndex => write!(f, "Invalid index"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
