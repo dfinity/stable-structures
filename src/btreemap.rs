@@ -118,7 +118,8 @@ where
 
     /// Initializes a v1 `BTreeMap`.
     ///
-    /// This is primarily exposed for testing and benchmarking.
+    /// This is exposed only in testing and benchmarking.
+    #[cfg(any(feature = "profiler", test))]
     pub fn init_v1(memory: M) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
@@ -193,7 +194,8 @@ where
 
     /// Create a v1 instance of the BTree.
     ///
-    /// This is primarily exposed for testing and benchmarking.
+    /// This is only exposed for testing and benchmarking.
+    #[cfg(any(feature = "profiler", test))]
     pub fn new_v1(memory: M) -> Self {
         let max_key_size = max_size::<K>();
         let max_value_size = max_size::<V>();
