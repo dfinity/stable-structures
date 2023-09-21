@@ -18,6 +18,35 @@ pub trait Storable {
 
     /// The size bounds of the type.
     const BOUND: Bound;
+
+    /// Like `to_bytes`, but includes additional checks to ensure the element's serialized bytes
+    /// are within the element's bounds.
+    fn to_bytes_checked(&self) -> Cow<[u8]> {
+        let bytes = self.to_bytes();
+        if let Bound::Bounded {
+            max_size,
+            is_fixed_size,
+        } = Self::BOUND
+        {
+            if is_fixed_size {
+                assert_eq!(
+                    bytes.len(),
+                    max_size as usize,
+                    "expected a fixed-size element with length {} bytes, but found {} bytes",
+                    max_size,
+                    bytes.len()
+                );
+            } else {
+                assert!(
+                    bytes.len() <= max_size as usize,
+                    "expected an element with length <= {} bytes, but found {} bytes",
+                    max_size,
+                    bytes.len()
+                );
+            }
+        }
+        bytes
+    }
 }
 
 /// States whether the type's size is bounded or unbounded.
@@ -443,11 +472,21 @@ pub(crate) const fn bounds<A: Storable>() -> Bounds {
 }
 
 /// Returns the max size of the given type if bounded, panics if unbounded.
-pub(crate) const fn max_size<A: Storable>() -> u32 {
+pub const fn max_size<A: Storable>() -> u32 {
     if let Bound::Bounded { max_size, .. } = A::BOUND {
         max_size
     } else {
         panic!("Cannot get max size of unbounded type.");
+    }
+}
+
+/// Returns true if the type is fixed in size, false otherwise.
+pub const fn is_fixed_size<A: Storable>() -> bool {
+    if let Bound::Bounded { is_fixed_size, .. } = A::BOUND {
+        is_fixed_size
+    } else {
+        // Unbounded types do not have a fixed size.
+        false
     }
 }
 

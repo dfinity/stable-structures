@@ -13,6 +13,29 @@ dfx start --background --clean
 # Deploys the examples.
 dfx deploy
 
+## Assets Example
+
+dfx canister call assets_example insert '("asset_1", blob "123412341234")'
+dfx canister call assets_example insert '("asset_2", blob "87123897123789123789")'
+
+# Upgrade the canister, which clears all the data in the heap.
+dfx deploy --upgrade-unchanged assets_example
+
+# Even though the canister has been upgraded and its heap is cleared,
+# querying the canister should still return the data stored prior to
+# the upgrade.
+DATA=$(dfx canister call assets_example get '("asset_1")')
+if ! [[ $DATA = '(opt blob "123412341234")' ]]; then
+  echo "FAIL"
+  exit 1
+fi
+
+DATA=$(dfx canister call assets_example get '("asset_2")')
+if ! [[ $DATA = '(opt blob "87123897123789123789")' ]]; then
+  echo "FAIL"
+  exit 1
+fi
+
 # Insert some data into the basic_example canister.
 dfx canister call basic_example insert '(1:nat, 2:nat)'
 dfx canister call basic_example insert '(3:nat, 4:nat)'
