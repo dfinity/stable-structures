@@ -293,7 +293,7 @@ struct MemoryManagerInner<M: Memory> {
     // A map mapping each managed memory to the bucket ids that are allocated to it.
     memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
 
-    // A list of freed buckets.
+    // Tracks the buckets that were freed to be reused in future calls to `grow`.
     freed_buckets: BTreeSet<BucketId>,
 }
 
