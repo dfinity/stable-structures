@@ -491,25 +491,6 @@ pub(crate) const fn bounds<A: Storable>() -> Bounds {
     }
 }
 
-/// Returns the max size of the given type if bounded, panics if unbounded.
-pub const fn max_size<A: Storable>() -> u32 {
-    if let Bound::Bounded { max_size, .. } = A::BOUND {
-        max_size
-    } else {
-        panic!("Cannot get max size of unbounded type.");
-    }
-}
-
-/// Returns true if the type is fixed in size, false otherwise.
-pub const fn is_fixed_size<A: Storable>() -> bool {
-    if let Bound::Bounded { is_fixed_size, .. } = A::BOUND {
-        is_fixed_size
-    } else {
-        // Unbounded types do not have a fixed size.
-        false
-    }
-}
-
 fn decode_size(src: &[u8], bounds: &Bounds) -> usize {
     if bounds.is_fixed_size {
         bounds.max_size as usize
