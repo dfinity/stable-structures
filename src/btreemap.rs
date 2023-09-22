@@ -1223,7 +1223,7 @@ mod test {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
+    pub(crate) fn make_memory() -> Rc<RefCell<Vec<u8>>> {
         Rc::new(RefCell::new(Vec::new()))
     }
 
