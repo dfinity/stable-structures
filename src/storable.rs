@@ -493,7 +493,6 @@ impl<T: Storable> Storable for Option<T> {
                 _ => panic!("Invalid Option encoding: unexpected variant marker {last}"),
             },
             None => panic!("Invalid Option encoding: expected at least one byte"),
-
         }
     }
 
