@@ -81,7 +81,6 @@ impl Bound {
     }
 
     /// Returns true if the type is fixed in size, false otherwise.
-    /// Panics if unbounded.
     pub const fn is_fixed_size(&self) -> bool {
         if let Bound::Bounded { is_fixed_size, .. } = self {
             *is_fixed_size
