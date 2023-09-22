@@ -70,6 +70,26 @@ pub enum Bound {
     },
 }
 
+impl Bound {
+    /// Returns the maximum size of the type if bounded, panics if unbounded.
+    pub const fn max_size(&self) -> u32 {
+        if let Bound::Bounded { max_size, .. } = self {
+            *max_size
+        } else {
+            panic!("Cannot get max size of unbounded type.");
+        }
+    }
+
+    /// Returns true if the type is fixed in size, false otherwise.
+    pub const fn is_fixed_size(&self) -> bool {
+        if let Bound::Bounded { is_fixed_size, .. } = self {
+            *is_fixed_size
+        } else {
+            false
+        }
+    }
+}
+
 /// Variable-size, but limited in capacity byte array.
 #[derive(Eq, Copy, Clone)]
 pub struct Blob<const N: usize> {
