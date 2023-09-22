@@ -134,6 +134,8 @@ fn map_upper_bound_iter(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: Vec
     });
 }
 
+// Given an operation, executes it on the given stable btreemap and standard btreemap, verifying
+// that the result of the operation is equal in both btrees.
 fn execute_operation<M: Memory>(
     std_btree: &mut StdBTreeMap<Vec<u8>, Vec<u8>>,
     btree: &mut BTreeMap<Vec<u8>, Vec<u8>, M>,
