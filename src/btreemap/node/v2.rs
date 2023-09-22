@@ -73,10 +73,7 @@
 
 use super::*;
 use crate::btreemap::Allocator;
-use crate::{
-    btreemap::node::io::NodeWriter,
-    types::NULL,
-};
+use crate::{btreemap::node::io::NodeWriter, types::NULL};
 
 // Initial page
 pub(super) const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
