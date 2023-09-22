@@ -470,6 +470,46 @@ where
     };
 }
 
+impl<T: Storable> Storable for Option<T> {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        match self {
+            Some(t) => {
+                let mut bytes = t.to_bytes().into_owned();
+                bytes.push(1);
+                Cow::Owned(bytes)
+            }
+            None => Cow::Borrowed(&[0]),
+        }
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        match bytes.split_last() {
+            Some((last, rest)) => match last {
+                0 => {
+                    assert!(rest.is_empty(), "Invalid Option encoding: unexpected prefix before the None marker: {rest:?}");
+                    None
+                }
+                1 => Some(T::from_bytes(Cow::Borrowed(rest))),
+                _ => panic!("Invalid Option encoding: unexpected variant marker {last}"),
+            },
+            None => panic!("Invalid Option encoding: expected at least one byte"),
+        }
+    }
+
+    const BOUND: Bound = {
+        match T::BOUND {
+            Bound::Bounded {
+                max_size,
+                is_fixed_size,
+            } => Bound::Bounded {
+                max_size: max_size + 1,
+                is_fixed_size,
+            },
+            Bound::Unbounded => Bound::Unbounded,
+        }
+    };
+}
+
 pub(crate) struct Bounds {
     pub max_size: u32,
     pub is_fixed_size: bool,
