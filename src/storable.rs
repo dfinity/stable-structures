@@ -484,13 +484,16 @@ impl<T: Storable> Storable for Option<T> {
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         match bytes.split_last() {
-            Some((&last, bytes)) => match last == 0 {
-                true => None,
-                false => Some(T::from_bytes(Cow::Borrowed(bytes))),
+            Some((last, rest)) => match last {
+                0 => {
+                    assert!(rest.is_empty(), "Invalid Option encoding: unexpected prefix before the None marker: {rest:?}");
+                    None
+                }
+                1 => Some(T::from_bytes(Cow::Borrowed(rest))),
+                _ => panic!("Invalid Option encoding: unexpected variant marker {last}"),
             },
-            None => {
-                panic!("Invalid Option encoding");
-            }
+            None => panic!("Invalid Option encoding: expected at least one byte"),
+
         }
     }
 
