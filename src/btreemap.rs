@@ -28,7 +28,7 @@ mod allocator;
 mod iter;
 mod node;
 use crate::{
-    storable::{max_size, Bound as StorableBound},
+    storable::Bound as StorableBound,
     types::{Address, NULL},
     Memory, Storable,
 };
@@ -197,8 +197,8 @@ where
     /// This is only exposed for testing and benchmarking.
     #[cfg(any(feature = "profiler", test))]
     pub fn new_v1(memory: M) -> Self {
-        let max_key_size = max_size::<K>();
-        let max_value_size = max_size::<V>();
+        let max_key_size = K::BOUND.max_size();
+        let max_value_size = V::BOUND.max_size();
 
         let btree = Self {
             root_addr: NULL,
@@ -235,12 +235,12 @@ where
                 max_value_size: expected_value_size,
             }) => {
                 assert!(
-                    max_size::<K>() <= expected_key_size,
+                    K::BOUND.max_size() <= expected_key_size,
                     "max_key_size must be <= {expected_key_size}"
                 );
 
                 assert!(
-                    max_size::<V>() <= expected_value_size,
+                    V::BOUND.max_size() <= expected_value_size,
                     "max_value_size must be <= {expected_value_size}"
                 );
             }
