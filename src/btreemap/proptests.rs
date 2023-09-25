@@ -23,7 +23,7 @@ enum Operation {
 // A custom strategy that gives unequal weights to the different operations.
 // Note that `Insert` has a higher weight than `Remove` so that, on average, BTreeMaps
 // are growing in size the more operations are executed.
-fn op_strategy() -> impl Strategy<Value = Operation> {
+fn operation_strategy() -> impl Strategy<Value = Operation> {
     prop_oneof![
         3 => (any::<Vec<u8>>(), any::<Vec<u8>>())
             .prop_map(|(key, value)| Operation::Insert { key, value }),
@@ -41,7 +41,7 @@ fn arb_blob() -> impl Strategy<Value = Blob<10>> {
 // Runs a comprehensive test for the major stable BTreeMap operations.
 // Results are validated against a standard BTreeMap.
 #[proptest(cases = 10)]
-fn comprehensive(#[strategy(pvec(op_strategy(), 100..5_000))] ops: Vec<Operation>) {
+fn comprehensive(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
     let mem = make_memory();
     let mut btree = BTreeMap::new(mem);
     let mut std_btree = StdBTreeMap::new();
@@ -74,8 +74,11 @@ fn comprehensive_fuzz() {
     let mut i = 0;
 
     loop {
-        let op = op_strategy().new_tree(&mut runner).unwrap().current();
-        execute_operation(&mut std_btree, &mut btree, op);
+        let operation = operation_strategy()
+            .new_tree(&mut runner)
+            .unwrap()
+            .current();
+        execute_operation(&mut std_btree, &mut btree, operation);
         i += 1;
         if i % 1000 == 0 {
             println!("=== Step {i} ===");
