@@ -36,9 +36,9 @@ use allocator::Allocator;
 pub use iter::Iter;
 use iter::{Cursor, Index};
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
+use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
-use std::{borrow::Cow, fmt};
 
 #[cfg(test)]
 mod proptests;
@@ -1187,32 +1187,6 @@ where
     }
 }
 
-/// An error returned when inserting entries into the map.
-#[derive(Debug, PartialEq, Eq)]
-pub enum InsertError {
-    KeyTooLarge { given: usize, max: usize },
-    ValueTooLarge { given: usize, max: usize },
-}
-
-impl fmt::Display for InsertError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::KeyTooLarge { given, max } => {
-                write!(
-                    f,
-                    "InsertError::KeyTooLarge Expected key to be <= {max} bytes but received key with {given} bytes."
-                )
-            }
-            Self::ValueTooLarge { given, max } => {
-                write!(
-                    f,
-                    "InsertError::ValueTooLarge Expected value to be <= {max} bytes but received value with {given} bytes."
-                )
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -1223,7 +1197,7 @@ mod test {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    fn make_memory() -> Rc<RefCell<Vec<u8>>> {
+    pub(crate) fn make_memory() -> Rc<RefCell<Vec<u8>>> {
         Rc::new(RefCell::new(Vec::new()))
     }
 
