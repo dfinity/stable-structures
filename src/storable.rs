@@ -70,6 +70,26 @@ pub enum Bound {
     },
 }
 
+impl Bound {
+    /// Returns the maximum size of the type if bounded, panics if unbounded.
+    pub const fn max_size(&self) -> u32 {
+        if let Bound::Bounded { max_size, .. } = self {
+            *max_size
+        } else {
+            panic!("Cannot get max size of unbounded type.");
+        }
+    }
+
+    /// Returns true if the type is fixed in size, false otherwise.
+    pub const fn is_fixed_size(&self) -> bool {
+        if let Bound::Bounded { is_fixed_size, .. } = self {
+            *is_fixed_size
+        } else {
+            false
+        }
+    }
+}
+
 /// Variable-size, but limited in capacity byte array.
 #[derive(Eq, Copy, Clone)]
 pub struct Blob<const N: usize> {
@@ -446,6 +466,46 @@ where
                 }
             }
             _ => Bound::Unbounded,
+        }
+    };
+}
+
+impl<T: Storable> Storable for Option<T> {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        match self {
+            Some(t) => {
+                let mut bytes = t.to_bytes().into_owned();
+                bytes.push(1);
+                Cow::Owned(bytes)
+            }
+            None => Cow::Borrowed(&[0]),
+        }
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        match bytes.split_last() {
+            Some((last, rest)) => match last {
+                0 => {
+                    assert!(rest.is_empty(), "Invalid Option encoding: unexpected prefix before the None marker: {rest:?}");
+                    None
+                }
+                1 => Some(T::from_bytes(Cow::Borrowed(rest))),
+                _ => panic!("Invalid Option encoding: unexpected variant marker {last}"),
+            },
+            None => panic!("Invalid Option encoding: expected at least one byte"),
+        }
+    }
+
+    const BOUND: Bound = {
+        match T::BOUND {
+            Bound::Bounded {
+                max_size,
+                is_fixed_size,
+            } => Bound::Bounded {
+                max_size: max_size + 1,
+                is_fixed_size,
+            },
+            Bound::Unbounded => Bound::Unbounded,
         }
     };
 }
