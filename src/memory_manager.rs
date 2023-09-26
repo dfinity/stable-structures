@@ -518,6 +518,21 @@ impl MemoryId {
     }
 }
 
+impl crate::Storable for MemoryId {
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        self.0.to_bytes()
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Self(u8::from_bytes(bytes))
+    }
+
+    const BOUND: crate::storable::Bound = crate::storable::Bound::Bounded {
+        max_size: 1,
+        is_fixed_size: true,
+    };
+}
+
 // Referring to a bucket.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct BucketId(u16);
