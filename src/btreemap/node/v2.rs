@@ -73,11 +73,7 @@
 
 use super::*;
 use crate::btreemap::Allocator;
-use crate::{
-    btreemap::node::io::NodeWriter,
-    storable::{is_fixed_size, max_size},
-    types::NULL,
-};
+use crate::{btreemap::node::io::NodeWriter, types::NULL};
 
 // Initial page
 pub(super) const OVERFLOW_ADDRESS_OFFSET: Bytes = Bytes::new(7);
@@ -159,9 +155,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut buf = vec![];
         for _ in 0..num_entries {
             // Load the key's size.
-            let key_size = if is_fixed_size::<K>() {
+            let key_size = if K::BOUND.is_fixed_size() {
                 // Key is fixed in size. The size of the key is always its max size.
-                max_size::<K>()
+                K::BOUND.max_size()
             } else {
                 // Key is not fixed in size. Read the size from memory.
                 let value = read_u32(&reader, offset);
@@ -251,7 +247,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             let key_bytes = key.to_bytes_checked();
 
             // Write the size of the key if it isn't fixed in size.
-            if !is_fixed_size::<K>() {
+            if !K::BOUND.is_fixed_size() {
                 writer.write_u32(offset, key_bytes.len() as u32);
                 offset += U32_SIZE;
             }
