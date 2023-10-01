@@ -605,6 +605,38 @@ where
             .map(V::from_bytes)
     }
 
+    /// Removes and returns the last element in the map. The key of this element is the maximum key that was in the map
+    pub fn pop_last(&mut self) -> Option<(K, V)> {
+        if self.root_addr == NULL {
+            return None;
+        }
+
+        let root_node = self.load_node(self.root_addr);
+        root_node.max_key(self.memory()).map(|max_key| {
+            let value = self
+                .remove_helper(root_node, &max_key)
+                .map(Cow::Owned)
+                .map(V::from_bytes);
+            (max_key, value.unwrap())
+        })
+    }
+
+    /// Removes and returns the first element in the map. The key of this element is the minimum key that was in the map
+    pub fn pop_first(&mut self) -> Option<(K, V)> {
+        if self.root_addr == NULL {
+            return None;
+        }
+
+        let root_node = self.load_node(self.root_addr);
+        root_node.min_key(self.memory()).map(|min_key| {
+            let value = self
+                .remove_helper(root_node, &min_key)
+                .map(Cow::Owned)
+                .map(V::from_bytes);
+            (min_key, value.unwrap())
+        })
+    }
+
     // A helper method for recursively removing a key from the B-tree.
     fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
         if node.address() != self.root_addr {
@@ -1415,6 +1447,32 @@ mod test {
     }
 
     #[test]
+    fn allocations_3() {
+        btree_test(|mut btree| {
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+
+            assert_eq!(btree.insert(b(&[]), b(&[])), None);
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+
+            assert_eq!(btree.pop_last(), Some((b(&[]), b(&[]))));
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
+    }
+
+    #[test]
+    fn allocations_4() {
+        btree_test(|mut btree| {
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+
+            assert_eq!(btree.insert(b(&[]), b(&[])), None);
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+
+            assert_eq!(btree.pop_first(), Some((b(&[]), b(&[]))));
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
+    }
+
+    #[test]
     fn insert_same_key_multiple() {
         btree_test(|mut btree| {
             assert_eq!(btree.insert(b(&[1]), b(&[2])), None);
@@ -1530,6 +1588,26 @@ mod test {
             assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
             assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
             assert_eq!(btree.remove(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.get(&b(&[1, 2, 3])), None);
+        });
+    }
+
+    #[test]
+    fn pop_last_simple() {
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.pop_last().unwrap().1, b(&[4, 5, 6]));
+            assert_eq!(btree.get(&b(&[1, 2, 3])), None);
+        });
+    }
+
+    #[test]
+    fn pop_first_simple() {
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.pop_first().map(|e| e.1), Some(b(&[4, 5, 6])));
             assert_eq!(btree.get(&b(&[1, 2, 3])), None);
         });
     }
@@ -1979,6 +2057,86 @@ mod test {
     }
 
     #[test]
+    fn many_insertions_3() {
+        let mem = make_memory();
+        let mut std_btree = std::collections::BTreeMap::new();
+        let mut btree = BTreeMap::new(mem.clone());
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(
+                    btree.insert(b(&[i, j]), b(&[i, j])),
+                    std_btree.insert(b(&[i, j]), b(&[i, j]))
+                );
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&b(&[i, j])), std_btree.get(&b(&[i, j])).cloned());
+            }
+        }
+
+        let mut btree = BTreeMap::load(mem);
+
+        for _ in 0..=10 {
+            for _ in 0..=255 {
+                assert_eq!(btree.pop_first(), std_btree.pop_first());
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&b(&[i, j])), None);
+                assert_eq!(std_btree.get(&b(&[i, j])), None);
+            }
+        }
+
+        // We've deallocated everything.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn many_insertions_4() {
+        let mem = make_memory();
+        let mut std_btree = std::collections::BTreeMap::new();
+        let mut btree = BTreeMap::new(mem.clone());
+
+        for j in (0..=10).rev() {
+            for i in (0..=255).rev() {
+                assert_eq!(
+                    btree.insert(b(&[i, j]), b(&[i, j])),
+                    std_btree.insert(b(&[i, j]), b(&[i, j]))
+                );
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&b(&[i, j])), std_btree.get(&b(&[i, j])).cloned());
+            }
+        }
+
+        let mut btree = BTreeMap::load(mem);
+
+        for _ in (0..=10).rev() {
+            for _ in (0..=255).rev() {
+                assert_eq!(btree.pop_last(), std_btree.pop_last());
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&b(&[i, j])), None);
+                assert_eq!(std_btree.get(&b(&[i, j])), None);
+            }
+        }
+
+        // We've deallocated everything.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
     fn reloading() {
         btree_test(|mut btree| {
             // The btree is initially empty.
@@ -2023,6 +2181,44 @@ mod test {
 
             for i in 0..1000u32 {
                 assert_eq!(btree.remove(&b(i.to_le_bytes().as_slice())), Some(b(&[])));
+            }
+
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
+        });
+    }
+
+    #[test]
+    fn len_2() {
+        btree_test(|mut btree| {
+            for i in 0..1000u32 {
+                assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
+            }
+
+            assert_eq!(btree.len(), 1000);
+            assert!(!btree.is_empty());
+
+            for i in 0..1000u32 {
+                assert_eq!(btree.pop_first().unwrap().1, b(&i.to_le_bytes()));
+            }
+
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
+        });
+    }
+
+    #[test]
+    fn len_3() {
+        btree_test(|mut btree| {
+            for i in 0..1000u32 {
+                assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
+            }
+
+            assert_eq!(btree.len(), 1000);
+            assert!(!btree.is_empty());
+
+            for i in (0..1000u32).rev() {
+                assert_eq!(btree.pop_last().unwrap().1, b(&i.to_le_bytes()));
             }
 
             assert_eq!(btree.len(), 0);

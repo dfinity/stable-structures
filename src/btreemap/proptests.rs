@@ -19,6 +19,8 @@ enum Operation {
     Get(usize),
     Remove(usize),
     Range { from: usize, len: usize },
+    PopLast,
+    PopFirst,
 }
 
 // A custom strategy that gives unequal weights to the different operations.
@@ -34,6 +36,8 @@ fn operation_strategy() -> impl Strategy<Value = Operation> {
         15 => (any::<usize>()).prop_map(Operation::Remove),
         5 => (any::<usize>(), any::<usize>())
             .prop_map(|(from, len)| Operation::Range { from, len }),
+        15 =>  Just(Operation::PopFirst),
+        15 =>  Just(Operation::PopLast),
     ]
 }
 
@@ -229,6 +233,34 @@ fn execute_operation<M: Memory>(
             for ((k1, v1), (k2, v2)) in std_range.zip(stable_range) {
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
+            }
+        }
+        Operation::PopLast => {
+            assert_eq!(std_btree.len(), btree.len() as usize);
+            if std_btree.is_empty() {
+                return;
+            }
+
+            let idx = std_btree.len();
+
+            if let Some(entry) = btree.iter().skip(idx).take(1).next() {
+                eprintln!("Pop last, the key is {}", hex::encode(&entry.0));
+                assert_eq!(std_btree.pop_last(), Some(entry.clone()));
+                assert_eq!(btree.pop_last(), Some(entry));
+            }
+        }
+        Operation::PopFirst => {
+            assert_eq!(std_btree.len(), btree.len() as usize);
+            if std_btree.is_empty() {
+                return;
+            }
+
+            let idx = std_btree.len();
+
+            if let Some(entry) = btree.iter().skip(idx).take(1).next() {
+                eprintln!("Pop first, the key is {}", hex::encode(&entry.0));
+                assert_eq!(std_btree.pop_first(), Some(entry.clone()));
+                assert_eq!(btree.pop_first(), Some(entry));
             }
         }
     };
