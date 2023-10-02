@@ -209,12 +209,12 @@ fn execute_operation<M: Memory>(
             let from = from % std_btree.len();
             let end = std::cmp::min(std_btree.len() - 1, from + len);
 
-            // Create a range from the keys at indexes `from` and `end`.
+            // Create a range for the stable btree from the keys at indexes `from` and `end`.
             let range_start = btree.iter().skip(from).take(1).next().unwrap().0.clone();
             let range_end = btree.iter().skip(end).take(1).next().unwrap().0.clone();
             let stable_range = btree.range(range_start..range_end);
 
-            // Create a range from the keys at indexes `from` and `end`.
+            // Create a range for the std btree from the keys at indexes `from` and `end`.
             let range_start = std_btree
                 .iter()
                 .skip(from)
