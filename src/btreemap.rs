@@ -1447,7 +1447,7 @@ mod test {
     }
 
     #[test]
-    fn allocations_3() {
+    fn pop_last_single_entry() {
         btree_test(|mut btree| {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
