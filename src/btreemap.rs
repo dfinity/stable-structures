@@ -2803,7 +2803,7 @@ mod test {
         let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
         assert_eq!(btree.get(&T2), Some(T2));
 
-        // Relaod the BTree again with bounded type.
+        // Reload the BTree again with bounded type.
         let btree: BTreeMap<T, T, _> = BTreeMap::init(btree.into_memory());
         assert_eq!(btree.get(&T), Some(T));
     }
