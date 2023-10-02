@@ -258,7 +258,7 @@ fn execute_operation<M: Memory>(
             let idx = std_btree.len();
 
             if let Some(entry) = btree.iter().skip(idx).take(1).next() {
-                eprintln!("Pop first, the key is {}", hex::encode(&entry.0));
+                eprintln!("PopFirst");
                 assert_eq!(std_btree.pop_first(), Some(entry.clone()));
                 assert_eq!(btree.pop_first(), Some(entry));
             }
