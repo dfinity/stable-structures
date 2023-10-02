@@ -2057,7 +2057,7 @@ mod test {
     }
 
     #[test]
-    fn many_insertions_3() {
+    fn pop_first_many_entries() {
         let mem = make_memory();
         let mut std_btree = std::collections::BTreeMap::new();
         let mut btree = BTreeMap::new(mem.clone());
