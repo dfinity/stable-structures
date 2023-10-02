@@ -2208,7 +2208,7 @@ mod test {
     }
 
     #[test]
-    fn len_3() {
+    fn pop_last_len() {
         btree_test(|mut btree| {
             for i in 0..1000u32 {
                 assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
