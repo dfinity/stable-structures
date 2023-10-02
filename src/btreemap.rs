@@ -1,6 +1,30 @@
 //! This module implements a key/value store based on a B-Tree
 //! in stable memory.
 //!
+//! # V2 layout
+//!
+//! ```text
+//! ---------------------------------------- <- Address 0
+//! Magic "BTR"                 ↕ 3 bytes
+//! ----------------------------------------
+//! Layout version              ↕ 1 byte
+//! ----------------------------------------
+//! Max key size                ↕ 4 bytes             Page size                   ↕ 4 bytes
+//! ----------------------------------------   OR   ----------------------------------------
+//! Max value size              ↕ 4 bytes             PAGE_SIZE_VALUE_MARKER      ↕ 4 bytes
+//! ----------------------------------------
+//! Root node address           ↕ 8 bytes
+//! ----------------------------------------
+//! Length (number of elements) ↕ 8 bytes
+//! ---------------------------------------- <- Address 28 (PACKED_HEADER_SIZE)
+//! Reserved space              ↕ 24 bytes
+//! ---------------------------------------- <- Address 52 (ALLOCATOR_OFFSET)
+//! Allocator
+//! ----------------------------------------
+//! ... free memory for nodes
+//! ----------------------------------------
+//! ```
+//!
 //! # V1 layout
 //!
 //! ```text
@@ -53,6 +77,9 @@ const ALLOCATOR_OFFSET: usize = 52;
 
 // The default page size to use in BTreeMap V2 in bytes.
 const DEFAULT_PAGE_SIZE: u32 = 1024;
+
+// A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
+const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -229,32 +256,26 @@ where
         // Read the header from memory.
         let header = Self::read_header(&memory);
 
-        match header.version {
-            Version::V1(DerivedPageSize {
-                max_key_size: expected_key_size,
-                max_value_size: expected_value_size,
-            }) => {
-                assert!(
-                    K::BOUND.max_size() <= expected_key_size,
-                    "max_key_size must be <= {expected_key_size}"
-                );
-
-                assert!(
-                    V::BOUND.max_size() <= expected_value_size,
-                    "max_value_size must be <= {expected_value_size}"
-                );
-            }
-            Version::V2 { .. } => {
-                // Nothing to assert.
-            }
-        }
-
-        // Migrate to V2 if flag is enabled.
         let version = match header.version {
             Version::V1(derived_page_size) => {
+                // Migrate to V2 if flag is enabled.
                 if migrate_to_v2 {
                     Version::V2(PageSize::Derived(derived_page_size))
                 } else {
+                    // Assert that the bounds are correct.
+                    let max_key_size = derived_page_size.max_key_size;
+                    let max_value_size = derived_page_size.max_value_size;
+
+                    assert!(
+                        K::BOUND.max_size() <= max_key_size,
+                        "max_key_size must be <= {max_key_size}",
+                    );
+
+                    assert!(
+                        V::BOUND.max_size() <= max_value_size,
+                        "max_value_size must be <= {max_value_size}"
+                    );
+
                     Version::V1(derived_page_size)
                 }
             }
@@ -292,13 +313,27 @@ where
                 }
             }
             LAYOUT_VERSION_2 => {
-                // TODO: Handle derived page sizes.
+                // Load the page size.
+                let page_size = {
+                    // Page sizes can be stored either as a direct value or as max/value sizes.
+                    let a = u32::from_le_bytes(buf[4..8].try_into().unwrap());
+                    let b = u32::from_le_bytes(buf[8..12].try_into().unwrap());
+
+                    if b == PAGE_SIZE_VALUE_MARKER {
+                        // Page size is stored as a direct value
+                        PageSize::Value(a)
+                    } else {
+                        // Page size is stored as a derived value.
+                        PageSize::Derived(DerivedPageSize {
+                            max_key_size: a,
+                            max_value_size: b,
+                        })
+                    }
+                };
 
                 // Deserialize the fields
                 BTreeHeader {
-                    version: Version::V2(PageSize::Value(u32::from_le_bytes(
-                        buf[4..8].try_into().unwrap(),
-                    ))),
+                    version: Version::V2(page_size),
                     root_addr: Address::from(u64::from_le_bytes(buf[12..20].try_into().unwrap())),
                     length: u64::from_le_bytes(buf[20..28].try_into().unwrap()),
                 }
@@ -1170,14 +1205,19 @@ where
             Version::V1(DerivedPageSize {
                 max_key_size,
                 max_value_size,
-            }) => {
+            })
+            | Version::V2(PageSize::Derived(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            })) => {
                 buf[3] = LAYOUT_VERSION;
                 buf[4..8].copy_from_slice(&max_key_size.to_le_bytes());
                 buf[8..12].copy_from_slice(&max_value_size.to_le_bytes());
             }
-            Version::V2(page_size) => {
+            Version::V2(PageSize::Value(page_size)) => {
                 buf[3] = LAYOUT_VERSION_2;
-                buf[4..8].copy_from_slice(&(page_size.get()).to_le_bytes());
+                buf[4..8].copy_from_slice(&page_size.to_le_bytes());
+                buf[8..12].copy_from_slice(&PAGE_SIZE_VALUE_MARKER.to_le_bytes());
             }
         };
         buf[12..20].copy_from_slice(&header.root_addr.get().to_le_bytes());
@@ -2711,5 +2751,60 @@ mod test {
 
         assert!(packed_header.root_addr == v1_header.root_addr);
         assert!(packed_header.length == v1_header.length);
+    }
+
+    #[test]
+    fn migrate_from_bounded_to_unbounded_and_back() {
+        // A type that is bounded.
+        #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
+        struct T;
+        impl Storable for T {
+            fn to_bytes(&self) -> Cow<[u8]> {
+                Cow::Owned(vec![1, 2, 3])
+            }
+
+            fn from_bytes(bytes: Cow<[u8]>) -> Self {
+                assert_eq!(bytes.to_vec(), vec![1, 2, 3]);
+                T
+            }
+
+            const BOUND: StorableBound = StorableBound::Bounded {
+                max_size: 3,
+                is_fixed_size: true,
+            };
+        }
+
+        // Same as the above type, but unbounded.
+        #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
+        struct T2;
+        impl Storable for T2 {
+            fn to_bytes(&self) -> Cow<[u8]> {
+                Cow::Owned(vec![1, 2, 3])
+            }
+
+            fn from_bytes(bytes: Cow<[u8]>) -> Self {
+                assert_eq!(bytes.to_vec(), vec![1, 2, 3]);
+                T2
+            }
+
+            const BOUND: StorableBound = StorableBound::Unbounded;
+        }
+
+        // Create a v1 btreemap with the bounded type.
+        let mem = make_memory();
+        let mut btree: BTreeMap<T, T, _> = BTreeMap::new_v1(mem);
+        btree.insert(T, T);
+
+        // Migrate to v2 and the unbounded type.
+        let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
+        btree.save();
+
+        // Reload the BTree again and try to read the value.
+        let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
+        assert_eq!(btree.get(&T2), Some(T2));
+
+        // Reload the BTree again with bounded type.
+        let btree: BTreeMap<T, T, _> = BTreeMap::init(btree.into_memory());
+        assert_eq!(btree.get(&T), Some(T));
     }
 }
