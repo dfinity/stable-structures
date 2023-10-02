@@ -1460,7 +1460,7 @@ mod test {
     }
 
     #[test]
-    fn allocations_4() {
+    fn pop_first_single_entry() {
         btree_test(|mut btree| {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
