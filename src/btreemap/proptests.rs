@@ -237,9 +237,6 @@ fn execute_operation<M: Memory>(
         }
         Operation::PopLast => {
             assert_eq!(std_btree.len(), btree.len() as usize);
-            if std_btree.is_empty() {
-                return;
-            }
 
             let idx = std_btree.len();
 
@@ -251,9 +248,6 @@ fn execute_operation<M: Memory>(
         }
         Operation::PopFirst => {
             assert_eq!(std_btree.len(), btree.len() as usize);
-            if std_btree.is_empty() {
-                return;
-            }
 
             let idx = std_btree.len();
 

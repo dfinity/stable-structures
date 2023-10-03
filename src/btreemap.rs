@@ -1452,9 +1452,11 @@ mod test {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
             assert_eq!(btree.insert(b(&[]), b(&[])), None);
+            assert!(!btree.is_empty());
             assert_eq!(btree.allocator.num_allocated_chunks(), 1);
 
             assert_eq!(btree.pop_last(), Some((b(&[]), b(&[]))));
+            assert!(btree.is_empty());
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
         });
     }
@@ -1465,9 +1467,11 @@ mod test {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
             assert_eq!(btree.insert(b(&[]), b(&[])), None);
+            assert!(!btree.is_empty());
             assert_eq!(btree.allocator.num_allocated_chunks(), 1);
 
             assert_eq!(btree.pop_first(), Some((b(&[]), b(&[]))));
+            assert!(btree.is_empty());
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
         });
     }
@@ -1610,6 +1614,16 @@ mod test {
             assert_eq!(btree.pop_first().map(|e| e.1), Some(b(&[4, 5, 6])));
             assert_eq!(btree.get(&b(&[1, 2, 3])), None);
         });
+    }
+
+    #[test]
+    fn pop_on_empty_tree_simple() {
+        btree_test(
+            |mut btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
+                assert_eq!(btree.pop_last(), None);
+                assert_eq!(btree.pop_first(), None);
+            },
+        );
     }
 
     #[test]
@@ -2093,6 +2107,8 @@ mod test {
         }
 
         // We've deallocated everything.
+        assert!(std_btree.is_empty());
+        assert!(btree.is_empty());
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
     }
 
@@ -2133,6 +2149,8 @@ mod test {
         }
 
         // We've deallocated everything.
+        assert!(std_btree.is_empty());
+        assert!(btree.is_empty());
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
     }
 
