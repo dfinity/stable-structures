@@ -611,14 +611,10 @@ where
             return None;
         }
 
-        let root_node = self.load_node(self.root_addr);
-        root_node.max_key(self.memory()).map(|max_key| {
-            let value = self
-                .remove_helper(root_node, &max_key)
-                .map(Cow::Owned)
-                .map(V::from_bytes);
-            (max_key, value.unwrap())
-        })
+        let root = self.load_node(self.root_addr);
+        let (max_key, _) = root.get_max(self.memory());
+        self.remove_helper(root, &max_key)
+            .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
     }
 
     /// Removes and returns the first element in the map. The key of this element is the minimum key that was in the map
@@ -627,14 +623,10 @@ where
             return None;
         }
 
-        let root_node = self.load_node(self.root_addr);
-        root_node.min_key(self.memory()).map(|min_key| {
-            let value = self
-                .remove_helper(root_node, &min_key)
-                .map(Cow::Owned)
-                .map(V::from_bytes);
-            (min_key, value.unwrap())
-        })
+        let root = self.load_node(self.root_addr);
+        let (min_key, _) = root.get_min(self.memory());
+        self.remove_helper(root, &min_key)
+            .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
 
     // A helper method for recursively removing a key from the B-tree.
@@ -1622,6 +1614,24 @@ mod test {
             |mut btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
                 assert_eq!(btree.pop_last(), None);
                 assert_eq!(btree.pop_first(), None);
+            },
+        );
+    }
+
+    #[test]
+    fn last_key_value_empty_tree_simple() {
+        btree_test(
+            |btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
+                assert_eq!(btree.last_key_value(), None);
+            },
+        );
+    }
+
+    #[test]
+    fn first_key_value_empty_tree_simple() {
+        btree_test(
+            |btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
+                assert_eq!(btree.first_key_value(), None);
             },
         );
     }

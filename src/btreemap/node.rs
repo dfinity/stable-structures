@@ -102,24 +102,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.node_type
     }
 
-    /// Returns the max key in the subtree.
-    pub fn max_key<M: Memory>(&self, memory: &M) -> Option<K> {
-        match self.node_type {
-            NodeType::Leaf => self.keys.last().cloned(),
-            NodeType::Internal => {
-                let last_child = Self::load(
-                    *self
-                        .children
-                        .last()
-                        .expect("An internal node must have children."),
-                    self.version.page_size(),
-                    memory,
-                );
-                last_child.max_key(memory)
-            }
-        }
-    }
-
     /// Returns the entry with the max key in the subtree.
     pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
         match self.node_type {
@@ -140,22 +122,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     memory,
                 );
                 last_child.get_max(memory)
-            }
-        }
-    }
-
-    /// Returns the min key in the subtree.
-    pub fn min_key<M: Memory>(&self, memory: &M) -> Option<K> {
-        match self.node_type {
-            NodeType::Leaf => self.keys.first().cloned(),
-            NodeType::Internal => {
-                let first_child = Self::load(
-                    // NOTE: an internal node must have children, so this access is safe.
-                    self.children[0],
-                    self.version.page_size(),
-                    memory,
-                );
-                first_child.min_key(memory)
             }
         }
     }
