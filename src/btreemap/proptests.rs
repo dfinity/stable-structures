@@ -238,21 +238,14 @@ fn execute_operation<M: Memory>(
         Operation::PopLast => {
             assert_eq!(std_btree.len(), btree.len() as usize);
 
-            let idx = std_btree.len();
-
             eprintln!("PopLast");
             assert_eq!(std_btree.pop_last(), btree.pop_last());
         }
         Operation::PopFirst => {
             assert_eq!(std_btree.len(), btree.len() as usize);
 
-            let idx = std_btree.len();
-
-            if let Some(entry) = btree.iter().skip(idx).take(1).next() {
-                eprintln!("PopFirst");
-                assert_eq!(std_btree.pop_first(), Some(entry.clone()));
-                assert_eq!(btree.pop_first(), Some(entry));
-            }
+            eprintln!("PopFirst");
+            assert_eq!(std_btree.pop_first(), btree.pop_first());
         }
     };
 }
