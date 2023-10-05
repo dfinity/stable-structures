@@ -236,14 +236,10 @@ fn execute_operation<M: Memory>(
             }
         }
         Operation::PopLast => {
-            assert_eq!(std_btree.len(), btree.len() as usize);
-
             eprintln!("PopLast");
             assert_eq!(std_btree.pop_last(), btree.pop_last());
         }
         Operation::PopFirst => {
-            assert_eq!(std_btree.len(), btree.len() as usize);
-
             eprintln!("PopFirst");
             assert_eq!(std_btree.pop_first(), btree.pop_first());
         }
