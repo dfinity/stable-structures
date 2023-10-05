@@ -240,11 +240,8 @@ fn execute_operation<M: Memory>(
 
             let idx = std_btree.len();
 
-            if let Some(entry) = btree.iter().skip(idx).take(1).next() {
-                eprintln!("PopLast");
-                assert_eq!(std_btree.pop_last(), Some(entry.clone()));
-                assert_eq!(btree.pop_last(), Some(entry));
-            }
+            eprintln!("PopLast");
+            assert_eq!(std_btree.pop_last(), btree.pop_last());
         }
         Operation::PopFirst => {
             assert_eq!(std_btree.len(), btree.len() as usize);
