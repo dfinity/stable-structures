@@ -19,6 +19,8 @@ enum Operation {
     Get(usize),
     Remove(usize),
     Range { from: usize, len: usize },
+    PopLast,
+    PopFirst,
 }
 
 // A custom strategy that gives unequal weights to the different operations.
@@ -34,6 +36,8 @@ fn operation_strategy() -> impl Strategy<Value = Operation> {
         15 => (any::<usize>()).prop_map(Operation::Remove),
         5 => (any::<usize>(), any::<usize>())
             .prop_map(|(from, len)| Operation::Range { from, len }),
+        2 =>  Just(Operation::PopFirst),
+        2 =>  Just(Operation::PopLast),
     ]
 }
 
@@ -230,6 +234,14 @@ fn execute_operation<M: Memory>(
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
             }
+        }
+        Operation::PopLast => {
+            eprintln!("PopLast");
+            assert_eq!(std_btree.pop_last(), btree.pop_last());
+        }
+        Operation::PopFirst => {
+            eprintln!("PopFirst");
+            assert_eq!(std_btree.pop_first(), btree.pop_first());
         }
     };
 }
