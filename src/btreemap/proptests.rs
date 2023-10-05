@@ -36,8 +36,8 @@ fn operation_strategy() -> impl Strategy<Value = Operation> {
         15 => (any::<usize>()).prop_map(Operation::Remove),
         5 => (any::<usize>(), any::<usize>())
             .prop_map(|(from, len)| Operation::Range { from, len }),
-        15 =>  Just(Operation::PopFirst),
-        15 =>  Just(Operation::PopLast),
+        2 =>  Just(Operation::PopFirst),
+        2 =>  Just(Operation::PopLast),
     ]
 }
 
