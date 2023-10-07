@@ -19,6 +19,11 @@ thread_local! {
     );
 }
 
+#[ic_cdk::post_upgrade]
+fn post_upgrade() {
+    ASSETS.with(|p| drop(p.borrow()));
+}
+
 /// Retrieves the value associated with the given key if it exists.
 #[ic_cdk_macros::query]
 fn get(key: String) -> Option<Vec<u8>> {
