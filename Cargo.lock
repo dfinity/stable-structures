@@ -432,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "ic-stable-structures"
-version = "0.6.0-beta.1"
+version = "0.6.0"
 dependencies = [
  "candid",
  "clap",
