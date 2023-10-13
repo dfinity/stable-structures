@@ -1,6 +1,30 @@
 //! This module implements a key/value store based on a B-Tree
 //! in stable memory.
 //!
+//! # V2 layout
+//!
+//! ```text
+//! ---------------------------------------- <- Address 0
+//! Magic "BTR"                 ↕ 3 bytes
+//! ----------------------------------------
+//! Layout version              ↕ 1 byte
+//! ----------------------------------------
+//! Max key size                ↕ 4 bytes             Page size                   ↕ 4 bytes
+//! ----------------------------------------   OR   ----------------------------------------
+//! Max value size              ↕ 4 bytes             PAGE_SIZE_VALUE_MARKER      ↕ 4 bytes
+//! ----------------------------------------
+//! Root node address           ↕ 8 bytes
+//! ----------------------------------------
+//! Length (number of elements) ↕ 8 bytes
+//! ---------------------------------------- <- Address 28 (PACKED_HEADER_SIZE)
+//! Reserved space              ↕ 24 bytes
+//! ---------------------------------------- <- Address 52 (ALLOCATOR_OFFSET)
+//! Allocator
+//! ----------------------------------------
+//! ... free memory for nodes
+//! ----------------------------------------
+//! ```
+//!
 //! # V1 layout
 //!
 //! ```text
@@ -53,6 +77,9 @@ const ALLOCATOR_OFFSET: usize = 52;
 
 // The default page size to use in BTreeMap V2 in bytes.
 const DEFAULT_PAGE_SIZE: u32 = 1024;
+
+// A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
+const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -229,32 +256,26 @@ where
         // Read the header from memory.
         let header = Self::read_header(&memory);
 
-        match header.version {
-            Version::V1(DerivedPageSize {
-                max_key_size: expected_key_size,
-                max_value_size: expected_value_size,
-            }) => {
-                assert!(
-                    K::BOUND.max_size() <= expected_key_size,
-                    "max_key_size must be <= {expected_key_size}"
-                );
-
-                assert!(
-                    V::BOUND.max_size() <= expected_value_size,
-                    "max_value_size must be <= {expected_value_size}"
-                );
-            }
-            Version::V2 { .. } => {
-                // Nothing to assert.
-            }
-        }
-
-        // Migrate to V2 if flag is enabled.
         let version = match header.version {
             Version::V1(derived_page_size) => {
+                // Migrate to V2 if flag is enabled.
                 if migrate_to_v2 {
                     Version::V2(PageSize::Derived(derived_page_size))
                 } else {
+                    // Assert that the bounds are correct.
+                    let max_key_size = derived_page_size.max_key_size;
+                    let max_value_size = derived_page_size.max_value_size;
+
+                    assert!(
+                        K::BOUND.max_size() <= max_key_size,
+                        "max_key_size must be <= {max_key_size}",
+                    );
+
+                    assert!(
+                        V::BOUND.max_size() <= max_value_size,
+                        "max_value_size must be <= {max_value_size}"
+                    );
+
                     Version::V1(derived_page_size)
                 }
             }
@@ -292,13 +313,27 @@ where
                 }
             }
             LAYOUT_VERSION_2 => {
-                // TODO: Handle derived page sizes.
+                // Load the page size.
+                let page_size = {
+                    // Page sizes can be stored either as a direct value or as max/value sizes.
+                    let a = u32::from_le_bytes(buf[4..8].try_into().unwrap());
+                    let b = u32::from_le_bytes(buf[8..12].try_into().unwrap());
+
+                    if b == PAGE_SIZE_VALUE_MARKER {
+                        // Page size is stored as a direct value
+                        PageSize::Value(a)
+                    } else {
+                        // Page size is stored as a derived value.
+                        PageSize::Derived(DerivedPageSize {
+                            max_key_size: a,
+                            max_value_size: b,
+                        })
+                    }
+                };
 
                 // Deserialize the fields
                 BTreeHeader {
-                    version: Version::V2(PageSize::Value(u32::from_le_bytes(
-                        buf[4..8].try_into().unwrap(),
-                    ))),
+                    version: Version::V2(page_size),
                     root_addr: Address::from(u64::from_le_bytes(buf[12..20].try_into().unwrap())),
                     length: u64::from_le_bytes(buf[20..28].try_into().unwrap()),
                 }
@@ -568,6 +603,30 @@ where
         self.remove_helper(root_node, key)
             .map(Cow::Owned)
             .map(V::from_bytes)
+    }
+
+    /// Removes and returns the last element in the map. The key of this element is the maximum key that was in the map
+    pub fn pop_last(&mut self) -> Option<(K, V)> {
+        if self.root_addr == NULL {
+            return None;
+        }
+
+        let root = self.load_node(self.root_addr);
+        let (max_key, _) = root.get_max(self.memory());
+        self.remove_helper(root, &max_key)
+            .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
+    }
+
+    /// Removes and returns the first element in the map. The key of this element is the minimum key that was in the map
+    pub fn pop_first(&mut self) -> Option<(K, V)> {
+        if self.root_addr == NULL {
+            return None;
+        }
+
+        let root = self.load_node(self.root_addr);
+        let (min_key, _) = root.get_min(self.memory());
+        self.remove_helper(root, &min_key)
+            .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
 
     // A helper method for recursively removing a key from the B-tree.
@@ -1170,14 +1229,19 @@ where
             Version::V1(DerivedPageSize {
                 max_key_size,
                 max_value_size,
-            }) => {
+            })
+            | Version::V2(PageSize::Derived(DerivedPageSize {
+                max_key_size,
+                max_value_size,
+            })) => {
                 buf[3] = LAYOUT_VERSION;
                 buf[4..8].copy_from_slice(&max_key_size.to_le_bytes());
                 buf[8..12].copy_from_slice(&max_value_size.to_le_bytes());
             }
-            Version::V2(page_size) => {
+            Version::V2(PageSize::Value(page_size)) => {
                 buf[3] = LAYOUT_VERSION_2;
-                buf[4..8].copy_from_slice(&(page_size.get()).to_le_bytes());
+                buf[4..8].copy_from_slice(&page_size.to_le_bytes());
+                buf[8..12].copy_from_slice(&PAGE_SIZE_VALUE_MARKER.to_le_bytes());
             }
         };
         buf[12..20].copy_from_slice(&header.root_addr.get().to_le_bytes());
@@ -1375,6 +1439,36 @@ mod test {
     }
 
     #[test]
+    fn pop_last_single_entry() {
+        btree_test(|mut btree| {
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+
+            assert_eq!(btree.insert(b(&[]), b(&[])), None);
+            assert!(!btree.is_empty());
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+
+            assert_eq!(btree.pop_last(), Some((b(&[]), b(&[]))));
+            assert!(btree.is_empty());
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
+    }
+
+    #[test]
+    fn pop_first_single_entry() {
+        btree_test(|mut btree| {
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+
+            assert_eq!(btree.insert(b(&[]), b(&[])), None);
+            assert!(!btree.is_empty());
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+
+            assert_eq!(btree.pop_first(), Some((b(&[]), b(&[]))));
+            assert!(btree.is_empty());
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
+    }
+
+    #[test]
     fn insert_same_key_multiple() {
         btree_test(|mut btree| {
             assert_eq!(btree.insert(b(&[1]), b(&[2])), None);
@@ -1492,6 +1586,54 @@ mod test {
             assert_eq!(btree.remove(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
             assert_eq!(btree.get(&b(&[1, 2, 3])), None);
         });
+    }
+
+    #[test]
+    fn pop_last_simple() {
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.pop_last().unwrap().1, b(&[4, 5, 6]));
+            assert_eq!(btree.get(&b(&[1, 2, 3])), None);
+        });
+    }
+
+    #[test]
+    fn pop_first_simple() {
+        btree_test(|mut btree| {
+            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
+            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.pop_first().map(|e| e.1), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.get(&b(&[1, 2, 3])), None);
+        });
+    }
+
+    #[test]
+    fn pop_on_empty_tree_simple() {
+        btree_test(
+            |mut btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
+                assert_eq!(btree.pop_last(), None);
+                assert_eq!(btree.pop_first(), None);
+            },
+        );
+    }
+
+    #[test]
+    fn last_key_value_empty_tree_simple() {
+        btree_test(
+            |btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
+                assert_eq!(btree.last_key_value(), None);
+            },
+        );
+    }
+
+    #[test]
+    fn first_key_value_empty_tree_simple() {
+        btree_test(
+            |btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
+                assert_eq!(btree.first_key_value(), None);
+            },
+        );
     }
 
     #[test]
@@ -1939,6 +2081,90 @@ mod test {
     }
 
     #[test]
+    fn pop_first_many_entries() {
+        let mem = make_memory();
+        let mut std_btree = std::collections::BTreeMap::new();
+        let mut btree = BTreeMap::new(mem.clone());
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(
+                    btree.insert(b(&[i, j]), b(&[i, j])),
+                    std_btree.insert(b(&[i, j]), b(&[i, j]))
+                );
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&b(&[i, j])), std_btree.get(&b(&[i, j])).cloned());
+            }
+        }
+
+        let mut btree = BTreeMap::load(mem);
+
+        for _ in 0..=10 {
+            for _ in 0..=255 {
+                assert_eq!(btree.pop_first(), std_btree.pop_first());
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&b(&[i, j])), None);
+                assert_eq!(std_btree.get(&b(&[i, j])), None);
+            }
+        }
+
+        // We've deallocated everything.
+        assert!(std_btree.is_empty());
+        assert!(btree.is_empty());
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn pop_last_many_entries() {
+        let mem = make_memory();
+        let mut std_btree = std::collections::BTreeMap::new();
+        let mut btree = BTreeMap::new(mem.clone());
+
+        for j in (0..=10).rev() {
+            for i in (0..=255).rev() {
+                assert_eq!(
+                    btree.insert(b(&[i, j]), b(&[i, j])),
+                    std_btree.insert(b(&[i, j]), b(&[i, j]))
+                );
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&b(&[i, j])), std_btree.get(&b(&[i, j])).cloned());
+            }
+        }
+
+        let mut btree = BTreeMap::load(mem);
+
+        for _ in (0..=10).rev() {
+            for _ in (0..=255).rev() {
+                assert_eq!(btree.pop_last(), std_btree.pop_last());
+            }
+        }
+
+        for j in 0..=10 {
+            for i in 0..=255 {
+                assert_eq!(btree.get(&b(&[i, j])), None);
+                assert_eq!(std_btree.get(&b(&[i, j])), None);
+            }
+        }
+
+        // We've deallocated everything.
+        assert!(std_btree.is_empty());
+        assert!(btree.is_empty());
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
     fn reloading() {
         btree_test(|mut btree| {
             // The btree is initially empty.
@@ -1983,6 +2209,44 @@ mod test {
 
             for i in 0..1000u32 {
                 assert_eq!(btree.remove(&b(i.to_le_bytes().as_slice())), Some(b(&[])));
+            }
+
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
+        });
+    }
+
+    #[test]
+    fn pop_first_len() {
+        btree_test(|mut btree| {
+            for i in 0..1000u32 {
+                assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
+            }
+
+            assert_eq!(btree.len(), 1000);
+            assert!(!btree.is_empty());
+
+            for i in 0..1000u32 {
+                assert_eq!(btree.pop_first().unwrap().1, b(&i.to_le_bytes()));
+            }
+
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
+        });
+    }
+
+    #[test]
+    fn pop_last_len() {
+        btree_test(|mut btree| {
+            for i in 0..1000u32 {
+                assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
+            }
+
+            assert_eq!(btree.len(), 1000);
+            assert!(!btree.is_empty());
+
+            for i in (0..1000u32).rev() {
+                assert_eq!(btree.pop_last().unwrap().1, b(&i.to_le_bytes()));
             }
 
             assert_eq!(btree.len(), 0);
@@ -2711,5 +2975,60 @@ mod test {
 
         assert!(packed_header.root_addr == v1_header.root_addr);
         assert!(packed_header.length == v1_header.length);
+    }
+
+    #[test]
+    fn migrate_from_bounded_to_unbounded_and_back() {
+        // A type that is bounded.
+        #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
+        struct T;
+        impl Storable for T {
+            fn to_bytes(&self) -> Cow<[u8]> {
+                Cow::Owned(vec![1, 2, 3])
+            }
+
+            fn from_bytes(bytes: Cow<[u8]>) -> Self {
+                assert_eq!(bytes.to_vec(), vec![1, 2, 3]);
+                T
+            }
+
+            const BOUND: StorableBound = StorableBound::Bounded {
+                max_size: 3,
+                is_fixed_size: true,
+            };
+        }
+
+        // Same as the above type, but unbounded.
+        #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
+        struct T2;
+        impl Storable for T2 {
+            fn to_bytes(&self) -> Cow<[u8]> {
+                Cow::Owned(vec![1, 2, 3])
+            }
+
+            fn from_bytes(bytes: Cow<[u8]>) -> Self {
+                assert_eq!(bytes.to_vec(), vec![1, 2, 3]);
+                T2
+            }
+
+            const BOUND: StorableBound = StorableBound::Unbounded;
+        }
+
+        // Create a v1 btreemap with the bounded type.
+        let mem = make_memory();
+        let mut btree: BTreeMap<T, T, _> = BTreeMap::new_v1(mem);
+        btree.insert(T, T);
+
+        // Migrate to v2 and the unbounded type.
+        let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
+        btree.save();
+
+        // Reload the BTree again and try to read the value.
+        let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
+        assert_eq!(btree.get(&T2), Some(T2));
+
+        // Reload the BTree again with bounded type.
+        let btree: BTreeMap<T, T, _> = BTreeMap::init(btree.into_memory());
+        assert_eq!(btree.get(&T), Some(T));
     }
 }

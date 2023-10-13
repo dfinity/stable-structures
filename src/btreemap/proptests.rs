@@ -18,6 +18,9 @@ enum Operation {
     Iter { from: usize, len: usize },
     Get(usize),
     Remove(usize),
+    Range { from: usize, len: usize },
+    PopLast,
+    PopFirst,
 }
 
 // A custom strategy that gives unequal weights to the different operations.
@@ -25,12 +28,16 @@ enum Operation {
 // are growing in size the more operations are executed.
 fn operation_strategy() -> impl Strategy<Value = Operation> {
     prop_oneof![
-        3 => (any::<Vec<u8>>(), any::<Vec<u8>>())
+        30 => (any::<Vec<u8>>(), any::<Vec<u8>>())
             .prop_map(|(key, value)| Operation::Insert { key, value }),
-        1 => (any::<usize>(), any::<usize>())
+        5 => (any::<usize>(), any::<usize>())
             .prop_map(|(from, len)| Operation::Iter { from, len }),
-        2 => (any::<usize>()).prop_map(Operation::Get),
-        1 => (any::<usize>()).prop_map(Operation::Remove),
+        50 => (any::<usize>()).prop_map(Operation::Get),
+        15 => (any::<usize>()).prop_map(Operation::Remove),
+        5 => (any::<usize>(), any::<usize>())
+            .prop_map(|(from, len)| Operation::Range { from, len }),
+        2 =>  Just(Operation::PopFirst),
+        2 =>  Just(Operation::PopLast),
     ]
 }
 
@@ -195,6 +202,46 @@ fn execute_operation<M: Memory>(
                 assert_eq!(std_btree.remove(&k), Some(v.clone()));
                 assert_eq!(btree.remove(&k), Some(v));
             }
+        }
+        Operation::Range { from, len } => {
+            assert_eq!(std_btree.len(), btree.len() as usize);
+            if std_btree.is_empty() {
+                return;
+            }
+
+            eprintln!("Range({}, {})", from, len);
+            let from = from % std_btree.len();
+            let end = std::cmp::min(std_btree.len() - 1, from + len);
+
+            // Create a range for the stable btree from the keys at indexes `from` and `end`.
+            let range_start = btree.iter().skip(from).take(1).next().unwrap().0.clone();
+            let range_end = btree.iter().skip(end).take(1).next().unwrap().0.clone();
+            let stable_range = btree.range(range_start..range_end);
+
+            // Create a range for the std btree from the keys at indexes `from` and `end`.
+            let range_start = std_btree
+                .iter()
+                .skip(from)
+                .take(1)
+                .next()
+                .unwrap()
+                .0
+                .clone();
+            let range_end = std_btree.iter().skip(end).take(1).next().unwrap().0.clone();
+            let std_range = std_btree.range(range_start..range_end);
+
+            for ((k1, v1), (k2, v2)) in std_range.zip(stable_range) {
+                assert_eq!(k1, &k2);
+                assert_eq!(v1, &v2);
+            }
+        }
+        Operation::PopLast => {
+            eprintln!("PopLast");
+            assert_eq!(std_btree.pop_last(), btree.pop_last());
+        }
+        Operation::PopFirst => {
+            eprintln!("PopFirst");
+            assert_eq!(std_btree.pop_first(), btree.pop_first());
         }
     };
 }

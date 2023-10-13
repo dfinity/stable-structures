@@ -28,6 +28,10 @@ For more information about the philosophy behind the library, see [Roman's tutor
 - [Cell]: A serializable value
 - [MinHeap]: A priority queue.
 
+## Tutorials
+
+[Schema Upgrades](./docs/schema-upgrades.md)
+
 ## How it Works
 
 Stable structures are able to work directly in stable memory because each data structure manages
