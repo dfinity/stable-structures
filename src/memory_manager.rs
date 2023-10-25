@@ -297,6 +297,7 @@ struct MemoryManagerInner<M: Memory> {
     memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
 
     // Tracks the buckets that were freed to be reused in future calls to `grow`.
+    // NOTE: A BTreeSet is used so that bucket IDs are maintained in sorted order.
     freed_buckets: BTreeSet<BucketId>,
 }
 
