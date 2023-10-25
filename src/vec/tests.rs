@@ -193,7 +193,7 @@ fn test_iter() {
     assert_eq!(sv.iter().nth(usize::MAX), None);
 
     assert_eq!(sv.iter().count(), 3);
-    assert_eq!(sv.iter().skip(0).count(), 3);
+    assert_eq!(sv.iter().count(), 3);
     assert_eq!(sv.iter().skip(1).count(), 2);
     assert_eq!(sv.iter().skip(2).count(), 1);
     assert_eq!(sv.iter().skip(3).count(), 0);
