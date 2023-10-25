@@ -426,15 +426,15 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let mut last_occupied_bucket: i32 = -1;
 
-        let mut j = 0;
+        let mut bucket_idx: usize = 0;
 
         for (memory, size_in_buckets) in memory_size_in_buckets.into_iter().enumerate() {
             let mut vec_buckets = vec![];
             for _ in 0..size_in_buckets {
-                let bucket = buckets_decompressed[j];
+                let bucket = buckets_decompressed[bucket_idx];
                 last_occupied_bucket = std::cmp::max(bucket.0 as i32, last_occupied_bucket);
                 vec_buckets.push(bucket);
-                j += 1;
+                bucket_idx += 1;
             }
             memory_buckets
                 .entry(MemoryId(memory as u8))
