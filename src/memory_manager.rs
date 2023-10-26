@@ -441,7 +441,7 @@ impl<M: Memory> MemoryManagerInner<M> {
                 .or_insert(vec_buckets);
         }
 
-        let mem_mgr = if last_occupied_bucket == -1 {
+        if last_occupied_bucket == -1 {
             Self {
                 memory,
                 allocated_buckets: header.num_allocated_buckets,
@@ -469,19 +469,7 @@ impl<M: Memory> MemoryManagerInner<M> {
                 memory_buckets,
                 freed_buckets,
             }
-        };
-
-        // Update the header.
-        mem_mgr.save_header();
-
-        // Rewrite the stable store to be layout V2.
-        write(
-            &mem_mgr.memory,
-            bucket_indexes_offset().get(),
-            mem_mgr.get_bucket_ids_in_bytes().as_ref(),
-        );
-
-        mem_mgr
+        }
     }
 
     fn load(memory: M) -> Self {
