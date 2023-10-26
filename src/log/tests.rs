@@ -230,7 +230,7 @@ fn test_iter() {
     assert_eq!(log.iter().nth(usize::MAX), None);
 
     assert_eq!(log.iter().count(), 3);
-    assert_eq!(log.iter().skip(0).count(), 3);
+    assert_eq!(log.iter().count(), 3);
     assert_eq!(log.iter().skip(1).count(), 2);
     assert_eq!(log.iter().skip(2).count(), 1);
     assert_eq!(log.iter().skip(3).count(), 0);
@@ -271,7 +271,7 @@ fn test_thread_local_iter() {
     assert_eq!(new_iter().nth(usize::MAX), None);
 
     assert_eq!(new_iter().count(), 3);
-    assert_eq!(new_iter().skip(0).count(), 3);
+    assert_eq!(new_iter().count(), 3);
     assert_eq!(new_iter().skip(1).count(), 2);
     assert_eq!(new_iter().skip(2).count(), 1);
     assert_eq!(new_iter().skip(3).count(), 0);
