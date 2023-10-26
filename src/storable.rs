@@ -154,7 +154,7 @@ impl<const N: usize> PartialEq for Blob<N> {
 
 impl<const N: usize> PartialOrd for Blob<N> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.as_slice().partial_cmp(other.as_slice())
+        Some(self.cmp(other))
     }
 }
 

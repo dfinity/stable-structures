@@ -530,7 +530,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
             self.memory_buckets
                 .entry(id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(new_bucket_id);
         }
 
