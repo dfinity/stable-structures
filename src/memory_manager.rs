@@ -411,14 +411,18 @@ impl<M: Memory> MemoryManagerInner<M> {
             number_of_used_buckets += size_in_buckets;
         }
 
-        const BYTE_SIZE_IN_BITS: usize = 8;
-        let buckets_index_size_in_bytes: usize =
-            (number_of_used_buckets as usize * BUCKET_ID_LEN_IN_BITS).div_ceil(BYTE_SIZE_IN_BITS);
+        // Load the buckets.
+        let buckets = {
+            const BYTE_SIZE_IN_BITS: usize = 8;
+            let buckets_index_size_in_bytes: usize = (number_of_used_buckets as usize
+                * BUCKET_ID_LEN_IN_BITS)
+                .div_ceil(BYTE_SIZE_IN_BITS);
 
-        let mut buckets = vec![0; buckets_index_size_in_bytes];
-        memory.read(bucket_indexes_offset().get(), &mut buckets);
+            let mut buckets = vec![0; buckets_index_size_in_bytes];
+            memory.read(bucket_indexes_offset().get(), &mut buckets);
 
-        let buckets_decompressed = bytes_to_bucket_indexes(&buckets);
+            bytes_to_bucket_indexes(&buckets)
+        };
 
         let mut memory_buckets = BTreeMap::new();
 
@@ -430,7 +434,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         for (memory, size_in_buckets) in memory_size_in_buckets.into_iter().enumerate() {
             let mut vec_buckets = vec![];
             for _ in 0..size_in_buckets {
-                let bucket = buckets_decompressed[bucket_idx];
+                let bucket = buckets[bucket_idx];
                 max_bucket_id = std::cmp::max(bucket.0, max_bucket_id);
                 vec_buckets.push(bucket);
                 bucket_idx += 1;
@@ -442,7 +446,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let mut freed_buckets: BTreeSet<BucketId> = (0..max_bucket_id).map(BucketId).collect();
 
-        for id in buckets_decompressed.iter() {
+        for id in buckets.iter() {
             freed_buckets.remove(id);
         }
 
