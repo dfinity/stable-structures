@@ -405,6 +405,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mut memory_size_in_buckets = vec![];
         let mut number_of_used_buckets = 0;
 
+        // Translate memory sizes expressed in pages to sizes expressed in buckets.
         for memory_size_in_pages in header.memory_sizes_in_pages.into_iter() {
             let size_in_buckets = memory_size_in_pages.div_ceil(header.bucket_size_in_pages as u64);
             memory_size_in_buckets.push(size_in_buckets);
@@ -424,6 +425,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             bytes_to_bucket_indexes(&buckets)
         };
 
+        // Map of all memories with their assigned buckets.
         let mut memory_buckets = BTreeMap::new();
 
         // The last bucket that's accessed.
@@ -431,6 +433,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let mut bucket_idx: usize = 0;
 
+        // Assign buckets to the memories they are part of.
         for (memory, size_in_buckets) in memory_size_in_buckets.into_iter().enumerate() {
             let mut vec_buckets = vec![];
             for _ in 0..size_in_buckets {
@@ -444,6 +447,7 @@ impl<M: Memory> MemoryManagerInner<M> {
                 .or_insert(vec_buckets);
         }
 
+        // Set of all buckets with ID smaller than 'max_bucket_id' which were allocated and freed.
         let mut freed_buckets: BTreeSet<BucketId> = (0..max_bucket_id).map(BucketId).collect();
 
         for id in buckets.iter() {
