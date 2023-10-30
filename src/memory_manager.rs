@@ -406,8 +406,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mut number_of_used_buckets = 0;
 
         for memory_size_in_pages in header.memory_sizes_in_pages.into_iter() {
-            let size_in_buckets = (memory_size_in_pages + header.bucket_size_in_pages as u64 - 1)
-                / header.bucket_size_in_pages as u64;
+            let size_in_buckets = memory_size_in_pages.div_ceil(header.bucket_size_in_pages as u64);
             memory_size_in_buckets.push(size_in_buckets);
             number_of_used_buckets += size_in_buckets;
         }
