@@ -422,7 +422,8 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let mut memory_buckets = BTreeMap::new();
 
-        let mut last_occupied_bucket: i32 = -1;
+        // The last bucket that's accessed.
+        let mut max_bucket_id: u16 = 0;
 
         let mut bucket_idx: usize = 0;
 
@@ -430,7 +431,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             let mut vec_buckets = vec![];
             for _ in 0..size_in_buckets {
                 let bucket = buckets_decompressed[bucket_idx];
-                last_occupied_bucket = std::cmp::max(bucket.0 as i32, last_occupied_bucket);
+                max_bucket_id = std::cmp::max(bucket.0, max_bucket_id);
                 vec_buckets.push(bucket);
                 bucket_idx += 1;
             }
@@ -439,34 +440,19 @@ impl<M: Memory> MemoryManagerInner<M> {
                 .or_insert(vec_buckets);
         }
 
-        if last_occupied_bucket == -1 {
-            Self {
-                memory,
-                allocated_buckets: header.num_allocated_buckets,
-                bucket_size_in_pages: header.bucket_size_in_pages,
-                memory_sizes_in_pages: header.memory_sizes_in_pages,
-                memory_buckets,
-                freed_buckets: BTreeSet::new(),
-            }
-        } else {
-            let mut freed_buckets = BTreeSet::new();
+        let mut freed_buckets: BTreeSet<BucketId> = (0..max_bucket_id).map(BucketId).collect();
 
-            for id in 0..last_occupied_bucket as u16 {
-                freed_buckets.insert(BucketId(id));
-            }
+        for id in buckets_decompressed.iter() {
+            freed_buckets.remove(id);
+        }
 
-            for id in buckets_decompressed.iter() {
-                freed_buckets.remove(id);
-            }
-
-            Self {
-                memory,
-                allocated_buckets: header.num_allocated_buckets,
-                bucket_size_in_pages: header.bucket_size_in_pages,
-                memory_sizes_in_pages: header.memory_sizes_in_pages,
-                memory_buckets,
-                freed_buckets,
-            }
+        Self {
+            memory,
+            allocated_buckets: header.num_allocated_buckets,
+            bucket_size_in_pages: header.bucket_size_in_pages,
+            memory_sizes_in_pages: header.memory_sizes_in_pages,
+            memory_buckets,
+            freed_buckets,
         }
     }
 
