@@ -413,8 +413,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         const BYTE_SIZE_IN_BITS: usize = 8;
         let buckets_index_size_in_bytes: usize =
-            (number_of_used_buckets as usize * BUCKET_ID_LEN_IN_BITS + (BYTE_SIZE_IN_BITS - 1))
-                / BYTE_SIZE_IN_BITS;
+            (number_of_used_buckets as usize * BUCKET_ID_LEN_IN_BITS).div_ceil(BYTE_SIZE_IN_BITS);
 
         let mut buckets = vec![0; buckets_index_size_in_bytes];
         memory.read(bucket_indexes_offset().get(), &mut buckets);
