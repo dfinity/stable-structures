@@ -398,7 +398,7 @@ where
     M: Memory,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        if self.range.is_empty() || self.vec.len() <= self.range.end - 1 {
+        if self.range.is_empty() || self.vec.len() < self.range.end {
             return None;
         }
 
