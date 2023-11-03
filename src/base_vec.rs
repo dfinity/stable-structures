@@ -36,8 +36,10 @@ use crate::{
     read_u32, read_u64, safe_write, write_u32, write_u64, Address, GrowFailed, Memory, Storable,
 };
 use std::borrow::{Borrow, Cow};
+use std::cmp::min;
 use std::fmt;
 use std::marker::PhantomData;
+use std::ops::Range;
 
 const LAYOUT_VERSION: u8 = 1;
 /// The offset where the user data begins.
@@ -227,7 +229,10 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         Iter {
             vec: self,
             buf: vec![],
-            pos: 0,
+            range: Range {
+                start: 0,
+                end: self.len(),
+            },
         }
     }
 
@@ -346,7 +351,7 @@ where
 {
     vec: &'a BaseVec<T, M>,
     buf: std::vec::Vec<u8>,
-    pos: u64,
+    range: Range<u64>,
 }
 
 impl<T, M> Iterator for Iter<'_, T, M>
@@ -357,21 +362,24 @@ where
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
-        if self.vec.len() <= self.pos {
+        if self.range.is_empty() || self.vec.len() <= self.range.start {
             return None;
         }
 
-        self.vec.read_entry_to(self.pos, &mut self.buf);
-        self.pos = self.pos.saturating_add(1);
+        self.vec.read_entry_to(self.range.start, &mut self.buf);
+        self.range.start = self.range.start.saturating_add(1);
         Some(T::from_bytes(Cow::Borrowed(&self.buf)))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.vec.len().saturating_sub(self.pos) as usize, None)
+        (
+            min(self.vec.len(), self.range.end).saturating_sub(self.range.start) as usize,
+            None,
+        )
     }
 
     fn count(self) -> usize {
-        let n = self.vec.len().saturating_sub(self.pos);
+        let n = self.vec.len().saturating_sub(self.range.start);
         if n > usize::MAX as u64 {
             panic!("The number of items in the vec {n} does not fit into usize");
         }
@@ -379,7 +387,28 @@ where
     }
 
     fn nth(&mut self, n: usize) -> Option<T> {
-        self.pos = self.pos.saturating_add(n as u64);
+        self.range.start = self.range.start.saturating_add(n as u64);
         self.next()
+    }
+}
+
+impl<T, M> DoubleEndedIterator for Iter<'_, T, M>
+where
+    T: Storable,
+    M: Memory,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.range.is_empty() || self.vec.len() <= self.range.end - 1 {
+            return None;
+        }
+
+        self.vec.read_entry_to(self.range.end - 1, &mut self.buf);
+        self.range.end = self.range.end.saturating_sub(1);
+        Some(T::from_bytes(Cow::Borrowed(&self.buf)))
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        self.range.end = self.range.end.saturating_sub(n as u64);
+        self.next_back()
     }
 }
