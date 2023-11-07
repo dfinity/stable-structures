@@ -83,7 +83,7 @@ impl<T: Storable, M: Memory> Vec<T, M> {
         self.0.pop()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = T> + '_ {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = T> + '_ {
         self.0.iter()
     }
 
