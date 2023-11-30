@@ -185,12 +185,40 @@ fn test_iter() {
     assert_eq!(iter.size_hint(), (0, None));
     assert_eq!(iter.next(), None);
 
+    let mut iter_back = sv.iter();
+    assert_eq!(iter_back.size_hint(), (3, None));
+    assert_eq!(iter_back.next_back(), Some(3));
+    assert_eq!(iter_back.size_hint(), (2, None));
+    assert_eq!(iter_back.next_back(), Some(2));
+    assert_eq!(iter_back.size_hint(), (1, None));
+    assert_eq!(iter_back.next_back(), Some(1));
+    assert_eq!(iter_back.size_hint(), (0, None));
+    assert_eq!(iter_back.next_back(), None);
+
+    let mut iter_mixed = sv.iter();
+    assert_eq!(iter_mixed.size_hint(), (3, None));
+    assert_eq!(iter_mixed.next_back(), Some(3));
+    assert_eq!(iter_mixed.size_hint(), (2, None));
+    assert_eq!(iter_mixed.next(), Some(1));
+    assert_eq!(iter_mixed.size_hint(), (1, None));
+    assert_eq!(iter_mixed.next_back(), Some(2));
+    assert_eq!(iter_mixed.size_hint(), (0, None));
+    assert_eq!(iter_mixed.next(), None);
+    assert_eq!(iter_mixed.next_back(), None);
+
     assert_eq!(sv.iter().nth(0), Some(1));
     assert_eq!(sv.iter().nth(1), Some(2));
     assert_eq!(sv.iter().nth(2), Some(3));
     assert_eq!(sv.iter().nth(3), None);
     assert_eq!(sv.iter().nth(4), None);
     assert_eq!(sv.iter().nth(usize::MAX), None);
+
+    assert_eq!(sv.iter().nth_back(0), Some(3));
+    assert_eq!(sv.iter().nth_back(1), Some(2));
+    assert_eq!(sv.iter().nth_back(2), Some(1));
+    assert_eq!(sv.iter().nth_back(3), None);
+    assert_eq!(sv.iter().nth_back(4), None);
+    assert_eq!(sv.iter().nth_back(usize::MAX), None);
 
     assert_eq!(sv.iter().count(), 3);
     assert_eq!(sv.iter().count(), 3);
