@@ -22,7 +22,6 @@ lazy_static::lazy_static! {
         // MemoryManager benchmarks
         "memory_manager_baseline",
         "memory_manager_overhead",
-        "memory_manager_buckets_allocation",
 
         // BTree benchmarks
         "btreemap_insert_10mib_values",
