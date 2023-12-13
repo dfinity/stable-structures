@@ -17,6 +17,7 @@ repository = "https://github.com/dfinity/stable-structures"
 bench = false
 
 [dependencies]
+ic_principal = "0.1.0"
 # An optional dependency to profile parts of the code.
 profiler = { path = "./profiler", optional = true }
 

@@ -440,6 +440,7 @@ dependencies = [
  "hex",
  "ic-cdk",
  "ic-cdk-macros",
+ "ic_principal",
  "lazy_static",
  "maplit",
  "profiler",
@@ -455,6 +456,21 @@ name = "ic0"
 version = "0.18.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "576c539151d4769fb4d1a0c25c4108dd18facd04c5695b02cf2d226ab4e43aa5"
+
+[[package]]
+name = "ic_principal"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "899a4e8ddada85b91a2fe32b4dc6c0d475ef7bfef3f51cf2aecb26ee4ac4724f"
+dependencies = [
+ "crc32fast",
+ "data-encoding",
+ "hex",
+ "serde",
+ "serde_bytes",
+ "sha2",
+ "thiserror",
+]
 
 [[package]]
 name = "indexmap"
