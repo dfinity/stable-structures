@@ -56,6 +56,13 @@ proptest! {
         let v = v.map(|(n, bytes)| (n, Blob::<48>::try_from(&bytes[..]).unwrap()));
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
+
+    #[test]
+    fn principal_roundtrip(mut bytes in pvec(any::<u8>(), 0..=28), tag in proptest::prop_oneof![Just(1),Just(2),Just(3),Just(4),Just(7)]) {
+        bytes.push(tag);
+        let principal = Principal::from_slice(bytes.as_slice());
+        prop_assert_eq!(principal, Storable::from_bytes(principal.to_bytes()));
+    }
 }
 
 #[test]

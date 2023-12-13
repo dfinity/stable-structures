@@ -17,11 +17,11 @@ repository = "https://github.com/dfinity/stable-structures"
 bench = false
 
 [dependencies]
+candid.workspace = true
 # An optional dependency to profile parts of the code.
 profiler = { path = "./profiler", optional = true }
 
 [dev-dependencies]
-candid.workspace = true 
 clap = { version = "4.0.11", features = ["derive"] }
 colored = "2.0.4"
 hex = "0.4.3"

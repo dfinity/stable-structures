@@ -3,6 +3,8 @@ use std::cmp::{Ordering, Reverse};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
+use candid::Principal;
+
 #[cfg(test)]
 mod tests;
 
@@ -359,6 +361,21 @@ impl<const N: usize> Storable for [u8; N] {
         max_size: N as u32,
         is_fixed_size: true,
     };
+}
+
+// candid::Principal::MAX_LENGTH_IN_BYTES is private
+const CANDID_MAX_LENGTH_IN_BYTES: u32 = 29;
+impl Storable for Principal {
+
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Borrowed(self.as_slice())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_slice(&bytes)
+    }
+
+    const BOUND: Bound = Bound::Bounded { max_size: CANDID_MAX_LENGTH_IN_BYTES, is_fixed_size: false };
 }
 
 impl<T: Storable> Storable for Reverse<T> {
