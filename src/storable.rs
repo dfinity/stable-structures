@@ -366,7 +366,6 @@ impl<const N: usize> Storable for [u8; N] {
 // candid::Principal::MAX_LENGTH_IN_BYTES is private
 const CANDID_MAX_LENGTH_IN_BYTES: u32 = 29;
 impl Storable for Principal {
-
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_slice())
     }
@@ -377,7 +376,7 @@ impl Storable for Principal {
 
     const BOUND: Bound = Bound::Bounded {
         max_size: CANDID_MAX_LENGTH_IN_BYTES,
-        is_fixed_size: false
+        is_fixed_size: false,
     };
 }
 
