@@ -375,7 +375,10 @@ impl Storable for Principal {
         Self::from_slice(&bytes)
     }
 
-    const BOUND: Bound = Bound::Bounded { max_size: CANDID_MAX_LENGTH_IN_BYTES, is_fixed_size: false };
+    const BOUND: Bound = Bound::Bounded {
+        max_size: CANDID_MAX_LENGTH_IN_BYTES,
+        is_fixed_size: false
+    };
 }
 
 impl<T: Storable> Storable for Reverse<T> {
