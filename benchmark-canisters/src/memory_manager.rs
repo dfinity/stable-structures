@@ -57,7 +57,7 @@ pub fn memory_manager_overhead() -> BenchResult {
     })
 }
 
-/// Benchmarks the `MemoryManager` by allocating a large number of buckets.
+/// Benchmarks the `MemoryManager`'s `grow` method.
 #[ic_cdk_macros::query]
 pub fn memory_manager_grow() -> BenchResult {
     let mem_mgr = MemoryManager::init_with_bucket_size(DefaultMemoryImpl::default(), 1);
