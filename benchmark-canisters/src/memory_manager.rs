@@ -56,3 +56,19 @@ pub fn memory_manager_overhead() -> BenchResult {
         }
     })
 }
+
+/// Benchmarks the `MemoryManager`'s `grow` method.
+#[ic_cdk_macros::query]
+pub fn memory_manager_grow() -> BenchResult {
+    let mem_mgr = MemoryManager::init_with_bucket_size(DefaultMemoryImpl::default(), 1);
+
+    let buckets_per_memory = 32000;
+
+    let memory = mem_mgr.get(MemoryId::new(0));
+
+    crate::benchmark(|| {
+        for _ in 0..buckets_per_memory {
+            memory.grow(1);
+        }
+    })
+}

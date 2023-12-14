@@ -70,3 +70,42 @@ jobs:
       - name: Run test
         run: |
           bash examples/test.sh
+
+  benchmark:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
+
+      - name: Install Rust
+        run: |
+          rustup update ${{ matrix.rust }} --no-self-update
+          rustup default ${{ matrix.rust }}
+          rustup target add wasm32-unknown-unknown
+
+      - name: Run benchmark test
+        run: |
+          bash benchmarks/benchmark_ci.sh
+
+  checks-pass:
+    # Always run this job!
+    if: always()
+    needs: [build, examples, benchmark]
+    runs-on: ubuntu-20.04
+    steps:
+      - name: check build result
+        if: ${{ needs.build.result != 'success' }}
+        run: exit 1
+      - name: check examples result
+        if: ${{ needs.examples.result != 'success' }}
+        run: exit 1
+      - name: check benchmark result
+        if: ${{ needs.benchmark.result != 'success' }}
+        run: exit 1
