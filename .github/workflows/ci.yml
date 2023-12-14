@@ -93,3 +93,19 @@ jobs:
       - name: Run benchmark test
         run: |
           bash benchmarks/benchmark_ci.sh
+
+  checks-pass:
+    # Always run this job!
+    if: always()
+    needs: [build, examples, benchmark]
+    runs-on: ubuntu-20.04
+    steps:
+      - name: check build result
+        if: ${{ needs.build.result != 'success' }}
+        run: exit 1
+      - name: check examples result
+        if: ${{ needs.examples.result != 'success' }}
+        run: exit 1
+      - name: check benchmark result
+        if: ${{ needs.benchmark.result != 'success' }}
+        run: exit 1
