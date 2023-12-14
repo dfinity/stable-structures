@@ -5,7 +5,6 @@ use ic_stable_structures::{DefaultMemoryImpl, Memory};
 const WASM_PAGE_SIZE: usize = 65536;
 const MB: usize = 1024 * 1024;
 const MB_IN_PAGES: usize = MB / WASM_PAGE_SIZE;
-const BUCKET_SIZE_IN_PAGES: u64 = 128;
 
 /// Benchmarks accessing stable memory without using a `MemoryManager` to establish a baseline.
 #[ic_cdk_macros::query]
@@ -60,18 +59,16 @@ pub fn memory_manager_overhead() -> BenchResult {
 
 /// Benchmarks the `MemoryManager` by allocating a large number of buckets.
 #[ic_cdk_macros::query]
-pub fn memory_manager_buckets_allocation() -> BenchResult {
+pub fn memory_manager_grow() -> BenchResult {
     let mem_mgr = MemoryManager::init_with_bucket_size(DefaultMemoryImpl::default(), 1);
 
-    let num_memories = 5;
-    let buckets_per_memory = 5000;
+    let buckets_per_memory = 32000;
+
+    let memory = mem_mgr.get(MemoryId::new(0));
 
     crate::benchmark(|| {
-        for i in 0..num_memories {
-            let memory = mem_mgr.get(MemoryId::new(i));
-            for _ in 0..buckets_per_memory {
-                memory.grow(BUCKET_SIZE_IN_PAGES);
-            }
+        for _ in 0..buckets_per_memory {
+            memory.grow(1);
         }
     })
 }

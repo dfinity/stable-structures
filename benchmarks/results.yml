@@ -382,10 +382,10 @@ memory_manager_baseline:
   measurements:
     instructions: 1144
     stable_memory_size: 8000
-memory_manager_buckets_allocation:
+memory_manager_grow:
   measurements:
-    instructions: 14510284
-    stable_memory_size: 32769
+    instructions: 287018881
+    stable_memory_size: 32001
 memory_manager_overhead:
   measurements:
     instructions: 4605248
