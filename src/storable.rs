@@ -511,8 +511,6 @@ impl<T: Storable> Storable for Option<T> {
     };
 }
 
-// ic_principal::Principal::MAX_LENGTH_IN_BYTES is private
-const CANDID_MAX_LENGTH_IN_BYTES: u32 = 29;
 impl Storable for Principal {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_slice())
@@ -523,7 +521,7 @@ impl Storable for Principal {
     }
 
     const BOUND: Bound = Bound::Bounded {
-        max_size: CANDID_MAX_LENGTH_IN_BYTES,
+        max_size: Principal::MAX_LENGTH_IN_BYTES as u32,
         is_fixed_size: false,
     };
 }
