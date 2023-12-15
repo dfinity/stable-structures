@@ -17,11 +17,12 @@ repository = "https://github.com/dfinity/stable-structures"
 bench = false
 
 [dependencies]
+ic_principal = { version = "0.1.1", default-features = false }
 # An optional dependency to profile parts of the code.
 profiler = { path = "./profiler", optional = true }
 
 [dev-dependencies]
-candid.workspace = true 
+candid.workspace = true
 clap = { version = "4.0.11", features = ["derive"] }
 colored = "2.0.4"
 hex = "0.4.3"
@@ -41,9 +42,7 @@ harness = false
 path = "benchmarks/benchmark.rs"
 
 [workspace]
-members = [
-  "benchmark-canisters"
-]
+members = ["benchmark-canisters"]
 
 [workspace.dependencies]
 candid = "0.9.11"

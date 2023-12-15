@@ -1,3 +1,4 @@
+use ic_principal::Principal;
 use std::borrow::{Borrow, Cow};
 use std::cmp::{Ordering, Reverse};
 use std::convert::{TryFrom, TryInto};
@@ -507,6 +508,21 @@ impl<T: Storable> Storable for Option<T> {
             },
             Bound::Unbounded => Bound::Unbounded,
         }
+    };
+}
+
+impl Storable for Principal {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Borrowed(self.as_slice())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self::from_slice(&bytes)
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: Principal::MAX_LENGTH_IN_BYTES as u32,
+        is_fixed_size: false,
     };
 }
 
