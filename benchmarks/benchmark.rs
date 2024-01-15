@@ -117,10 +117,18 @@ fn main() {
 
     // Parse the Wasm to determine all the benchmarks to run.
     // All query endpoints are assumed to be benchmarks.
+    let benchmark_canister_wasm = std::fs::read(
+        PathBuf::new()
+            .join(env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("target")
+            .join("wasm32-unknown-unknown")
+            .join("release")
+            .join("benchmarks.wasm"),
+    )
+    .unwrap();
+
     let benchmark_fns: Vec<_> = WasmParser::new(0)
-        .parse_all(include_bytes!(
-            "../target/wasm32-unknown-unknown/release/benchmarks.wasm"
-        ))
+        .parse_all(&benchmark_canister_wasm)
         .filter_map(|section| match section {
             Ok(wasmparser::Payload::ExportSection(export_section)) => {
                 let queries: Vec<_> = export_section
