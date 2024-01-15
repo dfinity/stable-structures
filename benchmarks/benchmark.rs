@@ -146,7 +146,7 @@ fn main() {
                             }
                         }
 
-                        return None;
+                        None
                     })
                     .collect();
 
