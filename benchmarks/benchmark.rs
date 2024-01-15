@@ -133,7 +133,7 @@ fn main() {
                                         .name
                                         .split_whitespace()
                                         .last()
-                                        .expect("query must hav name."),
+                                        .expect("query must have name."),
                                 );
                             }
                         }
