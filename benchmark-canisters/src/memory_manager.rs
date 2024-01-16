@@ -1,4 +1,4 @@
-use crate::BenchResult;
+use profiler::{benchmark, BenchResult};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::{DefaultMemoryImpl, Memory};
 
@@ -15,7 +15,7 @@ pub fn memory_manager_baseline() -> BenchResult {
     let mut buf = vec![0; buf_size];
 
     let memory = DefaultMemoryImpl::default();
-    crate::benchmark(|| {
+    benchmark(|| {
         // Write the buffer 5 times consecutively in memory.
         for i in 0..5 {
             memory.grow(buf_size_in_pages);
@@ -41,7 +41,7 @@ pub fn memory_manager_overhead() -> BenchResult {
 
     let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     let num_memories = 5;
-    crate::benchmark(|| {
+    benchmark(|| {
         for i in 0..num_memories {
             let memory = mem_mgr.get(MemoryId::new(i));
             for j in 0..num_chunks {
@@ -66,7 +66,7 @@ pub fn memory_manager_grow() -> BenchResult {
 
     let memory = mem_mgr.get(MemoryId::new(0));
 
-    crate::benchmark(|| {
+    benchmark(|| {
         for _ in 0..buckets_per_memory {
             memory.grow(1);
         }

@@ -1,7 +1,6 @@
 //! A script for running benchmarks on a canister.
 //! To run this script, run `cargo bench`.
 use clap::Parser;
-use profiler::benchmark::run_benchmarks;
 use std::{env, path::PathBuf};
 
 #[derive(Parser, Debug)]
@@ -22,7 +21,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    run_benchmarks(
+    profiler::run_benchmarks(
         PathBuf::new()
             .join(env::var("CARGO_MANIFEST_DIR").unwrap())
             .join("benchmark-canisters"),

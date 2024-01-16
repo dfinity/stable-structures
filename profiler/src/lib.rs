@@ -1,7 +1,12 @@
 //! A module for profiling canisters.
 #[cfg(feature = "benchmark")]
-pub mod benchmark;
+mod benchmark;
+#[cfg(feature = "benchmark")]
+pub use benchmark::run_benchmarks;
 
+use candid::CandidType;
+use maplit::btreemap;
+use serde::Deserialize;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -64,4 +69,32 @@ fn instruction_count() -> u64 {
         // Consider using cpu time here.
         0
     }
+}
+
+/// The results of a benchmark.
+#[derive(Debug, PartialEq, Deserialize, CandidType)]
+pub struct BenchResult {
+    measurements: BTreeMap<String, u64>,
+}
+
+/// Benchmarks the given function.
+pub fn benchmark<R>(f: impl FnOnce() -> R) -> BenchResult {
+    let start = ic_cdk::api::performance_counter(0);
+    reset();
+    f();
+    let total_instructions = ic_cdk::api::performance_counter(0) - start;
+
+    let mut measurements = btreemap! {
+        "instructions".to_string() => total_instructions,
+        "stable_memory_size".to_string() => ic_cdk::api::stable::stable64_size()
+    };
+
+    let mut profiling_results: std::collections::BTreeMap<_, _> = get_results()
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
+
+    measurements.append(&mut profiling_results);
+
+    BenchResult { measurements }
 }

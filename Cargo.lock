@@ -1038,6 +1038,7 @@ dependencies = [
  "flate2",
  "hex",
  "ic-cdk",
+ "maplit",
  "reqwest",
  "serde",
  "serde_yaml",
