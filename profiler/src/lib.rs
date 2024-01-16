@@ -1,4 +1,7 @@
 //! A module for profiling canisters.
+#[cfg(feature = "benchmark")]
+pub mod benchmark;
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -44,7 +47,7 @@ impl Drop for Profile {
 
         PROFILING.with(|p| {
             let mut p = p.borrow_mut();
-            let entry = p.entry(&self.name).or_insert(0);
+            let entry = p.entry(self.name).or_insert(0);
             *entry += instructions_count;
         });
     }

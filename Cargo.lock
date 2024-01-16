@@ -685,23 +685,15 @@ version = "0.6.1"
 dependencies = [
  "candid",
  "clap",
- "colored",
- "flate2",
  "hex",
  "ic-cdk",
  "ic-cdk-macros",
  "ic_principal",
- "lazy_static",
  "maplit",
  "profiler",
  "proptest",
- "reqwest",
- "serde",
- "serde_yaml",
- "sha256",
  "tempfile",
  "test-strategy",
- "wasmparser",
 ]
 
 [[package]]
@@ -1041,7 +1033,17 @@ dependencies = [
 name = "profiler"
 version = "0.1.0"
 dependencies = [
+ "candid",
+ "colored",
+ "flate2",
+ "hex",
  "ic-cdk",
+ "reqwest",
+ "serde",
+ "serde_yaml",
+ "sha256",
+ "tempfile",
+ "wasmparser",
 ]
 
 [[package]]

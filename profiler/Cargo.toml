@@ -6,4 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+candid = { workspace = true, optional = true }
+colored = { version = "2.0.4", optional = true }
+flate2 = { version = "1.0.28", optional = true }
+hex = { version = "0.4.3", optional = true }
 ic-cdk.workspace= true
+reqwest = { version = "0.11.23", features = ["blocking"], optional = true }
+serde = { version = "1.0", optional = true }
+serde_yaml = { version = "0.9", optional = true }
+sha256 = { version = "1.5.0", optional = true }
+tempfile = { version = "3.3.0", optional = true }
+wasmparser = { version = "0.119.0", optional = true }
+
+[features]
+benchmark = ["candid", "colored", "flate2", "hex", "reqwest", "sha256", "serde", "serde_yaml", "tempfile", "wasmparser"]
