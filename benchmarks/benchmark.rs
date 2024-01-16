@@ -164,6 +164,13 @@ fn download_drun() {
     let mut file = File::create(drun_path()).expect("Failed to create drun file");
 
     std::io::copy(&mut decoder, &mut file).expect("Failed to write drun file");
+
+    // Make the file executable.
+    Command::new("chmod")
+        .arg("+x")
+        .arg(drun_path())
+        .status()
+        .unwrap();
 }
 
 // Runs the given benchmark.
