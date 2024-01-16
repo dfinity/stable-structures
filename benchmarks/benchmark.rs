@@ -12,105 +12,10 @@ use std::{
     path::PathBuf,
     process::Command,
 };
+use wasmparser::Parser as WasmParser;
 
 // The file to persist benchmark results to.
 const RESULTS_FILE: &str = "results.yml";
-
-lazy_static::lazy_static! {
-    // The benchmarks to run.
-    static ref BENCHES: Vec<&'static str> = vec![
-        // MemoryManager benchmarks
-        "memory_manager_baseline",
-        "memory_manager_overhead",
-        "memory_manager_grow",
-
-        // BTree benchmarks
-        "btreemap_insert_10mib_values",
-        "btreemap_insert_blob_4_1024",
-        "btreemap_insert_blob_4_1024_v2",
-        "btreemap_insert_blob_8_1024",
-        "btreemap_insert_blob_8_1024_v2",
-        "btreemap_insert_blob_16_1024",
-        "btreemap_insert_blob_16_1024_v2",
-        "btreemap_insert_blob_32_1024",
-        "btreemap_insert_blob_32_1024_v2",
-        "btreemap_insert_blob_64_1024",
-        "btreemap_insert_blob_64_1024_v2",
-        "btreemap_insert_blob_128_1024",
-        "btreemap_insert_blob_128_1024_v2",
-        "btreemap_insert_blob_256_1024",
-        "btreemap_insert_blob_256_1024_v2",
-        "btreemap_insert_blob_512_1024",
-        "btreemap_insert_blob_512_1024_v2",
-        "btreemap_insert_u64_u64",
-        "btreemap_insert_u64_u64_v2",
-        "btreemap_insert_u64_blob_8",
-        "btreemap_insert_u64_blob_8_v2",
-        "btreemap_insert_blob_8_u64",
-        "btreemap_insert_blob_8_u64_v2",
-
-        "btreemap_get_blob_4_1024",
-        "btreemap_get_blob_4_1024_v2",
-        "btreemap_get_blob_8_1024",
-        "btreemap_get_blob_8_1024_v2",
-        "btreemap_get_blob_16_1024",
-        "btreemap_get_blob_16_1024_v2",
-        "btreemap_get_blob_32_1024",
-        "btreemap_get_blob_32_1024_v2",
-        "btreemap_get_blob_64_1024",
-        "btreemap_get_blob_64_1024_v2",
-        "btreemap_get_blob_128_1024",
-        "btreemap_get_blob_128_1024_v2",
-        "btreemap_get_u64_u64",
-        "btreemap_get_u64_u64_v2",
-        "btreemap_get_u64_blob_8",
-        "btreemap_get_u64_blob_8_v2",
-        "btreemap_get_blob_8_u64",
-        "btreemap_get_blob_8_u64_v2",
-        "btreemap_get_blob_256_1024",
-        "btreemap_get_blob_256_1024_v2",
-        "btreemap_get_blob_512_1024",
-        "btreemap_get_blob_512_1024_v2",
-
-        "btreemap_remove_blob_4_1024",
-        "btreemap_remove_blob_4_1024_v2",
-        "btreemap_remove_blob_8_1024",
-        "btreemap_remove_blob_8_1024_v2",
-        "btreemap_remove_blob_16_1024",
-        "btreemap_remove_blob_16_1024_v2",
-        "btreemap_remove_blob_32_1024",
-        "btreemap_remove_blob_32_1024_v2",
-        "btreemap_remove_blob_64_1024",
-        "btreemap_remove_blob_64_1024_v2",
-        "btreemap_remove_blob_128_1024",
-        "btreemap_remove_blob_128_1024_v2",
-        "btreemap_remove_blob_256_1024",
-        "btreemap_remove_blob_256_1024_v2",
-        "btreemap_remove_blob_512_1024",
-        "btreemap_remove_blob_512_1024_v2",
-        "btreemap_remove_u64_u64",
-        "btreemap_remove_u64_u64_v2",
-        "btreemap_remove_u64_blob_8",
-        "btreemap_remove_u64_blob_8_v2",
-        "btreemap_remove_blob_8_u64",
-        "btreemap_remove_blob_8_u64_v2",
-
-        // Vec benchmarks
-        "vec_insert_blob_4",
-        "vec_insert_blob_8",
-        "vec_insert_blob_16",
-        "vec_insert_blob_32",
-        "vec_insert_blob_128",
-        "vec_insert_u64",
-
-        "vec_get_blob_4",
-        "vec_get_blob_8",
-        "vec_get_blob_16",
-        "vec_get_blob_32",
-        "vec_get_blob_128",
-        "vec_get_u64",
-    ];
-}
 
 fn benchmarks_dir() -> PathBuf {
     PathBuf::new()
@@ -210,11 +115,53 @@ fn main() {
         .unwrap()
         .success());
 
+    // Parse the Wasm to determine all the benchmarks to run.
+    // All query endpoints are assumed to be benchmarks.
+    let benchmark_canister_wasm = std::fs::read(
+        PathBuf::new()
+            .join(env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("target")
+            .join("wasm32-unknown-unknown")
+            .join("release")
+            .join("benchmarks.wasm"),
+    )
+    .unwrap();
+
+    let benchmark_fns: Vec<_> = WasmParser::new(0)
+        .parse_all(&benchmark_canister_wasm)
+        .filter_map(|section| match section {
+            Ok(wasmparser::Payload::ExportSection(export_section)) => {
+                let queries: Vec<_> = export_section
+                    .into_iter()
+                    .filter_map(|export| {
+                        if let Ok(export) = export {
+                            if export.name.starts_with("canister_query ") {
+                                return Some(
+                                    export
+                                        .name
+                                        .split_whitespace()
+                                        .last()
+                                        .expect("query must have name."),
+                                );
+                            }
+                        }
+
+                        None
+                    })
+                    .collect();
+
+                Some(queries)
+            }
+            _ => None,
+        })
+        .flatten()
+        .collect();
+
     let current_results = read_current_results();
 
     let mut results = BTreeMap::new();
 
-    for bench_fn in BENCHES.iter() {
+    for bench_fn in benchmark_fns {
         if let Some(pattern) = &args.pattern {
             if !bench_fn.contains(pattern) {
                 continue;
@@ -249,7 +196,7 @@ fn main() {
             println!("{}", yaml);
         }
 
-        results.insert(*bench_fn, result);
+        results.insert(bench_fn, result);
     }
 
     // Persist the result if requested.
