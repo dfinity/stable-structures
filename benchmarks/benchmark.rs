@@ -155,7 +155,7 @@ fn download_drun() {
     };
 
     let url = format!("{}{}.gz", DRUN_URL_PREFIX, os);
-    let drun_compressed = reqwest::blocking::get(&url)
+    let drun_compressed = reqwest::blocking::get(url)
         .unwrap()
         .bytes()
         .expect("Failed to download drun");
