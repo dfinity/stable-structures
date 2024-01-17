@@ -8,7 +8,7 @@ use std::{
     env,
     fs::File,
     io::{Read, Write},
-    path::PathBuf,
+    path::{PathBuf, Path},
     process::Command,
 };
 use wasmparser::Parser as WasmParser;
@@ -25,14 +25,14 @@ struct BenchResult {
 
 /// Runs the benchmarks on the canister available in the provided `canister_wasm_path`.
 pub fn run_benchmarks(
-    canister_wasm_path: PathBuf,
+    canister_wasm_path: &PathBuf,
     pattern: Option<String>,
     persist: bool,
-    results_file: PathBuf,
+    results_file: &PathBuf,
 ) {
     // Parse the Wasm to determine all the benchmarks to run.
     // All query endpoints are assumed to be benchmarks.
-    let benchmark_canister_wasm = std::fs::read(&canister_wasm_path).unwrap();
+    let benchmark_canister_wasm = std::fs::read(canister_wasm_path).unwrap();
 
     let benchmark_fns: Vec<_> = WasmParser::new(0)
         .parse_all(&benchmark_canister_wasm)
@@ -66,7 +66,7 @@ pub fn run_benchmarks(
 
     maybe_download_drun();
 
-    let current_results = read_current_results(&results_file);
+    let current_results = read_current_results(results_file);
 
     let mut results = BTreeMap::new();
 
@@ -81,7 +81,7 @@ pub fn run_benchmarks(
         println!("---------------------------------------------------");
         println!();
 
-        let result = run_benchmark(&canister_wasm_path, bench_fn);
+        let result = run_benchmark(canister_wasm_path, bench_fn);
 
         // Compare result to previous result if that exists.
         if let Some(current_result) = current_results.get(&bench_fn.to_string()) {
@@ -99,7 +99,7 @@ pub fn run_benchmarks(
     // Persist the result if requested.
     if persist {
         // Open a file in write-only mode, returns `io::Result<File>`
-        let mut file = File::create(&results_file).unwrap();
+        let mut file = File::create(results_file).unwrap();
         file.write_all(serde_yaml::to_string(&results).unwrap().as_bytes())
             .unwrap();
         println!(
@@ -168,7 +168,7 @@ fn download_drun() {
 }
 
 // Runs the given benchmark.
-fn run_benchmark(canister_wasm_path: &PathBuf, bench_fn: &str) -> BenchResult {
+fn run_benchmark(canister_wasm_path: &Path, bench_fn: &str) -> BenchResult {
     // drun is used for running the benchmark.
     // First, we create a temporary file with steps for drun to execute the benchmark.
     let mut temp_file = tempfile::Builder::new().tempfile().unwrap();
