@@ -1,6 +1,7 @@
-use crate::{benchmark, BenchResult, Random};
+use crate::Random;
 use ic_cdk_macros::query;
 use ic_stable_structures::{storable::Blob, BTreeMap, DefaultMemoryImpl, Storable};
+use profiler::{benchmark, BenchResult};
 use tiny_rng::{Rand, Rng};
 
 #[query]
