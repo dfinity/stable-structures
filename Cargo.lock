@@ -692,6 +692,7 @@ dependencies = [
  "maplit",
  "profiler",
  "proptest",
+ "serde_yaml",
  "tempfile",
  "test-strategy",
 ]

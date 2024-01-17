@@ -30,6 +30,7 @@ ic-cdk-macros.workspace = true
 maplit = "1.0.2"
 profiler = { path = "./profiler", features = ["benchmark"] }
 proptest = "1"
+serde_yaml = "0.9"
 tempfile = "3.3.0"
 test-strategy = "0.3.1"
 
