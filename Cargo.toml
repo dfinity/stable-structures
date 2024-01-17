@@ -25,14 +25,17 @@ profiler = { path = "./profiler", optional = true }
 candid.workspace = true
 clap = { version = "4.0.11", features = ["derive"] }
 colored = "2.0.4"
+flate2 = "1.0.28"
 hex = "0.4.3"
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
 lazy_static = "1.4.0"
 maplit = "1.0.2"
 proptest = "1"
+reqwest = { version = "0.11.23", features = ["blocking"] }
 serde = "1.0"
 serde_yaml = "0.9"
+sha256 = "1.5.0"
 tempfile = "3.3.0"
 test-strategy = "0.3.1"
 wasmparser = "0.119.0"
