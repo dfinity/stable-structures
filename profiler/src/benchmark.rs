@@ -8,7 +8,7 @@ use std::{
     env,
     fs::File,
     io::{Read, Write},
-    path::{PathBuf, Path},
+    path::{Path, PathBuf},
     process::Command,
 };
 use wasmparser::Parser as WasmParser;
