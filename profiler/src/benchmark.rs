@@ -23,25 +23,16 @@ struct BenchResult {
     measurements: BTreeMap<String, u64>,
 }
 
-/// Runs the benchmarks on the canister available in the provided `canister_dir`.
+/// Runs the benchmarks on the canister available in the provided `canister_wasm_path`.
 pub fn run_benchmarks(
-    canister_dir: PathBuf,
     canister_wasm_path: PathBuf,
     pattern: Option<String>,
     persist: bool,
     results_file: PathBuf,
 ) {
-    // Build benchmark canister.
-    assert!(Command::new("cargo")
-        .args(["build", "--release", "--target", "wasm32-unknown-unknown"])
-        .current_dir(canister_dir)
-        .status()
-        .unwrap()
-        .success());
-
     // Parse the Wasm to determine all the benchmarks to run.
     // All query endpoints are assumed to be benchmarks.
-    let benchmark_canister_wasm = std::fs::read(canister_wasm_path).unwrap();
+    let benchmark_canister_wasm = std::fs::read(&canister_wasm_path).unwrap();
 
     let benchmark_fns: Vec<_> = WasmParser::new(0)
         .parse_all(&benchmark_canister_wasm)
@@ -90,7 +81,7 @@ pub fn run_benchmarks(
         println!("---------------------------------------------------");
         println!();
 
-        let result = run_benchmark(bench_fn);
+        let result = run_benchmark(&canister_wasm_path, bench_fn);
 
         // Compare result to previous result if that exists.
         if let Some(current_result) = current_results.get(&bench_fn.to_string()) {
@@ -122,15 +113,6 @@ fn drun_path() -> PathBuf {
     PathBuf::new()
         .join(env::var("CARGO_MANIFEST_DIR").unwrap())
         .join("drun")
-}
-
-fn benchmark_canister_wasm_path() -> PathBuf {
-    PathBuf::new()
-        .join(env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("target")
-        .join("wasm32-unknown-unknown")
-        .join("release")
-        .join("benchmarks.wasm")
 }
 
 // Downloads drun if it's not already downloaded.
@@ -186,7 +168,7 @@ fn download_drun() {
 }
 
 // Runs the given benchmark.
-fn run_benchmark(bench_fn: &str) -> BenchResult {
+fn run_benchmark(canister_wasm_path: &PathBuf, bench_fn: &str) -> BenchResult {
     // drun is used for running the benchmark.
     // First, we create a temporary file with steps for drun to execute the benchmark.
     let mut temp_file = tempfile::Builder::new().tempfile().unwrap();
@@ -195,14 +177,13 @@ fn run_benchmark(bench_fn: &str) -> BenchResult {
         "create
 install rwlgt-iiaaa-aaaaa-aaaaa-cai {} \"\"
 query rwlgt-iiaaa-aaaaa-aaaaa-cai {} \"DIDL\x00\x00\"",
-        benchmark_canister_wasm_path().display(),
+        canister_wasm_path.display(),
         bench_fn
     )
     .unwrap();
 
     // Run the benchmark with drun.
     let drun_output = Command::new(drun_path())
-        .current_dir(PathBuf::new().join(env::var("CARGO_MANIFEST_DIR").unwrap()))
         .args(vec![
             temp_file.into_temp_path().to_str().unwrap(),
             "--instruction-limit",
