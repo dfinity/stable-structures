@@ -1,6 +1,6 @@
+use canbench::{benchmark, BenchResult};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::{DefaultMemoryImpl, Memory};
-use profiler::{benchmark, BenchResult};
 
 const WASM_PAGE_SIZE: usize = 65536;
 const MB: usize = 1024 * 1024;

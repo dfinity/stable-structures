@@ -14,7 +14,7 @@ repository = "https://github.com/dfinity/stable-structures"
 [dependencies]
 ic_principal = { version = "0.1.1", default-features = false }
 # An optional dependency to profile parts of the code.
-profiler = { path = "./profiler", optional = true }
+canbench = { path = "./canbench-rs", optional = true }
 
 [dev-dependencies]
 candid.workspace = true
@@ -27,7 +27,7 @@ tempfile = "3.3.0"
 test-strategy = "0.3.1"
 
 [workspace]
-members = ["benchmarks"]
+members = ["benchmarks", "canbench-bin", "canbench-rs"]
 
 [workspace.dependencies]
 candid = "0.9.11"
