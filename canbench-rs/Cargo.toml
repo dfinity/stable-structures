@@ -10,6 +10,7 @@ name = "canbench"
 path = "src/lib.rs"
 
 [dependencies]
+canbench-macros = { path = "../canbench-rs-macros" }
 candid.workspace = true
 ic-cdk.workspace= true
 maplit = "1.0.2"

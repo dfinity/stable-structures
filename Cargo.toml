@@ -27,7 +27,7 @@ tempfile = "3.3.0"
 test-strategy = "0.3.1"
 
 [workspace]
-members = ["benchmarks", "canbench-bin", "canbench-rs"]
+members = ["benchmarks", "canbench-bin", "canbench-rs", "canbench-rs-macros"]
 
 [workspace.dependencies]
 candid = "0.9.11"
