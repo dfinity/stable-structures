@@ -1,7 +1,7 @@
 //! A module for profiling canisters.
 use candid::CandidType;
 use maplit::btreemap;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -67,9 +67,9 @@ fn instruction_count() -> u64 {
 }
 
 /// The results of a benchmark.
-#[derive(Debug, PartialEq, Deserialize, CandidType)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, CandidType)]
 pub struct BenchResult {
-    measurements: BTreeMap<String, u64>,
+    pub measurements: BTreeMap<String, u64>,
 }
 
 /// Benchmarks the given function.

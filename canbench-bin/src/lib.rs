@@ -1,8 +1,8 @@
 //! A module for running benchmarks.
-use candid::{CandidType, Decode};
+use canbench::BenchResult;
+use candid::Decode;
 use colored::Colorize;
 use flate2::read::GzDecoder;
-use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     env,
@@ -17,11 +17,6 @@ const DRUN_LINUX_SHA: &str = "7bf08d5f1c1a7cd44f62c03f8554f07aa2430eb3ae81c7c0a1
 const DRUN_MAC_SHA: &str = "57b506d05a6f42f7461198f79f648ad05434c72f3904834db2ced30853d01a62";
 const DRUN_URL_PREFIX: &str =
     "https://github.com/dfinity/ic/releases/download/release-2023-09-27_23-01%2Bquic/drun-x86_64-";
-
-#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
-struct BenchResult {
-    measurements: BTreeMap<String, u64>,
-}
 
 /// Runs the benchmarks on the canister available in the provided `canister_wasm_path`.
 pub fn run_benchmarks(
