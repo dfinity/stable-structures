@@ -1,7 +1,7 @@
 //! A module for profiling canisters.
-#[cfg(feature = "benchmark")]
+#[cfg(feature = "bin")]
 mod benchmark;
-#[cfg(feature = "benchmark")]
+#[cfg(feature = "bin")]
 pub use benchmark::run_benchmarks;
 
 use candid::CandidType;
