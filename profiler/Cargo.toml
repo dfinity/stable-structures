@@ -5,12 +5,22 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "profiler"
+path = "src/lib.rs"
+
+[[bin]]
+name = "canbench"
+path = "src/bin.rs"
+required-features = ["bin"]
+
 [dependencies]
 candid.workspace = true
 ic-cdk.workspace= true
 maplit = "1.0.2"
 serde = "1.0"
 
+clap = { version = "4.0.11", features = ["derive"], optional = true }
 colored = { version = "2.0.4", optional = true }
 flate2 = { version = "1.0.28", optional = true }
 hex = { version = "0.4.3", optional = true }
@@ -31,3 +41,5 @@ benchmark = [
   "tempfile",
   "wasmparser",
 ]
+
+bin = ["clap", "benchmark"]

@@ -109,10 +109,16 @@ pub fn run_benchmarks(
     }
 }
 
-fn drun_path() -> PathBuf {
+// Path to the canbench directory where we keep internal data.
+fn canbench_dir() -> PathBuf {
     PathBuf::new()
-        .join(env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("drun")
+        .join(env::current_dir().unwrap())
+        .join(".canbench")
+}
+
+// Path to drun.
+fn drun_path() -> PathBuf {
+    canbench_dir().join("drun")
 }
 
 // Downloads drun if it's not already downloaded.
@@ -139,6 +145,9 @@ fn maybe_download_drun() {
 
 fn download_drun() {
     println!("Downloading drun (will be cached for future uses)...");
+
+    // Create the canbench directory if it doesn't exist.
+    std::fs::create_dir_all(canbench_dir()).unwrap();
 
     let os = if cfg!(target_os = "linux") {
         "linux"

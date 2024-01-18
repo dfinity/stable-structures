@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -Eexuo pipefail
 
-BENCH_OUTPUT=$(cargo bench)
+# Install cargobench
+cargo install --path ./profiler --features bin
+
+BENCH_OUTPUT=$(canbench)
 
 set +e
 REGRESSIONS=$( echo "$BENCH_OUTPUT" |  grep -c "regressed by" )
