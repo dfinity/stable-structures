@@ -1,9 +1,4 @@
 //! A module for profiling canisters.
-#[cfg(feature = "bin")]
-mod benchmark;
-#[cfg(feature = "bin")]
-pub use benchmark::run_benchmarks;
-
 use candid::CandidType;
 use maplit::btreemap;
 use serde::Deserialize;
