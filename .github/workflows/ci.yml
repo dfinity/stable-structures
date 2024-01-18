@@ -92,7 +92,7 @@ jobs:
 
       - name: Run benchmark test
         run: |
-          bash benchmarks/benchmark_ci.sh
+          bash .github/workflows/benchmark_ci.sh
 
   checks-pass:
     # Always run this job!

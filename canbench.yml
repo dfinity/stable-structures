@@ -3,6 +3,3 @@ build_cmd:
 
 wasm_path:
   ./target/wasm32-unknown-unknown/release/benchmarks.wasm
-
-results_path:
-  ./benchmarks/results.yml

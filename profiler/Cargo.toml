@@ -20,6 +20,7 @@ ic-cdk.workspace= true
 maplit = "1.0.2"
 serde = "1.0"
 
+# Dependencies for the canbench binary.
 clap = { version = "4.0.11", features = ["derive"], optional = true }
 colored = { version = "2.0.4", optional = true }
 flate2 = { version = "1.0.28", optional = true }
@@ -31,7 +32,8 @@ tempfile = { version = "3.3.0", optional = true }
 wasmparser = { version = "0.119.0", optional = true }
 
 [features]
-benchmark = [
+bin = [
+  "clap",
   "colored",
   "flate2",
   "hex",
@@ -41,5 +43,3 @@ benchmark = [
   "tempfile",
   "wasmparser",
 ]
-
-bin = ["clap", "benchmark"]

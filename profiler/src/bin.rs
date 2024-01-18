@@ -4,6 +4,7 @@ use clap::Parser;
 use std::{collections::BTreeMap, fs::File, io::Read, path::PathBuf, process::Command};
 
 const CFG_FILE_NAME: &str = "canbench.yml";
+const DEFAULT_RESULTS_FILE: &str = "canbench_results.yml";
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -49,7 +50,7 @@ fn main() {
 
     let results_path = PathBuf::from(
         cfg.get("results_path")
-            .expect("`results_path` in the config must be specified."),
+            .unwrap_or(&DEFAULT_RESULTS_FILE.to_string()),
     );
 
     // Build the canister if a build command is specified.
