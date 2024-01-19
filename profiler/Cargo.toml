@@ -43,3 +43,5 @@ bin = [
   "tempfile",
   "wasmparser",
 ]
+
+bin = ["clap", "benchmark"]
