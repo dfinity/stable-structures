@@ -3,6 +3,8 @@
 use clap::Parser;
 use std::{collections::BTreeMap, fs::File, io::Read, path::PathBuf, process::Command};
 
+const CFG_FILE_NAME: &str = "canbench.yml";
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -21,8 +23,21 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    // Read and parse the configuration in `bench.yml` file.
-    let mut file = File::open("bench.yml").expect("bench.yml not found");
+    // Read and parse the configuration file.
+    let mut file = match File::open(CFG_FILE_NAME) {
+        Ok(file) => file,
+        Err(err) => {
+            match err.kind() {
+                std::io::ErrorKind::NotFound => {
+                    println!("{} not found in current directory.", CFG_FILE_NAME)
+                }
+                other => println!("Error while opening `{}`: {}", CFG_FILE_NAME, other),
+            }
+
+            std::process::exit(1);
+        }
+    };
+
     let mut config_str = String::new();
     file.read_to_string(&mut config_str).unwrap();
     let cfg: BTreeMap<String, String> = serde_yaml::from_str(&config_str).unwrap();

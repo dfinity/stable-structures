@@ -1,5 +1,6 @@
 **/target
 **/.dfx
+**/.canbench
 
 # Various IDEs and Editors
 .vscode/
