@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eexuo pipefail
 
-# Install cargobench
-cargo install --path ./profiler --features bin
+# Install canbench
+cargo install --path ./canbench-bin
 
 BENCH_OUTPUT=$(canbench)
 

@@ -1,8 +1,8 @@
 use crate::Random;
+use canbench::{benchmark, BenchResult};
 use ic_cdk_macros::query;
 use ic_stable_structures::storable::Blob;
 use ic_stable_structures::{DefaultMemoryImpl, StableVec, Storable};
-use profiler::{benchmark, BenchResult};
 use tiny_rng::{Rand, Rng};
 
 #[query]
