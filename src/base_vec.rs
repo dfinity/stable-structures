@@ -179,7 +179,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         assert!(index < self.len());
 
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
-        let bytes = item.to_bytes();
+        let bytes = item.to_bytes_checked();
         let data_offset = self
             .write_entry_size(offset, bytes.len() as u32)
             .expect("unreachable: cannot fail to write to pre-allocated area");
@@ -203,7 +203,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
         let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
-        let bytes = item.to_bytes();
+        let bytes = item.to_bytes_checked();
         let data_offset = self.write_entry_size(offset, bytes.len() as u32)?;
         safe_write(&self.memory, data_offset, bytes.borrow())?;
         // NB. We update the size only after we ensure that the data

@@ -228,3 +228,41 @@ fn test_iter() {
     assert_eq!(sv.iter().skip(4).count(), 0);
     assert_eq!(sv.iter().skip(usize::MAX).count(), 0);
 }
+
+// A struct with a bugg implementation of storable where the max_size can
+// smaller than the serialized size.
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+struct BuggyStruct(Vec<u8>);
+impl crate::Storable for BuggyStruct {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Borrowed(&self.0)
+    }
+
+    fn from_bytes(_: Cow<[u8]>) -> Self {
+        unimplemented!();
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 1,
+        is_fixed_size: false,
+    };
+}
+
+#[test]
+#[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+fn push_element_bigger_than_max_size_panics() {
+    let sv = StableVec::<BuggyStruct, M>::new(M::default()).unwrap();
+    // Insert a struct where the serialized size is > `MAX_SIZE`. Should panic.
+    sv.push(&BuggyStruct(vec![1, 2, 3, 4])).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "expected an element with length <= 1 bytes, but found 5")]
+fn set_element_bigger_than_max_size_panics() {
+    let sv = StableVec::<BuggyStruct, M>::new(M::default()).unwrap();
+    // Insert a struct where the serialized size is <= `MAX_SIZE`. This should succeed.
+    sv.push(&BuggyStruct(vec![1])).unwrap();
+
+    // Insert a struct where the serialized size is > `MAX_SIZE`. Should panic.
+    sv.set(0, &BuggyStruct(vec![1, 2, 3, 4, 5]));
+}
