@@ -13,10 +13,9 @@ use std::{
 };
 use wasmparser::Parser as WasmParser;
 
-const DRUN_LINUX_SHA: &str = "7bf08d5f1c1a7cd44f62c03f8554f07aa2430eb3ae81c7c0a143a68ff52dc7f7";
-const DRUN_MAC_SHA: &str = "57b506d05a6f42f7461198f79f648ad05434c72f3904834db2ced30853d01a62";
-const DRUN_URL_PREFIX: &str =
-    "https://github.com/dfinity/ic/releases/download/release-2023-09-27_23-01%2Bquic/drun-x86_64-";
+// The prefix benchmarks are expected to have in their name.
+// Other queries exposed by the canister are ignored.
+const BENCH_PREFIX: &str = "__canbench__";
 
 /// Runs the benchmarks on the canister available in the provided `canister_wasm_path`.
 pub fn run_benchmarks(
@@ -29,6 +28,8 @@ pub fn run_benchmarks(
     // All query endpoints are assumed to be benchmarks.
     let benchmark_canister_wasm = std::fs::read(canister_wasm_path).unwrap();
 
+    let prefix = format!("canister_query {BENCH_PREFIX}");
+
     let benchmark_fns: Vec<_> = WasmParser::new(0)
         .parse_all(&benchmark_canister_wasm)
         .filter_map(|section| match section {
@@ -37,13 +38,13 @@ pub fn run_benchmarks(
                     .into_iter()
                     .filter_map(|export| {
                         if let Ok(export) = export {
-                            if export.name.starts_with("canister_query ") {
+                            if export.name.starts_with(&prefix) {
                                 return Some(
                                     export
                                         .name
-                                        .split_whitespace()
+                                        .split(&prefix)
                                         .last()
-                                        .expect("query must have name."),
+                                        .expect("query must have a name."),
                                 );
                             }
                         }
@@ -76,7 +77,7 @@ pub fn run_benchmarks(
         println!("---------------------------------------------------");
         println!();
 
-        let result = run_benchmark(canister_wasm_path, bench_fn);
+        let result = run_benchmark(canister_wasm_path, &bench_fn);
 
         // Compare result to previous result if that exists.
         if let Some(current_result) = current_results.get(&bench_fn.to_string()) {
@@ -118,6 +119,9 @@ fn drun_path() -> PathBuf {
 
 // Downloads drun if it's not already downloaded.
 fn maybe_download_drun() {
+    const DRUN_LINUX_SHA: &str = "7bf08d5f1c1a7cd44f62c03f8554f07aa2430eb3ae81c7c0a143a68ff52dc7f7";
+    const DRUN_MAC_SHA: &str = "57b506d05a6f42f7461198f79f648ad05434c72f3904834db2ced30853d01a62";
+
     if drun_path().exists() {
         // Drun found. Verify that it's the version we expect it to be.
         let expected_sha = match env::consts::OS {
@@ -139,6 +143,9 @@ fn maybe_download_drun() {
 }
 
 fn download_drun() {
+    const DRUN_URL_PREFIX: &str =
+        "https://github.com/dfinity/ic/releases/download/release-2023-09-27_23-01%2Bquic/drun-x86_64-";
+
     println!("Downloading drun (will be cached for future uses)...");
 
     // Create the canbench directory if it doesn't exist.
@@ -180,8 +187,9 @@ fn run_benchmark(canister_wasm_path: &Path, bench_fn: &str) -> BenchResult {
         temp_file,
         "create
 install rwlgt-iiaaa-aaaaa-aaaaa-cai {} \"\"
-query rwlgt-iiaaa-aaaaa-aaaaa-cai {} \"DIDL\x00\x00\"",
+query rwlgt-iiaaa-aaaaa-aaaaa-cai {}{} \"DIDL\x00\x00\"",
         canister_wasm_path.display(),
+        BENCH_PREFIX,
         bench_fn
     )
     .unwrap();
@@ -205,7 +213,14 @@ query rwlgt-iiaaa-aaaaa-aaaaa-cai {} \"DIDL\x00\x00\"",
         .to_string();
 
     // Decode the response.
-    Decode!(&hex::decode(&result_hex[2..]).unwrap(), BenchResult).unwrap()
+    Decode!(
+        &hex::decode(&result_hex[2..]).expect(&format!(
+            "error parsing result of benchmark {}. Result: {}",
+            bench_fn, result_hex
+        )),
+        BenchResult
+    )
+    .expect("error decoding benchmark result {:?}")
 }
 
 // Prints a measurement along with its percentage change relative to the old value.

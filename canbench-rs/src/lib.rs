@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
+pub use canbench_macros as macros;
+
 thread_local! {
     static PROFILING: RefCell<BTreeMap<&'static str, u64>> = RefCell::new(BTreeMap::new());
 }
