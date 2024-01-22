@@ -684,7 +684,6 @@ name = "ic-stable-structures"
 version = "0.6.1"
 dependencies = [
  "candid",
- "clap",
  "hex",
  "ic-cdk",
  "ic-cdk-macros",
@@ -692,7 +691,6 @@ dependencies = [
  "maplit",
  "profiler",
  "proptest",
- "serde_yaml",
  "tempfile",
  "test-strategy",
 ]
