@@ -1,76 +1,75 @@
 use crate::Random;
-use ic_cdk_macros::query;
+use canbench::{benchmark, macros::bench, BenchResult};
 use ic_stable_structures::storable::Blob;
 use ic_stable_structures::{DefaultMemoryImpl, StableVec, Storable};
-use profiler::{benchmark, BenchResult};
 use tiny_rng::{Rand, Rng};
 
-#[query]
+#[bench]
 pub fn vec_insert_blob_4() -> BenchResult {
     vec_insert_blob::<4>()
 }
 
-#[query]
+#[bench]
 pub fn vec_insert_blob_8() -> BenchResult {
     vec_insert_blob::<8>()
 }
 
-#[query]
+#[bench]
 pub fn vec_insert_blob_16() -> BenchResult {
     vec_insert_blob::<16>()
 }
 
-#[query]
+#[bench]
 pub fn vec_insert_blob_32() -> BenchResult {
     vec_insert_blob::<32>()
 }
 
-#[query]
+#[bench]
 pub fn vec_insert_blob_64() -> BenchResult {
     vec_insert_blob::<64>()
 }
 
-#[query]
+#[bench]
 pub fn vec_insert_blob_128() -> BenchResult {
     vec_insert_blob::<128>()
 }
 
-#[query]
+#[bench]
 pub fn vec_insert_u64() -> BenchResult {
     vec_insert::<u64>()
 }
 
-#[query]
+#[bench]
 pub fn vec_get_blob_4() -> BenchResult {
     vec_get_blob::<4>()
 }
 
-#[query]
+#[bench]
 pub fn vec_get_blob_8() -> BenchResult {
     vec_get_blob::<8>()
 }
 
-#[query]
+#[bench]
 pub fn vec_get_blob_16() -> BenchResult {
     vec_get_blob::<16>()
 }
 
-#[query]
+#[bench]
 pub fn vec_get_blob_32() -> BenchResult {
     vec_get_blob::<32>()
 }
 
-#[query]
+#[bench]
 pub fn vec_get_blob_64() -> BenchResult {
     vec_get_blob::<64>()
 }
 
-#[query]
+#[bench]
 pub fn vec_get_blob_128() -> BenchResult {
     vec_get_blob::<128>()
 }
 
-#[query]
+#[bench]
 pub fn vec_get_u64() -> BenchResult {
     vec_get::<u64>()
 }

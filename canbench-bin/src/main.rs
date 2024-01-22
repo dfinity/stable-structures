@@ -67,5 +67,5 @@ fn main() {
     }
 
     // Run the benchmarks.
-    profiler::run_benchmarks(&wasm_path, args.pattern, args.persist, &results_path);
+    canbench_bin::run_benchmarks(&wasm_path, args.pattern, args.persist, &results_path);
 }

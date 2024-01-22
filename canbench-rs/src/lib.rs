@@ -1,14 +1,11 @@
 //! A module for profiling canisters.
-#[cfg(feature = "bin")]
-mod benchmark;
-#[cfg(feature = "bin")]
-pub use benchmark::run_benchmarks;
-
 use candid::CandidType;
 use maplit::btreemap;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+
+pub use canbench_macros as macros;
 
 thread_local! {
     static PROFILING: RefCell<BTreeMap<&'static str, u64>> = RefCell::new(BTreeMap::new());
@@ -72,9 +69,9 @@ fn instruction_count() -> u64 {
 }
 
 /// The results of a benchmark.
-#[derive(Debug, PartialEq, Deserialize, CandidType)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, CandidType)]
 pub struct BenchResult {
-    measurements: BTreeMap<String, u64>,
+    pub measurements: BTreeMap<String, u64>,
 }
 
 /// Benchmarks the given function.
