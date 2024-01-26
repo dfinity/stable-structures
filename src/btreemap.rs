@@ -349,8 +349,6 @@ where
     /// The previous value of the key, if present, is returned.
     ///
     /// PRECONDITION:
-    ///   Key is bounded in size
-    ///   Value is bounded in size
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
