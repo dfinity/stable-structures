@@ -1,6 +1,6 @@
 [package]
 name = "ic-stable-structures"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2021"
 description = "A collection of data structures for fearless canister upgrades."
 homepage = "https://docs.rs/ic-stable-structures"
@@ -30,6 +30,6 @@ test-strategy = "0.3.1"
 members = ["benchmarks", "canbench-bin", "canbench-rs", "canbench-rs-macros"]
 
 [workspace.dependencies]
-candid = "0.9.11"
-ic-cdk = "0.10.0"
-ic-cdk-macros = "0.7.1"
+candid = "0.10.2"
+ic-cdk = "0.12.1"
+ic-cdk-macros = "0.8.4"
