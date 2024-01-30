@@ -605,3 +605,20 @@ pub(crate) const fn bytes_to_store_size(bounds: &Bounds) -> u32 {
         4
     }
 }
+
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+
+    #[test]
+    fn test_storable_for_bool() {
+        let assert_storable = |b: bool| {
+            let bytes = b.to_bytes();
+            assert_eq!(bytes.len(), 1);
+            assert_eq!(b, bool::from_bytes(bytes));
+        };
+
+        assert_storable(true);
+        assert_storable(false);
+    }
+}
