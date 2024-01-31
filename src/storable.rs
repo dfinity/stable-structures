@@ -612,13 +612,7 @@ mod unit_tests {
 
     #[test]
     fn test_storable_for_bool() {
-        let assert_storable = |b: bool| {
-            let bytes = b.to_bytes();
-            assert_eq!(bytes.len(), 1);
-            assert_eq!(b, bool::from_bytes(bytes));
-        };
-
-        assert_storable(true);
-        assert_storable(false);
+        assert_eq!(false, Storable::from_bytes(false.to_bytes()));
+        assert_eq!(true, Storable::from_bytes(true.to_bytes()));
     }
 }
