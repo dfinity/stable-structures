@@ -351,11 +351,11 @@ impl Storable for bool {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let num = u8::from_be_bytes(bytes.as_ref().try_into().unwrap());
-        match num {
+        assert_eq!(bytes.len(), 1);
+        match bytes[0] {
             0 => false,
             1 => true,
-            _  => panic!("Invalid bool encoding: expected 0 or 1, found {}", num)
+            other => panic!("Invalid bool encoding: expected 0 or 1, found {}", other),
         }
     }
 
