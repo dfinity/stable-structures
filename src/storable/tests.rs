@@ -172,6 +172,6 @@ fn to_bytes_checked_fixed_element_correct_size_no_panic() {
 
 #[test]
 fn storable_for_bool() {
-    assert_eq!(false, Storable::from_bytes(false.to_bytes()));
-    assert_eq!(true, Storable::from_bytes(true.to_bytes()));
+    assert!(!bool::from_bytes(false.to_bytes()));
+    assert!(bool::from_bytes(true.to_bytes()));
 }
