@@ -344,6 +344,27 @@ impl Storable for u8 {
     };
 }
 
+impl Storable for bool {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let num: u8 = if *self { 1 } else { 0 };
+        Cow::Owned(num.to_be_bytes().to_vec())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        assert_eq!(bytes.len(), 1);
+        match bytes[0] {
+            0 => false,
+            1 => true,
+            other => panic!("Invalid bool encoding: expected 0 or 1, found {}", other),
+        }
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 1,
+        is_fixed_size: true,
+    };
+}
+
 impl<const N: usize> Storable for [u8; N] {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(&self[..])
