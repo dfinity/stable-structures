@@ -1,4 +1,5 @@
 use super::*;
+use crate::memory_manager::MemoryManager;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -47,4 +48,12 @@ fn vec_exposes_init_err() {
     // clients that depend on it.
     #[allow(unused_imports)]
     use crate::vec::InitError;
+}
+
+#[test]
+fn should_be_able_to_recover_memory_from_memory_manager() {
+    let raw_memory = DefaultMemoryImpl::default();
+    let memory_manager = MemoryManager::init(raw_memory);
+    let recovered_memory = memory_manager.into_inner();
+    assert!(recovered_memory.is_some());
 }
