@@ -54,6 +54,6 @@ fn vec_exposes_init_err() {
 fn should_be_able_to_recover_memory_from_memory_manager() {
     let raw_memory = DefaultMemoryImpl::default();
     let memory_manager = MemoryManager::init(raw_memory);
-    let recovered_memory = memory_manager.into_inner();
+    let recovered_memory = memory_manager.into_memory();
     assert!(recovered_memory.is_some());
 }

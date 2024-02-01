@@ -161,8 +161,8 @@ impl<M: Memory> MemoryManager<M> {
     /// # Returns
     /// - The underlying memory, if there is exactly one strong reference to the memory manager.  Please see [`Rc::try_unwrap`](https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap) for more details.
     /// - None otherwise.
-    pub fn into_inner(self) -> Option<M> {
-        Rc::into_inner(self.inner).map(|inner| inner.into_inner().into_inner())
+    pub fn into_memory(self) -> Option<M> {
+        Rc::into_inner(self.inner).map(|inner| inner.into_inner().into_memory())
     }
 }
 
@@ -430,7 +430,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 
     // Returns the underlying memory.
-    pub fn into_inner(self) -> M {
+    pub fn into_memory(self) -> M {
         self.memory
     }
 }
