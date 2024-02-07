@@ -145,7 +145,7 @@ where
                 let key = node.key(entry_idx);
 
                 // If the key does not belong to the range, iteration stops.
-                if !self.range.contains(&key) {
+                if !self.range.contains(key) {
                     // Clear all cursors to avoid needless work in subsequent calls.
                     self.cursors = vec![];
                     return None;
@@ -180,7 +180,7 @@ where
                 let key = node.key(entry_idx);
 
                 // If the key does not belong to the range, iteration stops.
-                if !self.range.contains(&key) {
+                if !self.range.contains(key) {
                     // Clear all cursors to avoid needless work in subsequent calls.
                     self.cursors = vec![];
                     return None;
@@ -200,10 +200,10 @@ where
         Self: Sized,
     {
         let mut cnt = 0;
-        while let Some(_) = self.next_without_loading_value() {
+        while self.next_without_loading_value().is_some() {
             cnt += 1;
         }
-        return cnt;
+        cnt
     }
 }
 
