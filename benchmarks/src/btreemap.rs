@@ -1,6 +1,7 @@
 use crate::Random;
 use canbench::{benchmark, macros::bench, BenchResult};
 use ic_stable_structures::{storable::Blob, BTreeMap, DefaultMemoryImpl, Storable};
+use std::ops::Bound;
 use tiny_rng::{Rand, Rng};
 
 #[bench]
@@ -215,6 +216,34 @@ pub fn btreemap_insert_10mib_values() -> BenchResult {
         for value in values.into_iter() {
             btree.insert(i, value);
             i += 1;
+        }
+    })
+}
+
+#[bench]
+pub fn btreemap_iter_count() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+
+    // Insert 200 10MiB values.
+    let mut rng = Rng::from_seed(0);
+    let mut values = vec![];
+    for _ in 0..200 {
+        values.push(rng.iter(Rand::rand_u8).take(10 * 1024).collect::<Vec<_>>());
+    }
+
+    let mut i = 0u8;
+    for value in values.into_iter() {
+        btree.insert(i, value);
+        i += 1;
+    }
+
+    benchmark(|| {
+        for j in 0..i {
+            for k in j + 1..i {
+                btree
+                    .range((Bound::Included(j), Bound::Included(k)))
+                    .count();
+            }
         }
     })
 }
