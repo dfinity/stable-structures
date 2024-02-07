@@ -2318,6 +2318,21 @@ mod test {
     }
 
     #[test]
+    fn iter_count_test() {
+        btree_test(|mut btree| {
+            for i in 1..=250 {
+                assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+            }
+
+            for i in 1..250 {
+                for j in i..=250 {
+                    assert_eq!(btree.range(b(&[i])..b(&[j])).count(), (j - i) as usize);
+                }
+            }
+        });
+    }
+
+    #[test]
     fn range_various_prefixes() {
         btree_test(|mut btree| {
             btree.insert(b(&[0, 1]), b(&[]));

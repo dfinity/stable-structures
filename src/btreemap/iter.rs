@@ -6,12 +6,14 @@ use crate::{types::NULL, Address, Memory, Storable};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
+#[derive(Clone)]
 /// An indicator of the current position in the map.
 pub(crate) enum Cursor<K: Storable + Ord + Clone> {
     Address(Address),
     Node { node: Node<K>, next: Index },
 }
 
+#[derive(Clone)]
 /// An index into a node's child or entry.
 pub(crate) enum Index {
     Child(usize),
@@ -71,19 +73,10 @@ where
             range,
         }
     }
-}
 
-impl<K, V, M> Iterator for Iter<'_, K, V, M>
-where
-    K: Storable + Ord + Clone,
-    V: Storable,
-    M: Memory,
-{
-    type Item = (K, V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.cursors.pop() {
-            Some(Cursor::Address(address)) => {
+    fn update_cursors_for_iteration(&mut self, cursor: Cursor<K>) {
+        match cursor {
+            Cursor::Address(address) => {
                 if address != NULL {
                     // Load the node at the given address, and add it to the cursors.
                     let node = self.map.load_node(address);
@@ -97,13 +90,12 @@ where
                         node,
                     });
                 }
-                self.next()
             }
 
-            Some(Cursor::Node {
+            Cursor::Node {
                 node,
                 next: Index::Child(child_idx),
-            }) => {
+            } => {
                 let child_address = node.child(child_idx);
 
                 // After iterating on the child, iterate on the next _entry_ in this node.
@@ -115,20 +107,16 @@ where
 
                 // Add the child to the top of the cursors to be iterated on first.
                 self.cursors.push(Cursor::Address(child_address));
-
-                self.next()
             }
 
-            Some(Cursor::Node {
+            Cursor::Node {
                 node,
                 next: Index::Entry(entry_idx),
-            }) => {
+            } => {
                 if entry_idx >= node.entries_len() {
                     // No more entries to iterate on in this node.
-                    return self.next();
+                    return;
                 }
-
-                let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
@@ -140,6 +128,21 @@ where
                     },
                     node,
                 });
+            }
+        }
+    }
+
+    fn next_without_loading_value(&mut self) -> Option<()> {
+        // If the cursors are empty. Iteration is complete.
+        let cursor_last = self.cursors.pop()?;
+        self.update_cursors_for_iteration(cursor_last.clone());
+        if let Cursor::Node {
+            node,
+            next: Index::Entry(entry_idx),
+        } = cursor_last
+        {
+            if entry_idx < node.entries_len() {
+                let key = node.key(entry_idx);
 
                 // If the key does not belong to the range, iteration stops.
                 if !self.range.contains(&key) {
@@ -148,13 +151,59 @@ where
                     return None;
                 }
 
-                Some((key, V::from_bytes(Cow::Owned(encoded_value))))
-            }
-            None => {
-                // The cursors are empty. Iteration is complete.
-                None
+                return Some(());
             }
         }
+
+        self.next().map(|_| ())
+    }
+}
+
+impl<K, V, M> Iterator for Iter<'_, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // If the cursors are empty. Iteration is complete.
+        let cursor_last = self.cursors.pop()?;
+        self.update_cursors_for_iteration(cursor_last.clone());
+        if let Cursor::Node {
+            node,
+            next: Index::Entry(entry_idx),
+        } = cursor_last
+        {
+            if entry_idx < node.entries_len() {
+                let key = node.key(entry_idx);
+
+                // If the key does not belong to the range, iteration stops.
+                if !self.range.contains(&key) {
+                    // Clear all cursors to avoid needless work in subsequent calls.
+                    self.cursors = vec![];
+                    return None;
+                }
+
+                let encoded_value = node.value(entry_idx, self.map.memory()).to_vec();
+
+                return Some((key.clone(), V::from_bytes(Cow::Owned(encoded_value))));
+            }
+        }
+
+        self.next()
+    }
+
+    fn count(mut self) -> usize
+    where
+        Self: Sized,
+    {
+        let mut cnt = 0;
+        while let Some(_) = self.next_without_loading_value() {
+            cnt += 1;
+        }
+        return cnt;
     }
 }
 

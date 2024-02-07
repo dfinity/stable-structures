@@ -46,7 +46,7 @@ pub type Entry<K> = (K, Vec<u8>);
 /// 2. `V2`, which supports both bounded and unbounded types.
 ///
 /// See `v1.rs` and `v2.rs` for more details.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     keys: Vec<K>,
@@ -434,7 +434,7 @@ impl NodeHeader {
 }
 
 // The value in a K/V pair.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Value {
     // The value's encoded bytes.
     ByVal(Vec<u8>),
