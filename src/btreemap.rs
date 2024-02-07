@@ -166,19 +166,8 @@ where
         }
     }
 
-    /// Creates a new instance a `BTreeMap`.
-    ///
-    /// The given `memory` is assumed to be exclusively reserved for this data
-    /// structure and that it starts at address zero. Typically `memory` will
-    /// be an instance of `RestrictedMemory`.
-    ///
-    /// When initialized, the data structure has the following memory layout:
-    ///
-    ///    |  BTreeHeader  |  Allocator | ... free memory for nodes |
-    ///
-    /// See `Allocator` for more details on its own memory layout.
-    pub fn new(memory: M) -> Self {
-        let page_size = match (K::BOUND, V::BOUND) {
+    fn page_size() -> PageSize {
+        match (K::BOUND, V::BOUND) {
             // The keys and values are both bounded.
             (
                 StorableBound::Bounded {
@@ -201,7 +190,22 @@ where
             }
             // Use a default page size.
             _ => PageSize::Value(DEFAULT_PAGE_SIZE),
-        };
+        }
+    }
+
+    /// Creates a new instance a `BTreeMap`.
+    ///
+    /// The given `memory` is assumed to be exclusively reserved for this data
+    /// structure and that it starts at address zero. Typically `memory` will
+    /// be an instance of `RestrictedMemory`.
+    ///
+    /// When initialized, the data structure has the following memory layout:
+    ///
+    ///    |  BTreeHeader  |  Allocator | ... free memory for nodes |
+    ///
+    /// See `Allocator` for more details on its own memory layout.
+    pub fn new(memory: M) -> Self {
+        let page_size = Self::page_size();
 
         let btree = Self {
             root_addr: NULL,
@@ -559,6 +563,16 @@ where
     pub fn clear(self) -> Self {
         let mem = self.allocator.into_memory();
         Self::new(mem)
+    }
+
+    pub fn clear_new(&mut self) {
+        self.root_addr = NULL;
+        self.length = 0;
+        /*self.allocator = Allocator::new(
+            //self.allocator.into_memory(),
+            Address::from(ALLOCATOR_OFFSET as u64),
+            Self::page_size().get().into(),
+        )*/
     }
 
     /// Returns the first key-value pair in the map. The key in this
