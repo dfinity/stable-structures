@@ -132,7 +132,7 @@ where
         }
     }
 
-    fn next_without_loading_value(&mut self) -> Option<()> {
+    fn next_internal(&mut self, load_value: bool) -> Option<(K, Option<V>)> {
         // If the cursors are empty. Iteration is complete.
         let cursor_last = self.cursors.pop()?;
         self.update_cursors_for_iteration(cursor_last.clone());
@@ -150,12 +150,19 @@ where
                     self.cursors = vec![];
                     return None;
                 }
-
-                return Some(());
+                return Some((
+                    key.clone(),
+                    if load_value {
+                        let encoded_value = node.value(entry_idx, self.map.memory()).to_vec();
+                        Some(V::from_bytes(Cow::Owned(encoded_value)))
+                    } else {
+                        None
+                    },
+                ));
             }
         }
 
-        self.next_without_loading_value()
+        self.next_internal(load_value)
     }
 }
 
@@ -168,31 +175,9 @@ where
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        // If the cursors are empty. Iteration is complete.
-        let cursor_last = self.cursors.pop()?;
-        self.update_cursors_for_iteration(cursor_last.clone());
-        if let Cursor::Node {
-            node,
-            next: Index::Entry(entry_idx),
-        } = cursor_last
-        {
-            if entry_idx < node.entries_len() {
-                let key = node.key(entry_idx);
-
-                // If the key does not belong to the range, iteration stops.
-                if !self.range.contains(key) {
-                    // Clear all cursors to avoid needless work in subsequent calls.
-                    self.cursors = vec![];
-                    return None;
-                }
-
-                let encoded_value = node.value(entry_idx, self.map.memory()).to_vec();
-
-                return Some((key.clone(), V::from_bytes(Cow::Owned(encoded_value))));
-            }
-        }
-
-        self.next()
+        // It is safe to unwrap value because when the key exists the
+        // value will exist as well, and it will be loaded.
+        self.next_internal(true).map(|(k, v)| (k, v.unwrap()))
     }
 
     fn count(mut self) -> usize
@@ -200,7 +185,7 @@ where
         Self: Sized,
     {
         let mut cnt = 0;
-        while self.next_without_loading_value().is_some() {
+        while self.next_internal(false).is_some() {
             cnt += 1;
         }
         cnt
