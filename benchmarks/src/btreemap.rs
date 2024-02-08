@@ -223,6 +223,25 @@ pub fn btreemap_insert_10mib_values() -> BenchResult {
 #[bench]
 pub fn btreemap_iter_count() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let size: u8 = 200;
+    for i in 0..size {
+        btree.insert(i, i);
+    }
+
+    benchmark(|| {
+        for i in 0..size {
+            for j in i + 1..size {
+                btree
+                    .range((Bound::Included(i), Bound::Included(j)))
+                    .count();
+            }
+        }
+    })
+}
+
+#[bench]
+pub fn btreemap_iter_count_10mib_values() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
 
     // Insert 200 10MiB values.
     let mut rng = Rng::from_seed(0);
