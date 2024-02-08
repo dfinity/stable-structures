@@ -344,8 +344,8 @@ btreemap_insert_u64_u64_v2:
     stable_memory_size: 7
 btreemap_iter_count:
   measurements:
-    instructions: 65743677214
-    node_load_v2: 4398038633
+    instructions: 13815905541
+    node_load_v2: 4398038607
     stable_memory_size: 33
 btreemap_remove_blob_128_1024:
   measurements:

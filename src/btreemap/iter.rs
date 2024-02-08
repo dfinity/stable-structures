@@ -155,7 +155,7 @@ where
             }
         }
 
-        self.next().map(|_| ())
+        self.next_without_loading_value()
     }
 }
 
