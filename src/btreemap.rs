@@ -3037,7 +3037,7 @@ mod test {
                 start in 0..250u8,
                 size in 1..250u8,
             ) {
-                let end = std::cmp::min(start + size, 255);
+                let end = std::cmp::min(start as u64 + size as u64, 255) as u8;
                 btree_test(|mut btree| {
                     for i in start..end {
                         assert_eq!(btree.insert(b(&[i]), b(&[])), None);
