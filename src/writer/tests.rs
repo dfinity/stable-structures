@@ -61,7 +61,11 @@ proptest! {
         }
 
         let capacity_pages = memory.size();
-        let min_pages_required = (offset + bytes.len() as u64 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
+        let min_pages_required = if bytes.is_empty() {
+            0
+        }else{
+            (offset + bytes.len() as u64 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE
+        };
 
         assert_eq!(capacity_pages, min_pages_required);
     }
