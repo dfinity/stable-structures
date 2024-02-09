@@ -53,9 +53,6 @@ proptest! {
         bytes in proptest::collection::vec(0..u8::MAX, 0..3 * WASM_PAGE_SIZE as usize),
         offset in 0..2 * WASM_PAGE_SIZE
     ) {
-       // let buffer_size = None;
-       // let bytes = vec![];
-       // let offset = 1;
         let mut memory = VectorMemory::default();
         {
             let mut writer = build_writer(&mut memory, buffer_size, offset);
