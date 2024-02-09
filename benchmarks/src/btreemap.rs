@@ -222,7 +222,7 @@ pub fn btreemap_insert_10mib_values() -> BenchResult {
 }
 
 #[bench]
-pub fn btreemap_iter_count() -> BenchResult {
+pub fn btreemap_iter_count_small_values() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let size: u8 = 200;
     for i in 0..size {
