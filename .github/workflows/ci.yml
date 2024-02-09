@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [ 1.73.0 ]
+        rust: [ 1.76.0 ]
 
     steps:
       - uses: actions/checkout@v2
