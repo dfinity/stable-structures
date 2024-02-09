@@ -18,7 +18,9 @@ proptest! {
             writer.flush().unwrap();
         }
         let mut buf = vec![0; bytes.len()];
-        memory.read(offset, &mut buf);
+        if !bytes.is_empty(){
+            memory.read(offset, &mut buf);
+        }
         assert_eq!(bytes, buf);
     }
 
