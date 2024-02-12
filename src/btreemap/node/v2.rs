@@ -233,7 +233,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Add a null overflow address.
         // This might get overwritten later in case the node does overflow.
-        writer.write_u64(offset, self.overflows.get(0).unwrap_or(&NULL).get());
+        writer.write_u64(offset, self.overflows.first().unwrap_or(&NULL).get());
         offset += Bytes::from(8u64);
 
         // Write the children
