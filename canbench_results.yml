@@ -344,13 +344,13 @@ btreemap_insert_u64_u64_v2:
     stable_memory_size: 7
 btreemap_iter_count_10mib_values:
   measurements:
-    instructions: 1674294
-    node_load_v2: 436630
+    instructions: 530543
+    node_load_v2: 413792
     stable_memory_size: 33
 btreemap_iter_count_small_values:
   measurements:
-    instructions: 39427638
-    node_load_v2: 6483830
+    instructions: 11963239
+    node_load_v2: 6367125
     stable_memory_size: 32
 btreemap_remove_blob_128_1024:
   measurements:
@@ -490,11 +490,11 @@ memory_manager_baseline:
     stable_memory_size: 8000
 memory_manager_grow:
   measurements:
-    instructions: 284711825
+    instructions: 283783820
     stable_memory_size: 32001
 memory_manager_overhead:
   measurements:
-    instructions: 4523476
+    instructions: 4522090
     stable_memory_size: 8321
 vec_get_blob_128:
   measurements:

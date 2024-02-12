@@ -74,8 +74,9 @@ where
         }
     }
 
-    fn update_cursors_for_iteration(&mut self, cursor: Cursor<K>) {
-        match cursor {
+    fn next_internal(&mut self, load_value: bool) -> Option<(K, Option<V>)> {
+        // If the cursors are empty. Iteration is complete.
+        match self.cursors.pop()? {
             Cursor::Address(address) => {
                 if address != NULL {
                     // Load the node at the given address, and add it to the cursors.
@@ -90,6 +91,7 @@ where
                         node,
                     });
                 }
+                self.next_internal(load_value)
             }
 
             Cursor::Node {
@@ -107,6 +109,8 @@ where
 
                 // Add the child to the top of the cursors to be iterated on first.
                 self.cursors.push(Cursor::Address(child_address));
+
+                self.next_internal(load_value)
             }
 
             Cursor::Node {
@@ -115,7 +119,22 @@ where
             } => {
                 if entry_idx >= node.entries_len() {
                     // No more entries to iterate on in this node.
-                    return;
+                    return self.next_internal(load_value);
+                }
+
+                let key = node.key(entry_idx).clone();
+                let value = if load_value {
+                    let encoded_value = node.value(entry_idx, self.map.memory()).to_vec();
+                    Some(V::from_bytes(Cow::Owned(encoded_value)))
+                } else {
+                    None
+                };
+
+                // If the key does not belong to the range, iteration stops.
+                if !self.range.contains(&key) {
+                    // Clear all cursors to avoid needless work in subsequent calls.
+                    self.cursors = vec![];
+                    return None;
                 }
 
                 // Add to the cursors the next element to be traversed.
@@ -128,41 +147,10 @@ where
                     },
                     node,
                 });
+
+                return Some((key, value));
             }
         }
-    }
-
-    fn next_internal(&mut self, load_value: bool) -> Option<(K, Option<V>)> {
-        // If the cursors are empty. Iteration is complete.
-        let cursor_last = self.cursors.pop()?;
-        self.update_cursors_for_iteration(cursor_last.clone());
-        if let Cursor::Node {
-            node,
-            next: Index::Entry(entry_idx),
-        } = cursor_last
-        {
-            if entry_idx < node.entries_len() {
-                let key = node.key(entry_idx);
-
-                // If the key does not belong to the range, iteration stops.
-                if !self.range.contains(key) {
-                    // Clear all cursors to avoid needless work in subsequent calls.
-                    self.cursors = vec![];
-                    return None;
-                }
-                return Some((
-                    key.clone(),
-                    if load_value {
-                        let encoded_value = node.value(entry_idx, self.map.memory()).to_vec();
-                        Some(V::from_bytes(Cow::Owned(encoded_value)))
-                    } else {
-                        None
-                    },
-                ));
-            }
-        }
-
-        self.next_internal(load_value)
     }
 }
 
