@@ -365,6 +365,18 @@ benches:
       heap_increase: 0
       stable_memory_increase: 6
     scopes: {}
+  btreemap_iter_count_10mib_values:
+    total:
+      instructions: 23609229
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_iter_count_small_values:
+    total:
+      instructions: 25579067
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
   btreemap_remove_blob_128_1024:
     total:
       instructions: 1693092896
@@ -505,13 +517,13 @@ benches:
     scopes: {}
   memory_manager_grow:
     total:
-      instructions: 286247872
+      instructions: 285287867
       heap_increase: 2
       stable_memory_increase: 32000
     scopes: {}
   memory_manager_overhead:
     total:
-      instructions: 4545062
+      instructions: 4543611
       heap_increase: 0
       stable_memory_increase: 8320
     scopes: {}
