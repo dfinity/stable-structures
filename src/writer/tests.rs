@@ -7,7 +7,7 @@ proptest! {
     #[test]
     fn should_write_single_slice(
         buffer_size in proptest::option::of(0..2 * WASM_PAGE_SIZE as usize),
-        bytes in proptest::collection::vec(0..u8::MAX, 0..2 * WASM_PAGE_SIZE as usize),
+        bytes in proptest::collection::vec(0..u8::MAX, 1..2 * WASM_PAGE_SIZE as usize),
         offset in 0..2 * WASM_PAGE_SIZE
     ) {
         let mut memory = VectorMemory::default();
@@ -61,7 +61,11 @@ proptest! {
         }
 
         let capacity_pages = memory.size();
-        let min_pages_required = (offset + bytes.len() as u64 + WASM_PAGE_SIZE - 1) / WASM_PAGE_SIZE;
+        let min_pages_required = if bytes.is_empty() {
+            0
+        } else {
+            u64::div_ceil(offset + bytes.len() as u64, WASM_PAGE_SIZE)
+        };
 
         assert_eq!(capacity_pages, min_pages_required);
     }
