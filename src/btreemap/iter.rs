@@ -6,14 +6,12 @@ use crate::{types::NULL, Address, Memory, Storable};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
-#[derive(Clone)]
 /// An indicator of the current position in the map.
 pub(crate) enum Cursor<K: Storable + Ord + Clone> {
     Address(Address),
     Node { node: Node<K>, next: Index },
 }
 
-#[derive(Clone)]
 /// An index into a node's child or entry.
 pub(crate) enum Index {
     Child(usize),
