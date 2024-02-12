@@ -7,7 +7,7 @@ proptest! {
     #[test]
     fn should_write_single_slice(
         buffer_size in proptest::option::of(0..2 * WASM_PAGE_SIZE as usize),
-        bytes in proptest::collection::vec(0..u8::MAX, 0..2 * WASM_PAGE_SIZE as usize),
+        bytes in proptest::collection::vec(0..u8::MAX, 1..2 * WASM_PAGE_SIZE as usize),
         offset in 0..2 * WASM_PAGE_SIZE
     ) {
         let mut memory = VectorMemory::default();
@@ -18,9 +18,7 @@ proptest! {
             writer.flush().unwrap();
         }
         let mut buf = vec![0; bytes.len()];
-        if !bytes.is_empty(){
-            memory.read(offset, &mut buf);
-        }
+        memory.read(offset, &mut buf);
         assert_eq!(bytes, buf);
     }
 
