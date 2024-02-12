@@ -54,15 +54,20 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
 
   # Run canbench to compare result to main branch.
   pushd "$CANISTER_PATH"
+  set +e
   canbench --less-verbose > $CANBENCH_OUTPUT
+  RES=$?
+  set -e
   popd
 
-  if grep -q "(regress\|(improved by" "${CANBENCH_OUTPUT}"; then
-    echo "**Significant performance change detected! ⚠️**
-    " >> $COMMENT_MESSAGE_PATH;
-  else
-    echo "**No significant performance changes detected ✅**
-    " >> $COMMENT_MESSAGE_PATH
+  if [ "$RES" -eq 0 ]; then
+    if grep -q "(regress\|(improved by" "${CANBENCH_OUTPUT}"; then
+      echo "**Significant performance change detected! ⚠️**
+      " >> $COMMENT_MESSAGE_PATH;
+    else
+      echo "**No significant performance changes detected ✅**
+      " >> $COMMENT_MESSAGE_PATH
+    fi
   fi
 fi
 
