@@ -68,6 +68,9 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
       echo "**No significant performance changes detected ✅**
       " >> $COMMENT_MESSAGE_PATH
     fi
+  else
+    echo "Failed to run \`canbench\` against main branch ⚠️
+    " >> $COMMENT_MESSAGE_PATH
   fi
 fi
 
