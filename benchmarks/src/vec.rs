@@ -1,5 +1,5 @@
 use crate::Random;
-use canbench_rs::{bench_fn, bench, BenchResult};
+use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_stable_structures::storable::Blob;
 use ic_stable_structures::{DefaultMemoryImpl, StableVec, Storable};
 use tiny_rng::{Rand, Rng};

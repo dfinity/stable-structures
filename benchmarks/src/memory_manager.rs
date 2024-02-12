@@ -1,4 +1,4 @@
-use canbench_rs::{bench_fn, bench, BenchResult};
+use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::{DefaultMemoryImpl, Memory};
 
