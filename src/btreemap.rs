@@ -1256,7 +1256,6 @@ mod test {
         storable::{Blob, Bound as StorableBound},
         VectorMemory,
     };
-    use proptest::proptest;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -3029,26 +3028,5 @@ mod test {
         // Reload the BTree again with bounded type.
         let btree: BTreeMap<T, T, _> = BTreeMap::init(btree.into_memory());
         assert_eq!(btree.get(&T), Some(T));
-    }
-
-    proptest! {
-            #[test]
-            fn iter_count_test(
-                start in 0..250u8,
-                size in 1..250u8,
-            ) {
-                let end = std::cmp::min(start as u64 + size as u64, 255) as u8;
-                btree_test(|mut btree| {
-                    for i in start..end {
-                        assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-                    }
-
-                    for i in start..end {
-                        for j in i..end {
-                            assert_eq!(btree.range(b(&[i])..b(&[j])).count(), (j - i) as usize);
-                        }
-                    }
-                });
-            }
     }
 }

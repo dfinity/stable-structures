@@ -144,6 +144,22 @@ fn map_upper_bound_iter(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: Vec
     });
 }
 
+#[proptest]
+fn iter_count_test(#[strategy(0..250u8)] start: u8, #[strategy(1..250u8)] size: u8) {
+    let end = std::cmp::min(start as u64 + size as u64, 255) as u8;
+    btree_test(|mut btree| {
+        for i in start..end {
+            assert_eq!(btree.insert(b(&[i]), b(&[])), None);
+        }
+
+        for i in start..end {
+            for j in i..end {
+                assert_eq!(btree.range(b(&[i])..b(&[j])).count(), (j - i) as usize);
+            }
+        }
+    });
+}
+
 // Given an operation, executes it on the given stable btreemap and standard btreemap, verifying
 // that the result of the operation is equal in both btrees.
 fn execute_operation<M: Memory>(
