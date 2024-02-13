@@ -146,7 +146,7 @@ where
                     node,
                 });
 
-                return Some((key, value));
+                Some((key, value))
             }
         }
     }
