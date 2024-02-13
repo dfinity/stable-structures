@@ -72,7 +72,7 @@ where
         }
     }
 
-    fn next_internal(&mut self, load_value: bool) -> Option<(K, Option<V>)> {
+    fn next_map<T, F: Fn(&Node<K>, usize) -> T>(&mut self, map: F) -> Option<T> {
         // If the cursors are empty. Iteration is complete.
         match self.cursors.pop()? {
             Cursor::Address(address) => {
@@ -89,7 +89,7 @@ where
                         node,
                     });
                 }
-                self.next_internal(load_value)
+                self.next_map(map)
             }
 
             Cursor::Node {
@@ -108,7 +108,7 @@ where
                 // Add the child to the top of the cursors to be iterated on first.
                 self.cursors.push(Cursor::Address(child_address));
 
-                self.next_internal(load_value)
+                self.next_map(map)
             }
 
             Cursor::Node {
@@ -117,23 +117,17 @@ where
             } => {
                 if entry_idx >= node.entries_len() {
                     // No more entries to iterate on in this node.
-                    return self.next_internal(load_value);
+                    return self.next_map(map);
                 }
 
-                let key = node.key(entry_idx).clone();
-                let value = if load_value {
-                    let encoded_value = node.value(entry_idx, self.map.memory()).to_vec();
-                    Some(V::from_bytes(Cow::Owned(encoded_value)))
-                } else {
-                    None
-                };
-
                 // If the key does not belong to the range, iteration stops.
-                if !self.range.contains(&key) {
+                if !self.range.contains(node.key(entry_idx)) {
                     // Clear all cursors to avoid needless work in subsequent calls.
                     self.cursors = vec![];
                     return None;
                 }
+
+                let res = map(&node, entry_idx);
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
@@ -146,7 +140,7 @@ where
                     node,
                 });
 
-                Some((key, value))
+                Some(res)
             }
         }
     }
@@ -161,9 +155,10 @@ where
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        // It is safe to unwrap value because when the key exists the
-        // value will exist as well, and it will be loaded.
-        self.next_internal(true).map(|(k, v)| (k, v.unwrap()))
+        self.next_map(|node, entry_idx| {
+            let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
+            (key, V::from_bytes(Cow::Owned(encoded_value)))
+        })
     }
 
     fn count(mut self) -> usize
@@ -171,7 +166,7 @@ where
         Self: Sized,
     {
         let mut cnt = 0;
-        while self.next_internal(false).is_some() {
+        while self.next_map(|_, _| ()).is_some() {
             cnt += 1;
         }
         cnt
