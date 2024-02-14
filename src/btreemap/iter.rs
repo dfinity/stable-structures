@@ -72,6 +72,8 @@ where
         }
     }
 
+    // Iterates to find the next element in the requested range.
+    // If it exists, `map` is applied to that element and the result is returned.
     fn next_map<T, F: Fn(&Node<K>, usize) -> T>(&mut self, map: F) -> Option<T> {
         // If the cursors are empty. Iteration is complete.
         match self.cursors.pop()? {
