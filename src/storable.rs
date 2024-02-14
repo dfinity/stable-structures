@@ -594,23 +594,14 @@ where
     const BOUND: Bound = {
         match (A::BOUND, B::BOUND, C::BOUND) {
             (Bound::Bounded { .. }, Bound::Bounded { .. }, Bound::Bounded { .. }) => {
-                let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
+                let a_b_bounds = bounds::<(A, B)>();
                 let c_bounds = bounds::<C>();
 
-                let max_size = a_bounds.max_size
-                    + b_bounds.max_size
-                    + c_bounds.max_size
-                    + bytes_to_store_size(&a_bounds)
-                    + bytes_to_store_size(&b_bounds)
-                    + bytes_to_store_size(&c_bounds);
-
-                let is_fixed_size =
-                    a_bounds.is_fixed_size && b_bounds.is_fixed_size && c_bounds.is_fixed_size;
-
                 Bound::Bounded {
-                    max_size,
-                    is_fixed_size,
+                    max_size: a_b_bounds.max_size
+                        + c_bounds.max_size
+                        + bytes_to_store_size(&c_bounds),
+                    is_fixed_size: a_b_bounds.is_fixed_size && c_bounds.is_fixed_size,
                 }
             }
             _ => Bound::Unbounded,
