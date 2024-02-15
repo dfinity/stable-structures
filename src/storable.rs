@@ -492,90 +492,54 @@ where
     };
 }
 
+fn serialize_with_size<T>(entry: &T, bytes: &mut Vec<u8>, start: usize) -> usize
+where
+    T: Storable,
+{
+    let entry_bytes = entry.to_bytes();
+    bytes[start..start + entry_bytes.len()].copy_from_slice(entry_bytes.borrow());
+    let bounds = bounds::<T>();
+    let max_size = bounds.max_size as usize;
+    debug_assert!(entry_bytes.len() <= max_size);
+    let size_len = bytes_to_store_size(&bounds) as usize;
+    encode_size(
+        &mut bytes[start + max_size..start + max_size + size_len],
+        entry_bytes.len(),
+        &bounds,
+    );
+    start + max_size + size_len
+}
+
+fn deserialize_with_size<T>(bytes: &Cow<[u8]>, start: usize) -> (T, usize)
+where
+    T: Storable,
+{
+    let bounds = bounds::<T>();
+    let max_size = bounds.max_size as usize;
+    let size_len = bytes_to_store_size(&bounds) as usize;
+    let len = decode_size(
+        &bytes[start + max_size..start + max_size + size_len],
+        &bounds,
+    );
+
+    let a = T::from_bytes(Cow::Borrowed(&bytes[start..start + len]));
+    (a, start + max_size + size_len)
+}
+
 impl<A, B, C> Storable for (A, B, C)
 where
     A: Storable,
     B: Storable,
     C: Storable,
 {
-    /*fn to_bytes(&self) -> Cow<[u8]> {
-        match Self::BOUND {
-            Bound::Bounded { max_size, .. } => {
-                let mut bytes = vec![0; max_size as usize];
-
-                let a_bytes = self.0.to_bytes();
-                let a_bounds = bounds::<A>();
-                let a_max_size = a_bounds.max_size as usize;
-                debug_assert!(a_bytes.len() <= a_max_size);
-
-                bytes[0..a_bytes.len()].copy_from_slice(a_bytes.borrow());
-                let a_size_len = bytes_to_store_size(&a_bounds) as usize;
-                encode_size(
-                    &mut bytes[a_max_size..a_max_size + a_size_len],
-                    a_bytes.len(),
-                    &a_bounds,
-                );
-
-                let b_c_bytes = (self.1, self.2).to_bytes();
-
-                bytes[a_max_size + a_size_len..a_max_size + a_size_len + b_c_bytes.len()]
-                    .copy_from_slice(b_c_bytes.borrow());
-
-                Cow::Owned(bytes)
-            }
-            _ => todo!("Serializing tuples with unbounded types is not yet supported."),
-        }
-    }*/
-
     fn to_bytes(&self) -> Cow<[u8]> {
         match Self::BOUND {
             Bound::Bounded { max_size, .. } => {
                 let mut bytes = vec![0; max_size as usize];
-                let a_bytes = self.0.to_bytes();
-                let b_bytes = self.1.to_bytes();
-                let c_bytes = self.2.to_bytes();
 
-                let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
-                let c_bounds = bounds::<C>();
-
-                let a_max_size = a_bounds.max_size as usize;
-                let b_max_size = b_bounds.max_size as usize;
-                let c_max_size = c_bounds.max_size as usize;
-
-                debug_assert!(a_bytes.len() <= a_max_size);
-                debug_assert!(b_bytes.len() <= b_max_size);
-                debug_assert!(c_bytes.len() <= c_max_size);
-                let a_size_len = bytes_to_store_size(&a_bounds) as usize;
-                let b_size_len = bytes_to_store_size(&b_bounds) as usize;
-                let c_size_len = bytes_to_store_size(&c_bounds) as usize;
-                let sizes_offset: usize = a_max_size + b_max_size + c_max_size;
-
-                bytes[0..a_bytes.len()].copy_from_slice(a_bytes.borrow());
-
-                encode_size(
-                    &mut bytes[sizes_offset..sizes_offset + a_size_len],
-                    a_bytes.len(),
-                    &a_bounds,
-                );
-                bytes[a_max_size + a_size_len..a_max_size + a_size_len + b_bytes.len()]
-                    .copy_from_slice(b_bytes.borrow());
-                bytes[a_max_size + a_size_len + b_max_size
-                    ..a_max_size + a_size_len + b_max_size + c_bytes.len()]
-                    .copy_from_slice(c_bytes.borrow());
-
-                encode_size(
-                    &mut bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
-                    b_bytes.len(),
-                    &b_bounds,
-                );
-                encode_size(
-                    &mut bytes[sizes_offset + a_size_len + b_size_len
-                        ..sizes_offset + a_size_len + b_size_len + c_size_len],
-                    c_bytes.len(),
-                    &c_bounds,
-                );
-
+                let a_end = serialize_with_size(self.0.borrow(), &mut bytes, 0);
+                let b_end = serialize_with_size(self.1.borrow(), &mut bytes, a_end);
+                serialize_with_size(self.2.borrow(), &mut bytes, b_end);
                 Cow::Owned(bytes)
             }
             _ => todo!("Serializing tuples with unbounded types is not yet supported."),
@@ -586,16 +550,10 @@ where
         match Self::BOUND {
             Bound::Bounded { max_size, .. } => {
                 assert_eq!(bytes.len(), max_size as usize);
-                let a_bounds = bounds::<A>();
-                let a_max_size = a_bounds.max_size as usize;
-                let a_size_len = bytes_to_store_size(&a_bounds) as usize;
-                let a_len = decode_size(&bytes[a_max_size..a_max_size + a_size_len], &a_bounds);
 
-                let a = A::from_bytes(Cow::Borrowed(&bytes[0..a_len]));
-
-                let (b, c) = <(B, C)>::from_bytes(Cow::Borrowed(
-                    &bytes[a_max_size + a_size_len..bytes.len()],
-                ));
+                let (a, a_end) = deserialize_with_size::<A>(bytes.borrow(), 0);
+                let (b, b_end) = deserialize_with_size::<B>(bytes.borrow(), a_end);
+                let (c, _) = deserialize_with_size::<C>(bytes.borrow(), b_end);
 
                 (a, b, c)
             }
