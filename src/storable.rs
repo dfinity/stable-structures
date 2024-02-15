@@ -492,14 +492,14 @@ where
     };
 }
 
-fn serialize_bounded_with_size<T>(entry: &T, bytes: &mut [u8], start: usize) -> usize
-where
-    T: Storable,
-{
-    let bounds = bounds::<T>();
+fn serialize_bounded_with_size(
+    entry_bytes: &[u8],
+    bytes: &mut [u8],
+    start: usize,
+    bounds: Bounds,
+) -> usize {
     let size_len = bytes_to_store_size(&bounds) as usize;
     let max_size = bounds.max_size as usize;
-    let entry_bytes = entry.to_bytes();
     debug_assert!(entry_bytes.len() <= max_size);
 
     encode_size(
@@ -508,8 +508,7 @@ where
         &bounds,
     );
 
-    bytes[start + size_len..start + size_len + entry_bytes.len()]
-        .copy_from_slice(entry_bytes.borrow());
+    bytes[start + size_len..start + size_len + entry_bytes.len()].copy_from_slice(entry_bytes);
 
     start + max_size + size_len
 }
@@ -529,6 +528,64 @@ where
     (a, start + max_size + size_len)
 }
 
+fn deserialize_unbounded_with_size<T>(bytes: &[u8], start: usize) -> (T, usize)
+where
+    T: Storable,
+{
+    let size_len = 8;
+    let len = decode_size_unbounded(&bytes[start..start + size_len]);
+
+    let a = T::from_bytes(Cow::Borrowed(
+        &bytes[start + size_len..start + size_len + len],
+    ));
+
+    (a, start + len + size_len)
+}
+
+fn serialize_unbounded_with_size(entry_bytes: &[u8], bytes: &mut [u8], start: usize) -> usize {
+    let size_len = 8;
+    encode_size_unbounded(&mut bytes[start..start + size_len], entry_bytes.len());
+
+    bytes[start + size_len..start + size_len + entry_bytes.len()].copy_from_slice(entry_bytes);
+
+    start + entry_bytes.len() + size_len
+}
+
+fn deserialize_with_size<T>(bytes: &[u8], start: usize) -> (T, usize)
+where
+    T: Storable,
+{
+    match T::BOUND {
+        Bound::Bounded { .. } => deserialize_bounded_with_size(bytes, start),
+        Bound::Unbounded => deserialize_unbounded_with_size(bytes, start),
+    }
+}
+
+fn serialize_with_size<T>(entry_bytes: &[u8], bytes: &mut [u8], start: usize) -> usize
+where
+    T: Storable,
+{
+    match T::BOUND {
+        Bound::Bounded { .. } => {
+            serialize_bounded_with_size(entry_bytes, bytes, start, bounds::<T>())
+        }
+        Bound::Unbounded => serialize_unbounded_with_size(entry_bytes, bytes, start),
+    }
+}
+
+fn get_size_len<T>() -> usize
+where
+    T: Storable,
+{
+    match T::BOUND {
+        Bound::Bounded { .. } => {
+            let bounds = bounds::<T>();
+            bytes_to_store_size(&bounds) as usize
+        }
+        Bound::Unbounded => 8,
+    }
+}
+
 impl<A, B, C> Storable for (A, B, C)
 where
     A: Storable,
@@ -536,32 +593,42 @@ where
     C: Storable,
 {
     fn to_bytes(&self) -> Cow<[u8]> {
-        match Self::BOUND {
-            Bound::Bounded { max_size, .. } => {
-                let mut bytes = vec![0; max_size as usize];
+        let a_bytes = self.0.to_bytes();
+        let b_bytes = self.1.to_bytes();
+        let c_bytes = self.2.to_bytes();
 
-                let a_end = serialize_bounded_with_size(self.0.borrow(), &mut bytes, 0);
-                let b_end = serialize_bounded_with_size(self.1.borrow(), &mut bytes, a_end);
-                serialize_bounded_with_size(self.2.borrow(), &mut bytes, b_end);
-                Cow::Owned(bytes)
+        let mut bytes = match Self::BOUND {
+            Bound::Bounded { max_size, .. } => {
+                vec![0; max_size as usize]
             }
-            _ => todo!("Serializing tuples with unbounded types is not yet supported."),
-        }
+            Bound::Unbounded => {
+                let out_size = a_bytes.len()
+                    + get_size_len::<A>()
+                    + b_bytes.len()
+                    + get_size_len::<B>()
+                    + c_bytes.len()
+                    + get_size_len::<C>();
+
+                vec![0; out_size]
+            }
+        };
+        let a_end = serialize_with_size::<A>(self.0.to_bytes().borrow(), &mut bytes, 0);
+        let b_end = serialize_with_size::<B>(self.1.to_bytes().borrow(), &mut bytes, a_end);
+        serialize_with_size::<C>(self.2.to_bytes().borrow(), &mut bytes, b_end);
+
+        Cow::Owned(bytes)
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        match Self::BOUND {
-            Bound::Bounded { max_size, .. } => {
-                assert_eq!(bytes.len(), max_size as usize);
-
-                let (a, a_end) = deserialize_bounded_with_size::<A>(bytes.borrow(), 0);
-                let (b, b_end) = deserialize_bounded_with_size::<B>(bytes.borrow(), a_end);
-                let (c, _) = deserialize_bounded_with_size::<C>(bytes.borrow(), b_end);
-
-                (a, b, c)
-            }
-            _ => todo!("Deserializing tuples with unbounded types is not yet supported."),
+        if let Bound::Bounded { max_size, .. } = Self::BOUND {
+            assert_eq!(bytes.len(), max_size as usize);
         }
+
+        let (a, a_end) = deserialize_with_size::<A>(bytes.borrow(), 0);
+        let (b, b_end) = deserialize_with_size::<B>(bytes.borrow(), a_end);
+        let (c, _) = deserialize_with_size::<C>(bytes.borrow(), b_end);
+
+        (a, b, c)
     }
 
     const BOUND: Bound = {
@@ -662,6 +729,16 @@ pub(crate) const fn bounds<A: Storable>() -> Bounds {
     } else {
         panic!("Cannot get bounds of unbounded type.");
     }
+}
+
+fn decode_size_unbounded(src: &[u8]) -> usize {
+    u64::from_be_bytes([
+        src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7],
+    ]) as usize
+}
+
+fn encode_size_unbounded(dst: &mut [u8], n: usize) {
+    dst[0..8].copy_from_slice(&(n as u64).to_be_bytes());
 }
 
 fn decode_size(src: &[u8], bounds: &Bounds) -> usize {
