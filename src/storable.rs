@@ -498,6 +498,34 @@ where
     B: Storable,
     C: Storable,
 {
+    /*fn to_bytes(&self) -> Cow<[u8]> {
+        match Self::BOUND {
+            Bound::Bounded { max_size, .. } => {
+                let mut bytes = vec![0; max_size as usize];
+                let a_bytes = self.0.to_bytes();
+                let a_bounds = bounds::<A>();
+                let a_max_size = a_bounds.max_size as usize;
+                debug_assert!(a_bytes.len() <= a_max_size);
+
+                bytes[0..a_bytes.len()].copy_from_slice(a_bytes.borrow());
+                let a_size_len = bytes_to_store_size(&a_bounds) as usize;
+                encode_size(
+                    &mut bytes[a_max_size..a_max_size + a_size_len],
+                    a_bytes.len(),
+                    &a_bounds,
+                );
+
+                let b_c_bytes = <(B, C)>::to_bytes(&(self.1, self.2));
+
+                bytes[a_max_size + a_size_len..a_max_size + a_size_len + b_c_bytes.len()]
+                    .copy_from_slice(b_c_bytes.into_owned().as_slice());
+
+                Cow::Owned(bytes)
+            }
+            _ => todo!("Serializing tuples with unbounded types is not yet supported."),
+        }
+    }*/
+
     fn to_bytes(&self) -> Cow<[u8]> {
         match Self::BOUND {
             Bound::Bounded { max_size, .. } => {
@@ -517,23 +545,24 @@ where
                 debug_assert!(a_bytes.len() <= a_max_size);
                 debug_assert!(b_bytes.len() <= b_max_size);
                 debug_assert!(c_bytes.len() <= c_max_size);
-
-                bytes[0..a_bytes.len()].copy_from_slice(a_bytes.borrow());
-                bytes[a_max_size..a_max_size + b_bytes.len()].copy_from_slice(b_bytes.borrow());
-                bytes[a_max_size + b_max_size..a_max_size + b_max_size + c_bytes.len()]
-                    .copy_from_slice(c_bytes.borrow());
-
                 let a_size_len = bytes_to_store_size(&a_bounds) as usize;
                 let b_size_len = bytes_to_store_size(&b_bounds) as usize;
                 let c_size_len = bytes_to_store_size(&c_bounds) as usize;
-
                 let sizes_offset: usize = a_max_size + b_max_size + c_max_size;
+
+                bytes[0..a_bytes.len()].copy_from_slice(a_bytes.borrow());
 
                 encode_size(
                     &mut bytes[sizes_offset..sizes_offset + a_size_len],
                     a_bytes.len(),
                     &a_bounds,
                 );
+                bytes[a_max_size + a_size_len..a_max_size + a_size_len + b_bytes.len()]
+                    .copy_from_slice(b_bytes.borrow());
+                bytes[a_max_size + a_size_len + b_max_size
+                    ..a_max_size + a_size_len + b_max_size + c_bytes.len()]
+                    .copy_from_slice(c_bytes.borrow());
+
                 encode_size(
                     &mut bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
                     b_bytes.len(),
@@ -556,33 +585,15 @@ where
         match Self::BOUND {
             Bound::Bounded { max_size, .. } => {
                 assert_eq!(bytes.len(), max_size as usize);
-
                 let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
-                let c_bounds = bounds::<C>();
                 let a_max_size = a_bounds.max_size as usize;
-                let b_max_size = b_bounds.max_size as usize;
-                let c_max_size = c_bounds.max_size as usize;
-                let sizes_offset = a_max_size + b_max_size + c_max_size;
-
                 let a_size_len = bytes_to_store_size(&a_bounds) as usize;
-                let b_size_len = bytes_to_store_size(&b_bounds) as usize;
-                let c_size_len = bytes_to_store_size(&c_bounds) as usize;
-                let a_len = decode_size(&bytes[sizes_offset..sizes_offset + a_size_len], &a_bounds);
-                let b_len = decode_size(
-                    &bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
-                    &b_bounds,
-                );
-                let c_len = decode_size(
-                    &bytes[sizes_offset + a_size_len + b_size_len
-                        ..sizes_offset + a_size_len + b_size_len + c_size_len],
-                    &c_bounds,
-                );
+                let a_len = decode_size(&bytes[a_max_size..a_max_size + a_size_len], &a_bounds);
 
                 let a = A::from_bytes(Cow::Borrowed(&bytes[0..a_len]));
-                let b = B::from_bytes(Cow::Borrowed(&bytes[a_max_size..a_max_size + b_len]));
-                let c = C::from_bytes(Cow::Borrowed(
-                    &bytes[a_max_size + b_max_size..a_max_size + b_max_size + c_len],
+
+                let (b, c) = <(B, C)>::from_bytes(Cow::Borrowed(
+                    &bytes[a_max_size + a_size_len..bytes.len()],
                 ));
 
                 (a, b, c)
@@ -594,14 +605,14 @@ where
     const BOUND: Bound = {
         match (A::BOUND, B::BOUND, C::BOUND) {
             (Bound::Bounded { .. }, Bound::Bounded { .. }, Bound::Bounded { .. }) => {
-                let a_b_bounds = bounds::<(A, B)>();
-                let c_bounds = bounds::<C>();
+                let a_bounds = bounds::<A>();
+                let b_c_bounds = bounds::<(B, C)>();
 
                 Bound::Bounded {
-                    max_size: a_b_bounds.max_size
-                        + c_bounds.max_size
-                        + bytes_to_store_size(&c_bounds),
-                    is_fixed_size: a_b_bounds.is_fixed_size && c_bounds.is_fixed_size,
+                    max_size: a_bounds.max_size
+                        + bytes_to_store_size(&a_bounds)
+                        + b_c_bounds.max_size,
+                    is_fixed_size: a_bounds.is_fixed_size && b_c_bounds.is_fixed_size,
                 }
             }
             _ => Bound::Unbounded,
