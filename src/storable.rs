@@ -492,37 +492,40 @@ where
     };
 }
 
-fn serialize_with_size<T>(entry: &T, bytes: &mut Vec<u8>, start: usize) -> usize
+fn serialize_bounded_with_size<T>(entry: &T, bytes: &mut [u8], start: usize) -> usize
 where
     T: Storable,
 {
-    let entry_bytes = entry.to_bytes();
-    bytes[start..start + entry_bytes.len()].copy_from_slice(entry_bytes.borrow());
     let bounds = bounds::<T>();
-    let max_size = bounds.max_size as usize;
-    debug_assert!(entry_bytes.len() <= max_size);
     let size_len = bytes_to_store_size(&bounds) as usize;
+    let max_size = bounds.max_size as usize;
+    let entry_bytes = entry.to_bytes();
+    debug_assert!(entry_bytes.len() <= max_size);
+
     encode_size(
-        &mut bytes[start + max_size..start + max_size + size_len],
+        &mut bytes[start..start + size_len],
         entry_bytes.len(),
         &bounds,
     );
+
+    bytes[start + size_len..start + size_len + entry_bytes.len()]
+        .copy_from_slice(entry_bytes.borrow());
+
     start + max_size + size_len
 }
 
-fn deserialize_with_size<T>(bytes: &Cow<[u8]>, start: usize) -> (T, usize)
+fn deserialize_bounded_with_size<T>(bytes: &[u8], start: usize) -> (T, usize)
 where
     T: Storable,
 {
     let bounds = bounds::<T>();
     let max_size = bounds.max_size as usize;
     let size_len = bytes_to_store_size(&bounds) as usize;
-    let len = decode_size(
-        &bytes[start + max_size..start + max_size + size_len],
-        &bounds,
-    );
+    let len = decode_size(&bytes[start..start + size_len], &bounds);
 
-    let a = T::from_bytes(Cow::Borrowed(&bytes[start..start + len]));
+    let a = T::from_bytes(Cow::Borrowed(
+        &bytes[start + size_len..start + size_len + len],
+    ));
     (a, start + max_size + size_len)
 }
 
@@ -537,9 +540,9 @@ where
             Bound::Bounded { max_size, .. } => {
                 let mut bytes = vec![0; max_size as usize];
 
-                let a_end = serialize_with_size(self.0.borrow(), &mut bytes, 0);
-                let b_end = serialize_with_size(self.1.borrow(), &mut bytes, a_end);
-                serialize_with_size(self.2.borrow(), &mut bytes, b_end);
+                let a_end = serialize_bounded_with_size(self.0.borrow(), &mut bytes, 0);
+                let b_end = serialize_bounded_with_size(self.1.borrow(), &mut bytes, a_end);
+                serialize_bounded_with_size(self.2.borrow(), &mut bytes, b_end);
                 Cow::Owned(bytes)
             }
             _ => todo!("Serializing tuples with unbounded types is not yet supported."),
@@ -551,9 +554,9 @@ where
             Bound::Bounded { max_size, .. } => {
                 assert_eq!(bytes.len(), max_size as usize);
 
-                let (a, a_end) = deserialize_with_size::<A>(bytes.borrow(), 0);
-                let (b, b_end) = deserialize_with_size::<B>(bytes.borrow(), a_end);
-                let (c, _) = deserialize_with_size::<C>(bytes.borrow(), b_end);
+                let (a, a_end) = deserialize_bounded_with_size::<A>(bytes.borrow(), 0);
+                let (b, b_end) = deserialize_bounded_with_size::<B>(bytes.borrow(), a_end);
+                let (c, _) = deserialize_bounded_with_size::<C>(bytes.borrow(), b_end);
 
                 (a, b, c)
             }
@@ -565,13 +568,19 @@ where
         match (A::BOUND, B::BOUND, C::BOUND) {
             (Bound::Bounded { .. }, Bound::Bounded { .. }, Bound::Bounded { .. }) => {
                 let a_bounds = bounds::<A>();
-                let b_c_bounds = bounds::<(B, C)>();
+                let b_bounds = bounds::<B>();
+                let c_bounds = bounds::<C>();
 
                 Bound::Bounded {
                     max_size: a_bounds.max_size
                         + bytes_to_store_size(&a_bounds)
-                        + b_c_bounds.max_size,
-                    is_fixed_size: a_bounds.is_fixed_size && b_c_bounds.is_fixed_size,
+                        + b_bounds.max_size
+                        + bytes_to_store_size(&b_bounds)
+                        + c_bounds.max_size
+                        + bytes_to_store_size(&c_bounds),
+                    is_fixed_size: a_bounds.is_fixed_size
+                        && b_bounds.is_fixed_size
+                        && c_bounds.is_fixed_size,
                 }
             }
             _ => Bound::Unbounded,
