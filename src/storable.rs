@@ -502,6 +502,7 @@ where
         match Self::BOUND {
             Bound::Bounded { max_size, .. } => {
                 let mut bytes = vec![0; max_size as usize];
+
                 let a_bytes = self.0.to_bytes();
                 let a_bounds = bounds::<A>();
                 let a_max_size = a_bounds.max_size as usize;
@@ -515,10 +516,10 @@ where
                     &a_bounds,
                 );
 
-                let b_c_bytes = <(B, C)>::to_bytes(&(self.1, self.2));
+                let b_c_bytes = (self.1, self.2).to_bytes();
 
                 bytes[a_max_size + a_size_len..a_max_size + a_size_len + b_c_bytes.len()]
-                    .copy_from_slice(b_c_bytes.into_owned().as_slice());
+                    .copy_from_slice(b_c_bytes.borrow());
 
                 Cow::Owned(bytes)
             }
