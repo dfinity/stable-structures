@@ -54,6 +54,13 @@ proptest! {
     }
 
     #[test]
+    fn tuple_with_three_unbounded_elements_roundtrip(v1 in pvec(any::<u8>(), 0..40), v2 in pvec(any::<u8>(), 0..80), v3 in pvec(any::<u8>(), 0..120)) {
+        let tuple = (v1, v2, v3);
+        assert_eq!(tuple, Storable::from_bytes(tuple.to_bytes()));
+    }
+
+
+    #[test]
     fn f64_roundtrip(v in any::<f64>()) {
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
     }
