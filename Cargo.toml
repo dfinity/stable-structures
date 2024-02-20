@@ -13,8 +13,8 @@ repository = "https://github.com/dfinity/stable-structures"
 
 [dependencies]
 ic_principal = { version = "0.1.1", default-features = false }
-# An optional dependency to profile parts of the code.
-canbench = { path = "./canbench-rs", optional = true }
+# An optional dependency to benchmark parts of the code.
+canbench-rs = { version = "0.1.1", optional = true }
 
 [dev-dependencies]
 candid.workspace = true
@@ -27,9 +27,9 @@ tempfile = "3.3.0"
 test-strategy = "0.3.1"
 
 [workspace]
-members = ["benchmarks", "canbench-bin", "canbench-rs", "canbench-rs-macros"]
+members = ["benchmarks"]
 
 [workspace.dependencies]
-candid = "0.9.11"
-ic-cdk = "0.10.0"
-ic-cdk-macros = "0.7.1"
+candid = "0.10.3"
+ic-cdk = "0.12.1"
+ic-cdk-macros = "0.8.4"
