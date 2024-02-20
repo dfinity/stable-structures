@@ -560,19 +560,17 @@ where
     }
 
     /// Removes all elements from the map.
+    #[deprecated(since = "0.6.3", note = "please use `clear_new` instead")]
     pub fn clear(self) -> Self {
         let mem = self.allocator.into_memory();
         Self::new(mem)
     }
 
+    /// Removes all elements from the map.
     pub fn clear_new(&mut self) {
         self.root_addr = NULL;
         self.length = 0;
-        /*self.allocator = Allocator::new(
-            //self.allocator.into_memory(),
-            Address::from(ALLOCATOR_OFFSET as u64),
-            Self::page_size().get().into(),
-        )*/
+        self.allocator.clear();
     }
 
     /// Returns the first key-value pair in the map. The key in this

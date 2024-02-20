@@ -94,6 +94,17 @@ impl<M: Memory> Allocator<M> {
         allocator
     }
 
+    // Deallocate all allocated chunks.
+    pub fn clear(&mut self) {
+        // Create the initial memory chunk and save it directly after the allocator's header.
+        let chunk = ChunkHeader::null();
+        chunk.save(self.free_list_head, &self.memory);
+
+        self.num_allocated_chunks = 0;
+
+        self.save()
+    }
+
     /// Load an allocator from memory at the given `addr`.
     pub fn load(memory: M, addr: Address) -> Self {
         let header: AllocatorHeader = read_struct(addr, &memory);
