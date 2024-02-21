@@ -502,27 +502,21 @@ where
     T: Storable,
 {
     let bounds = bounds::<T>();
+    let size_len = bytes_to_store_size(&bounds) as usize;
     let max_size = bounds.max_size as usize;
-
     let entry_bytes = entry.to_bytes();
     debug_assert!(entry_bytes.len() <= max_size);
 
-    let length_of_size_encoding = if bounds.is_fixed_size {
-        0
-    } else {
-        let length_of_size_encoding = bytes_to_store_size(&bounds) as usize;
-        encode_size(
-            &mut bytes[start..start + length_of_size_encoding],
-            entry_bytes.len(),
-            &bounds,
-        );
-        length_of_size_encoding
-    };
+    encode_size(
+        &mut bytes[start..start + size_len],
+        entry_bytes.len(),
+        &bounds,
+    );
 
-    bytes[start + length_of_size_encoding..start + length_of_size_encoding + entry_bytes.len()]
+    bytes[start + size_len..start + size_len + entry_bytes.len()]
         .copy_from_slice(entry_bytes.borrow());
 
-    start + max_size + length_of_size_encoding
+    start + max_size + size_len
 }
 
 /// Deserialize the struct starting at index `start` in `bytes`.
@@ -535,19 +529,13 @@ where
 {
     let bounds = bounds::<T>();
     let max_size = bounds.max_size as usize;
-
-    let (length_of_size_encoding, actual_size) = if bounds.is_fixed_size {
-        (0, max_size)
-    } else {
-        let size_len = bytes_to_store_size(&bounds) as usize;
-        let len = decode_size(&bytes[start..start + size_len], &bounds);
-        (size_len, len)
-    };
+    let size_len = bytes_to_store_size(&bounds) as usize;
+    let len = decode_size(&bytes[start..start + size_len], &bounds);
 
     let a = T::from_bytes(Cow::Borrowed(
-        &bytes[start + length_of_size_encoding..start + length_of_size_encoding + actual_size],
+        &bytes[start + size_len..start + size_len + len],
     ));
-    (a, start + max_size + length_of_size_encoding)
+    (a, start + max_size + size_len)
 }
 
 impl<A, B, C> Storable for (A, B, C)
