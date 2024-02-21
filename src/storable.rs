@@ -519,10 +519,10 @@ where
     start + max_size + size_len
 }
 
-/// Deserialize the struct starting at index `start` in `bytes`.
-/// When serialized struct is saved in `bytes` on indices `[start, end)` the
-/// function will return deserialized struct and index `end` - the first index
-/// after `start` that is not occupied with the serialization of the struct.
+// Deserialize the struct starting at index `start` in `bytes`.
+// When serialized struct is saved in `bytes` on indices `[start, end)` the
+// function will return deserialized struct and index `end` - the first index
+// after `start` that is not occupied with the serialization of the struct.
 fn deserialize_bounded_with_size<T>(bytes: &[u8], start: usize) -> (T, usize)
 where
     T: Storable,
