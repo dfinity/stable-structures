@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [ 1.73.0 ]
+        rust: [ 1.76.0 ]
 
     steps:
       - uses: actions/checkout@v2
@@ -41,7 +41,7 @@ jobs:
           RUST_BACKTRACE: 1
 
   examples:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -72,17 +72,30 @@ jobs:
           bash examples/test.sh
 
   benchmark:
-    runs-on: ubuntu-20.04
-
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      PROJECT_DIR: .
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - name: Checkout current PR
+        uses: actions/checkout@v4
+
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: _canbench_main_branch
+
+      - name: Cache Cargo
+        uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
+          key: ${{ matrix.build }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.build }}-cargo-
 
       - name: Install Rust
         run: |
@@ -90,15 +103,25 @@ jobs:
           rustup default ${{ matrix.rust }}
           rustup target add wasm32-unknown-unknown
 
-      - name: Run benchmark test
+      - name: Benchmark
         run: |
-          bash .github/workflows/benchmark_ci.sh
+          bash .github/workflows/canbench_ci_run_benchmark.sh $PROJECT_DIR
+
+      - name: Post comment
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          filePath: /tmp/canbench_comment_message.txt
+          comment_tag: ${{ env.PROJECT_DIR }}
+
+      - name: Pass or fail
+        run: |
+          bash .github/workflows/canbench_ci_post_run_benchmark.sh
 
   checks-pass:
     # Always run this job!
     if: always()
     needs: [build, examples, benchmark]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: check build result
         if: ${{ needs.build.result != 'success' }}

@@ -71,19 +71,13 @@ where
             range,
         }
     }
-}
 
-impl<K, V, M> Iterator for Iter<'_, K, V, M>
-where
-    K: Storable + Ord + Clone,
-    V: Storable,
-    M: Memory,
-{
-    type Item = (K, V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.cursors.pop() {
-            Some(Cursor::Address(address)) => {
+    // Iterates to find the next element in the requested range.
+    // If it exists, `map` is applied to that element and the result is returned.
+    fn next_map<T, F: Fn(&Node<K>, usize) -> T>(&mut self, map: F) -> Option<T> {
+        // If the cursors are empty. Iteration is complete.
+        match self.cursors.pop()? {
+            Cursor::Address(address) => {
                 if address != NULL {
                     // Load the node at the given address, and add it to the cursors.
                     let node = self.map.load_node(address);
@@ -97,13 +91,13 @@ where
                         node,
                     });
                 }
-                self.next()
+                self.next_map(map)
             }
 
-            Some(Cursor::Node {
+            Cursor::Node {
                 node,
                 next: Index::Child(child_idx),
-            }) => {
+            } => {
                 let child_address = node.child(child_idx);
 
                 // After iterating on the child, iterate on the next _entry_ in this node.
@@ -116,19 +110,26 @@ where
                 // Add the child to the top of the cursors to be iterated on first.
                 self.cursors.push(Cursor::Address(child_address));
 
-                self.next()
+                self.next_map(map)
             }
 
-            Some(Cursor::Node {
+            Cursor::Node {
                 node,
                 next: Index::Entry(entry_idx),
-            }) => {
+            } => {
                 if entry_idx >= node.entries_len() {
                     // No more entries to iterate on in this node.
-                    return self.next();
+                    return self.next_map(map);
                 }
 
-                let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
+                // If the key does not belong to the range, iteration stops.
+                if !self.range.contains(node.key(entry_idx)) {
+                    // Clear all cursors to avoid needless work in subsequent calls.
+                    self.cursors = vec![];
+                    return None;
+                }
+
+                let res = map(&node, entry_idx);
 
                 // Add to the cursors the next element to be traversed.
                 self.cursors.push(Cursor::Node {
@@ -141,20 +142,36 @@ where
                     node,
                 });
 
-                // If the key does not belong to the range, iteration stops.
-                if !self.range.contains(&key) {
-                    // Clear all cursors to avoid needless work in subsequent calls.
-                    self.cursors = vec![];
-                    return None;
-                }
-
-                Some((key, V::from_bytes(Cow::Owned(encoded_value))))
-            }
-            None => {
-                // The cursors are empty. Iteration is complete.
-                None
+                Some(res)
             }
         }
+    }
+}
+
+impl<K, V, M> Iterator for Iter<'_, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_map(|node, entry_idx| {
+            let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
+            (key, V::from_bytes(Cow::Owned(encoded_value)))
+        })
+    }
+
+    fn count(mut self) -> usize
+    where
+        Self: Sized,
+    {
+        let mut cnt = 0;
+        while self.next_map(|_, _| ()).is_some() {
+            cnt += 1;
+        }
+        cnt
     }
 }
 
