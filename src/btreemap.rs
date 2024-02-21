@@ -166,8 +166,19 @@ where
         }
     }
 
-    fn page_size() -> PageSize {
-        match (K::BOUND, V::BOUND) {
+    /// Creates a new instance a `BTreeMap`.
+    ///
+    /// The given `memory` is assumed to be exclusively reserved for this data
+    /// structure and that it starts at address zero. Typically `memory` will
+    /// be an instance of `RestrictedMemory`.
+    ///
+    /// When initialized, the data structure has the following memory layout:
+    ///
+    ///    |  BTreeHeader  |  Allocator | ... free memory for nodes |
+    ///
+    /// See `Allocator` for more details on its own memory layout.
+    pub fn new(memory: M) -> Self {
+        let page_size = match (K::BOUND, V::BOUND) {
             // The keys and values are both bounded.
             (
                 StorableBound::Bounded {
@@ -190,22 +201,7 @@ where
             }
             // Use a default page size.
             _ => PageSize::Value(DEFAULT_PAGE_SIZE),
-        }
-    }
-
-    /// Creates a new instance a `BTreeMap`.
-    ///
-    /// The given `memory` is assumed to be exclusively reserved for this data
-    /// structure and that it starts at address zero. Typically `memory` will
-    /// be an instance of `RestrictedMemory`.
-    ///
-    /// When initialized, the data structure has the following memory layout:
-    ///
-    ///    |  BTreeHeader  |  Allocator | ... free memory for nodes |
-    ///
-    /// See `Allocator` for more details on its own memory layout.
-    pub fn new(memory: M) -> Self {
-        let page_size = Self::page_size();
+        };
 
         let btree = Self {
             root_addr: NULL,
