@@ -497,10 +497,13 @@ where
     T: Storable,
 {
     match T::BOUND {
-        Bound::Bounded { .. } => {
-            let bounds = bounds::<T>();
-            bytes_to_store_size(&bounds) as usize
-        }
+        Bound::Bounded {
+            max_size,
+            is_fixed_size,
+        } => bytes_to_store_size(&Bounds {
+            max_size,
+            is_fixed_size,
+        }) as usize,
         Bound::Unbounded => 8,
     }
 }
@@ -710,8 +713,17 @@ where
     T: Storable,
 {
     match T::BOUND {
-        Bound::Bounded { max_size, .. } => {
-            let size = decode_size(src, &bounds::<T>());
+        Bound::Bounded {
+            max_size,
+            is_fixed_size,
+        } => {
+            let size = decode_size(
+                src,
+                &Bounds {
+                    max_size,
+                    is_fixed_size,
+                },
+            );
             debug_assert!(size <= max_size as usize);
             size
         }
@@ -726,9 +738,19 @@ where
     T: Storable,
 {
     match T::BOUND {
-        Bound::Bounded { max_size, .. } => {
+        Bound::Bounded {
+            max_size,
+            is_fixed_size,
+        } => {
             debug_assert!(n <= max_size as usize);
-            encode_size(dst, n, &bounds::<T>())
+            encode_size(
+                dst,
+                n,
+                &Bounds {
+                    max_size,
+                    is_fixed_size,
+                },
+            )
         }
         Bound::Unbounded => dst[0..8].copy_from_slice(&(n as u64).to_be_bytes()),
     }
