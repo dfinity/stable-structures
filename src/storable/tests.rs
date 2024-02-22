@@ -21,6 +21,18 @@ proptest! {
         prop_assert_eq!(tuple, Storable::from_bytes(bytes));
     }
 
+    #[test]
+    fn tuple_with_three_unbounded_elements_roundtrip(v1 in pvec(any::<u8>(), 0..4), v2 in pvec(any::<u8>(), 0..8), v3 in pvec(any::<u8>(), 0..12)) {
+        let tuple = (v1, v2, v3);
+        assert_eq!(tuple, Storable::from_bytes(tuple.to_bytes()));
+    }
+
+    #[test]
+    fn tuple_with_three_elements_bounded_and_unbounded_roundtrip(v1 in pvec(any::<u8>(), 0..4), x in any::<u64>(), v2 in pvec(any::<u8>(), 0..12)) {
+        let tuple = (v1, x, v2);
+        assert_eq!(tuple, Storable::from_bytes(tuple.to_bytes()));
+    }
+
 
     #[test]
     fn tuple_variable_width_u8_roundtrip(x in any::<u64>(), v in pvec(any::<u8>(), 0..40)) {
@@ -84,6 +96,11 @@ proptest! {
     }
 
     #[test]
+    fn optional_tuple_with_three_unbounded_elements_roundtrip(v in proptest::option::of((pvec(any::<u8>(), 0..4), pvec(any::<u8>(), 0..8),  pvec(any::<u8>(), 0..12)))) {
+        prop_assert_eq!(v.clone(), Storable::from_bytes(v.to_bytes()));
+    }
+
+    #[test]
     fn optional_tuple_variable_width_u8_roundtrip(v in proptest::option::of((any::<u64>(), pvec(any::<u8>(), 0..40)))) {
         let v = v.map(|(n, bytes)| (n, Blob::<48>::try_from(&bytes[..]).unwrap()));
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
@@ -93,6 +110,11 @@ proptest! {
     fn optional_tuple_with_three_elements_variable_width_u8_roundtrip(v in proptest::option::of((any::<u64>(), pvec(any::<u8>(), 0..40), pvec(any::<u8>(), 0..80)))) {
         let v = v.map(|(n, bytes_1, bytes_2)| (n, Blob::<40>::try_from(&bytes_1[..]).unwrap(), Blob::<80>::try_from(&bytes_2[..]).unwrap()));
         prop_assert_eq!(v, Storable::from_bytes(v.to_bytes()));
+    }
+
+    #[test]
+    fn optional_tuple_with_three_elements_bounded_and_unbounded_roundtrip(v in proptest::option::of((any::<u64>(), pvec(any::<u8>(), 0..40), pvec(any::<u8>(), 0..80)))) {
+        prop_assert_eq!(v.clone(), Storable::from_bytes(v.to_bytes()));
     }
 
     #[test]
