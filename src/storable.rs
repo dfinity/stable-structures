@@ -504,8 +504,8 @@ where
     let bounds = bounds::<T>();
     let size_len = bytes_to_store_size(&bounds) as usize;
     let max_size = bounds.max_size as usize;
-    debug_assert!(entry_bytes.len() <= max_size);
     let actual_size = entry_bytes.len();
+    debug_assert!(actual_size <= max_size);
 
     encode_size(&mut bytes[start..start + size_len], actual_size, &bounds);
 
