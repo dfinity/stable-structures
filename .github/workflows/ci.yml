@@ -62,6 +62,7 @@ jobs:
       - name: Install DFX
         run: |
           wget --output-document install-dfx.sh "https://internetcomputer.org/install.sh"
+          DFXVM_INIT_YES=true
           DFX_VERSION=${DFX_VERSION:=0.16.0} bash install-dfx.sh < <(yes Y)
           rm install-dfx.sh
           dfx cache install
