@@ -3037,4 +3037,24 @@ mod test {
         let btree: BTreeMap<T, T, _> = BTreeMap::init(btree.into_memory());
         assert_eq!(btree.get(&T), Some(T));
     }
+
+    #[test]
+    fn test_clear_new() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init(mem);
+        btree.insert(
+            [1u8; 4].as_slice().try_into().unwrap(),
+            [1u8; 4].as_slice().try_into().unwrap(),
+        );
+
+        assert_ne!(btree.len(), 0);
+        assert_ne!(btree.allocator.num_allocated_chunks(), 0);
+        assert_ne!(btree.root_addr, NULL);
+
+        btree.clear_new();
+
+        assert_eq!(btree.len(), 0);
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        assert_eq!(btree.root_addr, NULL);
+    }
 }
