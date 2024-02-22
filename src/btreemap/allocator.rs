@@ -97,6 +97,7 @@ impl<M: Memory> Allocator<M> {
     // Deallocate all allocated chunks.
     pub fn clear(&mut self) {
         // Create the initial memory chunk and save it directly after the allocator's header.
+        self.free_list_head = self.header_addr + AllocatorHeader::size();
         let chunk = ChunkHeader::null();
         chunk.save(self.free_list_head, &self.memory);
 
@@ -397,6 +398,40 @@ mod test {
             allocator_addr + AllocatorHeader::size() + allocator.chunk_size()
         );
         allocator.deallocate(chunk_addr);
+        assert_eq!(
+            allocator.free_list_head,
+            allocator_addr + AllocatorHeader::size()
+        );
+        assert_eq!(allocator.num_allocated_chunks, 0);
+
+        // Load and reload to verify that the data is the same.
+        let allocator = Allocator::load(mem, allocator_addr);
+        assert_eq!(
+            allocator.free_list_head,
+            allocator_addr + AllocatorHeader::size()
+        );
+        assert_eq!(allocator.num_allocated_chunks, 0);
+    }
+
+    #[test]
+    fn allocate_then_clear() {
+        let mem = make_memory();
+        let allocation_size = Bytes::from(16u64);
+        let allocator_addr = Address::from(0);
+
+        let mut allocator = Allocator::new(mem.clone(), allocator_addr, allocation_size);
+
+        allocator.allocate();
+        allocator.allocate();
+
+        assert_eq!(
+            allocator.free_list_head,
+            allocator_addr
+                + AllocatorHeader::size()
+                + allocator.chunk_size()
+                + allocator.chunk_size()
+        );
+        allocator.clear();
         assert_eq!(
             allocator.free_list_head,
             allocator_addr + AllocatorHeader::size()
