@@ -94,7 +94,7 @@ impl<M: Memory> Allocator<M> {
         allocator
     }
 
-    // Deallocate all allocated chunks.
+    /// Deallocate all allocated chunks.
     pub fn clear(&mut self) {
         // Create the initial memory chunk and save it directly after the allocator's header.
         self.free_list_head = self.header_addr + AllocatorHeader::size();
