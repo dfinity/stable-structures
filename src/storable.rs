@@ -497,26 +497,21 @@ where
 // When serialized `entry` is saved in `bytes` on indices `[start, end)`
 // the function will return index `end` - the first index after
 // `start` that is not occupied with the serialization of `entry`.
-fn serialize_bounded_with_size<T>(entry: &T, bytes: &mut [u8], start: usize) -> usize
+fn serialize_bounded_with_size<T>(entry_bytes: &[u8], bytes: &mut [u8], start: usize) -> usize
 where
     T: Storable,
 {
     let bounds = bounds::<T>();
     let size_len = bytes_to_store_size(&bounds) as usize;
     let max_size = bounds.max_size as usize;
-    let entry_bytes = entry.to_bytes();
     debug_assert!(entry_bytes.len() <= max_size);
+    let actual_size = entry_bytes.len();
 
-    encode_size(
-        &mut bytes[start..start + size_len],
-        entry_bytes.len(),
-        &bounds,
-    );
+    encode_size(&mut bytes[start..start + size_len], actual_size, &bounds);
 
-    bytes[start + size_len..start + size_len + entry_bytes.len()]
-        .copy_from_slice(entry_bytes.borrow());
+    bytes[start + size_len..start + size_len + actual_size].copy_from_slice(entry_bytes);
 
-    start + max_size + size_len
+    start + actual_size + size_len
 }
 
 // Deserialize the struct starting at index `start` in `bytes`.
@@ -528,14 +523,26 @@ where
     T: Storable,
 {
     let bounds = bounds::<T>();
-    let max_size = bounds.max_size as usize;
     let size_len = bytes_to_store_size(&bounds) as usize;
-    let len = decode_size(&bytes[start..start + size_len], &bounds);
+    let actual_size = decode_size(&bytes[start..start + size_len], &bounds);
 
     let a = T::from_bytes(Cow::Borrowed(
-        &bytes[start + size_len..start + size_len + len],
+        &bytes[start + size_len..start + size_len + actual_size],
     ));
-    (a, start + max_size + size_len)
+    (a, start + actual_size + size_len)
+}
+
+fn get_size_len<T>() -> usize
+where
+    T: Storable,
+{
+    match T::BOUND {
+        Bound::Bounded { .. } => {
+            let bounds = bounds::<T>();
+            bytes_to_store_size(&bounds) as usize
+        }
+        Bound::Unbounded => todo!("Serializing tuples with unbounded types is not yet supported."),
+    }
 }
 
 impl<A, B, C> Storable for (A, B, C)
@@ -546,12 +553,23 @@ where
 {
     fn to_bytes(&self) -> Cow<[u8]> {
         match Self::BOUND {
-            Bound::Bounded { max_size, .. } => {
-                let mut bytes = vec![0; max_size as usize];
+            Bound::Bounded { .. } => {
+                let a_bytes = self.0.to_bytes();
+                let b_bytes = self.1.to_bytes();
+                let c_bytes = self.2.to_bytes();
 
-                let a_end = serialize_bounded_with_size(self.0.borrow(), &mut bytes, 0);
-                let b_end = serialize_bounded_with_size(self.1.borrow(), &mut bytes, a_end);
-                serialize_bounded_with_size(self.2.borrow(), &mut bytes, b_end);
+                let output_size = a_bytes.len()
+                    + get_size_len::<A>()
+                    + b_bytes.len()
+                    + get_size_len::<B>()
+                    + c_bytes.len()
+                    + get_size_len::<C>();
+
+                let mut bytes = vec![0; output_size];
+
+                let a_end = serialize_bounded_with_size::<A>(a_bytes.borrow(), &mut bytes, 0);
+                let b_end = serialize_bounded_with_size::<B>(b_bytes.borrow(), &mut bytes, a_end);
+                serialize_bounded_with_size::<C>(c_bytes.borrow(), &mut bytes, b_end);
                 Cow::Owned(bytes)
             }
             _ => todo!("Serializing tuples with unbounded types is not yet supported."),
@@ -560,9 +578,7 @@ where
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         match Self::BOUND {
-            Bound::Bounded { max_size, .. } => {
-                assert_eq!(bytes.len(), max_size as usize);
-
+            Bound::Bounded { .. } => {
                 let (a, a_end) = deserialize_bounded_with_size::<A>(bytes.borrow(), 0);
                 let (b, b_end) = deserialize_bounded_with_size::<B>(bytes.borrow(), a_end);
                 let (c, _) = deserialize_bounded_with_size::<C>(bytes.borrow(), b_end);
