@@ -551,6 +551,7 @@ where
     C: Storable,
 {
     fn to_bytes(&self) -> Cow<[u8]> {
+        // Serialize each of the tuple's elements
         let a_bytes = self.0.to_bytes();
         let b_bytes = self.1.to_bytes();
         let c_bytes = self.2.to_bytes();
