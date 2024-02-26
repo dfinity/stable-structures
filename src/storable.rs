@@ -531,7 +531,7 @@ where
 // When serialized struct is saved in `bytes` on indices `[start, end)` the
 // function will return deserialized struct and index `end` - the first index
 // after `start` that is not occupied with the serialization of the struct.
-fn deserialize_bounded_with_size<T>(bytes: &[u8], start: usize) -> (T, usize)
+fn deserialize_with_size<T>(bytes: &[u8], start: usize) -> (T, usize)
 where
     T: Storable,
 {
@@ -576,9 +576,9 @@ where
             assert!(bytes.len() <= max_size as usize);
         }
 
-        let (a, a_end) = deserialize_bounded_with_size::<A>(bytes.borrow(), 0);
-        let (b, b_end) = deserialize_bounded_with_size::<B>(bytes.borrow(), a_end);
-        let (c, _) = deserialize_bounded_with_size::<C>(bytes.borrow(), b_end);
+        let (a, a_end) = deserialize_with_size::<A>(bytes.borrow(), 0);
+        let (b, b_end) = deserialize_with_size::<B>(bytes.borrow(), a_end);
+        let (c, _) = deserialize_with_size::<C>(bytes.borrow(), b_end);
 
         (a, b, c)
     }
