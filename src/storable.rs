@@ -495,12 +495,12 @@ where
     };
 }
 
-// Serializes `entry` into `bytes` starting from the index `start`
-// in `bytes`.
-// When serialized `entry` is saved in `bytes` on indices `[start, end)`
+// Encodes `entry_bytes` size followed with `entry_bytes` into `bytes`
+// starting from the index `start`.
+// When encoding is saved in `bytes` on indices `[start, end)`
 // the function will return index `end` - the first index after
-// `start` that is not occupied with the serialization of `entry`.
-fn serialize_with_size<T>(entry_bytes: &[u8], bytes: &mut [u8], start: usize) -> usize
+// `start` that is not occupied with encoding.
+fn encode_with_size<T>(entry_bytes: &[u8], bytes: &mut [u8], start: usize) -> usize
 where
     T: Storable,
 {
@@ -552,9 +552,9 @@ where
 
         let mut bytes = vec![0; output_size];
 
-        let a_end = serialize_with_size::<A>(a_bytes.borrow(), &mut bytes, 0);
-        let b_end = serialize_with_size::<B>(b_bytes.borrow(), &mut bytes, a_end);
-        serialize_with_size::<C>(c_bytes.borrow(), &mut bytes, b_end);
+        let a_end = encode_with_size::<A>(a_bytes.borrow(), &mut bytes, 0);
+        let b_end = encode_with_size::<B>(b_bytes.borrow(), &mut bytes, a_end);
+        encode_with_size::<C>(c_bytes.borrow(), &mut bytes, b_end);
         Cow::Owned(bytes)
     }
 
