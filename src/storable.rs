@@ -495,22 +495,6 @@ where
     };
 }
 
-fn get_num_bytes_required_to_store_size<T>() -> usize
-where
-    T: Storable,
-{
-    match T::BOUND {
-        Bound::Bounded {
-            max_size,
-            is_fixed_size,
-        } => bytes_to_store_size(&Bounds {
-            max_size,
-            is_fixed_size,
-        }) as usize,
-        Bound::Unbounded => 8,
-    }
-}
-
 // Serializes `entry` into `bytes` starting from the index `start`
 // in `bytes`.
 // When serialized `entry` is saved in `bytes` on indices `[start, end)`
@@ -686,6 +670,36 @@ pub(crate) const fn bounds<A: Storable>() -> Bounds {
     }
 }
 
+pub(crate) const fn bytes_to_store_size(bounds: &Bounds) -> u32 {
+    if bounds.is_fixed_size {
+        0
+    } else if bounds.max_size <= u8::MAX as u32 {
+        1
+    } else if bounds.max_size <= u16::MAX as u32 {
+        2
+    } else {
+        4
+    }
+}
+
+const NUM_BYTES_TO_STORE_SIZE_OF_UNBOUNDED_TYPE: usize = 8;
+
+const fn get_num_bytes_required_to_store_size<T>() -> usize
+where
+    T: Storable,
+{
+    match T::BOUND {
+        Bound::Bounded {
+            max_size,
+            is_fixed_size,
+        } => bytes_to_store_size(&Bounds {
+            max_size,
+            is_fixed_size,
+        }) as usize,
+        Bound::Unbounded => NUM_BYTES_TO_STORE_SIZE_OF_UNBOUNDED_TYPE,
+    }
+}
+
 fn decode_size_of_bound(src: &[u8], bounds: &Bounds) -> usize {
     if bounds.is_fixed_size {
         bounds.max_size as usize
@@ -756,18 +770,7 @@ where
                 },
             )
         }
-        Bound::Unbounded => dst[0..8].copy_from_slice(&(n as u64).to_be_bytes()),
-    }
-}
-
-pub(crate) const fn bytes_to_store_size(bounds: &Bounds) -> u32 {
-    if bounds.is_fixed_size {
-        0
-    } else if bounds.max_size <= u8::MAX as u32 {
-        1
-    } else if bounds.max_size <= u16::MAX as u32 {
-        2
-    } else {
-        4
+        Bound::Unbounded => dst[0..NUM_BYTES_TO_STORE_SIZE_OF_UNBOUNDED_TYPE]
+            .copy_from_slice(&(n as u64).to_be_bytes()),
     }
 }
