@@ -424,12 +424,12 @@ where
 
                 let sizes_offset: usize = a_max_size + b_max_size;
 
-                encode_size(
+                encode_size_of_bound(
                     &mut bytes[sizes_offset..sizes_offset + a_size_len],
                     a_bytes.len(),
                     &a_bounds,
                 );
-                encode_size(
+                encode_size_of_bound(
                     &mut bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
                     b_bytes.len(),
                     &b_bounds,
@@ -454,8 +454,11 @@ where
 
                 let a_size_len = bytes_to_store_size(&a_bounds) as usize;
                 let b_size_len = bytes_to_store_size(&b_bounds) as usize;
-                let a_len = decode_size(&bytes[sizes_offset..sizes_offset + a_size_len], &a_bounds);
-                let b_len = decode_size(
+                let a_len = decode_size_of_bound(
+                    &bytes[sizes_offset..sizes_offset + a_size_len],
+                    &a_bounds,
+                );
+                let b_len = decode_size_of_bound(
                     &bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
                     &b_bounds,
                 );
@@ -520,7 +523,7 @@ where
     let size_len = get_num_bytes_required_to_store_size::<T>();
     let actual_size = entry_bytes.len();
 
-    encode_size_universal::<T>(&mut bytes[start..start + size_len], actual_size);
+    encode_size::<T>(&mut bytes[start..start + size_len], actual_size);
 
     bytes[start + size_len..start + size_len + actual_size].copy_from_slice(entry_bytes);
 
@@ -536,7 +539,7 @@ where
     T: Storable,
 {
     let size_len = get_num_bytes_required_to_store_size::<T>();
-    let actual_size = decode_size_universal::<T>(&bytes[start..start + size_len]);
+    let actual_size = decode_size::<T>(&bytes[start..start + size_len]);
 
     let a = T::from_bytes(Cow::Borrowed(
         &bytes[start + size_len..start + size_len + actual_size],
@@ -683,7 +686,7 @@ pub(crate) const fn bounds<A: Storable>() -> Bounds {
     }
 }
 
-fn decode_size(src: &[u8], bounds: &Bounds) -> usize {
+fn decode_size_of_bound(src: &[u8], bounds: &Bounds) -> usize {
     if bounds.is_fixed_size {
         bounds.max_size as usize
     } else if bounds.max_size <= u8::MAX as u32 {
@@ -695,7 +698,7 @@ fn decode_size(src: &[u8], bounds: &Bounds) -> usize {
     }
 }
 
-fn encode_size(dst: &mut [u8], n: usize, bounds: &Bounds) {
+fn encode_size_of_bound(dst: &mut [u8], n: usize, bounds: &Bounds) {
     if bounds.is_fixed_size {
         return;
     }
@@ -709,7 +712,7 @@ fn encode_size(dst: &mut [u8], n: usize, bounds: &Bounds) {
     }
 }
 
-fn decode_size_universal<T>(src: &[u8]) -> usize
+fn decode_size<T>(src: &[u8]) -> usize
 where
     T: Storable,
 {
@@ -718,7 +721,7 @@ where
             max_size,
             is_fixed_size,
         } => {
-            let size = decode_size(
+            let size = decode_size_of_bound(
                 src,
                 &Bounds {
                     max_size,
@@ -734,7 +737,7 @@ where
     }
 }
 
-fn encode_size_universal<T>(dst: &mut [u8], n: usize)
+fn encode_size<T>(dst: &mut [u8], n: usize)
 where
     T: Storable,
 {
@@ -744,7 +747,7 @@ where
             is_fixed_size,
         } => {
             debug_assert!(n <= max_size as usize);
-            encode_size(
+            encode_size_of_bound(
                 dst,
                 n,
                 &Bounds {
