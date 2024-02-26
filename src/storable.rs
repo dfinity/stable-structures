@@ -492,7 +492,7 @@ where
     };
 }
 
-fn get_size_len<T>() -> usize
+fn get_num_bytes_required_to_store_size<T>() -> usize
 where
     T: Storable,
 {
@@ -517,7 +517,7 @@ fn serialize_with_size<T>(entry_bytes: &[u8], bytes: &mut [u8], start: usize) ->
 where
     T: Storable,
 {
-    let size_len = get_size_len::<T>();
+    let size_len = get_num_bytes_required_to_store_size::<T>();
     let actual_size = entry_bytes.len();
 
     encode_size_universal::<T>(&mut bytes[start..start + size_len], actual_size);
@@ -535,7 +535,7 @@ fn deserialize_bounded_with_size<T>(bytes: &[u8], start: usize) -> (T, usize)
 where
     T: Storable,
 {
-    let size_len = get_size_len::<T>();
+    let size_len = get_num_bytes_required_to_store_size::<T>();
     let actual_size = decode_size_universal::<T>(&bytes[start..start + size_len]);
 
     let a = T::from_bytes(Cow::Borrowed(
@@ -557,11 +557,11 @@ where
         let c_bytes = self.2.to_bytes();
 
         let output_size = a_bytes.len()
-            + get_size_len::<A>()
+            + get_num_bytes_required_to_store_size::<A>()
             + b_bytes.len()
-            + get_size_len::<B>()
+            + get_num_bytes_required_to_store_size::<B>()
             + c_bytes.len()
-            + get_size_len::<C>();
+            + get_num_bytes_required_to_store_size::<C>();
 
         let mut bytes = vec![0; output_size];
 
