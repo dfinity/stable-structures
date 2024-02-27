@@ -682,7 +682,7 @@ pub(crate) const fn bytes_to_store_size(bounds: &Bounds) -> u32 {
     }
 }
 
-const NUM_BYTES_TO_STORE_SIZE_OF_UNBOUNDED_TYPE: usize = 8;
+const NUM_BYTES_TO_STORE_SIZE_OF_UNBOUNDED_TYPE: usize = 4;
 
 const fn get_num_bytes_required_to_store_size<T>() -> usize
 where
@@ -745,9 +745,7 @@ where
             debug_assert!(size <= max_size as usize);
             size
         }
-        Bound::Unbounded => u64::from_be_bytes([
-            src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7],
-        ]) as usize,
+        Bound::Unbounded => u32::from_be_bytes([src[0], src[1], src[2], src[3]]) as usize,
     }
 }
 
@@ -771,6 +769,6 @@ where
             )
         }
         Bound::Unbounded => dst[0..NUM_BYTES_TO_STORE_SIZE_OF_UNBOUNDED_TYPE]
-            .copy_from_slice(&(n as u64).to_be_bytes()),
+            .copy_from_slice(&(n as u32).to_be_bytes()),
     }
 }
