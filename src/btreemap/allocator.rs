@@ -77,21 +77,15 @@ impl<M: Memory> Allocator<M> {
     ///                |__________|       |____ NULL
     ///
     pub fn new(memory: M, addr: Address, allocation_size: Bytes) -> Self {
-        let free_list_head = addr + AllocatorHeader::size();
-
-        // Create the initial memory chunk and save it directly after the allocator's header.
-        let chunk = ChunkHeader::null();
-        chunk.save(free_list_head, &memory);
-
-        let allocator = Self {
+        let mut allocator = Self {
             header_addr: addr,
             allocation_size,
             num_allocated_chunks: 0,
-            free_list_head,
+            free_list_head: NULL, // Will be set in `allocator.clear()` below.
             memory,
         };
 
-        allocator.save();
+        allocator.clear();
         allocator
     }
 
@@ -415,7 +409,7 @@ mod test {
     }
 
     #[test]
-    fn clear_deallocates_all_allocated_chunks {
+    fn clear_deallocates_all_allocated_chunks() {
         let mem = make_memory();
         let allocation_size = Bytes::from(16u64);
         let allocator_addr = Address::from(0);

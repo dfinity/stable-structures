@@ -3041,7 +3041,7 @@ mod test {
     }
 
     #[test]
-    fn test_clear_new() {
+    fn test_clear_new_bounded_type() {
         let mem = make_memory();
         let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::new(mem.clone());
         btree.insert(
@@ -3060,6 +3060,27 @@ mod test {
         BTreeMap::<Blob<4>, Blob<4>, _>::new(mem.clone());
 
         let header_expected = BTreeMap::<Blob<4>, Blob<4>, _>::read_header(&mem);
+
+        assert_eq!(header_actual, header_expected);
+    }
+
+    #[test]
+    fn test_clear_new_unbounded_type() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<String, String, _> = BTreeMap::new(mem.clone());
+        btree.insert("asd".try_into().unwrap(), "bce".try_into().unwrap());
+
+        assert_ne!(btree.len(), 0);
+        assert_ne!(btree.allocator.num_allocated_chunks(), 0);
+        assert_ne!(btree.root_addr, NULL);
+
+        btree.clear_new();
+
+        let header_actual = BTreeMap::<String, String, _>::read_header(&mem);
+
+        BTreeMap::<String, String, _>::new(mem.clone());
+
+        let header_expected = BTreeMap::<String, String, _>::read_header(&mem);
 
         assert_eq!(header_actual, header_expected);
     }
