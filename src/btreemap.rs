@@ -3068,7 +3068,7 @@ mod test {
     fn test_clear_new_unbounded_type() {
         let mem = make_memory();
         let mut btree: BTreeMap<String, String, _> = BTreeMap::new(mem.clone());
-        btree.insert("asd".try_into().unwrap(), "bce".try_into().unwrap());
+        btree.insert("asd".into(), "bce".into());
 
         assert_ne!(btree.len(), 0);
         assert_ne!(btree.allocator.num_allocated_chunks(), 0);
