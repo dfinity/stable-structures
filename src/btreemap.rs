@@ -107,6 +107,7 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
+#[derive(PartialEq, Debug)]
 /// The packed header size must be <= ALLOCATOR_OFFSET.
 struct BTreeHeader {
     version: Version,
@@ -567,6 +568,7 @@ where
         self.root_addr = NULL;
         self.length = 0;
         self.allocator.clear();
+        self.save();
     }
 
     /// Returns the first key-value pair in the map. The key in this
@@ -3041,7 +3043,7 @@ mod test {
     #[test]
     fn test_clear_new() {
         let mem = make_memory();
-        let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init(mem);
+        let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::new(mem.clone());
         btree.insert(
             [1u8; 4].as_slice().try_into().unwrap(),
             [1u8; 4].as_slice().try_into().unwrap(),
@@ -3053,8 +3055,12 @@ mod test {
 
         btree.clear_new();
 
-        assert_eq!(btree.len(), 0);
-        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
-        assert_eq!(btree.root_addr, NULL);
+        let header_actual = BTreeMap::<Blob<4>, Blob<4>, _>::read_header(&mem);
+
+        BTreeMap::<Blob<4>, Blob<4>, _>::new(mem.clone());
+
+        let header_expected = BTreeMap::<Blob<4>, Blob<4>, _>::read_header(&mem);
+
+        assert_eq!(header_actual, header_expected);
     }
 }

@@ -46,6 +46,7 @@ pub struct Allocator<M: Memory> {
 }
 
 #[repr(C, packed)]
+#[derive(PartialEq, Debug)]
 struct AllocatorHeader {
     magic: [u8; 3],
     version: u8,
@@ -432,19 +433,14 @@ mod test {
                 + allocator.chunk_size()
         );
         allocator.clear();
-        assert_eq!(
-            allocator.free_list_head,
-            allocator_addr + AllocatorHeader::size()
-        );
-        assert_eq!(allocator.num_allocated_chunks, 0);
 
-        // Load and reload to verify that the data is the same.
-        let allocator = Allocator::load(mem, allocator_addr);
-        assert_eq!(
-            allocator.free_list_head,
-            allocator_addr + AllocatorHeader::size()
-        );
-        assert_eq!(allocator.num_allocated_chunks, 0);
+        let header_actual: AllocatorHeader = read_struct(allocator_addr, &mem);
+
+        Allocator::new(mem.clone(), allocator_addr, allocation_size);
+
+        let header_expected: AllocatorHeader = read_struct(allocator_addr, &mem);
+
+        assert_eq!(header_actual, header_expected);
     }
 
     #[test]
