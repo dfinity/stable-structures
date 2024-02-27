@@ -415,7 +415,7 @@ mod test {
     }
 
     #[test]
-    fn allocate_then_clear() {
+    fn clear_deallocates_all_allocated_chunks {
         let mem = make_memory();
         let allocation_size = Bytes::from(16u64);
         let allocator_addr = Address::from(0);
