@@ -3044,6 +3044,7 @@ mod test {
     fn test_clear_new_bounded_type() {
         let mem = make_memory();
         let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::new(mem.clone());
+
         btree.insert(
             [1u8; 4].as_slice().try_into().unwrap(),
             [1u8; 4].as_slice().try_into().unwrap(),
