@@ -657,7 +657,7 @@ fn get_size_lens(mut sizes_len_byte: u8, number_of_elements: u8) -> Vec<u8> {
         panic!("");
     }
     let mut size_lens = vec![];
-    for i in 0..number_of_elements - 1 {
+    for _ in 0..number_of_elements - 1 {
         let mask: u8 = 3;
         let curr_size: u8 = (sizes_len_byte & mask) + 1;
         size_lens.push(curr_size);
@@ -682,7 +682,7 @@ where
         let b_bytes = self.1.to_bytes();
         let b_size = b_bytes.len();
         let b_size_len = size_len(b_size);
-        let c_bytes = self.1.to_bytes();
+        let c_bytes = self.2.to_bytes();
         let c_size = c_bytes.len();
 
         let output_size = a_size + b_size + c_size + a_size_len + b_size_len + 1;
