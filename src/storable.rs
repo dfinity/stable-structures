@@ -419,8 +419,8 @@ where
                 bytes[0..a_bytes.len()].copy_from_slice(a_bytes.borrow());
                 bytes[a_max_size..a_max_size + b_bytes.len()].copy_from_slice(b_bytes.borrow());
 
-                let a_size_len = bytes_to_store_size(&a_bounds) as usize;
-                let b_size_len = bytes_to_store_size(&b_bounds) as usize;
+                let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
+                let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
 
                 let sizes_offset: usize = a_max_size + b_max_size;
 
@@ -452,8 +452,8 @@ where
                 let b_max_size = b_bounds.max_size as usize;
                 let sizes_offset = a_max_size + b_max_size;
 
-                let a_size_len = bytes_to_store_size(&a_bounds) as usize;
-                let b_size_len = bytes_to_store_size(&b_bounds) as usize;
+                let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
+                let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
                 let a_len = decode_size_of_bound(
                     &bytes[sizes_offset..sizes_offset + a_size_len],
                     &a_bounds,
@@ -480,8 +480,8 @@ where
 
                 let max_size = a_bounds.max_size
                     + b_bounds.max_size
-                    + bytes_to_store_size(&a_bounds)
-                    + bytes_to_store_size(&b_bounds);
+                    + bytes_to_store_size_bounded(&a_bounds)
+                    + bytes_to_store_size_bounded(&b_bounds);
 
                 let is_fixed_size = a_bounds.is_fixed_size && b_bounds.is_fixed_size;
 
@@ -605,27 +605,25 @@ fn decode_size(src: &[u8], size_len: usize) -> usize {
     }
 }
 
-fn encode_size(dst: &mut [u8], n: usize, size_len: usize) {
-    match size_len {
+fn encode_size(dst: &mut [u8], n: usize) -> usize {
+    let bytes_to_store_size = bytes_to_store_size(n);
+    match bytes_to_store_size {
         1 => dst[0] = n as u8,
         2 => dst[0..2].copy_from_slice(&(n as u16).to_be_bytes()),
         _ => dst[0..4].copy_from_slice(&(n as u32).to_be_bytes()),
     };
+    bytes_to_store_size
 }
 
-pub(crate) const fn bytes_to_store_size(bounds: &Bounds) -> u32 {
+pub(crate) const fn bytes_to_store_size_bounded(bounds: &Bounds) -> u32 {
     if bounds.is_fixed_size {
         0
-    } else if bounds.max_size <= u8::MAX as u32 {
-        1
-    } else if bounds.max_size <= u16::MAX as u32 {
-        2
     } else {
-        4
+        bytes_to_store_size(bounds.max_size as usize) as u32
     }
 }
 
-fn size_len(bytes_size: usize) -> usize {
+const fn bytes_to_store_size(bytes_size: usize) -> usize {
     if bytes_size <= u8::MAX as usize {
         1
     } else if bytes_size <= u16::MAX as usize {
@@ -635,38 +633,49 @@ fn size_len(bytes_size: usize) -> usize {
     }
 }
 
-fn get_size_len_byte(sizes_len: Vec<usize>) -> u8 {
-    if sizes_len.len() > 4 {
-        panic!("");
-    }
-    let mut sizes_len_byte: u8 = 0;
+fn encode_size_lengths(sizes: Vec<usize>) -> u8 {
+    assert!(sizes.len() <= 4);
 
-    for size_len in sizes_len.iter() {
-        if *size_len > 4 {
-            panic!();
-        }
-        sizes_len_byte <<= 2;
-        sizes_len_byte += (*size_len - 1) as u8;
+    let mut size_lengths_byte: u8 = 0;
+
+    for size in sizes.iter() {
+        let size_length = bytes_to_store_size(*size);
+        // Number of bytes required to store the size of every
+        // element is represented with 2 bits.
+        size_lengths_byte <<= 2;
+        // `size_length` can take value in {1, 2, 4}, but to
+        // compress it into 2 bit we will decrement its value.
+        size_lengths_byte += (size_length - 1) as u8;
     }
 
-    sizes_len_byte
+    size_lengths_byte
 }
 
-fn get_size_lens(mut sizes_len_byte: u8, number_of_elements: u8) -> Vec<u8> {
-    if number_of_elements > 5 {
-        panic!("");
-    }
-    let mut size_lens = vec![];
-    for _ in 0..number_of_elements - 1 {
+fn decode_sizes_length(mut encoded_bytes_to_store: u8, number_of_encoded_lengths: u8) -> Vec<u8> {
+    assert!(number_of_encoded_lengths <= 4);
+
+    let mut bytes_to_store_sizes = vec![];
+
+    for _ in 0..number_of_encoded_lengths - 1 {
+        // The number of bytes required to store the size of every
+        // element is represented with 2 bits. Hence we use
+        // mask `11`, equivalent to 3 in the decimal system.
         let mask: u8 = 3;
-        let curr_size: u8 = (sizes_len_byte & mask) + 1;
-        size_lens.push(curr_size);
-        sizes_len_byte >>= 2;
+        // The number of bytes required to store size can take value
+        // in {1, 2, 4}, but to compress it to 2-bit,
+        // when encoding we decreased the value, hence now we need
+        // to do inverse.
+        let bytes_to_store: u8 = (encoded_bytes_to_store & mask) + 1;
+        bytes_to_store_sizes.push(bytes_to_store);
+        encoded_bytes_to_store >>= 2;
     }
 
-    size_lens.reverse();
+    // Because encoding and decoding are started on the same
+    // end of the byte, we need to reverse `bytes_to_store_sizes`
+    // to get sizes in order.
+    bytes_to_store_sizes.reverse();
 
-    size_lens
+    bytes_to_store_sizes
 }
 
 impl<A, B, C> Storable for (A, B, C)
@@ -678,28 +687,37 @@ where
     fn to_bytes(&self) -> Cow<[u8]> {
         let a_bytes = self.0.to_bytes();
         let a_size = a_bytes.len();
-        let a_size_len = size_len(a_size);
+
         let b_bytes = self.1.to_bytes();
         let b_size = b_bytes.len();
-        let b_size_len = size_len(b_size);
+
         let c_bytes = self.2.to_bytes();
         let c_size = c_bytes.len();
 
-        let output_size = a_size + b_size + c_size + a_size_len + b_size_len + 1;
+        let output_size = a_size
+            + b_size
+            + c_size
+            + bytes_to_store_size(a_size)
+            + bytes_to_store_size(b_size)
+            + 1;
 
         let mut bytes = vec![0; output_size];
+
         let mut curr_ind = 0;
-        bytes[0] = get_size_len_byte(vec![a_size_len, b_size_len]);
+
+        bytes[0] = encode_size_lengths(vec![a_size, b_size]);
         curr_ind += 1;
-        encode_size(&mut bytes[curr_ind..], a_size, a_size_len);
-        curr_ind += a_size_len;
+
+        curr_ind += encode_size(&mut bytes[curr_ind..], a_size);
         bytes[curr_ind..curr_ind + a_size].copy_from_slice(a_bytes.borrow());
         curr_ind += a_size;
-        encode_size(&mut bytes[curr_ind..], b_size, b_size_len);
-        curr_ind += b_size_len;
+
+        curr_ind += encode_size(&mut bytes[curr_ind..], b_size);
         bytes[curr_ind..curr_ind + b_size].copy_from_slice(b_bytes.borrow());
         curr_ind += b_size;
+
         bytes[curr_ind..curr_ind + c_size].copy_from_slice(c_bytes.borrow());
+
         debug_assert_eq!(curr_ind + c_size, output_size);
 
         Cow::Owned(bytes)
@@ -707,7 +725,7 @@ where
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         let mut curr_ind = 0;
-        let sizes_len = get_size_lens(bytes[0], 3);
+        let sizes_len = decode_sizes_length(bytes[0], 2);
         curr_ind += 1;
         let a_size_len = sizes_len[0] as usize;
         let a_size = decode_size(&bytes[curr_ind..], a_size_len);
@@ -733,11 +751,11 @@ where
 
                 Bound::Bounded {
                     max_size: a_bounds.max_size
-                        + bytes_to_store_size(&a_bounds)
+                        + bytes_to_store_size_bounded(&a_bounds)
                         + b_bounds.max_size
-                        + bytes_to_store_size(&b_bounds)
+                        + bytes_to_store_size_bounded(&b_bounds)
                         + c_bounds.max_size
-                        + bytes_to_store_size(&c_bounds),
+                        + bytes_to_store_size_bounded(&c_bounds),
                     is_fixed_size: a_bounds.is_fixed_size
                         && b_bounds.is_fixed_size
                         && c_bounds.is_fixed_size,
