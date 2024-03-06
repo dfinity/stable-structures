@@ -583,14 +583,7 @@ fn encode_size_of_bound(dst: &mut [u8], n: usize, bounds: &Bounds) {
     if bounds.is_fixed_size {
         return;
     }
-
-    if bounds.max_size <= u8::MAX as u32 {
-        dst[0] = n as u8;
-    } else if bounds.max_size <= u16::MAX as u32 {
-        dst[0..2].copy_from_slice(&(n as u16).to_be_bytes());
-    } else {
-        dst[0..4].copy_from_slice(&(n as u32).to_be_bytes());
-    }
+    encode_size(dst, n, bytes_to_store_size(bounds.max_size as usize));
 }
 
 /// Decodes size from the beginning of `src` of length `size_len` and returns it.
@@ -602,15 +595,13 @@ fn decode_size(src: &[u8], size_len: usize) -> usize {
     }
 }
 
-/// Encodes size at beginning of `dst` and returns the length of the encoding.
-fn encode_size(dst: &mut [u8], n: usize) -> usize {
-    let bytes_to_store_size = bytes_to_store_size(n);
+/// Encodes `size` at the beginning of `dst` of length `bytes_to_store_size` bytes.
+fn encode_size(dst: &mut [u8], size: usize, bytes_to_store_size: usize) {
     match bytes_to_store_size {
-        1 => dst[0] = n as u8,
-        2 => dst[0..2].copy_from_slice(&(n as u16).to_be_bytes()),
-        _ => dst[0..4].copy_from_slice(&(n as u32).to_be_bytes()),
+        1 => dst[0] = size as u8,
+        2 => dst[0..2].copy_from_slice(&(size as u16).to_be_bytes()),
+        _ => dst[0..4].copy_from_slice(&(size as u32).to_be_bytes()),
     };
-    bytes_to_store_size
 }
 
 pub(crate) const fn bytes_to_store_size_bounded(bounds: &Bounds) -> u32 {
@@ -707,11 +698,13 @@ where
 
         let mut curr_ind = 1;
 
-        curr_ind += encode_size(&mut bytes[curr_ind..], a_size);
+        encode_size(&mut bytes[curr_ind..], a_size, bytes_to_store_size(a_size));
+        curr_ind += bytes_to_store_size(a_size);
         bytes[curr_ind..curr_ind + a_size].copy_from_slice(a_bytes.borrow());
         curr_ind += a_size;
 
-        curr_ind += encode_size(&mut bytes[curr_ind..], b_size);
+        encode_size(&mut bytes[curr_ind..], b_size, bytes_to_store_size(b_size));
+        curr_ind += bytes_to_store_size(b_size);
         bytes[curr_ind..curr_ind + b_size].copy_from_slice(b_bytes.borrow());
         curr_ind += b_size;
 
