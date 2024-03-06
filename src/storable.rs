@@ -597,6 +597,7 @@ fn encode_size_of_bound(dst: &mut [u8], n: usize, bounds: &Bounds) {
     }
 }
 
+/// Decodes size from the beginning of `src` of length `size_len` and returns it.
 fn decode_size(src: &[u8], size_len: usize) -> usize {
     match size_len {
         1 => src[0] as usize,
@@ -605,6 +606,7 @@ fn decode_size(src: &[u8], size_len: usize) -> usize {
     }
 }
 
+/// Encodes size at beginning of `dst` and returns the length of the encoding.
 fn encode_size(dst: &mut [u8], n: usize) -> usize {
     let bytes_to_store_size = bytes_to_store_size(n);
     match bytes_to_store_size {
@@ -651,12 +653,12 @@ fn encode_size_lengths(sizes: Vec<usize>) -> u8 {
     size_lengths_byte
 }
 
-fn decode_sizes_length(mut encoded_bytes_to_store: u8, number_of_encoded_lengths: u8) -> Vec<u8> {
+fn decode_size_lengths(mut encoded_bytes_to_store: u8, number_of_encoded_lengths: u8) -> Vec<u8> {
     assert!(number_of_encoded_lengths <= 4);
 
     let mut bytes_to_store_sizes = vec![];
 
-    for _ in 0..number_of_encoded_lengths - 1 {
+    for _ in 0..number_of_encoded_lengths {
         // The number of bytes required to store the size of every
         // element is represented with 2 bits. Hence we use
         // mask `11`, equivalent to 3 in the decimal system.
@@ -684,6 +686,8 @@ where
     B: Storable,
     C: Storable,
 {
+    // Touple will be serialized in the following form:
+    // <size_lengths (1B)> <size_a (1-4B)> <a_bytes> <size_b(1-4B)> <b_bytes> <c_bytes>
     fn to_bytes(&self) -> Cow<[u8]> {
         let a_bytes = self.0.to_bytes();
         let a_size = a_bytes.len();
@@ -694,19 +698,18 @@ where
         let c_bytes = self.2.to_bytes();
         let c_size = c_bytes.len();
 
-        let output_size = a_size
-            + b_size
-            + c_size
+        let output_size = 1
             + bytes_to_store_size(a_size)
+            + a_size
             + bytes_to_store_size(b_size)
-            + 1;
+            + b_size
+            + c_size;
 
         let mut bytes = vec![0; output_size];
 
-        let mut curr_ind = 0;
-
         bytes[0] = encode_size_lengths(vec![a_size, b_size]);
-        curr_ind += 1;
+
+        let mut curr_ind = 1;
 
         curr_ind += encode_size(&mut bytes[curr_ind..], a_size);
         bytes[curr_ind..curr_ind + a_size].copy_from_slice(a_bytes.borrow());
@@ -724,19 +727,22 @@ where
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let mut curr_ind = 0;
-        let sizes_len = decode_sizes_length(bytes[0], 2);
-        curr_ind += 1;
-        let a_size_len = sizes_len[0] as usize;
+        let size_lengths = decode_size_lengths(bytes[0], 2);
+
+        let mut curr_ind = 1;
+
+        let a_size_len = size_lengths[0] as usize;
         let a_size = decode_size(&bytes[curr_ind..], a_size_len);
         curr_ind += a_size_len;
         let a = A::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + a_size]));
         curr_ind += a_size;
-        let b_size_len = sizes_len[1] as usize;
+
+        let b_size_len = size_lengths[1] as usize;
         let b_size = decode_size(&bytes[curr_ind..], b_size_len);
         curr_ind += b_size_len;
         let b = B::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + b_size]));
         curr_ind += b_size;
+
         let c = C::from_bytes(Cow::Borrowed(&bytes[curr_ind..]));
 
         (a, b, c)
