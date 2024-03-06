@@ -574,12 +574,8 @@ pub(crate) const fn bounds<A: Storable>() -> Bounds {
 fn decode_size_of_bound(src: &[u8], bounds: &Bounds) -> usize {
     if bounds.is_fixed_size {
         bounds.max_size as usize
-    } else if bounds.max_size <= u8::MAX as u32 {
-        src[0] as usize
-    } else if bounds.max_size <= u16::MAX as u32 {
-        u16::from_be_bytes([src[0], src[1]]) as usize
     } else {
-        u32::from_be_bytes([src[0], src[1], src[2], src[3]]) as usize
+        decode_size(src, bytes_to_store_size(bounds.max_size as usize))
     }
 }
 
