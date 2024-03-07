@@ -673,7 +673,7 @@ where
     B: Storable,
     C: Storable,
 {
-    // Touple will be serialized in the following form:
+    // Tuple will be serialized in the following form:
     // <size_lengths (1B)> <size_a (1-4B)> <a_bytes> <size_b(1-4B)> <b_bytes> <c_bytes>
     fn to_bytes(&self) -> Cow<[u8]> {
         let a_bytes = self.0.to_bytes();
