@@ -14,11 +14,11 @@ proptest! {
     }
 
     #[test]
-    fn tuple_with_three_elements_roundtrip(x in any::<u64>(), y in uniform20(any::<u8>()), z in uniform20(any::<u8>())) {
+    fn tuple_with_three_elements_fixed_size_roundtrip(x in any::<u64>(), y in uniform20(any::<u8>()), z in uniform20(any::<u8>())) {
         let tuple = (x, y, z);
         let bytes = tuple.to_bytes();
-        // 1B sizes len | 1B x size | 8B x bytes | 1B y size | 20B y bytes | 20B z bytes
-        prop_assert_eq!(bytes.len(), 51);
+        // 8B x bytes | 20B y bytes | 20B z bytes
+        prop_assert_eq!(bytes.len(), 48);
         prop_assert_eq!(tuple, Storable::from_bytes(bytes));
     }
 
@@ -29,9 +29,13 @@ proptest! {
     }
 
     #[test]
-    fn tuple_with_three_elements_bounded_and_unbounded_roundtrip(v1 in pvec(any::<u8>(), 0..4), x in any::<u64>(), v2 in pvec(any::<u8>(), 0..12)) {
-        let tuple = (v1, x, v2);
-        assert_eq!(tuple, Storable::from_bytes(tuple.to_bytes()));
+    fn tuple_with_three_elements_bounded_and_unbounded_roundtrip(x in pvec(any::<u8>(), 4..5), y in any::<u64>(), z in pvec(any::<u8>(), 12..13)) {
+        let tuple = (x, y, z);
+        let tuple_copy = tuple.clone();
+        let bytes = tuple_copy.to_bytes();
+        // 1B sizes len | 1B x size | 4B x bytes | 1B y size | 8B y bytes | 12B z bytes
+        prop_assert_eq!(bytes.len(), 27);
+        prop_assert_eq!(tuple, Storable::from_bytes(bytes));
     }
 
 

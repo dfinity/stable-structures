@@ -667,14 +667,42 @@ fn decode_size_lengths(mut encoded_bytes_to_store: u8, number_of_encoded_lengths
     bytes_to_store_sizes
 }
 
+const fn get_fixed_sizes<A, B>() -> Option<(usize, usize)>
+where
+    A: Storable,
+    B: Storable,
+{
+    if let Bound::Bounded {
+        max_size: max_size_a,
+        is_fixed_size: is_fixed_size_a,
+    } = A::BOUND
+    {
+        if is_fixed_size_a {
+            if let Bound::Bounded {
+                max_size: max_size_b,
+                is_fixed_size: is_fixed_size_b,
+            } = B::BOUND
+            {
+                if is_fixed_size_b {
+                    return Some((max_size_a as usize, max_size_b as usize));
+                }
+            }
+        }
+    }
+    None
+}
+
 impl<A, B, C> Storable for (A, B, C)
 where
     A: Storable,
     B: Storable,
     C: Storable,
 {
-    // Tuple will be serialized in the following form:
-    // <size_lengths (1B)> <size_a (1-4B)> <a_bytes> <size_b(1-4B)> <b_bytes> <c_bytes>
+    // Tuple (A, B, C) will be serialized in the following form:
+    //      If A and B have fixed size
+    //          <a_bytes> <b_bytes> <c_bytes>
+    //      Otherwise
+    //          <size_lengths (1B)> <size_a (1-4B)> <a_bytes> <size_b(1-4B)> <b_bytes> <c_bytes>
     fn to_bytes(&self) -> Cow<[u8]> {
         let a_bytes = self.0.to_bytes();
         let a_size = a_bytes.len();
@@ -685,26 +713,35 @@ where
         let c_bytes = self.2.to_bytes();
         let c_size = c_bytes.len();
 
-        let output_size = 1
-            + bytes_to_store_size(a_size)
-            + a_size
-            + bytes_to_store_size(b_size)
-            + b_size
-            + c_size;
+        let a_b_fixed_sizes = get_fixed_sizes::<A, B>();
+
+        let sizes_overhead = if a_b_fixed_sizes.is_some() {
+            0
+        } else {
+            1 + bytes_to_store_size(a_size) + bytes_to_store_size(b_size)
+        };
+
+        let output_size = a_size + b_size + c_size + sizes_overhead;
+
+        let mut curr_ind = 0;
 
         let mut bytes = vec![0; output_size];
 
-        bytes[0] = encode_size_lengths(vec![a_size, b_size]);
+        if a_b_fixed_sizes.is_none() {
+            bytes[curr_ind] = encode_size_lengths(vec![a_size, b_size]);
+            curr_ind += 1;
+            encode_size(&mut bytes[curr_ind..], a_size, bytes_to_store_size(a_size));
+            curr_ind += bytes_to_store_size(a_size);
+        }
 
-        let mut curr_ind = 1;
-
-        encode_size(&mut bytes[curr_ind..], a_size, bytes_to_store_size(a_size));
-        curr_ind += bytes_to_store_size(a_size);
         bytes[curr_ind..curr_ind + a_size].copy_from_slice(a_bytes.borrow());
         curr_ind += a_size;
 
-        encode_size(&mut bytes[curr_ind..], b_size, bytes_to_store_size(b_size));
-        curr_ind += bytes_to_store_size(b_size);
+        if a_b_fixed_sizes.is_none() {
+            encode_size(&mut bytes[curr_ind..], b_size, bytes_to_store_size(b_size));
+            curr_ind += bytes_to_store_size(b_size);
+        }
+
         bytes[curr_ind..curr_ind + b_size].copy_from_slice(b_bytes.borrow());
         curr_ind += b_size;
 
@@ -716,21 +753,36 @@ where
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let size_lengths = decode_size_lengths(bytes[0], 2);
+        let a_b_fixed_sizes = get_fixed_sizes::<A, B>();
 
-        let mut curr_ind = 1;
+        let mut curr_ind = 0;
 
-        let a_size_len = size_lengths[0] as usize;
-        let a_size = decode_size(&bytes[curr_ind..], a_size_len);
-        curr_ind += a_size_len;
-        let a = A::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + a_size]));
-        curr_ind += a_size;
+        let (a, b) = if let Some((a_size, b_size)) = a_b_fixed_sizes {
+            let a = A::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + a_size]));
+            curr_ind += a_size;
 
-        let b_size_len = size_lengths[1] as usize;
-        let b_size = decode_size(&bytes[curr_ind..], b_size_len);
-        curr_ind += b_size_len;
-        let b = B::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + b_size]));
-        curr_ind += b_size;
+            let b = B::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + b_size]));
+            curr_ind += b_size;
+
+            (a, b)
+        } else {
+            let size_lengths = decode_size_lengths(bytes[curr_ind], 2);
+            curr_ind += 1;
+
+            let a_size_len = size_lengths[0] as usize;
+            let a_size = decode_size(&bytes[curr_ind..], a_size_len);
+            curr_ind += a_size_len;
+            let a = A::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + a_size]));
+            curr_ind += a_size;
+
+            let b_size_len = size_lengths[1] as usize;
+            let b_size = decode_size(&bytes[curr_ind..], b_size_len);
+            curr_ind += b_size_len;
+            let b = B::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + b_size]));
+            curr_ind += b_size;
+
+            (a, b)
+        };
 
         let c = C::from_bytes(Cow::Borrowed(&bytes[curr_ind..]));
 
@@ -744,13 +796,18 @@ where
                 let b_bounds = bounds::<B>();
                 let c_bounds = bounds::<C>();
 
+                let sizes_overhead = if a_bounds.is_fixed_size && b_bounds.is_fixed_size {
+                    0
+                } else {
+                    1 + bytes_to_store_size_bounded(&a_bounds)
+                        + bytes_to_store_size_bounded(&b_bounds)
+                };
+
                 Bound::Bounded {
                     max_size: a_bounds.max_size
-                        + bytes_to_store_size_bounded(&a_bounds)
                         + b_bounds.max_size
-                        + bytes_to_store_size_bounded(&b_bounds)
                         + c_bounds.max_size
-                        + bytes_to_store_size_bounded(&c_bounds),
+                        + sizes_overhead,
                     is_fixed_size: a_bounds.is_fixed_size
                         && b_bounds.is_fixed_size
                         && c_bounds.is_fixed_size,
