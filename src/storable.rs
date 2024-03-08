@@ -672,24 +672,19 @@ where
     A: Storable,
     B: Storable,
 {
-    if let Bound::Bounded {
-        max_size: max_size_a,
-        is_fixed_size: is_fixed_size_a,
-    } = A::BOUND
-    {
-        if is_fixed_size_a {
-            if let Bound::Bounded {
+    match (A::BOUND, B::BOUND) {
+        (
+            Bound::Bounded {
+                max_size: max_size_a,
+                is_fixed_size: true,
+            },
+            Bound::Bounded {
                 max_size: max_size_b,
-                is_fixed_size: is_fixed_size_b,
-            } = B::BOUND
-            {
-                if is_fixed_size_b {
-                    return Some((max_size_a as usize, max_size_b as usize));
-                }
-            }
-        }
+                is_fixed_size: true,
+            },
+        ) => Some((max_size_a as usize, max_size_b as usize)),
+        _ => None,
     }
-    None
 }
 
 impl<A, B, C> Storable for (A, B, C)
