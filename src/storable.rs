@@ -703,6 +703,7 @@ fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: boo
     {
         max_size as usize
     } else {
+        // This case should only happen for the last element.
         assert!(last);
         src.len()
     };
