@@ -782,7 +782,7 @@ where
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         let mut bytes_read_total = 0;
 
-        let mut size_lengths = vec![None, None];
+        let mut size_lengths = [None, None];
 
         if !(A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size()) {
             let lengths = decode_size_lengths(bytes[bytes_read_total], 2);
