@@ -713,7 +713,7 @@ fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: boo
     )
 }
 
-// Returns number of bytes required to store encoding of size for A and B.
+// Returns number of bytes required to store encoding of sizes for elements of type A and B.
 const fn sizes_overhead<A: Storable, B: Storable>(a_size: usize, b_size: usize) -> usize {
     let mut sizes_overhead = 0;
 
@@ -782,34 +782,27 @@ where
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         let mut bytes_read_total = 0;
 
-        let size_lengths = if A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size() {
-            vec![]
-        } else {
+        let mut size_lengths = vec![None, None];
+
+        if !(A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size()) {
             let lengths = decode_size_lengths(bytes[bytes_read_total], 2);
             bytes_read_total += 1;
-            lengths
-        };
 
-        let (a, bytes_read) = decode_tuple_element::<A>(
-            &bytes[bytes_read_total..],
-            if A::BOUND.is_fixed_size() {
-                None
-            } else {
-                Some(size_lengths[0])
-            },
-            false,
-        );
+            if !A::BOUND.is_fixed_size() {
+                size_lengths[0] = Some(lengths[0]);
+            }
+
+            if !B::BOUND.is_fixed_size() {
+                size_lengths[1] = Some(lengths[1]);
+            }
+        }
+
+        let (a, bytes_read) =
+            decode_tuple_element::<A>(&bytes[bytes_read_total..], size_lengths[0], false);
         bytes_read_total += bytes_read;
 
-        let (b, bytes_read) = decode_tuple_element::<B>(
-            &bytes[bytes_read_total..],
-            if B::BOUND.is_fixed_size() {
-                None
-            } else {
-                Some(size_lengths[1])
-            },
-            false,
-        );
+        let (b, bytes_read) =
+            decode_tuple_element::<B>(&bytes[bytes_read_total..], size_lengths[1], false);
         bytes_read_total += bytes_read;
 
         let (c, bytes_read) = decode_tuple_element::<C>(&bytes[bytes_read_total..], None, true);
