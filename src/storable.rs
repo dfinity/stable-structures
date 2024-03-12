@@ -694,19 +694,17 @@ fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: boo
 
     let size = if last {
         src.len()
+    } else if let Bound::Bounded {
+        max_size,
+        is_fixed_size: true,
+    } = T::BOUND
+    {
+        max_size as usize
     } else {
-        if let Bound::Bounded {
-            max_size,
-            is_fixed_size: true,
-        } = T::BOUND
-        {
-            max_size as usize
-        } else {
-            let size_len = size_len.unwrap() as usize;
-            let size = decode_size(&src[bytes_read..], size_len);
-            bytes_read += size_len;
-            size
-        }
+        let size_len = size_len.unwrap() as usize;
+        let size = decode_size(&src[bytes_read..], size_len);
+        bytes_read += size_len;
+        size
     };
 
     (
