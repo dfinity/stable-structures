@@ -667,24 +667,72 @@ fn decode_size_lengths(mut encoded_bytes_to_store: u8, number_of_encoded_lengths
     bytes_to_store_sizes
 }
 
-const fn get_fixed_sizes<A, B>() -> Option<(usize, usize)>
-where
-    A: Storable,
-    B: Storable,
-{
-    match (A::BOUND, B::BOUND) {
-        (
-            Bound::Bounded {
-                max_size: max_size_a,
-                is_fixed_size: true,
-            },
-            Bound::Bounded {
-                max_size: max_size_b,
-                is_fixed_size: true,
-            },
-        ) => Some((max_size_a as usize, max_size_b as usize)),
-        _ => None,
+// Encodes a serialized element `T` in a tuple.
+// The element is assumed to be at the beginning of `dst`.
+// Returns the number of bytes written to `dst`.
+fn encode_tuple_element<T: Storable>(dst: &mut [u8], bytes: &[u8], last: bool) -> usize {
+    let mut bytes_written: usize = 0;
+    let size = bytes.len();
+
+    if !last && !T::BOUND.is_fixed_size() {
+        encode_size(&mut dst[bytes_written..], size, bytes_to_store_size(size));
+        bytes_written += bytes_to_store_size(size);
     }
+
+    dst[bytes_written..bytes_written + size].copy_from_slice(bytes);
+    bytes_written + size
+}
+
+// Decodes an element `T` from a tuple.
+//
+// The element is assumed to be at the beginning of `src`.
+// The length of the size of the element should be provided if the element is *not* fixed in size.
+//
+// Returns the element `T` and the number of bytes read from `src`.
+fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: bool) -> (T, usize) {
+    let mut bytes_read: usize = 0;
+
+    let size = if last {
+        src.len()
+    } else {
+        if let Bound::Bounded {
+            max_size,
+            is_fixed_size: true,
+        } = T::BOUND
+        {
+            max_size as usize
+        } else {
+            let size_len = size_len.unwrap() as usize;
+            let size = decode_size(&src[bytes_read..], size_len);
+            bytes_read += size_len;
+            size
+        }
+    };
+
+    (
+        T::from_bytes(Cow::Borrowed(&src[bytes_read..bytes_read + size])),
+        bytes_read + size,
+    )
+}
+
+// Returns number of bytes required to store encoding of size for A and B.
+const fn sizes_overhead<A: Storable, B: Storable>(a_size: usize, b_size: usize) -> usize {
+    let mut sizes_overhead = 0;
+
+    if !(A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size()) {
+        // 1B for size lengths encoding
+        sizes_overhead += 1;
+
+        if !A::BOUND.is_fixed_size() {
+            sizes_overhead += bytes_to_store_size(a_size);
+        }
+
+        if !B::BOUND.is_fixed_size() {
+            sizes_overhead += bytes_to_store_size(b_size);
+        }
+    }
+
+    sizes_overhead
 }
 
 impl<A, B, C> Storable for (A, B, C)
@@ -697,7 +745,7 @@ where
     //      If A and B have fixed size
     //          <a_bytes> <b_bytes> <c_bytes>
     //      Otherwise
-    //          <size_lengths (1B)> <size_a (1-4B)> <a_bytes> <size_b(1-4B)> <b_bytes> <c_bytes>
+    //          <size_lengths (1B)> <size_a (0-4B)> <a_bytes> <size_b(0-4B)> <b_bytes> <c_bytes>
     fn to_bytes(&self) -> Cow<[u8]> {
         let a_bytes = self.0.to_bytes();
         let a_size = a_bytes.len();
@@ -708,78 +756,69 @@ where
         let c_bytes = self.2.to_bytes();
         let c_size = c_bytes.len();
 
-        let a_b_fixed_sizes = get_fixed_sizes::<A, B>();
-
-        let sizes_overhead = if a_b_fixed_sizes.is_some() {
-            0
-        } else {
-            1 + bytes_to_store_size(a_size) + bytes_to_store_size(b_size)
-        };
+        let sizes_overhead = sizes_overhead::<A, B>(a_size, b_size);
 
         let output_size = a_size + b_size + c_size + sizes_overhead;
 
-        let mut curr_ind = 0;
+        let mut bytes_written = 0;
 
         let mut bytes = vec![0; output_size];
 
-        if a_b_fixed_sizes.is_none() {
-            bytes[curr_ind] = encode_size_lengths(vec![a_size, b_size]);
-            curr_ind += 1;
-            encode_size(&mut bytes[curr_ind..], a_size, bytes_to_store_size(a_size));
-            curr_ind += bytes_to_store_size(a_size);
+        if sizes_overhead != 0 {
+            bytes[bytes_written] = encode_size_lengths(vec![a_size, b_size]);
+            bytes_written += 1;
         }
 
-        bytes[curr_ind..curr_ind + a_size].copy_from_slice(a_bytes.borrow());
-        curr_ind += a_size;
+        bytes_written +=
+            encode_tuple_element::<A>(&mut bytes[bytes_written..], a_bytes.borrow(), false);
+        bytes_written +=
+            encode_tuple_element::<B>(&mut bytes[bytes_written..], b_bytes.borrow(), false);
+        bytes_written +=
+            encode_tuple_element::<C>(&mut bytes[bytes_written..], c_bytes.borrow(), true);
 
-        if a_b_fixed_sizes.is_none() {
-            encode_size(&mut bytes[curr_ind..], b_size, bytes_to_store_size(b_size));
-            curr_ind += bytes_to_store_size(b_size);
-        }
-
-        bytes[curr_ind..curr_ind + b_size].copy_from_slice(b_bytes.borrow());
-        curr_ind += b_size;
-
-        bytes[curr_ind..curr_ind + c_size].copy_from_slice(c_bytes.borrow());
-
-        debug_assert_eq!(curr_ind + c_size, output_size);
+        assert_eq!(bytes_written, output_size);
 
         Cow::Owned(bytes)
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let a_b_fixed_sizes = get_fixed_sizes::<A, B>();
+        let mut bytes_read_total = 0;
 
-        let mut curr_ind = 0;
-
-        let (a, b) = if let Some((a_size, b_size)) = a_b_fixed_sizes {
-            let a = A::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + a_size]));
-            curr_ind += a_size;
-
-            let b = B::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + b_size]));
-            curr_ind += b_size;
-
-            (a, b)
+        let size_lengths = if A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size() {
+            vec![]
         } else {
-            let size_lengths = decode_size_lengths(bytes[curr_ind], 2);
-            curr_ind += 1;
-
-            let a_size_len = size_lengths[0] as usize;
-            let a_size = decode_size(&bytes[curr_ind..], a_size_len);
-            curr_ind += a_size_len;
-            let a = A::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + a_size]));
-            curr_ind += a_size;
-
-            let b_size_len = size_lengths[1] as usize;
-            let b_size = decode_size(&bytes[curr_ind..], b_size_len);
-            curr_ind += b_size_len;
-            let b = B::from_bytes(Cow::Borrowed(&bytes[curr_ind..curr_ind + b_size]));
-            curr_ind += b_size;
-
-            (a, b)
+            let lengths = decode_size_lengths(bytes[bytes_read_total], 2);
+            bytes_read_total += 1;
+            lengths
         };
 
-        let c = C::from_bytes(Cow::Borrowed(&bytes[curr_ind..]));
+        let (a, bytes_read) = decode_tuple_element::<A>(
+            &bytes[bytes_read_total..],
+            if A::BOUND.is_fixed_size() {
+                None
+            } else {
+                Some(size_lengths[0])
+            },
+            false,
+        );
+        bytes_read_total += bytes_read;
+
+        let (b, bytes_read) = decode_tuple_element::<B>(
+            &bytes[bytes_read_total..],
+            if B::BOUND.is_fixed_size() {
+                None
+            } else {
+                Some(size_lengths[1])
+            },
+            false,
+        );
+        bytes_read_total += bytes_read;
+
+        let (c, bytes_read) = decode_tuple_element::<C>(&bytes[bytes_read_total..], None, true);
+
+        bytes_read_total += bytes_read;
+
+        assert_eq!(bytes_read_total, bytes.len());
 
         (a, b, c)
     }
@@ -791,12 +830,9 @@ where
                 let b_bounds = bounds::<B>();
                 let c_bounds = bounds::<C>();
 
-                let sizes_overhead = if a_bounds.is_fixed_size && b_bounds.is_fixed_size {
-                    0
-                } else {
-                    1 + bytes_to_store_size_bounded(&a_bounds)
-                        + bytes_to_store_size_bounded(&b_bounds)
-                };
+                let sizes_overhead =
+                    sizes_overhead::<A, B>(a_bounds.max_size as usize, b_bounds.max_size as usize)
+                        as u32;
 
                 Bound::Bounded {
                     max_size: a_bounds.max_size

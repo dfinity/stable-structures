@@ -33,8 +33,8 @@ proptest! {
         let tuple = (x, y, z);
         let tuple_copy = tuple.clone();
         let bytes = tuple_copy.to_bytes();
-        // 1B sizes len | 1B x size | 4B x bytes | 1B y size | 8B y bytes | 12B z bytes
-        prop_assert_eq!(bytes.len(), 27);
+        // 1B sizes len | 1B x size | 4B x bytes | 0B y size | 8B y bytes | 12B z bytes
+        prop_assert_eq!(bytes.len(), 26);
         prop_assert_eq!(tuple, Storable::from_bytes(bytes));
     }
 
