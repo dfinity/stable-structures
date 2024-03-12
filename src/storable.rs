@@ -692,8 +692,10 @@ fn encode_tuple_element<T: Storable>(dst: &mut [u8], bytes: &[u8], last: bool) -
 fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: bool) -> (T, usize) {
     let mut bytes_read: usize = 0;
 
-    let size = if last {
-        src.len()
+    let size = if let Some(size_len) = size_len {
+        let size = decode_size(&src[bytes_read..], size_len as usize);
+        bytes_read += size_len as usize;
+        size
     } else if let Bound::Bounded {
         max_size,
         is_fixed_size: true,
@@ -701,10 +703,8 @@ fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: boo
     {
         max_size as usize
     } else {
-        let size_len = size_len.unwrap() as usize;
-        let size = decode_size(&src[bytes_read..], size_len);
-        bytes_read += size_len;
-        size
+        assert!(last);
+        src.len()
     };
 
     (
