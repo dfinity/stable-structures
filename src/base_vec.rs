@@ -31,7 +31,7 @@
 //! type is fixed in size, the `SLOT_SIZE` is equal to the max size.
 //! Otherwise, the `SLOT_SIZE` is the max size plus the number of
 //! bytes required to represent integers up to that max size.
-use crate::storable::{bounds, bytes_to_store_size};
+use crate::storable::{bounds, bytes_to_store_size_bounded};
 use crate::{
     read_u32, read_u64, safe_write, write_u32, write_u64, Address, GrowFailed, Memory, Storable,
 };
@@ -341,7 +341,7 @@ impl<T: Storable + fmt::Debug, M: Memory> fmt::Debug for BaseVec<T, M> {
 
 fn slot_size<T: Storable>() -> u32 {
     let t_bounds = bounds::<T>();
-    t_bounds.max_size + bytes_to_store_size(&t_bounds)
+    t_bounds.max_size + bytes_to_store_size_bounded(&t_bounds)
 }
 
 pub struct Iter<'a, T, M>
