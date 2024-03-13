@@ -239,3 +239,46 @@ fn storable_for_bool() {
     assert!(!bool::from_bytes(false.to_bytes()));
     assert!(bool::from_bytes(true.to_bytes()));
 }
+
+#[test]
+fn tuple_with_three_elements_test_bound() {
+    // <8B a_bytes> <8B b_bytes> <8B c_bytes>
+    assert_eq!(<(u64, u64, u64)>::BOUND.max_size(), 24);
+    assert!(<(u64, u64, u64)>::BOUND.is_fixed_size());
+
+    // <8B a_bytes> <8B b_bytes> <8B c_bytes>
+    assert_eq!(<(u64, u64, Blob<8>)>::BOUND.max_size(), 24);
+    assert!(!<(u64, u64, Blob<8>)>::BOUND.is_fixed_size());
+
+    // <1B size_lengths> <1B size_a> <8B a_bytes> <0B size_b> <8B b_bytes> <8B c_bytes>
+    assert_eq!(<(Blob<8>, u64, u64)>::BOUND.max_size(), 26);
+    assert!(!<(Blob<8>, u64, u64)>::BOUND.is_fixed_size());
+
+    // <1B size_lengths> <0B size_a> <8B a_bytes> <1B size_b> <8B b_bytes> <8B c_bytes>
+    assert_eq!(<(u64, Blob<8>, u64)>::BOUND.max_size(), 26);
+    assert!(!<(u64, Blob<8>, u64)>::BOUND.is_fixed_size());
+
+    // <1B size_lengths> <1B size_a> <8B a_bytes> <1B size_b> <8B b_bytes> <8B c_bytes>
+    assert_eq!(<(Blob<8>, Blob<8>, u64)>::BOUND.max_size(), 27);
+    assert!(!<(Blob<8>, Blob<8>, u64)>::BOUND.is_fixed_size());
+
+    // <1B size_lengths> <1B size_a> <8B a_bytes> <0B size_b> <8B b_bytes> <8B c_bytes>
+    assert_eq!(<(Blob<8>, u64, Blob<8>)>::BOUND.max_size(), 26);
+    assert!(!<(Blob<8>, u64, Blob<8>)>::BOUND.is_fixed_size());
+
+    // <1B size_lengths> <0B size_a> <8B a_bytes> <1B size_b> <8B b_bytes> <8B c_bytes>
+    assert_eq!(<(u64, Blob<8>, Blob<8>)>::BOUND.max_size(), 26);
+    assert!(!<(u64, Blob<8>, Blob<8>)>::BOUND.is_fixed_size());
+
+    // <1B size_lengths> <1B size_a> <8B a_bytes> <1B size_b> <8B b_bytes> <8B c_bytes>
+    assert_eq!(<(Blob<8>, Blob<8>, Blob<8>)>::BOUND.max_size(), 27);
+    assert!(!<(Blob<8>, Blob<8>, Blob<8>)>::BOUND.is_fixed_size());
+
+    assert_eq!(<(Blob<8>, Blob<8>, String)>::BOUND, Bound::Unbounded);
+    assert_eq!(<(Blob<8>, String, Blob<8>)>::BOUND, Bound::Unbounded);
+    assert_eq!(<(String, Blob<8>, Blob<8>)>::BOUND, Bound::Unbounded);
+    assert_eq!(<(String, String, Blob<8>)>::BOUND, Bound::Unbounded);
+    assert_eq!(<(String, Blob<8>, String)>::BOUND, Bound::Unbounded);
+    assert_eq!(<(Blob<8>, String, String)>::BOUND, Bound::Unbounded);
+    assert_eq!(<(String, String, String)>::BOUND, Bound::Unbounded);
+}

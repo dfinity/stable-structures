@@ -50,6 +50,7 @@ pub trait Storable {
     }
 }
 
+#[derive(Debug, PartialEq)]
 /// States whether the type's size is bounded or unbounded.
 pub enum Bound {
     /// The type has no size bounds.
