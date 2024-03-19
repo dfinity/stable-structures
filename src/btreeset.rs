@@ -1,29 +1,28 @@
-use crate::{btreemap::Iter, BTreeMap, Memory, Storable};
+use crate::{btreemap::Iter as IterMap, BTreeMap, Memory, Storable};
 use core::ops::RangeBounds;
 
-/// An iterator over the entries of a [`BTreeMap`].
-#[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct IterSet<'a, K, M>
+/// An iterator over the entries of a [`BTreeSet`].
+pub struct Iter<'a, K, M>
 where
     K: Storable + Ord + Clone,
     M: Memory,
 {
-    iter_internal: Iter<'a, K, (), M>,
+    iter_internal: IterMap<'a, K, (), M>,
 }
 
-impl<'a, K, M> IterSet<'a, K, M>
+impl<'a, K, M> Iter<'a, K, M>
 where
     K: Storable + Ord + Clone,
     M: Memory,
 {
-    fn new(iter: Iter<'a, K, (), M>) -> Self {
-        IterSet {
+    fn new(iter: IterMap<'a, K, (), M>) -> Self {
+        Iter {
             iter_internal: iter,
         }
     }
 }
 
-impl<K, M> Iterator for IterSet<'_, K, M>
+impl<K, M> Iterator for Iter<'_, K, M>
 where
     K: Storable + Ord + Clone,
     M: Memory,
@@ -135,20 +134,20 @@ where
     }
 
     /// Returns an iterator over the entries of the set, sorted by key.
-    pub fn iter(&self) -> IterSet<K, M> {
-        IterSet::new(self.map.iter())
+    pub fn iter(&self) -> Iter<K, M> {
+        Iter::new(self.map.iter())
     }
 
     /// Returns an iterator over the entries in the set where keys
     /// belong to the specified range.
-    pub fn range(&self, key_range: impl RangeBounds<K>) -> IterSet<K, M> {
-        IterSet::new(self.map.range(key_range))
+    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, M> {
+        Iter::new(self.map.range(key_range))
     }
 
     /// Returns an iterator pointing to the first element below the given bound.
     /// Returns an empty iterator if there are no keys below the given bound.
-    pub fn iter_upper_bound(&self, bound: &K) -> IterSet<K, M> {
-        IterSet::new(self.map.iter_upper_bound(bound))
+    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, M> {
+        Iter::new(self.map.iter_upper_bound(bound))
     }
 }
 
