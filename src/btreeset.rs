@@ -79,7 +79,7 @@ where
     /// Inserts a key into the set. Returns true if key
     /// did not exist in the set before.
     pub fn insert(&mut self, key: K) -> bool {
-        self.map.insert(key, ()) == None
+        self.map.insert(key, ()).is_none()
     }
 
     /// Returns `true` if the key exists in the map, `false` otherwise.
@@ -121,7 +121,7 @@ where
 
     /// Removes a key from the map, returning true if it exists.
     pub fn remove(&mut self, key: &K) -> bool {
-        self.map.remove(key) != None
+        self.map.remove(key).is_some()
     }
 
     /// Removes and returns the last element in the set. The key of this element is the maximum key that was in the set.
