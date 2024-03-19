@@ -76,9 +76,10 @@ where
         }
     }
 
-    /// Inserts a key into the set.
+    /// Inserts a key into the set. Returns true if key
+    /// did not exist in the set before.
     pub fn insert(&mut self, key: K) -> bool {
-        self.map.insert(key, ()) != None
+        self.map.insert(key, ()) == None
     }
 
     /// Returns `true` if the key exists in the map, `false` otherwise.
