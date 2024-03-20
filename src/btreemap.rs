@@ -48,7 +48,7 @@
 //! ... free memory for nodes
 //! ----------------------------------------
 //! ```
-mod allocator;
+mod allocator2;
 mod iter;
 mod node;
 use crate::{
