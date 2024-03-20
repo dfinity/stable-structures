@@ -76,6 +76,7 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     needs: build
+    on: [pull_request_target] # To allow running from forked repositories.
     permissions:
       # To allow writing comments to the PR in forked repositorites.
       # See https://github.com/thollander/actions-comment-pull-request/issues/181
