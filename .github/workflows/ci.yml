@@ -9,6 +9,12 @@ jobs:
         rust: [ 1.76.0 ]
 
     steps:
+      - name: Post Comment Test
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: post-comment
+          client-payload: '{"message": "my comment message!!", "comment_tag": "test_comment_tag"}'
+
       - uses: actions/checkout@v2
 
       - name: Cache Cargo
@@ -76,12 +82,6 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     needs: build
-    on: [pull_request_target] # To allow running from forked repositories.
-    permissions:
-      # To allow writing comments to the PR in forked repositorites.
-      # See https://github.com/thollander/actions-comment-pull-request/issues/181
-      pull-requests: write
-
     env:
       PROJECT_DIR: .
     steps:
