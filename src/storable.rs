@@ -4,6 +4,8 @@ use std::cmp::{Ordering, Reverse};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
+mod tuples;
+
 #[cfg(test)]
 mod tests;
 
@@ -50,6 +52,7 @@ pub trait Storable {
     }
 }
 
+#[derive(Debug, PartialEq)]
 /// States whether the type's size is bounded or unbounded.
 pub enum Bound {
     /// The type has no size bounds.
@@ -395,103 +398,6 @@ impl<T: Storable> Storable for Reverse<T> {
     const BOUND: Bound = T::BOUND;
 }
 
-impl<A, B> Storable for (A, B)
-where
-    A: Storable,
-    B: Storable,
-{
-    fn to_bytes(&self) -> Cow<[u8]> {
-        match Self::BOUND {
-            Bound::Bounded { max_size, .. } => {
-                let mut bytes = vec![0; max_size as usize];
-                let a_bytes = self.0.to_bytes();
-                let b_bytes = self.1.to_bytes();
-
-                let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
-
-                let a_max_size = a_bounds.max_size as usize;
-                let b_max_size = b_bounds.max_size as usize;
-
-                debug_assert!(a_bytes.len() <= a_max_size);
-                debug_assert!(b_bytes.len() <= b_max_size);
-
-                bytes[0..a_bytes.len()].copy_from_slice(a_bytes.borrow());
-                bytes[a_max_size..a_max_size + b_bytes.len()].copy_from_slice(b_bytes.borrow());
-
-                let a_size_len = bytes_to_store_size(&a_bounds) as usize;
-                let b_size_len = bytes_to_store_size(&b_bounds) as usize;
-
-                let sizes_offset: usize = a_max_size + b_max_size;
-
-                encode_size(
-                    &mut bytes[sizes_offset..sizes_offset + a_size_len],
-                    a_bytes.len(),
-                    &a_bounds,
-                );
-                encode_size(
-                    &mut bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
-                    b_bytes.len(),
-                    &b_bounds,
-                );
-
-                Cow::Owned(bytes)
-            }
-            _ => todo!("Serializing tuples with unbounded types is not yet supported."),
-        }
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        match Self::BOUND {
-            Bound::Bounded { max_size, .. } => {
-                assert_eq!(bytes.len(), max_size as usize);
-
-                let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
-                let a_max_size = a_bounds.max_size as usize;
-                let b_max_size = b_bounds.max_size as usize;
-                let sizes_offset = a_max_size + b_max_size;
-
-                let a_size_len = bytes_to_store_size(&a_bounds) as usize;
-                let b_size_len = bytes_to_store_size(&b_bounds) as usize;
-                let a_len = decode_size(&bytes[sizes_offset..sizes_offset + a_size_len], &a_bounds);
-                let b_len = decode_size(
-                    &bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
-                    &b_bounds,
-                );
-
-                let a = A::from_bytes(Cow::Borrowed(&bytes[0..a_len]));
-                let b = B::from_bytes(Cow::Borrowed(&bytes[a_max_size..a_max_size + b_len]));
-
-                (a, b)
-            }
-            _ => todo!("Deserializing tuples with unbounded types is not yet supported."),
-        }
-    }
-
-    const BOUND: Bound = {
-        match (A::BOUND, B::BOUND) {
-            (Bound::Bounded { .. }, Bound::Bounded { .. }) => {
-                let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
-
-                let max_size = a_bounds.max_size
-                    + b_bounds.max_size
-                    + bytes_to_store_size(&a_bounds)
-                    + bytes_to_store_size(&b_bounds);
-
-                let is_fixed_size = a_bounds.is_fixed_size && b_bounds.is_fixed_size;
-
-                Bound::Bounded {
-                    max_size,
-                    is_fixed_size,
-                }
-            }
-            _ => Bound::Unbounded,
-        }
-    };
-}
-
 impl<T: Storable> Storable for Option<T> {
     fn to_bytes(&self) -> Cow<[u8]> {
         match self {
@@ -568,38 +474,18 @@ pub(crate) const fn bounds<A: Storable>() -> Bounds {
     }
 }
 
-fn decode_size(src: &[u8], bounds: &Bounds) -> usize {
-    if bounds.is_fixed_size {
-        bounds.max_size as usize
-    } else if bounds.max_size <= u8::MAX as u32 {
-        src[0] as usize
-    } else if bounds.max_size <= u16::MAX as u32 {
-        u16::from_be_bytes([src[0], src[1]]) as usize
-    } else {
-        u32::from_be_bytes([src[0], src[1], src[2], src[3]]) as usize
-    }
-}
-
-fn encode_size(dst: &mut [u8], n: usize, bounds: &Bounds) {
-    if bounds.is_fixed_size {
-        return;
-    }
-
-    if bounds.max_size <= u8::MAX as u32 {
-        dst[0] = n as u8;
-    } else if bounds.max_size <= u16::MAX as u32 {
-        dst[0..2].copy_from_slice(&(n as u16).to_be_bytes());
-    } else {
-        dst[0..4].copy_from_slice(&(n as u32).to_be_bytes());
-    }
-}
-
-pub(crate) const fn bytes_to_store_size(bounds: &Bounds) -> u32 {
+pub(crate) const fn bytes_to_store_size_bounded(bounds: &Bounds) -> u32 {
     if bounds.is_fixed_size {
         0
-    } else if bounds.max_size <= u8::MAX as u32 {
+    } else {
+        bytes_to_store_size(bounds.max_size as usize) as u32
+    }
+}
+
+const fn bytes_to_store_size(bytes_size: usize) -> usize {
+    if bytes_size <= u8::MAX as usize {
         1
-    } else if bounds.max_size <= u16::MAX as u32 {
+    } else if bytes_size <= u16::MAX as usize {
         2
     } else {
         4

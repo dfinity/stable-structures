@@ -7,8 +7,11 @@ set -Eexuo pipefail
 # Path to run `canbench` from.
 CANISTER_PATH=$1
 
+# The name of the job in CI
+CANBENCH_JOB_NAME=$2
+
 # Must match the file specified in the github action.
-COMMENT_MESSAGE_PATH=/tmp/canbench_comment_message.txt
+COMMENT_MESSAGE_PATH=/tmp/canbench_result_${CANBENCH_JOB_NAME}
 
 # Github CI is expected to have the main branch checked out in this folder.
 MAIN_BRANCH_DIR=_canbench_main_branch
@@ -45,7 +48,7 @@ fi
 popd
 
 
-echo "# \`canbench\` 🏋" > $COMMENT_MESSAGE_PATH
+echo "# \`canbench\` 🏋 (dir: $CANISTER_PATH)" > "$COMMENT_MESSAGE_PATH"
 
 # Detect if there are performance changes relative to the main branch.
 if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
@@ -54,23 +57,15 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
 
   # Run canbench to compare result to main branch.
   pushd "$CANISTER_PATH"
-  set +e
-  canbench --less-verbose > $CANBENCH_OUTPUT
-  RES=$?
-  set -e
+  canbench --less-verbose > "$CANBENCH_OUTPUT"
   popd
 
-  if [ "$RES" -eq 0 ]; then
-    if grep -q "(regress\|(improved by" "${CANBENCH_OUTPUT}"; then
-      echo "**Significant performance change detected! ⚠️**
-      " >> $COMMENT_MESSAGE_PATH;
-    else
-      echo "**No significant performance changes detected ✅**
-      " >> $COMMENT_MESSAGE_PATH
-    fi
+  if grep -q "(regress\|(improved by" "${CANBENCH_OUTPUT}"; then
+    echo "**Significant performance change detected! ⚠️**
+    " >> "$COMMENT_MESSAGE_PATH"
   else
-    echo "Failed to run \`canbench\` against main branch ⚠️
-    " >> $COMMENT_MESSAGE_PATH
+    echo "**No significant performance changes detected ✅**
+    " >> "$COMMENT_MESSAGE_PATH"
   fi
 fi
 
@@ -81,7 +76,7 @@ fi
   echo "\`\`\`"
   cat "$CANBENCH_OUTPUT"
   echo "\`\`\`"
-} >> $COMMENT_MESSAGE_PATH
+} >> "$COMMENT_MESSAGE_PATH"
 
 # Output the comment to stdout.
-cat $COMMENT_MESSAGE_PATH
+cat "$COMMENT_MESSAGE_PATH"
