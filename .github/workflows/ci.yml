@@ -98,8 +98,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update $RUST_VERSION --no-self-update
-          rustup default $RUST_VERSION
+          rustup update ${{ matrix.rust }} --no-self-update
+          rustup default ${{ matrix.rust }}
           rustup target add wasm32-unknown-unknown
 
       - name: Benchmark
