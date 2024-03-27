@@ -104,7 +104,7 @@ jobs:
 
       - name: Benchmark
         run: |
-          bash .github/workflows/canbench_ci_run_benchmark.sh $PROJECT_DIR ${{ github.job }}
+          bash ./scripts/ci_run_benchmark.sh $PROJECT_DIR ${{ github.job }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -122,7 +122,7 @@ jobs:
 
       - name: Pass or fail
         run: |
-          bash .github/workflows/canbench_ci_post_run_benchmark.sh
+          bash ./scripts/ci_post_run_benchmark.sh
 
   checks-pass:
     # Always run this job!
