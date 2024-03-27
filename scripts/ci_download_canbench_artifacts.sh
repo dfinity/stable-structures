@@ -27,4 +27,3 @@ json_array+="]"
 # Output the benchmarks and PR number to be used by the next job.
 echo "matrix={\"benchmark\": $json_array}" >> "$GITHUB_OUTPUT"
 echo "pr_number=$(cat ./pr_number/pr_number)" >> "$GITHUB_OUTPUT"
-
