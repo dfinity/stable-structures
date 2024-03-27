@@ -107,6 +107,7 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
+#[derive(PartialEq, Debug)]
 /// The packed header size must be <= ALLOCATOR_OFFSET.
 struct BTreeHeader {
     version: Version,
@@ -556,9 +557,18 @@ where
     }
 
     /// Removes all elements from the map.
+    #[deprecated(since = "0.6.3", note = "please use `clear_new` instead")]
     pub fn clear(self) -> Self {
         let mem = self.allocator.into_memory();
         Self::new(mem)
+    }
+
+    /// Removes all elements from the map.
+    pub fn clear_new(&mut self) {
+        self.root_addr = NULL;
+        self.length = 0;
+        self.allocator.clear();
+        self.save();
     }
 
     /// Returns the first key-value pair in the map. The key in this
@@ -3028,5 +3038,51 @@ mod test {
         // Reload the BTree again with bounded type.
         let btree: BTreeMap<T, T, _> = BTreeMap::init(btree.into_memory());
         assert_eq!(btree.get(&T), Some(T));
+    }
+
+    #[test]
+    fn test_clear_new_bounded_type() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::new(mem.clone());
+
+        btree.insert(
+            [1u8; 4].as_slice().try_into().unwrap(),
+            [1u8; 4].as_slice().try_into().unwrap(),
+        );
+
+        assert_ne!(btree.len(), 0);
+        assert_ne!(btree.allocator.num_allocated_chunks(), 0);
+        assert_ne!(btree.root_addr, NULL);
+
+        btree.clear_new();
+
+        let header_actual = BTreeMap::<Blob<4>, Blob<4>, _>::read_header(&mem);
+
+        BTreeMap::<Blob<4>, Blob<4>, _>::new(mem.clone());
+
+        let header_expected = BTreeMap::<Blob<4>, Blob<4>, _>::read_header(&mem);
+
+        assert_eq!(header_actual, header_expected);
+    }
+
+    #[test]
+    fn test_clear_new_unbounded_type() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<String, String, _> = BTreeMap::new(mem.clone());
+        btree.insert("asd".into(), "bce".into());
+
+        assert_ne!(btree.len(), 0);
+        assert_ne!(btree.allocator.num_allocated_chunks(), 0);
+        assert_ne!(btree.root_addr, NULL);
+
+        btree.clear_new();
+
+        let header_actual = BTreeMap::<String, String, _>::read_header(&mem);
+
+        BTreeMap::<String, String, _>::new(mem.clone());
+
+        let header_expected = BTreeMap::<String, String, _>::read_header(&mem);
+
+        assert_eq!(header_actual, header_expected);
     }
 }
