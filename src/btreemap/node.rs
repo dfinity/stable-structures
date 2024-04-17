@@ -292,11 +292,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///   * `source` is deallocated.
     ///   * all the entries of `source`, as well as the median, are merged into `self`, in sorted
     ///      order.
-    pub fn merge<'a, M: Memory>(
+    pub fn merge<M: Memory>(
         &mut self,
         mut source: Node<K>,
         median: Entry<K>,
-        allocator: &'a mut Allocator<M>,
+        allocator: &mut Allocator<M>,
     ) {
         // Load all the values from the source node first, as they will be moved out.
         for i in 0..source.entries_len() {
@@ -426,7 +426,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Deallocates a node.
-    pub fn deallocate<'a, M: Memory>(self, allocator: &'a mut Allocator<M>) {
+    pub fn deallocate<M: Memory>(self, allocator: &mut Allocator<M>) {
         for overflow in self.overflows.into_iter() {
             allocator.deallocate(overflow);
         }
