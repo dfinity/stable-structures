@@ -174,7 +174,7 @@ fn no_memory_leaks(#[strategy(pvec(pvec(0..u8::MAX, 100..10_000), 100))] keys: V
         btree.remove(k);
     }
 
-    // After inserting and deleting all the entries, there should be allocated chunks.
+    // After inserting and deleting all the entries, there should be no allocated chunks.
     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 }
 
