@@ -289,13 +289,18 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///   * `self` and `source` are of the same node type.
     ///
     /// POSTCONDITION:
-    ///   * `source` is empty (no entries and no children).
+    ///   * `source` is deallocated.
     ///   * all the entries of `source`, as well as the median, are merged into `self`, in sorted
     ///      order.
-    pub fn merge<M: Memory>(&mut self, mut source: Node<K>, median: Entry<K>, memory: &M) {
+    pub fn merge<'a, M: Memory>(
+        &mut self,
+        mut source: Node<K>,
+        median: Entry<K>,
+        allocator: &'a mut Allocator<M>,
+    ) {
         // Load all the values from the source node first, as they will be moved out.
         for i in 0..source.entries_len() {
-            source.value(i, memory);
+            source.value(i, allocator.memory());
         }
 
         if source.key(0) > self.key(0) {
@@ -308,10 +313,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
             Self::append(&mut source, self, median);
 
             // Move the entries and children into self.
-            self.keys = source.keys;
-            self.encoded_values = source.encoded_values;
-            self.children = source.children;
+            self.keys = core::mem::take(&mut source.keys);
+            self.encoded_values = core::mem::take(&mut source.encoded_values);
+            self.children = core::mem::take(&mut source.children);
         }
+
+        self.save(allocator);
+        source.deallocate(allocator);
     }
 
     // Appends the entries and children of node `b` into `a`, along with the median entry.
@@ -415,6 +423,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Return the median entry.
         self.pop_entry(memory)
             .expect("An initially full node cannot be empty")
+    }
+
+    /// Deallocates a node.
+    pub fn deallocate<'a, M: Memory>(self, allocator: &'a mut Allocator<M>) {
+        for overflow in self.overflows.into_iter() {
+            allocator.deallocate(overflow);
+        }
+
+        allocator.deallocate(self.address);
     }
 }
 

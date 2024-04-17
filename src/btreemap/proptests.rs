@@ -159,6 +159,25 @@ fn iter_count_test(#[strategy(0..250u8)] start: u8, #[strategy(#start..255u8)] e
     });
 }
 
+#[proptest]
+fn no_memory_leaks(#[strategy(pvec(pvec(0..u8::MAX, 100..10_000), 100))] keys: Vec<Vec<u8>>) {
+    let mem = make_memory();
+    let mut btree = BTreeMap::new(mem);
+
+    // Insert entries.
+    for k in keys.iter() {
+        btree.insert(k.clone(), ());
+    }
+
+    // Remove entries.
+    for k in keys.iter() {
+        btree.remove(k);
+    }
+
+    // After inserting and deleting all the entries, there should be allocated chunks.
+    assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+}
+
 // Given an operation, executes it on the given stable btreemap and standard btreemap, verifying
 // that the result of the operation is equal in both btrees.
 fn execute_operation<M: Memory>(
