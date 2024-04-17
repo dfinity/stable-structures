@@ -663,7 +663,7 @@ where
                             );
 
                             // Deallocate the empty node.
-                            self.allocator.deallocate(node.address());
+                            node.deallocate(&mut self.allocator);
                             self.root_addr = NULL;
                         } else {
                             node.save(self.allocator_mut());
@@ -953,9 +953,10 @@ where
                             node.remove_child(idx);
 
                             if node.entries_len() == 0 {
-                                self.allocator.deallocate(node.address());
+                                let node_address = node.address();
+                                node.deallocate(&mut self.allocator);
 
-                                if node.address() == self.root_addr {
+                                if node_address == self.root_addr {
                                     // Update the root.
                                     self.root_addr = left_sibling.address();
                                     self.save();
@@ -981,9 +982,10 @@ where
                             node.remove_child(idx);
 
                             if node.entries_len() == 0 {
-                                self.allocator.deallocate(node.address());
+                                let node_address = node.address();
+                                node.deallocate(&mut self.allocator);
 
-                                if node.address() == self.root_addr {
+                                if node_address == self.root_addr {
                                     // Update the root.
                                     self.root_addr = right_sibling.address();
                                     self.save();
@@ -1199,10 +1201,7 @@ where
     //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     //   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
-        let source_address = source.address();
-        into.merge(source, median, self.memory());
-        into.save(self.allocator_mut());
-        self.allocator.deallocate(source_address);
+        into.merge(source, median, &mut self.allocator);
         into
     }
 
@@ -3084,5 +3083,47 @@ mod test {
         let header_expected = BTreeMap::<String, String, _>::read_header(&mem);
 
         assert_eq!(header_actual, header_expected);
+    }
+
+    #[test]
+    fn deallocating_node_with_overflows() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new(mem.clone());
+
+        // No allocated chunks yet.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+
+        // Insert and remove an entry that's large and requires overflow pages.
+        btree.insert(vec![0; 10_000], vec![]);
+
+        // At least two chunks should be allocated.
+        // One for the node itself and at least one overflow page.
+        assert!(btree.allocator.num_allocated_chunks() >= 2);
+        btree.remove(&vec![0; 10_000]);
+
+        // All chunks have been deallocated.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn repeatedly_deallocating_nodes_with_overflows() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new(mem.clone());
+
+        // No allocated chunks yet.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+
+        for _ in 0..100 {
+            for i in 0..100 {
+                btree.insert(vec![i; 10_000], vec![]);
+            }
+
+            for i in 0..100 {
+                btree.remove(&vec![i; 10_000]);
+            }
+        }
+
+        // All chunks have been deallocated.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
     }
 }
