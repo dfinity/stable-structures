@@ -791,11 +791,12 @@ where
                             self.root_addr = new_child.address();
 
                             // Deallocate the root node.
-                            self.allocator.deallocate(node.address());
+                            node.deallocate(&mut self.allocator);
                             self.save();
+                        } else {
+                            node.save(self.allocator_mut());
                         }
 
-                        node.save(self.allocator_mut());
                         new_child.save(self.allocator_mut());
 
                         // Recursively delete the key.
@@ -3124,6 +3125,72 @@ mod test {
         }
 
         // All chunks have been deallocated.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn deallocating_root_does_not_leak_memory() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Vec<u8>, _, _> = BTreeMap::new(mem.clone());
+
+        for i in 1..=11 {
+            // Large keys are stored so that each node overflows.
+            assert_eq!(btree.insert(vec![i; 10_000], ()), None);
+        }
+
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![0; 10_000], ()), None);
+
+        // The btree should look like this:
+        //                    [6]
+        //                   /   \
+        // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
+        let root = btree.load_node(btree.root_addr);
+        assert_eq!(root.node_type(), NodeType::Internal);
+        assert_eq!(root.keys(), vec![vec![6; 10_000]]);
+        assert_eq!(root.children_len(), 2);
+
+        // Remove the element in the root.
+        btree.remove(&vec![6; 10_000]);
+
+        // The btree should look like this:
+        //                 [5]
+        //                /   \
+        // [0, 1, 2, 3, 4]     [7, 8, 9, 10, 11]
+        let root = btree.load_node(btree.root_addr);
+        assert_eq!(root.node_type(), NodeType::Internal);
+        assert_eq!(root.keys(), vec![vec![5; 10_000]]);
+        assert_eq!(root.children_len(), 2);
+
+        // Remove the element in the root. This triggers the case where the root
+        // node is deallocated and the children are merged into a single node.
+        btree.remove(&vec![5; 10_000]);
+
+        // The btree should look like this:
+        //      [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
+        let root = btree.load_node(btree.root_addr);
+        assert_eq!(root.node_type(), NodeType::Leaf);
+        assert_eq!(
+            root.keys(),
+            vec![
+                vec![0; 10_000],
+                vec![1; 10_000],
+                vec![2; 10_000],
+                vec![3; 10_000],
+                vec![4; 10_000],
+                vec![7; 10_000],
+                vec![8; 10_000],
+                vec![9; 10_000],
+                vec![10; 10_000],
+                vec![11; 10_000],
+            ]
+        );
+
+        // Delete everything else.
+        for i in 0..=11 {
+            btree.remove(&vec![i; 10_000]);
+        }
+
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
     }
 }
