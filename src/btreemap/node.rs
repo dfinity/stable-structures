@@ -367,6 +367,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     #[cfg(test)]
+    pub fn keys(&self) -> &[K] {
+        &self.keys
+    }
+
+    #[cfg(test)]
     pub fn overflows(&self) -> &[Address] {
         &self.overflows
     }
