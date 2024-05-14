@@ -5,6 +5,7 @@
   <a href="https://forum.dfinity.org/"><img alt="Chat on the Forum" src="https://img.shields.io/badge/help-post%20on%20forum.dfinity.org-blue"></a>
 </p>
 
+
 # Stable Structures
 
 A collection of scalable data structures for the [Internet Computer](https://internetcomputer.org) that persist across upgrades.
