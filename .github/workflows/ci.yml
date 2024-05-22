@@ -42,6 +42,7 @@ jobs:
       
       - name: Build Fuzzers
         run: |
+          rustup install nightly-2024-01-20
           cargo install cargo-fuzz
           cargo +nightly fuzz build
 
