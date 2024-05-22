@@ -49,7 +49,7 @@ fuzz_target!(|ops: Vec<StableBTreeOperation>| {
     // A new panic hook is registered to override the one set by libfuzzer which
     // aborts by default. This is done because,
     //
-    // The fuzzer maintains state via thread_local! store and on discovering a crash, AFL only
+    // The fuzzer maintains state via thread_local! store and on discovering a crash, libfuzzer only
     // records the last set of operations that caused the crash. These operations are however
     // useless without the existing memory state.
     //
@@ -57,9 +57,7 @@ fuzz_target!(|ops: Vec<StableBTreeOperation>| {
     // are dumped to a file along with the memory on a panic. This allows us to reproduce the crash
     // by replaying the operations.
     //
-    // Note: This method only works if the code panics. To record multiple inputs for all forms of
-    // crash, look into AFL_PERSISTENT_RECORD. (https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md#6-persistent-record-and-replay)
-
+    // Note: This method only works if the code panics.
     std::panic::set_hook(Box::new(move |panic_info| {
         println!("{panic_info}");
 
