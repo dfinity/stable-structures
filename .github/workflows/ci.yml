@@ -28,6 +28,7 @@ jobs:
           rustup default ${{ matrix.rust }}
           rustup component add rustfmt
           rustup component add clippy
+          rustup toolchain install nightly
 
       - name: Check Format
         run: cargo fmt --all -- --check
@@ -42,7 +43,6 @@ jobs:
       
       - name: Build Fuzzers
         run: |
-          rustup install nightly-2024-01-20
           cargo install cargo-fuzz
           cargo +nightly fuzz build
 
