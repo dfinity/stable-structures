@@ -152,7 +152,7 @@ However, it's important to note that if you also intend to perform serialization
 
 ## Fuzzing
 
-Stable structures requires strong guarantees to work reliably and scale over millions of operations. To that extend, the repository contains fuzzing implememntations that emulate the operations on the available data strucutres. 
+Stable structures requires strong guarantees to work reliably and scale over millions of operations. To that extent, we use fuzzing to emulate such operations on the available data structures.
 
 To run a fuzzer locally, 
 ```sh
