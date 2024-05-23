@@ -149,3 +149,19 @@ fn insert(key: u128, value: u128) -> Option<u128> {
 If your project exclusively relies on stable structures, the memory can expand in size without the requirement of `pre_upgrade`/`post_upgrade` hooks.
 
 However, it's important to note that if you also intend to perform serialization/deserialization of the heap data, utilizing the memory manager becomes necessary. To effectively combine both approaches, refer to the [Quickstart Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/quick_start) for guidance.
+
+## Fuzzing
+
+Stable structures requires strong guarantees to work reliably and scale over millions of operations. To that extend, the repository contains fuzzing implememntations that emulate the operations on the available data strucutres. 
+
+To run a fuzzer locally, 
+```sh
+rustup toolchain install nightly
+cargo install cargo-fuzz
+
+# To list available fuzzer targets
+cargo +nightly fuzz list
+
+# To run a target 
+cargo +nightly fuzz run <TARGET_NAME>
+```
