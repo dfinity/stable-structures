@@ -278,6 +278,6 @@ fn set_last_element_to_large_blob() {
     // Store a large blob that would require growing the memory.
     sv.set(
         0,
-        &Blob::try_from(vec![1; 64 * 1024 as usize].as_slice()).unwrap(),
+        &Blob::try_from(vec![1; 65536].as_slice()).unwrap(),
     );
 }
