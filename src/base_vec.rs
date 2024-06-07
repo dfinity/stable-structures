@@ -33,7 +33,8 @@
 //! bytes required to represent integers up to that max size.
 use crate::storable::{bounds, bytes_to_store_size_bounded};
 use crate::{
-    read_u32, read_u64, safe_write, write_u32, write_u64, Address, GrowFailed, Memory, Storable,
+    read_u32, read_u64, safe_write, write, write_u32, write_u64, Address, GrowFailed, Memory,
+    Storable,
 };
 use std::borrow::{Borrow, Cow};
 use std::cmp::min;
@@ -183,7 +184,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         let data_offset = self
             .write_entry_size(offset, bytes.len() as u32)
             .expect("unreachable: cannot fail to write to pre-allocated area");
-        self.memory.write(data_offset, bytes.borrow());
+        write(&self.memory, data_offset, bytes.borrow());
     }
 
     /// Returns the item at the specified index.
