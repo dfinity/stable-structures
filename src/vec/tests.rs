@@ -266,3 +266,15 @@ fn set_element_bigger_than_max_size_panics() {
     // Insert a struct where the serialized size is > `MAX_SIZE`. Should panic.
     sv.set(0, &BuggyStruct(vec![1, 2, 3, 4, 5]));
 }
+
+#[test]
+fn set_last_element_to_large_blob() {
+    use crate::storable::Blob;
+    let sv = StableVec::<Blob<65536>, M>::new(M::default()).unwrap();
+
+    // Store a small blob.
+    sv.push(&Blob::default()).unwrap();
+
+    // Store a large blob that would require growing the memory.
+    sv.set(0, &Blob::try_from(vec![1; 65536].as_slice()).unwrap());
+}
