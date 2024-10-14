@@ -29,7 +29,7 @@ jobs:
       matrix: ${{fromJSON(needs.download-results.outputs.matrix)}}
     steps:
       - name: Post comment
-        uses: thollander/actions-comment-pull-request@v2
+        uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
             ${{ matrix.benchmark.result }}
