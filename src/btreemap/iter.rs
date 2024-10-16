@@ -73,7 +73,11 @@ where
         }
     }
 
-    pub(crate) fn new_with_cursors(map: &'a BTreeMap<K, V, M>, range: (Bound<K>, Bound<K>), cursors: Vec<Cursor<K>>) -> Self {
+    pub(crate) fn new_with_cursors(
+        map: &'a BTreeMap<K, V, M>,
+        range: (Bound<K>, Bound<K>),
+        cursors: Vec<Cursor<K>>,
+    ) -> Self {
         Self {
             map,
             cursors_initialized: true,

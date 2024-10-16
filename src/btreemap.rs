@@ -1146,13 +1146,13 @@ where
         buf[0..3].copy_from_slice(MAGIC.as_slice());
         match header.version {
             Version::V1(DerivedPageSize {
-                            max_key_size,
-                            max_value_size,
-                        })
+                max_key_size,
+                max_value_size,
+            })
             | Version::V2(PageSize::Derived(DerivedPageSize {
-                                                max_key_size,
-                                                max_value_size,
-                                            })) => {
+                max_key_size,
+                max_value_size,
+            })) => {
                 buf[3] = LAYOUT_VERSION;
                 buf[4..8].copy_from_slice(&max_key_size.to_le_bytes());
                 buf[8..12].copy_from_slice(&max_value_size.to_le_bytes());
@@ -2506,7 +2506,7 @@ mod test {
             // Tests an offset that has a keys somewhere in the range of keys of an internal node.
             assert_eq!(
                 btree.range(b(&[1, 3])..b(&[2])).collect::<Vec<_>>(),
-                vec![(b(&[1, 3]), b(&[])), (b(&[1, 4]), b(&[])), ]
+                vec![(b(&[1, 3]), b(&[])), (b(&[1, 4]), b(&[])),]
             );
 
             // Tests an offset that's larger than the key in the internal node.
@@ -2883,9 +2883,9 @@ mod test {
         assert!(packed_header.version == LAYOUT_VERSION);
         match v1_header.version {
             Version::V1(DerivedPageSize {
-                            max_key_size,
-                            max_value_size,
-                        }) => {
+                max_key_size,
+                max_value_size,
+            }) => {
                 assert!(packed_header.max_key_size == max_key_size);
                 assert!(packed_header.max_value_size == max_value_size);
             }
