@@ -29,6 +29,9 @@ where
     // A reference to the map being iterated on.
     map: &'a BTreeMap<K, V, M>,
 
+    // A flag indicating if the cursors have been initialized yet.
+    cursors_initialized: bool,
+
     // A stack of cursors indicating the current position in the tree.
     cursors: Vec<Cursor<K>>,
 
@@ -45,8 +48,8 @@ where
     pub(crate) fn new(map: &'a BTreeMap<K, V, M>) -> Self {
         Self {
             map,
-            // Initialize the cursors with the address of the root of the map.
-            cursors: vec![Cursor::Address(map.root_addr)],
+            cursors_initialized: false,
+            cursors: vec![],
             range: (Bound::Unbounded, Bound::Unbounded),
         }
     }
@@ -55,26 +58,121 @@ where
     pub(crate) fn null(map: &'a BTreeMap<K, V, M>) -> Self {
         Self {
             map,
+            cursors_initialized: true,
             cursors: vec![],
             range: (Bound::Unbounded, Bound::Unbounded),
         }
     }
 
-    pub(crate) fn new_in_range(
-        map: &'a BTreeMap<K, V, M>,
-        range: (Bound<K>, Bound<K>),
-        cursors: Vec<Cursor<K>>,
-    ) -> Self {
+    pub(crate) fn new_in_range(map: &'a BTreeMap<K, V, M>, range: (Bound<K>, Bound<K>)) -> Self {
         Self {
             map,
-            cursors,
+            cursors_initialized: false,
+            cursors: vec![],
             range,
         }
+    }
+
+    fn ensure_cursors_initialized(&mut self) {
+        if self.cursors_initialized {
+            return;
+        }
+
+        match self.range.start_bound() {
+            Bound::Unbounded => {
+                self.cursors.push(Cursor::Address(self.map.root_addr));
+            }
+            Bound::Included(key) | Bound::Excluded(key) => {
+                let mut node = self.map.load_node(self.map.root_addr);
+                loop {
+                    match node.search(key) {
+                        Ok(idx) => {
+                            if let Bound::Included(_) = self.range.start_bound() {
+                                // We found the key exactly matching the left bound.
+                                // Here is where we'll start the iteration.
+                                self.cursors.push(Cursor::Node {
+                                    node,
+                                    next: Index::Entry(idx),
+                                });
+                                break;
+                            } else {
+                                // We found the key that we must
+                                // exclude.  We add its right neighbor
+                                // to the stack and start iterating
+                                // from its right child.
+                                let right_child = match node.node_type() {
+                                    NodeType::Internal => Some(node.child(idx + 1)),
+                                    NodeType::Leaf => None,
+                                };
+
+                                if idx + 1 != node.entries_len()
+                                    && self.range.contains(node.key(idx + 1))
+                                {
+                                    self.cursors.push(Cursor::Node {
+                                        node,
+                                        next: Index::Entry(idx + 1),
+                                    });
+                                }
+                                if let Some(right_child) = right_child {
+                                    self.cursors.push(Cursor::Address(right_child));
+                                }
+                                break;
+                            }
+                        }
+                        Err(idx) => {
+                            // The `idx` variable points to the first
+                            // key that is greater than the left
+                            // bound.
+                            //
+                            // If the index points to a valid node, we
+                            // will visit its left subtree and then
+                            // return to this key.
+                            //
+                            // If the index points at the end of
+                            // array, we'll continue with the right
+                            // child of the last key.
+
+                            // Load the left child of the node to visit if it exists.
+                            // This is done first to avoid cloning the node.
+                            let child = match node.node_type() {
+                                NodeType::Internal => {
+                                    // Note that loading a child node cannot fail since
+                                    // len(children) = len(entries) + 1
+                                    Some(self.map.load_node(node.child(idx)))
+                                }
+                                NodeType::Leaf => None,
+                            };
+
+                            if idx < node.entries_len() && self.range.contains(node.key(idx)) {
+                                self.cursors.push(Cursor::Node {
+                                    node,
+                                    next: Index::Entry(idx),
+                                });
+                            }
+
+                            match child {
+                                None => {
+                                    // Leaf node. Return an iterator with the found cursors.
+                                    break;
+                                }
+                                Some(child) => {
+                                    // Iterate over the child node.
+                                    node = child;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        self.cursors_initialized = true;
     }
 
     // Iterates to find the next element in the requested range.
     // If it exists, `map` is applied to that element and the result is returned.
     fn next_map<T, F: Fn(&Node<K>, usize) -> T>(&mut self, map: F) -> Option<T> {
+        self.ensure_cursors_initialized();
+
         // If the cursors are empty. Iteration is complete.
         match self.cursors.pop()? {
             Cursor::Address(address) => {
