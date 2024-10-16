@@ -1029,19 +1029,12 @@ where
     /// Returns an iterator pointing to the first element below the given bound.
     /// Returns an empty iterator if there are no keys below the given bound.
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
-        if let Some(key) = self.find_by_upper_bound(bound) {
-            Iter::new_in_range(self, (Bound::Included(key), Bound::Unbounded))
-        } else {
-            Iter::null(self)
-        }
-    }
-
-    fn find_by_upper_bound(&self, bound: &K) -> Option<K> {
         if self.root_addr == NULL {
             // Map is empty.
-            return None;
+            return Iter::null(self);
         }
 
+        let dummy_bounds = (Bound::Unbounded, Bound::Unbounded);
         // INVARIANT: all cursors point to keys greater than or equal to bound.
         let mut cursors = vec![];
 
@@ -1067,19 +1060,27 @@ where
                                                 debug_assert!(node.key(n) >= bound);
                                                 continue;
                                             } else {
-                                                let key: &K = node.key(n - 1);
-                                                debug_assert!(key < bound);
-                                                return Some(key.clone());
+                                                debug_assert!(node.key(n - 1) < bound);
+                                                cursors.push(Cursor::Node {
+                                                    node,
+                                                    next: Index::Entry(n - 1),
+                                                });
+                                                break;
                                             }
                                         }
                                         _ => panic!("BUG: unexpected cursor shape"),
                                     }
                                 }
-                                return None;
+                                // If the cursors are empty, the iterator will be empty.
+                                return Iter::new_with_cursors(self, dummy_bounds, cursors);
                             }
-                            let key = node.key(idx - 1);
-                            debug_assert!(key < bound);
-                            return Some(key.clone());
+                            debug_assert!(node.key(idx - 1) < bound);
+
+                            cursors.push(Cursor::Node {
+                                node,
+                                next: Index::Entry(idx - 1),
+                            });
+                            return Iter::new_with_cursors(self, dummy_bounds, cursors);
                         }
                         NodeType::Internal => {
                             let child = self.load_node(node.child(idx));
@@ -1145,13 +1146,13 @@ where
         buf[0..3].copy_from_slice(MAGIC.as_slice());
         match header.version {
             Version::V1(DerivedPageSize {
-                max_key_size,
-                max_value_size,
-            })
+                            max_key_size,
+                            max_value_size,
+                        })
             | Version::V2(PageSize::Derived(DerivedPageSize {
-                max_key_size,
-                max_value_size,
-            })) => {
+                                                max_key_size,
+                                                max_value_size,
+                                            })) => {
                 buf[3] = LAYOUT_VERSION;
                 buf[4..8].copy_from_slice(&max_key_size.to_le_bytes());
                 buf[8..12].copy_from_slice(&max_value_size.to_le_bytes());
@@ -2505,7 +2506,7 @@ mod test {
             // Tests an offset that has a keys somewhere in the range of keys of an internal node.
             assert_eq!(
                 btree.range(b(&[1, 3])..b(&[2])).collect::<Vec<_>>(),
-                vec![(b(&[1, 3]), b(&[])), (b(&[1, 4]), b(&[])),]
+                vec![(b(&[1, 3]), b(&[])), (b(&[1, 4]), b(&[])), ]
             );
 
             // Tests an offset that's larger than the key in the internal node.
@@ -2882,9 +2883,9 @@ mod test {
         assert!(packed_header.version == LAYOUT_VERSION);
         match v1_header.version {
             Version::V1(DerivedPageSize {
-                max_key_size,
-                max_value_size,
-            }) => {
+                            max_key_size,
+                            max_value_size,
+                        }) => {
                 assert!(packed_header.max_key_size == max_key_size);
                 assert!(packed_header.max_value_size == max_value_size);
             }
