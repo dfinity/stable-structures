@@ -87,10 +87,8 @@ where
         }
     }
 
-    fn ensure_cursors_initialized(&mut self) {
-        if self.cursors_initialized {
-            return;
-        }
+    fn initialize_cursors(&mut self) {
+        debug_assert!(!self.cursors_initialized);
 
         match self.range.start_bound() {
             Bound::Unbounded => {
@@ -185,7 +183,9 @@ where
     // Iterates to find the next element in the requested range.
     // If it exists, `map` is applied to that element and the result is returned.
     fn next_map<T, F: Fn(&Node<K>, usize) -> T>(&mut self, map: F) -> Option<T> {
-        self.ensure_cursors_initialized();
+        if !self.cursors_initialized {
+            self.initialize_cursors();
+        }
 
         // If the cursors are empty. Iteration is complete.
         match self.cursors.pop()? {
