@@ -29,7 +29,9 @@ where
     // A reference to the map being iterated on.
     map: &'a BTreeMap<K, V, M>,
 
-    // A flag indicating if the cursors have been initialized yet.
+    // A flag indicating if the cursors have been initialized yet. This is needed to distinguish
+    // between the case where the iteration hasn't started yet and the case where the iteration has
+    // finished (in both cases the `cursors` field will be empty).
     cursors_initialized: bool,
 
     // A stack of cursors indicating the current position in the tree.
