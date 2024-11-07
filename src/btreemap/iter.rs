@@ -83,22 +83,6 @@ where
         }
     }
 
-    // This can be used as an optimisation if the cursors have already been calculated
-    pub(crate) fn new_with_cursors(
-        map: &'a BTreeMap<K, V, M>,
-        range: (Bound<K>, Bound<K>),
-        cursors: Vec<Cursor<K>>,
-    ) -> Self {
-        Self {
-            map,
-            forward_cursors_initialized: true,
-            backward_cursors_initialized: false,
-            forward_cursors: cursors,
-            backward_cursors: vec![],
-            range,
-        }
-    }
-
     fn initialize_forward_cursors(&mut self) {
         debug_assert!(!self.forward_cursors_initialized);
 
