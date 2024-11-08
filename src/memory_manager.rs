@@ -48,7 +48,9 @@ use crate::{
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
 use std::cmp::min;
+use std::collections::btree_map::Entry::Vacant;
 use std::collections::BTreeMap;
+use std::mem::size_of;
 use std::rc::Rc;
 use std::{cell::RefCell, collections::BTreeSet};
 
@@ -186,6 +188,54 @@ const BUCKET_ID_LEN_IN_BITS: usize = 15;
 /// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
 /// Bucket MAX_NUM_BUCKETS                  ↕ N pages
 /// ```
+/// # V2.1 layout
+///
+/// ```text
+/// -------------------------------------------------- <- Address 0
+/// Magic "MGR"                             ↕ 3 bytes
+/// --------------------------------------------------
+/// Layout version                          ↕ 1 byte
+/// --------------------------------------------------
+/// Number of allocated buckets             ↕ 2 bytes
+/// --------------------------------------------------
+/// Bucket size (in pages) = N              ↕ 2 bytes
+/// --------------------------------------------------
+/// Reserved space                          ↕ 32 bytes
+/// --------------------------------------------------
+/// Size of memory 0 (in pages)             ↕ 8 bytes
+/// --------------------------------------------------
+/// Size of memory 1 (in pages)             ↕ 8 bytes
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Size of memory 254 (in pages)           ↕ 8 bytes
+/// -------------------------------------------------- <- IDs of buckets
+/// Bucket 1 belonging to memory 0          ↕ 2 bytes
+/// --------------------------------------------------
+/// Bucket 1 belonging to memory 1          ↕ 2 bytes
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Bucket 1 belonging to memory 254        ↕ 2 bytes
+/// --------------------------------------------------
+/// Next bucket in linked list after bucket 1 ↕ 15 bits
+/// --------------------------------------------------
+/// Next bucket in linked list after bucket 2 ↕ 15 bits
+/// --------------------------------------------------
+/// ...
+/// ---------------------------------------------------
+/// Next bucket in linked list after bucket MAX_NUM_BUCKETS ↕ 15 bits
+/// --------------------------------------------------
+/// Unallocated space                       ↕ 1'506 bytes
+/// -------------------------------------------------- <- Buckets (Page 1)
+/// Bucket 1                                ↕ N pages
+/// -------------------------------------------------- <- Page N + 1
+/// Bucket 2                                ↕ N pages
+/// --------------------------------------------------
+/// ...
+/// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
+/// Bucket MAX_NUM_BUCKETS                  ↕ N pages
+/// ```
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
@@ -258,6 +308,9 @@ struct Header {
 
     // The size of each individual memory that can be created by the memory manager.
     memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
+
+    // The first bucket assigned to each memory.
+    first_bucket_per_memory: [u16; MAX_NUM_MEMORIES as usize],
 }
 
 impl Header {
@@ -308,6 +361,8 @@ struct MemoryManagerInner<M: Memory> {
     // Tracks the buckets that were freed to be reused in future calls to `grow`.
     // NOTE: A BTreeSet is used so that bucket IDs are maintained in sorted order.
     freed_buckets: BTreeSet<BucketId>,
+
+    bucket_bits: BucketBits,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -337,6 +392,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
             freed_buckets: BTreeSet::new(),
+            bucket_bits: BucketBits::default(),
         };
 
         mem_mgr.save_header();
@@ -372,6 +428,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
             freed_buckets: BTreeSet::new(),
+            bucket_bits: BucketBits::default(),
         };
 
         mem_mgr.save_header_v1();
@@ -400,6 +457,13 @@ impl<M: Memory> MemoryManagerInner<M> {
             }
         }
 
+        let mut bucket_bits = BucketBits::default();
+        for (_, buckets) in memory_buckets.iter() {
+            for (bucket, next_bucket) in buckets.iter().zip(buckets.iter().skip(1)) {
+                bucket_bits.set_next(*bucket, *next_bucket);
+            }
+        }
+
         Self {
             memory,
             allocated_buckets: header.num_allocated_buckets,
@@ -407,6 +471,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
             freed_buckets: BTreeSet::new(),
+            bucket_bits,
         }
     }
 
@@ -414,11 +479,27 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mut memory_size_in_buckets = vec![];
         let mut number_of_used_buckets = 0;
 
+        // Map of all memories with their assigned buckets.
+        let mut memory_buckets = BTreeMap::new();
+
+        let bucket_bits = BucketBits::load(&memory);
+
         // Translate memory sizes expressed in pages to sizes expressed in buckets.
-        for memory_size_in_pages in header.memory_sizes_in_pages.into_iter() {
+        for (index, memory_size_in_pages) in header.memory_sizes_in_pages.into_iter().enumerate() {
+            let memory_id = MemoryId(index as u8);
             let size_in_buckets = memory_size_in_pages.div_ceil(header.bucket_size_in_pages as u64);
             memory_size_in_buckets.push(size_in_buckets);
             number_of_used_buckets += size_in_buckets;
+
+            if size_in_buckets > 0 {
+                let mut bucket = BucketId(header.first_bucket_per_memory[index]);
+                let mut buckets = vec![bucket];
+                for _ in 1..size_in_buckets {
+                    bucket = bucket_bits.get_next(bucket);
+                    buckets.push(bucket);
+                }
+                memory_buckets.insert(memory_id, buckets);
+            }
         }
 
         // Load the buckets.
@@ -433,9 +514,6 @@ impl<M: Memory> MemoryManagerInner<M> {
 
             bytes_to_bucket_indexes(&buckets)
         };
-
-        // Map of all memories with their assigned buckets.
-        let mut memory_buckets = BTreeMap::new();
 
         // The last bucket that's accessed.
         let mut max_bucket_id: u16 = 0;
@@ -470,6 +548,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
             freed_buckets,
+            bucket_bits,
         }
     }
 
@@ -485,6 +564,13 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 
     fn save_header(&self) {
+        let mut first_bucket_per_memory = [0; MAX_NUM_MEMORIES as usize];
+        for (memory_id, buckets) in self.memory_buckets.iter() {
+            if let Some(first_bucket) = buckets.first() {
+                first_bucket_per_memory[memory_id.0 as usize] = first_bucket.0;
+            }
+        }
+
         let header = Header {
             magic: *MAGIC,
             version: LAYOUT_VERSION_V2,
@@ -492,6 +578,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: self.bucket_size_in_pages,
             _reserved: [0; HEADER_RESERVED_BYTES],
             memory_sizes_in_pages: self.memory_sizes_in_pages,
+            first_bucket_per_memory,
         };
 
         write_struct(&header, Address::from(0), &self.memory);
@@ -529,10 +616,11 @@ impl<M: Memory> MemoryManagerInner<M> {
                 }
             };
 
-            self.memory_buckets
-                .entry(id)
-                .or_default()
-                .push(new_bucket_id);
+            let buckets = self.memory_buckets.entry(id).or_default();
+            if let Some(last_bucket) = buckets.last() {
+                self.bucket_bits.set_next(*last_bucket, new_bucket_id);
+            }
+            buckets.push(new_bucket_id);
         }
 
         // Grow the underlying memory if necessary.
@@ -553,11 +641,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         self.save_header();
 
         // Write in stable store that this bucket belongs to the memory with the provided `id`.
-        write(
-            &self.memory,
-            bucket_indexes_offset().get(),
-            self.get_bucket_ids_in_bytes().as_ref(),
-        );
+        self.bucket_bits.save(&self.memory);
 
         // Return the old size.
         old_size as i64
@@ -664,6 +748,13 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     #[cfg(test)]
     fn save_header_v1(&self) {
+        let mut first_bucket_per_memory = [0; MAX_NUM_MEMORIES as usize];
+        for (memory_id, buckets) in self.memory_buckets.iter() {
+            if let Some(first_bucket) = buckets.first() {
+                first_bucket_per_memory[memory_id.0 as usize] = first_bucket.0;
+            }
+        }
+
         let header = Header {
             magic: *MAGIC,
             version: LAYOUT_VERSION_V1,
@@ -671,6 +762,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: self.bucket_size_in_pages,
             _reserved: [0; HEADER_RESERVED_BYTES],
             memory_sizes_in_pages: self.memory_sizes_in_pages,
+            first_bucket_per_memory,
         };
 
         write_struct(&header, Address::from(0), &self.memory);
@@ -801,6 +893,54 @@ fn bucket_allocations_address(id: BucketId) -> Address {
 
 fn bucket_indexes_offset() -> Address {
     Address::from(0) + Header::size()
+}
+
+#[derive(Clone)]
+struct BucketBits {
+    bits: [u8; (15 * MAX_NUM_BUCKETS / 8) as usize],
+    dirty_bytes: Vec<u16>,
+}
+
+impl BucketBits {
+    fn load<M: Memory>(memory: &M) -> Self {
+        let mut bucket_bits = BucketBits::default();
+        let offset = size_of::<Header>() as u64;
+        memory.read(offset, &mut bucket_bits.bits);
+        bucket_bits
+    }
+
+    fn get_next(&self, bucket: BucketId) -> BucketId {
+        let start_bit_index = bucket.0 * 15;
+        let end_bit_index = start_bit_index + 14;
+        let start_byte_index = start_bit_index / 8;
+        let end_byte_index = end_bit_index / 8;
+
+        let mut result = [0u8; 2];
+        todo!()
+    }
+
+    fn set_next(&mut self, bucket: BucketId, next: BucketId) {
+        todo!()
+    }
+
+    fn save<M: Memory>(&self, memory: &M) {
+        if !self.dirty_bytes.is_empty() {
+            let min = *self.dirty_bytes.iter().min().unwrap() as usize;
+            let max = *self.dirty_bytes.iter().max().unwrap() as usize;
+            let offset = (size_of::<Header>() + min) as u64;
+            let segment = &self.bits[min..=max];
+            memory.write(offset, segment);
+        }
+    }
+}
+
+impl Default for BucketBits {
+    fn default() -> Self {
+        BucketBits {
+            bits: [0; (15 * MAX_NUM_BUCKETS / 8) as usize],
+            dirty_bytes: Vec::new(),
+        }
+    }
 }
 
 #[cfg(test)]
