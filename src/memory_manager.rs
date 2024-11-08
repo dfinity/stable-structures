@@ -230,6 +230,15 @@ impl<M: Memory> MemoryManager<M> {
     pub fn free(&mut self, id: MemoryId) {
         self.inner.borrow_mut().free(id);
     }
+
+    /// Returns the underlying memory.
+    ///
+    /// # Returns
+    /// - The underlying memory, if there is exactly one strong reference to the memory manager.  Please see [`Rc::try_unwrap`](https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap) for more details.
+    /// - None otherwise.
+    pub fn into_memory(self) -> Option<M> {
+        Rc::into_inner(self.inner).map(|inner| inner.into_inner().into_memory())
+    }
 }
 
 #[repr(C, packed)]
@@ -646,6 +655,11 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_indexes_offset().get(),
             self.get_bucket_ids_in_bytes().as_ref(),
         );
+    }
+
+    // Returns the underlying memory.
+    pub fn into_memory(self) -> M {
+        self.memory
     }
 
     #[cfg(test)]

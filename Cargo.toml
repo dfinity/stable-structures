@@ -1,6 +1,6 @@
 [package]
 name = "ic-stable-structures"
-version = "0.6.0"
+version = "0.6.5"
 edition = "2021"
 description = "A collection of data structures for fearless canister upgrades."
 homepage = "https://docs.rs/ic-stable-structures"
@@ -11,42 +11,26 @@ keywords = ["internet-computer", "dfinity", "stable-structures"]
 include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 repository = "https://github.com/dfinity/stable-structures"
 
-# There are no benchmarks in the library itself, so by default it's turned off
-# to avoid having `cargo bench` look for benchmarks there.
-[lib]
-bench = false
-
 [dependencies]
 bit-vec = "0.6"
-# An optional dependency to profile parts of the code.
-profiler = { path = "./profiler", optional = true }
+ic_principal = { version = "0.1.1", default-features = false }
+# An optional dependency to benchmark parts of the code.
+canbench-rs = { version = "0.1.7", optional = true }
 
 [dev-dependencies]
-candid.workspace = true 
-clap = { version = "4.0.11", features = ["derive"] }
-colored = "2.0.4"
+candid.workspace = true
 hex = "0.4.3"
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
-lazy_static = "1.4.0"
 maplit = "1.0.2"
 proptest = "1"
-serde = "1.0"
-serde_yaml = "0.9"
 tempfile = "3.3.0"
 test-strategy = "0.3.1"
 
-[[bench]]
-name = "benchmarks"
-harness = false
-path = "benchmarks/benchmark.rs"
-
 [workspace]
-members = [
-  "benchmark-canisters"
-]
+members = ["benchmarks"]
 
 [workspace.dependencies]
-candid = "0.9.11"
-ic-cdk = "0.10.0"
-ic-cdk-macros = "0.7.1"
+candid = "0.10.3"
+ic-cdk = "0.12.1"
+ic-cdk-macros = "0.8.4"

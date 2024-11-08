@@ -31,9 +31,10 @@
 //! type is fixed in size, the `SLOT_SIZE` is equal to the max size.
 //! Otherwise, the `SLOT_SIZE` is the max size plus the number of
 //! bytes required to represent integers up to that max size.
-use crate::storable::{bounds, bytes_to_store_size};
+use crate::storable::{bounds, bytes_to_store_size_bounded};
 use crate::{
-    read_u32, read_u64, safe_write, write_u32, write_u64, Address, GrowFailed, Memory, Storable,
+    read_u32, read_u64, safe_write, write, write_u32, write_u64, Address, GrowFailed, Memory,
+    Storable,
 };
 use std::borrow::{Borrow, Cow};
 use std::cmp::min;
@@ -179,11 +180,11 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         assert!(index < self.len());
 
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
-        let bytes = item.to_bytes();
+        let bytes = item.to_bytes_checked();
         let data_offset = self
             .write_entry_size(offset, bytes.len() as u32)
             .expect("unreachable: cannot fail to write to pre-allocated area");
-        self.memory.write(data_offset, bytes.borrow());
+        write(&self.memory, data_offset, bytes.borrow());
     }
 
     /// Returns the item at the specified index.
@@ -203,7 +204,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
         let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
-        let bytes = item.to_bytes();
+        let bytes = item.to_bytes_checked();
         let data_offset = self.write_entry_size(offset, bytes.len() as u32)?;
         safe_write(&self.memory, data_offset, bytes.borrow())?;
         // NB. We update the size only after we ensure that the data
@@ -341,7 +342,7 @@ impl<T: Storable + fmt::Debug, M: Memory> fmt::Debug for BaseVec<T, M> {
 
 fn slot_size<T: Storable>() -> u32 {
     let t_bounds = bounds::<T>();
-    t_bounds.max_size + bytes_to_store_size(&t_bounds)
+    t_bounds.max_size + bytes_to_store_size_bounded(&t_bounds)
 }
 
 pub struct Iter<'a, T, M>
