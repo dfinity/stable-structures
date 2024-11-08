@@ -40,15 +40,11 @@
 //! memory_1.read(0, &mut bytes);
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
-use bit_vec::BitVec;
 
-use crate::{
-    read_struct,
-    types::{Address, Bytes},
-    write, write_struct, Memory, WASM_PAGE_SIZE,
-};
+use crate::{read_struct, types::{Address, Bytes}, write, write_struct, Memory, WASM_PAGE_SIZE};
+use bitvec::array::BitArray;
+use bitvec::macros::internal::funty::Fundamental;
 use std::cmp::min;
-use std::collections::btree_map::Entry::Vacant;
 use std::collections::BTreeMap;
 use std::mem::size_of;
 use std::rc::Rc;
@@ -76,9 +72,6 @@ const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
 
 // Reserved bytes in the header for future extensions.
 const HEADER_RESERVED_BYTES: usize = 32;
-
-// Size of the bucket ID in the header.
-const BUCKET_ID_LEN_IN_BITS: usize = 15;
 
 /// A memory manager simulates multiple memories within a single memory.
 ///
@@ -477,10 +470,13 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     fn load_layout_v2(memory: M, header: Header) -> Self {
         let mut memory_size_in_buckets = vec![];
-        let mut number_of_used_buckets = 0;
 
         // Map of all memories with their assigned buckets.
         let mut memory_buckets = BTreeMap::new();
+
+        // Set of all buckets with ID smaller than 'max_bucket_id' which were allocated and freed.
+        let mut freed_buckets: BTreeSet<BucketId> =
+            (0..header.num_allocated_buckets).map(BucketId).collect();
 
         let bucket_bits = BucketBits::load(&memory);
 
@@ -489,56 +485,18 @@ impl<M: Memory> MemoryManagerInner<M> {
             let memory_id = MemoryId(index as u8);
             let size_in_buckets = memory_size_in_pages.div_ceil(header.bucket_size_in_pages as u64);
             memory_size_in_buckets.push(size_in_buckets);
-            number_of_used_buckets += size_in_buckets;
 
             if size_in_buckets > 0 {
                 let mut bucket = BucketId(header.first_bucket_per_memory[index]);
                 let mut buckets = vec![bucket];
+                freed_buckets.remove(&bucket);
                 for _ in 1..size_in_buckets {
                     bucket = bucket_bits.get_next(bucket);
+                    freed_buckets.remove(&bucket);
                     buckets.push(bucket);
                 }
                 memory_buckets.insert(memory_id, buckets);
             }
-        }
-
-        // Load the buckets.
-        let buckets = {
-            const BYTE_SIZE_IN_BITS: usize = 8;
-            let buckets_index_size_in_bytes: usize = (number_of_used_buckets as usize
-                * BUCKET_ID_LEN_IN_BITS)
-                .div_ceil(BYTE_SIZE_IN_BITS);
-
-            let mut buckets = vec![0; buckets_index_size_in_bytes];
-            memory.read(bucket_indexes_offset().get(), &mut buckets);
-
-            bytes_to_bucket_indexes(&buckets)
-        };
-
-        // The last bucket that's accessed.
-        let mut max_bucket_id: u16 = 0;
-
-        let mut bucket_idx: usize = 0;
-
-        // Assign buckets to the memories they are part of.
-        for (memory, size_in_buckets) in memory_size_in_buckets.into_iter().enumerate() {
-            let mut vec_buckets = vec![];
-            for _ in 0..size_in_buckets {
-                let bucket = buckets[bucket_idx];
-                max_bucket_id = std::cmp::max(bucket.0, max_bucket_id);
-                vec_buckets.push(bucket);
-                bucket_idx += 1;
-            }
-            memory_buckets
-                .entry(MemoryId(memory as u8))
-                .or_insert(vec_buckets);
-        }
-
-        // Set of all buckets with ID smaller than 'max_bucket_id' which were allocated and freed.
-        let mut freed_buckets: BTreeSet<BucketId> = (0..max_bucket_id).map(BucketId).collect();
-
-        for id in buckets.iter() {
-            freed_buckets.remove(id);
         }
 
         Self {
@@ -647,21 +605,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         old_size as i64
     }
 
-    fn get_bucket_ids_in_bytes(&self) -> Vec<u8> {
-        let mut bit_vec = BitVec::new();
-        for memory in self.memory_buckets.iter() {
-            for bucket in memory.1 {
-                let bucket_ind = bucket.0;
-                // Splits bit_vec returning the slice [1, .., bit_vec.size() - 1].
-                // This is precisely what we need since the BucketId can be represented
-                // using only 15 bits, instead of 16.
-                let mut bit_vec_temp = BitVec::from_bytes(&bucket_ind.to_be_bytes()).split_off(1);
-                bit_vec.append(&mut bit_vec_temp);
-            }
-        }
-        bit_vec.to_bytes()
-    }
-
     fn write(&self, id: MemoryId, offset: u64, src: &[u8]) {
         if (offset + src.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
             panic!("{id:?}: write out of bounds");
@@ -732,13 +675,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
         // Update the header.
         self.save_header();
-
-        // Write in stable store that no bucket belongs to the memory with the provided `id`.
-        write(
-            &self.memory,
-            bucket_indexes_offset().get(),
-            self.get_bucket_ids_in_bytes().as_ref(),
-        );
     }
 
     // Returns the underlying memory.
@@ -767,23 +703,6 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         write_struct(&header, Address::from(0), &self.memory);
     }
-}
-
-fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<BucketId> {
-    let mut bucket_ids = vec![];
-    let bit_vec = BitVec::from_bytes(input);
-    for bucket_order_number in 0..bit_vec.len() / BUCKET_ID_LEN_IN_BITS {
-        let mut bucket_id: u16 = 0;
-        for bucket_id_bit in 0..BUCKET_ID_LEN_IN_BITS {
-            let next_bit = BUCKET_ID_LEN_IN_BITS * bucket_order_number + bucket_id_bit;
-            bucket_id <<= 1;
-            if bit_vec.get(next_bit) == Some(true) {
-                bucket_id |= 1;
-            }
-        }
-        bucket_ids.push(BucketId(bucket_id));
-    }
-    bucket_ids
 }
 
 struct Segment {
@@ -891,36 +810,53 @@ fn bucket_allocations_address(id: BucketId) -> Address {
     Address::from(0) + Header::size() + Bytes::from(id.0)
 }
 
-fn bucket_indexes_offset() -> Address {
-    Address::from(0) + Header::size()
-}
+const BUCKET_BITS_LEN: usize = 15 * MAX_NUM_BUCKETS as usize;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct BucketBits {
-    bits: [u8; (15 * MAX_NUM_BUCKETS / 8) as usize],
+    bits: BitArray<[u8; BUCKET_BITS_LEN / 8]>,
     dirty_bytes: Vec<u16>,
 }
 
 impl BucketBits {
     fn load<M: Memory>(memory: &M) -> Self {
-        let mut bucket_bits = BucketBits::default();
+        let mut bytes = [0; BUCKET_BITS_LEN / 8];
         let offset = size_of::<Header>() as u64;
-        memory.read(offset, &mut bucket_bits.bits);
-        bucket_bits
+        memory.read(offset, &mut bytes);
+
+        BucketBits {
+            bits: BitArray::from(bytes),
+            ..Default::default()
+        }
     }
 
     fn get_next(&self, bucket: BucketId) -> BucketId {
-        let start_bit_index = bucket.0 * 15;
-        let end_bit_index = start_bit_index + 14;
-        let start_byte_index = start_bit_index / 8;
-        let end_byte_index = end_bit_index / 8;
+        let start_bit_index = (bucket.0 * 15) as usize;
+        let mut next_bits: BitArray<[u8; 2]> = BitArray::new([0u8; 2]);
 
-        let mut result = [0u8; 2];
-        todo!()
+        for i in 0..15 {
+            next_bits.set(i + 1, self.bits.get(start_bit_index + i).unwrap().as_bool());
+        }
+
+        BucketId(u16::from_be_bytes(next_bits.data))
     }
 
     fn set_next(&mut self, bucket: BucketId, next: BucketId) {
-        todo!()
+        let start_bit_index = (bucket.0 * 15) as usize;
+        let next_bits: BitArray<[u8; 2]> = BitArray::from(next.0.to_be_bytes());
+
+        for (index, bit) in next_bits.iter().skip(1).enumerate() {
+            self.bits.set(start_bit_index + index, bit.as_bool());
+        }
+
+        let start_byte_index = start_bit_index / 8;
+        let end_byte_index = (start_bit_index + 14) / 8;
+
+        for index in (start_byte_index..=end_byte_index).map(|i| i as u16) {
+            if !self.dirty_bytes.contains(&index) {
+                self.dirty_bytes.push(index);
+            }
+        }
     }
 
     fn save<M: Memory>(&self, memory: &M) {
@@ -928,17 +864,8 @@ impl BucketBits {
             let min = *self.dirty_bytes.iter().min().unwrap() as usize;
             let max = *self.dirty_bytes.iter().max().unwrap() as usize;
             let offset = (size_of::<Header>() + min) as u64;
-            let segment = &self.bits[min..=max];
+            let segment = &self.bits.data[min..=max];
             memory.write(offset, segment);
-        }
-    }
-}
-
-impl Default for BucketBits {
-    fn default() -> Self {
-        BucketBits {
-            bits: [0; (15 * MAX_NUM_BUCKETS / 8) as usize],
-            dirty_bytes: Vec::new(),
         }
     }
 }
@@ -1488,13 +1415,9 @@ mod test {
         mem_mgr.free(MemoryId(4));
 
         let mem_mgr = MemoryManager::init(mem);
-        // Only Memory 0 and 2 buckets should be counted as freed_buckets.
-        // The bucket belonging to Memory 4 should not be counted as
-        // freed because it has the biggest Bucket ID of all allocated
-        // buckets hence it should become part of unallocated buckets.
         assert_eq!(
             mem_mgr.inner.borrow().freed_buckets,
-            maplit::btreeset! { BucketId(0), BucketId(2) }
+            maplit::btreeset! { BucketId(0), BucketId(2), BucketId(4) }
         );
     }
 
