@@ -41,7 +41,7 @@
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 
-use crate::{read_struct, types::{Address, Bytes}, write, write_struct, Memory, WASM_PAGE_SIZE};
+use crate::{read_struct, types::{Address, Bytes}, write_struct, Memory, WASM_PAGE_SIZE};
 use bitvec::array::BitArray;
 use bitvec::macros::internal::funty::Fundamental;
 use std::cmp::min;
@@ -69,6 +69,8 @@ const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
 // The offset where buckets are in memory.
 const BUCKETS_OFFSET_IN_PAGES: u64 = 1;
 const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
+
+const BUCKET_BITS_OFFSET: u64 = size_of::<Header>() as u64;
 
 // Reserved bytes in the header for future extensions.
 const HEADER_RESERVED_BYTES: usize = 32;
@@ -301,9 +303,6 @@ struct Header {
 
     // The size of each individual memory that can be created by the memory manager.
     memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
-
-    // The first bucket assigned to each memory.
-    first_bucket_per_memory: [u16; MAX_NUM_MEMORIES as usize],
 }
 
 impl Header {
@@ -397,7 +396,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn init_v1(memory: M, bucket_size_in_pages: u16) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
-            return Self::new(memory, bucket_size_in_pages);
+            return Self::new_v1(memory, bucket_size_in_pages);
         }
 
         // Check if the magic in the memory corresponds to this object.
@@ -427,7 +426,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         mem_mgr.save_header_v1();
 
         // Mark all the buckets as unallocated.
-        write(
+        crate::write(
             &mem_mgr.memory,
             bucket_allocations_address(BucketId(0)).get(),
             &[UNALLOCATED_BUCKET_MARKER; MAX_NUM_BUCKETS as usize],
@@ -478,7 +477,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mut freed_buckets: BTreeSet<BucketId> =
             (0..header.num_allocated_buckets).map(BucketId).collect();
 
-        let bucket_bits = BucketBits::load(&memory);
+        let bucket_bits: BucketBits = read_struct(Address::from(BUCKET_BITS_OFFSET), &memory);
 
         // Translate memory sizes expressed in pages to sizes expressed in buckets.
         for (index, memory_size_in_pages) in header.memory_sizes_in_pages.into_iter().enumerate() {
@@ -487,7 +486,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_size_in_buckets.push(size_in_buckets);
 
             if size_in_buckets > 0 {
-                let mut bucket = BucketId(header.first_bucket_per_memory[index]);
+                let mut bucket = bucket_bits.get_first(memory_id);
                 let mut buckets = vec![bucket];
                 freed_buckets.remove(&bucket);
                 for _ in 1..size_in_buckets {
@@ -522,13 +521,6 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 
     fn save_header(&self) {
-        let mut first_bucket_per_memory = [0; MAX_NUM_MEMORIES as usize];
-        for (memory_id, buckets) in self.memory_buckets.iter() {
-            if let Some(first_bucket) = buckets.first() {
-                first_bucket_per_memory[memory_id.0 as usize] = first_bucket.0;
-            }
-        }
-
         let header = Header {
             magic: *MAGIC,
             version: LAYOUT_VERSION_V2,
@@ -536,7 +528,6 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: self.bucket_size_in_pages,
             _reserved: [0; HEADER_RESERVED_BYTES],
             memory_sizes_in_pages: self.memory_sizes_in_pages,
-            first_bucket_per_memory,
         };
 
         write_struct(&header, Address::from(0), &self.memory);
@@ -577,6 +568,8 @@ impl<M: Memory> MemoryManagerInner<M> {
             let buckets = self.memory_buckets.entry(id).or_default();
             if let Some(last_bucket) = buckets.last() {
                 self.bucket_bits.set_next(*last_bucket, new_bucket_id);
+            } else {
+                self.bucket_bits.set_first(id, new_bucket_id);
             }
             buckets.push(new_bucket_id);
         }
@@ -599,7 +592,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         self.save_header();
 
         // Write in stable store that this bucket belongs to the memory with the provided `id`.
-        self.bucket_bits.save(&self.memory);
+        write_struct(&self.bucket_bits, Address::from(BUCKET_BITS_OFFSET), &self.memory);
 
         // Return the old size.
         old_size as i64
@@ -684,13 +677,6 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     #[cfg(test)]
     fn save_header_v1(&self) {
-        let mut first_bucket_per_memory = [0; MAX_NUM_MEMORIES as usize];
-        for (memory_id, buckets) in self.memory_buckets.iter() {
-            if let Some(first_bucket) = buckets.first() {
-                first_bucket_per_memory[memory_id.0 as usize] = first_bucket.0;
-            }
-        }
-
         let header = Header {
             magic: *MAGIC,
             version: LAYOUT_VERSION_V1,
@@ -698,7 +684,6 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: self.bucket_size_in_pages,
             _reserved: [0; HEADER_RESERVED_BYTES],
             memory_sizes_in_pages: self.memory_sizes_in_pages,
-            first_bucket_per_memory,
         };
 
         write_struct(&header, Address::from(0), &self.memory);
@@ -812,22 +797,20 @@ fn bucket_allocations_address(id: BucketId) -> Address {
 
 const BUCKET_BITS_LEN: usize = 15 * MAX_NUM_BUCKETS as usize;
 
-#[derive(Clone, Default)]
+#[repr(C, packed)]
+#[derive(Clone)]
 struct BucketBits {
-    bits: BitArray<[u8; BUCKET_BITS_LEN / 8]>,
-    dirty_bytes: Vec<u16>,
+    first_bucket_per_memory: [u16; MAX_NUM_MEMORIES as usize],
+    bucket_links: BitArray<[u8; BUCKET_BITS_LEN / 8]>,
 }
 
 impl BucketBits {
-    fn load<M: Memory>(memory: &M) -> Self {
-        let mut bytes = [0; BUCKET_BITS_LEN / 8];
-        let offset = size_of::<Header>() as u64;
-        memory.read(offset, &mut bytes);
+    fn get_first(&self, memory_id: MemoryId) -> BucketId {
+        BucketId(self.first_bucket_per_memory[memory_id.0 as usize])
+    }
 
-        BucketBits {
-            bits: BitArray::from(bytes),
-            ..Default::default()
-        }
+    fn set_first(&mut self, memory_id: MemoryId, value: BucketId) {
+        self.first_bucket_per_memory[memory_id.0 as usize] = value.0;
     }
 
     fn get_next(&self, bucket: BucketId) -> BucketId {
@@ -835,7 +818,7 @@ impl BucketBits {
         let mut next_bits: BitArray<[u8; 2]> = BitArray::new([0u8; 2]);
 
         for i in 0..15 {
-            next_bits.set(i + 1, self.bits.get(start_bit_index + i).unwrap().as_bool());
+            next_bits.set(i + 1, self.bucket_links.get(start_bit_index + i).unwrap().as_bool());
         }
 
         BucketId(u16::from_be_bytes(next_bits.data))
@@ -846,26 +829,25 @@ impl BucketBits {
         let next_bits: BitArray<[u8; 2]> = BitArray::from(next.0.to_be_bytes());
 
         for (index, bit) in next_bits.iter().skip(1).enumerate() {
-            self.bits.set(start_bit_index + index, bit.as_bool());
+            self.bucket_links.set(start_bit_index + index, bit.as_bool());
         }
 
-        let start_byte_index = start_bit_index / 8;
-        let end_byte_index = (start_bit_index + 14) / 8;
-
-        for index in (start_byte_index..=end_byte_index).map(|i| i as u16) {
-            if !self.dirty_bytes.contains(&index) {
-                self.dirty_bytes.push(index);
-            }
-        }
+        // let start_byte_index = start_bit_index / 8;
+        // let end_byte_index = (start_bit_index + 14) / 8;
+        //
+        // for index in (start_byte_index..=end_byte_index).map(|i| i as u16) {
+        //     if !self.dirty_bytes.contains(&index) {
+        //         self.dirty_bytes.push(index);
+        //     }
+        // }
     }
+}
 
-    fn save<M: Memory>(&self, memory: &M) {
-        if !self.dirty_bytes.is_empty() {
-            let min = *self.dirty_bytes.iter().min().unwrap() as usize;
-            let max = *self.dirty_bytes.iter().max().unwrap() as usize;
-            let offset = (size_of::<Header>() + min) as u64;
-            let segment = &self.bits.data[min..=max];
-            memory.write(offset, segment);
+impl Default for BucketBits {
+    fn default() -> Self {
+        BucketBits {
+            first_bucket_per_memory: [0; MAX_NUM_MEMORIES as usize],
+            bucket_links: BitArray::default(),
         }
     }
 }
@@ -1148,7 +1130,7 @@ mod test {
         )| {
             for memory in memories.iter().take(num_memories) {
                 // Write a random blob into the memory, growing the memory as it needs to.
-                write(memory, offset, &data);
+                crate::write(memory, offset, &data);
 
                 // Verify the blob can be read back.
                 let mut bytes = vec![0; data.len()];
@@ -1403,11 +1385,11 @@ mod test {
     #[test]
     fn freed_memories_are_tracked() {
         let mem = make_memory();
-        let mut mem_mgr = MemoryManager::init(mem.clone());
+        let mut mem_mgr = MemoryManager::init_with_bucket_size(mem.clone(), 1);
         mem_mgr.get(MemoryId(0)).grow(1);
-        mem_mgr.get(MemoryId(1)).grow(1);
-        mem_mgr.get(MemoryId(2)).grow(1);
-        mem_mgr.get(MemoryId(3)).grow(1);
+        mem_mgr.get(MemoryId(1)).grow(2);
+        mem_mgr.get(MemoryId(2)).grow(3);
+        mem_mgr.get(MemoryId(3)).grow(2);
         mem_mgr.get(MemoryId(4)).grow(1);
 
         mem_mgr.free(MemoryId(0));
@@ -1417,7 +1399,7 @@ mod test {
         let mem_mgr = MemoryManager::init(mem);
         assert_eq!(
             mem_mgr.inner.borrow().freed_buckets,
-            maplit::btreeset! { BucketId(0), BucketId(2), BucketId(4) }
+            maplit::btreeset! { BucketId(0), BucketId(3), BucketId(4), BucketId(5), BucketId(8) }
         );
     }
 
@@ -1438,7 +1420,7 @@ mod test {
         )| {
             for memory_v1 in memories_v1.iter().take(num_memories) {
                 // Write a random blob into the memory, growing the memory as it needs to.
-                write(memory_v1, offset, &data);
+                crate::write(memory_v1, offset, &data);
             }
 
             // Load layout v1 and convert it to layout v2.
