@@ -41,7 +41,11 @@
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 
-use crate::{read_struct, types::{Address, Bytes}, write_struct, Memory, WASM_PAGE_SIZE};
+use crate::{
+    read_struct,
+    types::{Address, Bytes},
+    write_struct, Memory, WASM_PAGE_SIZE,
+};
 use bitvec::array::BitArray;
 use bitvec::macros::internal::funty::Fundamental;
 use std::cmp::min;
@@ -473,7 +477,8 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Map of all memories with their assigned buckets.
         let mut memory_buckets = BTreeMap::new();
 
-        let bucket_bits: BucketBits = read_struct(Address::from(BUCKET_BITS_OFFSET), &memory);
+        let bucket_bits: BucketBits =
+            read_struct::<BucketBitsPacked, _>(Address::from(BUCKET_BITS_OFFSET), &memory).into();
 
         // Translate memory sizes expressed in pages to sizes expressed in buckets.
         for (index, memory_size_in_pages) in header.memory_sizes_in_pages.into_iter().enumerate() {
@@ -589,7 +594,8 @@ impl<M: Memory> MemoryManagerInner<M> {
         self.save_header();
 
         // Write in stable store that this bucket belongs to the memory with the provided `id`.
-        write_struct(&self.bucket_bits, Address::from(BUCKET_BITS_OFFSET), &self.memory);
+        self.bucket_bits
+            .flush_dirty_bytes(&self.memory, size_of::<Header>() as u64);
 
         // Return the old size.
         old_size as i64
@@ -794,20 +800,28 @@ fn bucket_allocations_address(id: BucketId) -> Address {
 
 const BUCKET_BITS_LEN: usize = 15 * MAX_NUM_BUCKETS as usize;
 
-#[repr(C, packed)]
 #[derive(Clone)]
 struct BucketBits {
+    inner: BucketBitsPacked,
+    first_buckets_dirty: bool,
+    dirty_bucket_link_bytes: BTreeSet<u16>,
+}
+
+#[derive(Clone)]
+#[repr(C, packed)]
+struct BucketBitsPacked {
     first_bucket_per_memory: [u16; MAX_NUM_MEMORIES as usize],
     bucket_links: BitArray<[u8; BUCKET_BITS_LEN / 8]>,
 }
 
 impl BucketBits {
     fn get_first(&self, memory_id: MemoryId) -> BucketId {
-        BucketId(self.first_bucket_per_memory[memory_id.0 as usize])
+        BucketId(self.inner.first_bucket_per_memory[memory_id.0 as usize])
     }
 
     fn set_first(&mut self, memory_id: MemoryId, value: BucketId) {
-        self.first_bucket_per_memory[memory_id.0 as usize] = value.0;
+        self.inner.first_bucket_per_memory[memory_id.0 as usize] = value.0;
+        self.first_buckets_dirty = true;
     }
 
     fn get_next(&self, bucket: BucketId) -> BucketId {
@@ -815,7 +829,14 @@ impl BucketBits {
         let mut next_bits: BitArray<[u8; 2]> = BitArray::new([0u8; 2]);
 
         for i in 0..15 {
-            next_bits.set(i + 1, self.bucket_links.get(start_bit_index + i).unwrap().as_bool());
+            next_bits.set(
+                i + 1,
+                self.inner
+                    .bucket_links
+                    .get(start_bit_index + i)
+                    .unwrap()
+                    .as_bool(),
+            );
         }
 
         BucketId(u16::from_be_bytes(next_bits.data))
@@ -826,17 +847,16 @@ impl BucketBits {
         let next_bits: BitArray<[u8; 2]> = BitArray::from(next.0.to_be_bytes());
 
         for (index, bit) in next_bits.iter().skip(1).enumerate() {
-            self.bucket_links.set(start_bit_index + index, bit.as_bool());
+            self.inner
+                .bucket_links
+                .set(start_bit_index + index, bit.as_bool());
         }
 
-        // let start_byte_index = start_bit_index / 8;
-        // let end_byte_index = (start_bit_index + 14) / 8;
-        //
-        // for index in (start_byte_index..=end_byte_index).map(|i| i as u16) {
-        //     if !self.dirty_bytes.contains(&index) {
-        //         self.dirty_bytes.push(index);
-        //     }
-        // }
+        let start_byte_index = start_bit_index / 8;
+        let end_byte_index = (start_bit_index + 14) / 8;
+
+        self.dirty_bucket_link_bytes
+            .extend((start_byte_index..=end_byte_index).map(|i| i as u16))
     }
 
     fn buckets_for_memory(&self, memory_id: MemoryId, count: u16) -> Vec<BucketId> {
@@ -852,13 +872,45 @@ impl BucketBits {
         }
         buckets
     }
+
+    fn flush_dirty_bytes<M: Memory>(&mut self, memory: &M, start_offset: u64) {
+        if !self.first_buckets_dirty && self.dirty_bucket_link_bytes.is_empty() {
+            return;
+        }
+
+        // Improve this to only write dirty bytes
+        write_struct(&self.inner, Address::from(start_offset), memory);
+
+        self.first_buckets_dirty = false;
+        self.dirty_bucket_link_bytes.clear();
+    }
 }
 
 impl Default for BucketBits {
     fn default() -> Self {
         BucketBits {
+            inner: BucketBitsPacked::default(),
+            first_buckets_dirty: false,
+            dirty_bucket_link_bytes: BTreeSet::new(),
+        }
+    }
+}
+
+impl Default for BucketBitsPacked {
+    fn default() -> Self {
+        BucketBitsPacked {
             first_bucket_per_memory: [0; MAX_NUM_MEMORIES as usize],
-            bucket_links: BitArray::default(),
+            bucket_links: BitArray::new([0u8; BUCKET_BITS_LEN / 8]),
+        }
+    }
+}
+
+impl From<BucketBitsPacked> for BucketBits {
+    fn from(value: BucketBitsPacked) -> Self {
+        BucketBits {
+            inner: value,
+            first_buckets_dirty: false,
+            dirty_bucket_link_bytes: BTreeSet::new(),
         }
     }
 }
