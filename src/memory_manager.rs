@@ -41,16 +41,12 @@
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 
-use crate::{
-    read_struct,
-    types::{Address, Bytes},
-    write_struct, Memory, WASM_PAGE_SIZE,
-};
+use crate::{read_struct, types::{Address, Bytes}, write, write_struct, Memory, WASM_PAGE_SIZE};
 use bitvec::array::BitArray;
 use bitvec::macros::internal::funty::Fundamental;
 use std::cmp::min;
 use std::collections::BTreeMap;
-use std::mem::size_of;
+use std::mem::{size_of, transmute};
 use std::rc::Rc;
 use std::{cell::RefCell, collections::BTreeSet};
 
@@ -803,7 +799,7 @@ const BUCKET_BITS_LEN: usize = 15 * MAX_NUM_BUCKETS as usize;
 #[derive(Clone)]
 struct BucketBits {
     inner: BucketBitsPacked,
-    first_buckets_dirty: bool,
+    dirty_first_buckets: BTreeSet<MemoryId>,
     dirty_bucket_link_bytes: BTreeSet<u16>,
 }
 
@@ -821,7 +817,7 @@ impl BucketBits {
 
     fn set_first(&mut self, memory_id: MemoryId, value: BucketId) {
         self.inner.first_bucket_per_memory[memory_id.0 as usize] = value.0;
-        self.first_buckets_dirty = true;
+        self.dirty_first_buckets.insert(memory_id);
     }
 
     fn get_next(&self, bucket: BucketId) -> BucketId {
@@ -874,15 +870,26 @@ impl BucketBits {
     }
 
     fn flush_dirty_bytes<M: Memory>(&mut self, memory: &M, start_offset: u64) {
-        if !self.first_buckets_dirty && self.dirty_bucket_link_bytes.is_empty() {
-            return;
+        if !self.dirty_first_buckets.is_empty() {
+            let bytes: [u8; MAX_NUM_MEMORIES as usize * 2] = unsafe { transmute(self.inner.first_bucket_per_memory) };
+
+            // Multiply by 2 since we've converted from [u16] to [u8].
+            let min = 2 * self.dirty_first_buckets.first().unwrap().0 as usize;
+            let max = 2 * self.dirty_first_buckets.last().unwrap().0 as usize + 1;
+
+            let slice = &bytes[min..=max];
+            write(memory, start_offset + min as u64, slice);
+            self.dirty_first_buckets.clear();
         }
 
-        // Improve this to only write dirty bytes
-        write_struct(&self.inner, Address::from(start_offset), memory);
+        if !self.dirty_bucket_link_bytes.is_empty() {
+            let min = *self.dirty_bucket_link_bytes.first().unwrap() as usize;
+            let max = *self.dirty_bucket_link_bytes.last().unwrap() as usize;
 
-        self.first_buckets_dirty = false;
-        self.dirty_bucket_link_bytes.clear();
+            let slice = &self.inner.bucket_links.data[min..=max];
+            write(memory, start_offset + min as u64, slice);
+            self.dirty_bucket_link_bytes.clear();
+        }
     }
 }
 
@@ -890,7 +897,7 @@ impl Default for BucketBits {
     fn default() -> Self {
         BucketBits {
             inner: BucketBitsPacked::default(),
-            first_buckets_dirty: false,
+            dirty_first_buckets: BTreeSet::new(),
             dirty_bucket_link_bytes: BTreeSet::new(),
         }
     }
@@ -909,7 +916,7 @@ impl From<BucketBitsPacked> for BucketBits {
     fn from(value: BucketBitsPacked) -> Self {
         BucketBits {
             inner: value,
-            first_buckets_dirty: false,
+            dirty_first_buckets: BTreeSet::new(),
             dirty_bucket_link_bytes: BTreeSet::new(),
         }
     }
