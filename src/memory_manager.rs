@@ -821,7 +821,7 @@ impl BucketBits {
     }
 
     fn get_next(&self, bucket: BucketId) -> BucketId {
-        let start_bit_index = (bucket.0 * 15) as usize;
+        let start_bit_index = bucket.0 as usize * 15;
         let mut next_bits: BitArray<[u8; 2]> = BitArray::new([0u8; 2]);
 
         for i in 0..15 {
@@ -870,8 +870,10 @@ impl BucketBits {
     }
 
     fn flush_dirty_bytes<M: Memory>(&mut self, memory: &M, start_offset: u64) {
+        const FIRST_BUCKET_PER_MEMORY_LEN: usize = 2 * MAX_NUM_MEMORIES as usize;
+
         if !self.dirty_first_buckets.is_empty() {
-            let bytes: [u8; MAX_NUM_MEMORIES as usize * 2] = unsafe { transmute(self.inner.first_bucket_per_memory) };
+            let bytes: [u8; FIRST_BUCKET_PER_MEMORY_LEN] = unsafe { transmute(self.inner.first_bucket_per_memory) };
 
             // Multiply by 2 since we've converted from [u16] to [u8].
             let min = 2 * self.dirty_first_buckets.first().unwrap().0 as usize;
@@ -887,7 +889,7 @@ impl BucketBits {
             let max = *self.dirty_bucket_link_bytes.last().unwrap() as usize;
 
             let slice = &self.inner.bucket_links.data[min..=max];
-            write(memory, start_offset + min as u64, slice);
+            write(memory, start_offset + (FIRST_BUCKET_PER_MEMORY_LEN + min) as u64, slice);
             self.dirty_bucket_link_bytes.clear();
         }
     }
