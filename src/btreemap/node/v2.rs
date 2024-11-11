@@ -172,9 +172,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Load the values
-        for i in 0..num_entries {
+        for (_key, value) in keys_encoded_values.iter_mut() {
             // Load the values lazily.
-            keys_encoded_values[i].1 = RefCell::new(Value::ByRef(Bytes::from(offset.get())));
+            *value = RefCell::new(Value::ByRef(Bytes::from(offset.get())));
             let value_size = read_u32(&reader, offset) as usize;
             offset += U32_SIZE + Bytes::from(value_size as u64);
         }
