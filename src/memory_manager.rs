@@ -410,7 +410,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             }
         }
 
-        write_struct(&bucket_bits.inner, Address::from(BUCKET_BITS_OFFSET), &memory);
+        bucket_bits.flush_all(&memory, BUCKET_BITS_OFFSET);
 
         let mem_mgr = Self {
             memory,
@@ -850,6 +850,12 @@ impl BucketBits {
             write(memory, start_offset + (FIRST_BUCKET_PER_MEMORY_LEN + min) as u64, slice);
             self.dirty_bucket_link_bytes.clear();
         }
+    }
+
+    fn flush_all<M: Memory>(&mut self, memory: &M, start_offset: u64) {
+        write_struct(&self.inner, Address::from(start_offset), memory);
+        self.dirty_first_buckets.clear();
+        self.dirty_bucket_link_bytes.clear();
     }
 }
 
