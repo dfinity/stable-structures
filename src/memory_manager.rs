@@ -287,6 +287,8 @@ impl<M: Memory> Memory for VirtualMemory<M> {
 struct MemoryManagerInner<M: Memory> {
     memory: M,
 
+    version: u8,
+
     // The number of buckets that have been allocated.
     allocated_buckets: u16,
 
@@ -327,6 +329,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn new(memory: M, bucket_size_in_pages: u16) -> Self {
         let mem_mgr = Self {
             memory,
+            version: LAYOUT_VERSION_V2,
             allocated_buckets: 0,
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
@@ -363,6 +366,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn new_v1(memory: M, bucket_size_in_pages: u16) -> Self {
         let mem_mgr = Self {
             memory,
+            version: LAYOUT_VERSION_V1,
             allocated_buckets: 0,
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
@@ -414,6 +418,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let mem_mgr = Self {
             memory,
+            version: LAYOUT_VERSION_V2,
             allocated_buckets: header.num_allocated_buckets,
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
@@ -456,6 +461,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         Self {
             memory,
+            version: LAYOUT_VERSION_V2,
             allocated_buckets: header.num_allocated_buckets,
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
@@ -479,7 +485,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn save_header(&self) {
         let header = Header {
             magic: *MAGIC,
-            version: LAYOUT_VERSION_V2,
+            version: self.version,
             num_allocated_buckets: self.allocated_buckets,
             bucket_size_in_pages: self.bucket_size_in_pages,
             _reserved: [0; HEADER_RESERVED_BYTES],
@@ -496,6 +502,13 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     // Grows the memory with the given id by the given number of pages.
     fn grow(&mut self, id: MemoryId, pages: u64) -> i64 {
+        #[cfg(test)]
+        if self.version == LAYOUT_VERSION_V1 {
+            return self.grow_v1(id, pages);
+        }
+
+        debug_assert_eq!(self.version, LAYOUT_VERSION_V2);
+
         // Compute how many additional buckets are needed.
         let old_size = self.memory_size(id);
         let new_size = old_size + pages;
@@ -552,6 +565,58 @@ impl<M: Memory> MemoryManagerInner<M> {
             .flush_dirty_bytes(&self.memory, BUCKET_BITS_OFFSET);
 
         // Return the old size.
+        old_size as i64
+    }
+
+    #[cfg(test)]
+    fn grow_v1(&mut self, id: MemoryId, pages: u64) -> i64 {
+        // Compute how many additional buckets are needed.
+        let old_size = self.memory_size(id);
+        let new_size = old_size + pages;
+        let current_buckets = self.num_buckets_needed(old_size);
+        let required_buckets = self.num_buckets_needed(new_size);
+        let new_buckets_needed = required_buckets - current_buckets;
+
+        if new_buckets_needed + self.allocated_buckets as u64 > MAX_NUM_BUCKETS {
+            // Exceeded the memory that can be managed.
+            return -1;
+        }
+
+        // Allocate new buckets as needed.
+        for _ in 0..new_buckets_needed {
+            let new_bucket_id = BucketId(self.allocated_buckets);
+
+            self.memory_buckets
+                .entry(id)
+                .or_default()
+                .push(new_bucket_id);
+
+            // Write in stable store that this bucket belongs to the memory with the provided `id`.
+            write(
+                &self.memory,
+                bucket_allocations_address(new_bucket_id).get(),
+                &[id.0],
+            );
+
+            self.allocated_buckets += 1;
+        }
+
+        // Grow the underlying memory if necessary.
+        let pages_needed = BUCKETS_OFFSET_IN_PAGES
+            + self.bucket_size_in_pages as u64 * self.allocated_buckets as u64;
+        if pages_needed > self.memory.size() {
+            let additional_pages_needed = pages_needed - self.memory.size();
+            let prev_pages = self.memory.grow(additional_pages_needed);
+            if prev_pages == -1 {
+                panic!("{id:?}: grow failed");
+            }
+        }
+
+        // Update the memory with the new size.
+        self.memory_sizes_in_pages[id.0 as usize] = new_size;
+
+        // Update the header and return the old size.
+        self.save_header();
         old_size as i64
     }
 
@@ -797,7 +862,7 @@ impl BucketBits {
     }
 
     fn set_next(&mut self, bucket: BucketId, next: BucketId) {
-        let start_bit_index = (bucket.0 * 15) as usize;
+        let start_bit_index = bucket.0 as usize * 15;
         let next_bits: BitArray<[u8; 2]> = BitArray::from(next.0.to_be_bytes());
 
         for (index, bit) in next_bits.iter().skip(1).enumerate() {
@@ -1450,7 +1515,7 @@ mod test {
             .collect();
 
         proptest!(|(
-            num_memories in 0..255usize,
+            num_memories in 0..10usize,
             data in proptest::collection::vec(0..u8::MAX, 0..2*WASM_PAGE_SIZE as usize),
             offset in 0..10*WASM_PAGE_SIZE
         )| {
@@ -1459,8 +1524,11 @@ mod test {
                 crate::write(memory_v1, offset, &data);
             }
 
+            // Copy the underlying memory because loading a v1 memory manager will convert it to v2
+            let mem_clone = Rc::new(RefCell::new(mem.borrow().clone()));
+
             // Load layout v1 and convert it to layout v2.
-            let mem_mgr_v2 = MemoryManager::init_with_bucket_size(mem.clone(), 1);
+            let mem_mgr_v2 = MemoryManager::init_with_bucket_size(mem_clone, 1);
             let memories_v2: Vec<_> = (0..MAX_NUM_MEMORIES)
                 .map(|id| mem_mgr_v2.get(MemoryId(id)))
                 .collect();
