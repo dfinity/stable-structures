@@ -473,10 +473,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Map of all memories with their assigned buckets.
         let mut memory_buckets = BTreeMap::new();
 
-        // Set of all buckets with ID smaller than 'max_bucket_id' which were allocated and freed.
-        let mut freed_buckets: BTreeSet<BucketId> =
-            (0..header.num_allocated_buckets).map(BucketId).collect();
-
         let bucket_bits: BucketBits = read_struct(Address::from(BUCKET_BITS_OFFSET), &memory);
 
         // Translate memory sizes expressed in pages to sizes expressed in buckets.
@@ -486,16 +482,17 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_size_in_buckets.push(size_in_buckets);
 
             if size_in_buckets > 0 {
-                let mut bucket = bucket_bits.get_first(memory_id);
-                let mut buckets = vec![bucket];
-                freed_buckets.remove(&bucket);
-                for _ in 1..size_in_buckets {
-                    bucket = bucket_bits.get_next(bucket);
-                    freed_buckets.remove(&bucket);
-                    buckets.push(bucket);
-                }
+                let buckets = bucket_bits.buckets_for_memory(memory_id, size_in_buckets as u16);
                 memory_buckets.insert(memory_id, buckets);
             }
+        }
+
+        // Set of all buckets with ID smaller than 'max_bucket_id' which were allocated and freed.
+        let mut freed_buckets: BTreeSet<BucketId> =
+            (0..header.num_allocated_buckets).map(BucketId).collect();
+
+        for bucket_id in memory_buckets.values().flat_map(|buckets| buckets.iter()) {
+            freed_buckets.remove(bucket_id);
         }
 
         Self {
@@ -840,6 +837,20 @@ impl BucketBits {
         //         self.dirty_bytes.push(index);
         //     }
         // }
+    }
+
+    fn buckets_for_memory(&self, memory_id: MemoryId, count: u16) -> Vec<BucketId> {
+        if count == 0 {
+            return Vec::new();
+        }
+
+        let mut bucket = self.get_first(memory_id);
+        let mut buckets = vec![bucket];
+        for _ in 1..count {
+            bucket = self.get_next(bucket);
+            buckets.push(bucket);
+        }
+        buckets
     }
 }
 
