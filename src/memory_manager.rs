@@ -398,13 +398,21 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         let mut bucket_bits = BucketBits::default();
-        for (_, buckets) in memory_buckets.iter() {
-            for (bucket, next_bucket) in buckets.iter().zip(buckets.iter().skip(1)) {
-                bucket_bits.set_next(*bucket, *next_bucket);
+        for (memory_id, buckets) in memory_buckets.iter() {
+            let mut previous = BucketId(0);
+            for (index, bucket) in buckets.iter().enumerate() {
+                if index == 0 {
+                    bucket_bits.set_first(*memory_id, *bucket)
+                } else {
+                    bucket_bits.set_next(previous, *bucket);
+                }
+                previous = *bucket;
             }
         }
 
-        Self {
+        write_struct(&bucket_bits.inner, Address::from(BUCKET_BITS_OFFSET), &memory);
+
+        let mem_mgr = Self {
             memory,
             allocated_buckets: header.num_allocated_buckets,
             bucket_size_in_pages: header.bucket_size_in_pages,
@@ -412,7 +420,9 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_buckets,
             freed_buckets: BTreeSet::new(),
             bucket_bits,
-        }
+        };
+        mem_mgr.save_header();
+        mem_mgr
     }
 
     fn load_layout_v2(memory: M, header: Header) -> Self {
@@ -539,7 +549,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         // Write in stable store that this bucket belongs to the memory with the provided `id`.
         self.bucket_bits
-            .flush_dirty_bytes(&self.memory, size_of::<Header>() as u64);
+            .flush_dirty_bytes(&self.memory, BUCKET_BITS_OFFSET);
 
         // Return the old size.
         old_size as i64
