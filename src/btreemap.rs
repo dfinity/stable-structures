@@ -51,6 +51,7 @@
 mod allocator;
 mod iter;
 mod node;
+use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
     storable::Bound as StorableBound,
     types::{Address, NULL},
@@ -1006,15 +1007,49 @@ where
 
     /// Returns an iterator over the entries of the map, sorted by key.
     pub fn iter(&self) -> Iter<K, V, M> {
-        Iter::new(self)
+        self.iter_internal().into()
     }
 
     /// Returns an iterator over the entries in the map where keys
     /// belong to the specified range.
     pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, V, M> {
+        self.range_internal(key_range).into()
+    }
+
+    /// Returns an iterator pointing to the first element below the given bound.
+    /// Returns an empty iterator if there are no keys below the given bound.
+    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
+        if let Some((start_key, _)) = self.range(..bound).next_back() {
+            IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
+        } else {
+            IterInternal::null(self).into()
+        }
+    }
+
+    pub fn keys(&self) -> KeysIter<K, V, M> {
+        self.iter_internal().into()
+    }
+
+    pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<K, V, M> {
+        self.range_internal(key_range).into()
+    }
+
+    pub fn values(&self) -> ValuesIter<K, V, M> {
+        self.iter_internal().into()
+    }
+
+    pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<K, V, M> {
+        self.range_internal(key_range).into()
+    }
+
+    fn iter_internal(&self) -> IterInternal<K, V, M> {
+        IterInternal::new(self)
+    }
+
+    fn range_internal(&self, key_range: impl RangeBounds<K>) -> IterInternal<K, V, M> {
         if self.root_addr == NULL {
             // Map is empty.
-            return Iter::null(self);
+            return IterInternal::null(self);
         }
 
         let range = (
@@ -1022,17 +1057,7 @@ where
             key_range.end_bound().cloned(),
         );
 
-        Iter::new_in_range(self, range)
-    }
-
-    /// Returns an iterator pointing to the first element below the given bound.
-    /// Returns an empty iterator if there are no keys below the given bound.
-    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
-        if let Some((start_key, _)) = self.range(..bound).next_back() {
-            Iter::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded))
-        } else {
-            Iter::null(self)
-        }
+        IterInternal::new_in_range(self, range)
     }
 
     // Merges one node (`source`) into another (`into`), along with a median entry.
