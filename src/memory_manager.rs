@@ -221,13 +221,6 @@ impl<M: Memory> MemoryManager<M> {
         }
     }
 
-    /// Frees the specified memory.
-    /// Note that the underlying physical memory doesn't shrink, but the space previously
-    /// occupied by the given memory will be reused.
-    pub fn free(&mut self, id: MemoryId) {
-        self.inner.borrow_mut().free(id);
-    }
-
     /// Returns the underlying memory.
     ///
     /// # Returns
@@ -235,6 +228,13 @@ impl<M: Memory> MemoryManager<M> {
     /// - None otherwise.
     pub fn into_memory(self) -> Option<M> {
         Rc::into_inner(self.inner).map(|inner| inner.into_inner().into_memory())
+    }
+
+    /// Frees the specified memory.
+    /// Note that the underlying physical memory doesn't shrink, but the space previously
+    /// occupied by the given memory will be reused.
+    pub fn free(&mut self, id: MemoryId) {
+        self.inner.borrow_mut().free(id);
     }
 }
 
