@@ -114,7 +114,7 @@ where
                                     NodeType::Leaf => None,
                                 };
 
-                                if idx + 1 != node.entries_len()
+                                if idx + 1 < node.entries_len()
                                     && self.range.contains(node.key(idx + 1))
                                 {
                                     self.forward_cursors.push(Cursor::Node {
@@ -300,12 +300,14 @@ where
             } => {
                 let child_address = node.child(child_idx);
 
-                // After iterating on the child, iterate on the next _entry_ in this node.
-                // The entry immediately after the child has the same index as the child's.
-                self.forward_cursors.push(Cursor::Node {
-                    node,
-                    next: Index::Entry(child_idx),
-                });
+                if child_idx < node.entries_len() {
+                    // After iterating on the child, iterate on the next _entry_ in this node.
+                    // The entry immediately after the child has the same index as the child's.
+                    self.forward_cursors.push(Cursor::Node {
+                        node,
+                        next: Index::Entry(child_idx),
+                    });
+                }
 
                 // Add the child to the top of the cursors to be iterated on first.
                 self.forward_cursors.push(Cursor::Address(child_address));
@@ -317,11 +319,6 @@ where
                 node,
                 next: Index::Entry(entry_idx),
             } => {
-                if entry_idx >= node.entries_len() {
-                    // No more entries to iterate on in this node.
-                    return self.next_map(map);
-                }
-
                 // If the key does not belong to the range, iteration stops.
                 if !self.range.contains(node.key(entry_idx)) {
                     // Clear all cursors to avoid needless work in subsequent calls.
@@ -333,16 +330,16 @@ where
                 let res = map(&node, entry_idx);
                 self.range.0 = Bound::Excluded(node.key(entry_idx).clone());
 
-                // Add to the cursors the next element to be traversed.
-                self.forward_cursors.push(Cursor::Node {
-                    next: match node.node_type() {
-                        // If this is an internal node, add the next child to the cursors.
-                        NodeType::Internal => Index::Child(entry_idx + 1),
-                        // If this is a leaf node, add the next entry to the cursors.
-                        NodeType::Leaf => Index::Entry(entry_idx + 1),
-                    },
-                    node,
-                });
+                if let Some(next) = match node.node_type() {
+                    // If this is an internal node, add the next child to the cursors.
+                    NodeType::Internal => Some(Index::Child(entry_idx + 1)),
+                    // If this is a leaf node, add the next entry to the cursors.
+                    NodeType::Leaf if entry_idx + 1 < node.entries_len() => Some(Index::Entry(entry_idx + 1)),
+                    _ => None,
+                } {
+                    // Add to the cursors the next element to be traversed.
+                    self.forward_cursors.push(Cursor::Node { next, node });
+                }
 
                 Some(res)
             }
