@@ -900,6 +900,7 @@ impl BucketBits {
         const FIRST_BUCKET_PER_MEMORY_LEN: usize = 2 * MAX_NUM_MEMORIES as usize;
 
         if !self.dirty_first_buckets.is_empty() {
+            // SAFETY: This is safe because we simply cast from [u16] to [u8] and double the length.
             let bytes: [u8; FIRST_BUCKET_PER_MEMORY_LEN] =
                 unsafe { transmute(self.inner.first_bucket_per_memory) };
 
