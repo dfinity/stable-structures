@@ -684,6 +684,11 @@ impl<M: Memory> MemoryManagerInner<M> {
         (num_pages + self.bucket_size_in_pages as u64 - 1) / self.bucket_size_in_pages as u64
     }
 
+    // Returns the underlying memory.
+    pub fn into_memory(self) -> M {
+        self.memory
+    }
+
     fn free(&mut self, id: MemoryId) {
         self.memory_sizes_in_pages[id.0 as usize] = 0;
         let buckets = self.memory_buckets.remove(&id);
@@ -694,11 +699,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
         // Update the header.
         self.save_header();
-    }
-
-    // Returns the underlying memory.
-    pub fn into_memory(self) -> M {
-        self.memory
     }
 
     #[cfg(test)]
