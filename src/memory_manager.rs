@@ -823,7 +823,7 @@ fn bucket_allocations_address(id: BucketId) -> Address {
 
 const BUCKET_BITS_LEN: usize = 15 * MAX_NUM_BUCKETS as usize;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct BucketBits {
     inner: BucketBitsPacked,
     dirty_first_buckets: BTreeSet<MemoryId>,
@@ -931,16 +931,6 @@ impl BucketBits {
         write_struct(&self.inner, Address::from(start_offset), memory);
         self.dirty_first_buckets.clear();
         self.dirty_bucket_link_bytes.clear();
-    }
-}
-
-impl Default for BucketBits {
-    fn default() -> Self {
-        BucketBits {
-            inner: BucketBitsPacked::default(),
-            dirty_first_buckets: BTreeSet::new(),
-            dirty_bucket_link_bytes: BTreeSet::new(),
-        }
     }
 }
 
