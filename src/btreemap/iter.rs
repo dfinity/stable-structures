@@ -222,12 +222,11 @@ where
                         }
                         Err(idx) => {
                             // The `idx` variable points to the first
-                            // key that is greater than the left
+                            // key that is greater than the right
                             // bound.
                             //
                             // If the index points to a valid node, we
-                            // will visit its left subtree and then
-                            // return to this key.
+                            // will visit its left subtree.
                             //
                             // If the index points at the end of
                             // array, we'll continue with the right
@@ -327,6 +326,7 @@ where
                 if !self.range.contains(node.key(entry_idx)) {
                     // Clear all cursors to avoid needless work in subsequent calls.
                     self.forward_cursors = vec![];
+                    self.backward_cursors = vec![];
                     return None;
                 }
 
@@ -363,11 +363,11 @@ where
                     // Load the node at the given address, and add it to the cursors.
                     let node = self.map.load_node(address);
                     if let Some(next) = match node.node_type() {
-                        // Iterate on internal nodes starting from the first child.
+                        // Iterate on internal nodes starting from the right child.
                         NodeType::Internal if node.children_len() > 0 => {
                             Some(Index::Child(node.children_len() - 1))
                         }
-                        // Iterate on leaf nodes starting from the first entry.
+                        // Iterate on leaf nodes starting from the right entry.
                         NodeType::Leaf if node.entries_len() > 0 => {
                             Some(Index::Entry(node.entries_len() - 1))
                         }
@@ -553,7 +553,7 @@ mod test {
             btree.insert(i, i + 1);
         }
 
-        // Iteration should be in ascending order.
+        // Iteration should be in descending order.
         let mut i = 100;
         for (key, value) in btree.iter().rev() {
             i -= 1;
@@ -574,7 +574,7 @@ mod test {
             btree.insert(i, i + 1);
         }
 
-        // Iteration should be in ascending order.
+        // Iteration should be in descending order.
         let mut i = 80;
         for (key, value) in btree.range(20..80).rev() {
             i -= 1;
