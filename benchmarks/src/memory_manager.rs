@@ -1,4 +1,4 @@
-use crate::BenchResult;
+use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::{DefaultMemoryImpl, Memory};
 
@@ -7,7 +7,7 @@ const MB: usize = 1024 * 1024;
 const MB_IN_PAGES: usize = MB / WASM_PAGE_SIZE;
 
 /// Benchmarks accessing stable memory without using a `MemoryManager` to establish a baseline.
-#[ic_cdk_macros::query]
+#[bench(raw)]
 pub fn memory_manager_baseline() -> BenchResult {
     // A buffer of 100MiB.
     let buf_size = 100 * MB;
@@ -15,7 +15,7 @@ pub fn memory_manager_baseline() -> BenchResult {
     let mut buf = vec![0; buf_size];
 
     let memory = DefaultMemoryImpl::default();
-    crate::benchmark(|| {
+    bench_fn(|| {
         // Write the buffer 5 times consecutively in memory.
         for i in 0..5 {
             memory.grow(buf_size_in_pages);
@@ -32,7 +32,7 @@ pub fn memory_manager_baseline() -> BenchResult {
 /// Benchmarks the `MemoryManager` by writing a 100MiB buffer to 5 memories.
 /// The virtual memories of the `MemoryManager` are written in small chunks so that they are
 /// interleaved in the underlying stable memory.
-#[ic_cdk_macros::query]
+#[bench(raw)]
 pub fn memory_manager_overhead() -> BenchResult {
     // A buffer of 100MiB.
     let num_chunks = 100;
@@ -41,7 +41,7 @@ pub fn memory_manager_overhead() -> BenchResult {
 
     let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     let num_memories = 5;
-    crate::benchmark(|| {
+    bench_fn(|| {
         for i in 0..num_memories {
             let memory = mem_mgr.get(MemoryId::new(i));
             for j in 0..num_chunks {
@@ -58,7 +58,7 @@ pub fn memory_manager_overhead() -> BenchResult {
 }
 
 /// Benchmarks the `MemoryManager`'s `grow` method.
-#[ic_cdk_macros::query]
+#[bench(raw)]
 pub fn memory_manager_grow() -> BenchResult {
     let mem_mgr = MemoryManager::init_with_bucket_size(DefaultMemoryImpl::default(), 1);
 
@@ -66,7 +66,7 @@ pub fn memory_manager_grow() -> BenchResult {
 
     let memory = mem_mgr.get(MemoryId::new(0));
 
-    crate::benchmark(|| {
+    bench_fn(|| {
         for _ in 0..buckets_per_memory {
             memory.grow(1);
         }

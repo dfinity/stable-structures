@@ -107,6 +107,7 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
+#[derive(PartialEq, Debug)]
 /// The packed header size must be <= ALLOCATOR_OFFSET.
 struct BTreeHeader {
     version: Version,
@@ -146,7 +147,7 @@ where
     /// Initializes a v1 `BTreeMap`.
     ///
     /// This is exposed only in testing and benchmarking.
-    #[cfg(any(feature = "profiler", test))]
+    #[cfg(any(feature = "canbench-rs", test))]
     pub fn init_v1(memory: M) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
@@ -222,7 +223,7 @@ where
     /// Create a v1 instance of the BTree.
     ///
     /// This is only exposed for testing and benchmarking.
-    #[cfg(any(feature = "profiler", test))]
+    #[cfg(any(feature = "canbench-rs", test))]
     pub fn new_v1(memory: M) -> Self {
         let max_key_size = K::BOUND.max_size();
         let max_value_size = V::BOUND.max_size();
@@ -349,8 +350,6 @@ where
     /// The previous value of the key, if present, is returned.
     ///
     /// PRECONDITION:
-    ///   Key is bounded in size
-    ///   Value is bounded in size
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
@@ -558,9 +557,18 @@ where
     }
 
     /// Removes all elements from the map.
+    #[deprecated(since = "0.6.3", note = "please use `clear_new` instead")]
     pub fn clear(self) -> Self {
         let mem = self.allocator.into_memory();
         Self::new(mem)
+    }
+
+    /// Removes all elements from the map.
+    pub fn clear_new(&mut self) {
+        self.root_addr = NULL;
+        self.length = 0;
+        self.allocator.clear();
+        self.save();
     }
 
     /// Returns the first key-value pair in the map. The key in this
@@ -655,7 +663,7 @@ where
                             );
 
                             // Deallocate the empty node.
-                            self.allocator.deallocate(node.address());
+                            node.deallocate(&mut self.allocator);
                             self.root_addr = NULL;
                         } else {
                             node.save(self.allocator_mut());
@@ -783,11 +791,12 @@ where
                             self.root_addr = new_child.address();
 
                             // Deallocate the root node.
-                            self.allocator.deallocate(node.address());
+                            node.deallocate(&mut self.allocator);
                             self.save();
+                        } else {
+                            node.save(self.allocator_mut());
                         }
 
-                        node.save(self.allocator_mut());
                         new_child.save(self.allocator_mut());
 
                         // Recursively delete the key.
@@ -945,9 +954,10 @@ where
                             node.remove_child(idx);
 
                             if node.entries_len() == 0 {
-                                self.allocator.deallocate(node.address());
+                                let node_address = node.address();
+                                node.deallocate(&mut self.allocator);
 
-                                if node.address() == self.root_addr {
+                                if node_address == self.root_addr {
                                     // Update the root.
                                     self.root_addr = left_sibling.address();
                                     self.save();
@@ -973,9 +983,10 @@ where
                             node.remove_child(idx);
 
                             if node.entries_len() == 0 {
-                                self.allocator.deallocate(node.address());
+                                let node_address = node.address();
+                                node.deallocate(&mut self.allocator);
 
-                                if node.address() == self.root_addr {
+                                if node_address == self.root_addr {
                                     // Update the root.
                                     self.root_addr = right_sibling.address();
                                     self.save();
@@ -1012,96 +1023,7 @@ where
             key_range.end_bound().cloned(),
         );
 
-        let mut cursors = vec![];
-
-        match key_range.start_bound() {
-            Bound::Unbounded => {
-                cursors.push(Cursor::Address(self.root_addr));
-                Iter::new_in_range(self, range, cursors)
-            }
-            Bound::Included(key) | Bound::Excluded(key) => {
-                let mut node = self.load_node(self.root_addr);
-                loop {
-                    match node.search(key) {
-                        Ok(idx) => {
-                            if let Bound::Included(_) = key_range.start_bound() {
-                                // We found the key exactly matching the left bound.
-                                // Here is where we'll start the iteration.
-                                cursors.push(Cursor::Node {
-                                    node,
-                                    next: Index::Entry(idx),
-                                });
-                                return Iter::new_in_range(self, range, cursors);
-                            } else {
-                                // We found the key that we must
-                                // exclude.  We add its right neighbor
-                                // to the stack and start iterating
-                                // from its right child.
-                                let right_child = match node.node_type() {
-                                    NodeType::Internal => Some(node.child(idx + 1)),
-                                    NodeType::Leaf => None,
-                                };
-
-                                if idx + 1 != node.entries_len()
-                                    && key_range.contains(node.key(idx + 1))
-                                {
-                                    cursors.push(Cursor::Node {
-                                        node,
-                                        next: Index::Entry(idx + 1),
-                                    });
-                                }
-                                if let Some(right_child) = right_child {
-                                    cursors.push(Cursor::Address(right_child));
-                                }
-                                return Iter::new_in_range(self, range, cursors);
-                            }
-                        }
-                        Err(idx) => {
-                            // The `idx` variable points to the first
-                            // key that is greater than the left
-                            // bound.
-                            //
-                            // If the index points to a valid node, we
-                            // will visit its left subtree and then
-                            // return to this key.
-                            //
-                            // If the index points at the end of
-                            // array, we'll continue with the right
-                            // child of the last key.
-
-                            // Load the left child of the node to visit if it exists.
-                            // This is done first to avoid cloning the node.
-                            let child = match node.node_type() {
-                                NodeType::Internal => {
-                                    // Note that loading a child node cannot fail since
-                                    // len(children) = len(entries) + 1
-                                    Some(self.load_node(node.child(idx)))
-                                }
-                                NodeType::Leaf => None,
-                            };
-
-                            if idx < node.entries_len() && key_range.contains(node.key(idx)) {
-                                cursors.push(Cursor::Node {
-                                    node,
-                                    next: Index::Entry(idx),
-                                });
-                            }
-
-                            match child {
-                                None => {
-                                    // Leaf node. Return an iterator with the found cursors.
-                                    return Iter::new_in_range(self, range, cursors);
-                                }
-                                Some(child) => {
-                                    // Iterate over the child node.
-                                    node = child;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Iter::new_in_range(self, range)
     }
 
     /// Returns an iterator pointing to the first element below the given bound.
@@ -1150,7 +1072,7 @@ where
                                     }
                                 }
                                 // If the cursors are empty, the iterator will be empty.
-                                return Iter::new_in_range(self, dummy_bounds, cursors);
+                                return Iter::new_with_cursors(self, dummy_bounds, cursors);
                             }
                             debug_assert!(node.key(idx - 1) < bound);
 
@@ -1158,7 +1080,7 @@ where
                                 node,
                                 next: Index::Entry(idx - 1),
                             });
-                            return Iter::new_in_range(self, dummy_bounds, cursors);
+                            return Iter::new_with_cursors(self, dummy_bounds, cursors);
                         }
                         NodeType::Internal => {
                             let child = self.load_node(node.child(idx));
@@ -1191,10 +1113,7 @@ where
     //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     //   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
-        let source_address = source.address();
-        into.merge(source, median, self.memory());
-        into.save(self.allocator_mut());
-        self.allocator.deallocate(source_address);
+        into.merge(source, median, &mut self.allocator);
         into
     }
 
@@ -3030,5 +2949,159 @@ mod test {
         // Reload the BTree again with bounded type.
         let btree: BTreeMap<T, T, _> = BTreeMap::init(btree.into_memory());
         assert_eq!(btree.get(&T), Some(T));
+    }
+
+    #[test]
+    fn test_clear_new_bounded_type() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::new(mem.clone());
+
+        btree.insert(
+            [1u8; 4].as_slice().try_into().unwrap(),
+            [1u8; 4].as_slice().try_into().unwrap(),
+        );
+
+        assert_ne!(btree.len(), 0);
+        assert_ne!(btree.allocator.num_allocated_chunks(), 0);
+        assert_ne!(btree.root_addr, NULL);
+
+        btree.clear_new();
+
+        let header_actual = BTreeMap::<Blob<4>, Blob<4>, _>::read_header(&mem);
+
+        BTreeMap::<Blob<4>, Blob<4>, _>::new(mem.clone());
+
+        let header_expected = BTreeMap::<Blob<4>, Blob<4>, _>::read_header(&mem);
+
+        assert_eq!(header_actual, header_expected);
+    }
+
+    #[test]
+    fn test_clear_new_unbounded_type() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<String, String, _> = BTreeMap::new(mem.clone());
+        btree.insert("asd".into(), "bce".into());
+
+        assert_ne!(btree.len(), 0);
+        assert_ne!(btree.allocator.num_allocated_chunks(), 0);
+        assert_ne!(btree.root_addr, NULL);
+
+        btree.clear_new();
+
+        let header_actual = BTreeMap::<String, String, _>::read_header(&mem);
+
+        BTreeMap::<String, String, _>::new(mem.clone());
+
+        let header_expected = BTreeMap::<String, String, _>::read_header(&mem);
+
+        assert_eq!(header_actual, header_expected);
+    }
+
+    #[test]
+    fn deallocating_node_with_overflows() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new(mem.clone());
+
+        // No allocated chunks yet.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+
+        // Insert and remove an entry that's large and requires overflow pages.
+        btree.insert(vec![0; 10_000], vec![]);
+
+        // At least two chunks should be allocated.
+        // One for the node itself and at least one overflow page.
+        assert!(btree.allocator.num_allocated_chunks() >= 2);
+        btree.remove(&vec![0; 10_000]);
+
+        // All chunks have been deallocated.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn repeatedly_deallocating_nodes_with_overflows() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new(mem.clone());
+
+        // No allocated chunks yet.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+
+        for _ in 0..100 {
+            for i in 0..100 {
+                btree.insert(vec![i; 10_000], vec![]);
+            }
+
+            for i in 0..100 {
+                btree.remove(&vec![i; 10_000]);
+            }
+        }
+
+        // All chunks have been deallocated.
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn deallocating_root_does_not_leak_memory() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Vec<u8>, _, _> = BTreeMap::new(mem.clone());
+
+        for i in 1..=11 {
+            // Large keys are stored so that each node overflows.
+            assert_eq!(btree.insert(vec![i; 10_000], ()), None);
+        }
+
+        // Should now split a node.
+        assert_eq!(btree.insert(vec![0; 10_000], ()), None);
+
+        // The btree should look like this:
+        //                    [6]
+        //                   /   \
+        // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
+        let root = btree.load_node(btree.root_addr);
+        assert_eq!(root.node_type(), NodeType::Internal);
+        assert_eq!(root.keys(), vec![vec![6; 10_000]]);
+        assert_eq!(root.children_len(), 2);
+
+        // Remove the element in the root.
+        btree.remove(&vec![6; 10_000]);
+
+        // The btree should look like this:
+        //                 [5]
+        //                /   \
+        // [0, 1, 2, 3, 4]     [7, 8, 9, 10, 11]
+        let root = btree.load_node(btree.root_addr);
+        assert_eq!(root.node_type(), NodeType::Internal);
+        assert_eq!(root.keys(), vec![vec![5; 10_000]]);
+        assert_eq!(root.children_len(), 2);
+
+        // Remove the element in the root. This triggers the case where the root
+        // node is deallocated and the children are merged into a single node.
+        btree.remove(&vec![5; 10_000]);
+
+        // The btree should look like this:
+        //      [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
+        let root = btree.load_node(btree.root_addr);
+        assert_eq!(root.node_type(), NodeType::Leaf);
+        assert_eq!(
+            root.keys(),
+            vec![
+                vec![0; 10_000],
+                vec![1; 10_000],
+                vec![2; 10_000],
+                vec![3; 10_000],
+                vec![4; 10_000],
+                vec![7; 10_000],
+                vec![8; 10_000],
+                vec![9; 10_000],
+                vec![10; 10_000],
+                vec![11; 10_000],
+            ]
+        );
+
+        // Delete everything else.
+        for i in 0..=11 {
+            btree.remove(&vec![i; 10_000]);
+        }
+
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
     }
 }

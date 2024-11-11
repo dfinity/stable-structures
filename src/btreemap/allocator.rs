@@ -46,6 +46,7 @@ pub struct Allocator<M: Memory> {
 }
 
 #[repr(C, packed)]
+#[derive(PartialEq, Debug)]
 struct AllocatorHeader {
     magic: [u8; 3],
     version: u8,
@@ -76,22 +77,28 @@ impl<M: Memory> Allocator<M> {
     ///                |__________|       |____ NULL
     ///
     pub fn new(memory: M, addr: Address, allocation_size: Bytes) -> Self {
-        let free_list_head = addr + AllocatorHeader::size();
-
-        // Create the initial memory chunk and save it directly after the allocator's header.
-        let chunk = ChunkHeader::null();
-        chunk.save(free_list_head, &memory);
-
-        let allocator = Self {
+        let mut allocator = Self {
             header_addr: addr,
             allocation_size,
             num_allocated_chunks: 0,
-            free_list_head,
+            free_list_head: NULL, // Will be set in `allocator.clear()` below.
             memory,
         };
 
-        allocator.save();
+        allocator.clear();
         allocator
+    }
+
+    /// Deallocate all allocated chunks.
+    pub fn clear(&mut self) {
+        // Create the initial memory chunk and save it directly after the allocator's header.
+        self.free_list_head = self.header_addr + AllocatorHeader::size();
+        let chunk = ChunkHeader::null();
+        chunk.save(self.free_list_head, &self.memory);
+
+        self.num_allocated_chunks = 0;
+
+        self.save()
     }
 
     /// Load an allocator from memory at the given `addr`.
@@ -399,6 +406,35 @@ mod test {
             allocator_addr + AllocatorHeader::size()
         );
         assert_eq!(allocator.num_allocated_chunks, 0);
+    }
+
+    #[test]
+    fn clear_deallocates_all_allocated_chunks() {
+        let mem = make_memory();
+        let allocation_size = Bytes::from(16u64);
+        let allocator_addr = Address::from(0);
+
+        let mut allocator = Allocator::new(mem.clone(), allocator_addr, allocation_size);
+
+        allocator.allocate();
+        allocator.allocate();
+
+        assert_eq!(
+            allocator.free_list_head,
+            allocator_addr
+                + AllocatorHeader::size()
+                + allocator.chunk_size()
+                + allocator.chunk_size()
+        );
+        allocator.clear();
+
+        let header_actual: AllocatorHeader = read_struct(allocator_addr, &mem);
+
+        Allocator::new(mem.clone(), allocator_addr, allocation_size);
+
+        let header_expected: AllocatorHeader = read_struct(allocator_addr, &mem);
+
+        assert_eq!(header_actual, header_expected);
     }
 
     #[test]

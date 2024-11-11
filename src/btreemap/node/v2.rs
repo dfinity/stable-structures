@@ -112,8 +112,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         header: NodeHeader,
         memory: &M,
     ) -> Self {
-        #[cfg(feature = "profiler")]
-        let _p = profiler::profile("node_load_v2");
+        #[cfg(feature = "canbench")]
+        let _p = canbench::profile("node_load_v2");
 
         // Load the node, including any overflows, into a buffer.
         let overflows = read_overflows(address, memory);
@@ -194,8 +194,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&mut self, allocator: &mut Allocator<M>) {
-        #[cfg(feature = "profiler")]
-        let _p = profiler::profile("node_save_v2");
+        #[cfg(feature = "canbench")]
+        let _p = canbench::profile("node_save_v2");
 
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
@@ -233,7 +233,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Add a null overflow address.
         // This might get overwritten later in case the node does overflow.
-        writer.write_u64(offset, self.overflows.get(0).unwrap_or(&NULL).get());
+        writer.write_u64(offset, self.overflows.first().unwrap_or(&NULL).get());
         offset += Bytes::from(8u64);
 
         // Write the children

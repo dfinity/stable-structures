@@ -224,6 +224,15 @@ impl<M: Memory> MemoryManager<M> {
         }
     }
 
+    /// Returns the underlying memory.
+    ///
+    /// # Returns
+    /// - The underlying memory, if there is exactly one strong reference to the memory manager.  Please see [`Rc::try_unwrap`](https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap) for more details.
+    /// - None otherwise.
+    pub fn into_memory(self) -> Option<M> {
+        Rc::into_inner(self.inner).map(|inner| inner.into_inner().into_memory())
+    }
+
     /// Frees the specified memory.
     /// Note that the underlying physical memory doesn't shrink, but the space previously
     /// occupied by the given memory will be reused.
@@ -627,6 +636,11 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn num_buckets_needed(&self, num_pages: u64) -> u64 {
         // Ceiling division.
         (num_pages + self.bucket_size_in_pages as u64 - 1) / self.bucket_size_in_pages as u64
+    }
+
+    // Returns the underlying memory.
+    pub fn into_memory(self) -> M {
+        self.memory
     }
 
     fn free(&mut self, id: MemoryId) {
