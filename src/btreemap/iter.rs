@@ -334,7 +334,9 @@ where
                     // If this is an internal node, add the next child to the cursors.
                     NodeType::Internal => Some(Index::Child(entry_idx + 1)),
                     // If this is a leaf node, add the next entry to the cursors.
-                    NodeType::Leaf if entry_idx + 1 < node.entries_len() => Some(Index::Entry(entry_idx + 1)),
+                    NodeType::Leaf if entry_idx + 1 < node.entries_len() => {
+                        Some(Index::Entry(entry_idx + 1))
+                    }
                     _ => None,
                 } {
                     // Add to the cursors the next element to be traversed.
