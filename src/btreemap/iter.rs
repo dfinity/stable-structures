@@ -363,11 +363,11 @@ where
                     // Load the node at the given address, and add it to the cursors.
                     let node = self.map.load_node(address);
                     if let Some(next) = match node.node_type() {
-                        // Iterate on internal nodes starting from the right child.
+                        // Iterate on internal nodes starting from the last child.
                         NodeType::Internal if node.children_len() > 0 => {
                             Some(Index::Child(node.children_len() - 1))
                         }
-                        // Iterate on leaf nodes starting from the right entry.
+                        // Iterate on leaf nodes starting from the last entry.
                         NodeType::Leaf if node.entries_len() > 0 => {
                             Some(Index::Entry(node.entries_len() - 1))
                         }
