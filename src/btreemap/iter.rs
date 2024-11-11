@@ -382,7 +382,7 @@ where
             } => {
                 let child_address = node.child(child_idx);
 
-                if 0 < child_idx && child_idx <= node.entries_len() {
+                if 0 < child_idx {
                     // After iterating on the child, iterate on the previous _entry_ in this node.
                     self.backward_cursors.push(Cursor::Node {
                         node,
