@@ -41,7 +41,11 @@
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 
-use crate::{read_struct, types::{Address, Bytes}, write, write_struct, Memory, WASM_PAGE_SIZE};
+use crate::{
+    read_struct,
+    types::{Address, Bytes},
+    write, write_struct, Memory, WASM_PAGE_SIZE,
+};
 use bitvec::array::BitArray;
 use bitvec::macros::internal::funty::Fundamental;
 use std::cmp::min;
@@ -896,7 +900,8 @@ impl BucketBits {
         const FIRST_BUCKET_PER_MEMORY_LEN: usize = 2 * MAX_NUM_MEMORIES as usize;
 
         if !self.dirty_first_buckets.is_empty() {
-            let bytes: [u8; FIRST_BUCKET_PER_MEMORY_LEN] = unsafe { transmute(self.inner.first_bucket_per_memory) };
+            let bytes: [u8; FIRST_BUCKET_PER_MEMORY_LEN] =
+                unsafe { transmute(self.inner.first_bucket_per_memory) };
 
             // Multiply by 2 since we've converted from [u16] to [u8].
             let min = 2 * self.dirty_first_buckets.first().unwrap().0 as usize;
@@ -912,7 +917,11 @@ impl BucketBits {
             let max = *self.dirty_bucket_link_bytes.last().unwrap() as usize;
 
             let slice = &self.inner.bucket_links.data[min..=max];
-            write(memory, start_offset + (FIRST_BUCKET_PER_MEMORY_LEN + min) as u64, slice);
+            write(
+                memory,
+                start_offset + (FIRST_BUCKET_PER_MEMORY_LEN + min) as u64,
+                slice,
+            );
             self.dirty_bucket_link_bytes.clear();
         }
     }
