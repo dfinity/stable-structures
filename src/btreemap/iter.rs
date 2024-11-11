@@ -88,8 +88,7 @@ where
 
         match self.range.start_bound() {
             Bound::Unbounded => {
-                self.forward_cursors
-                    .push(Cursor::Address(self.map.root_addr));
+                self.forward_cursors.push(Cursor::Address(self.map.root_addr));
             }
             Bound::Included(key) | Bound::Excluded(key) => {
                 let mut node = self.map.load_node(self.map.root_addr);
@@ -182,8 +181,7 @@ where
 
         match self.range.end_bound() {
             Bound::Unbounded => {
-                self.backward_cursors
-                    .push(Cursor::Address(self.map.root_addr));
+                self.backward_cursors.push(Cursor::Address(self.map.root_addr));
             }
             Bound::Included(key) | Bound::Excluded(key) => {
                 let mut node = self.map.load_node(self.map.root_addr);
@@ -208,7 +206,8 @@ where
                                     NodeType::Leaf => None,
                                 };
 
-                                if idx > 0 && self.range.contains(node.key(idx - 1)) {
+                                if idx > 0 && self.range.contains(node.key(idx - 1))
+                                {
                                     self.backward_cursors.push(Cursor::Node {
                                         node,
                                         next: Index::Entry(idx - 1),
@@ -364,16 +363,15 @@ where
                     let node = self.map.load_node(address);
                     if let Some(next) = match node.node_type() {
                         // Iterate on internal nodes starting from the first child.
-                        NodeType::Internal if node.children_len() > 0 => {
-                            Some(Index::Child(node.children_len() - 1))
-                        }
+                        NodeType::Internal if node.children_len() > 0 => Some(Index::Child(node.children_len() - 1)),
                         // Iterate on leaf nodes starting from the first entry.
-                        NodeType::Leaf if node.entries_len() > 0 => {
-                            Some(Index::Entry(node.entries_len() - 1))
-                        }
-                        _ => None,
+                        NodeType::Leaf if node.entries_len() > 0 => Some(Index::Entry(node.entries_len() - 1)),
+                        _ => None
                     } {
-                        self.backward_cursors.push(Cursor::Node { next, node });
+                        self.backward_cursors.push(Cursor::Node {
+                            next,
+                            node,
+                        });
                     }
                 }
                 self.next_back_map(map)
@@ -419,10 +417,13 @@ where
                     NodeType::Internal => Some(Index::Child(entry_idx)),
                     // If this is a leaf node, add the previous entry to the cursors.
                     NodeType::Leaf if entry_idx > 0 => Some(Index::Entry(entry_idx - 1)),
-                    _ => None,
+                    _ => None
                 } {
                     // Add to the cursors the next element to be traversed.
-                    self.backward_cursors.push(Cursor::Node { next, node });
+                    self.backward_cursors.push(Cursor::Node {
+                        next,
+                        node,
+                    });
                 }
 
                 Some(res)

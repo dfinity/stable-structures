@@ -365,39 +365,15 @@ benches:
       heap_increase: 0
       stable_memory_increase: 6
     scopes: {}
-  btreemap_iter_10mib_values:
-    total:
-      instructions: 25686915
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_iter_count_10mib_values:
     total:
-      instructions: 547724
+      instructions: 525036
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_count_small_values:
     total:
-      instructions: 11474450
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_iter_rev_10mib_values:
-    total:
-      instructions: 25585848
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_iter_rev_small_values:
-    total:
-      instructions: 23893873
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_iter_small_values:
-    total:
-      instructions: 25970069
+      instructions: 10458516
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -541,13 +517,13 @@ benches:
     scopes: {}
   memory_manager_grow:
     total:
-      instructions: 350727867
+      instructions: 351687872
       heap_increase: 2
       stable_memory_increase: 32000
     scopes: {}
   memory_manager_overhead:
     total:
-      instructions: 1182141676
+      instructions: 1182143127
       heap_increase: 0
       stable_memory_increase: 8320
     scopes: {}
