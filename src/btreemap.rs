@@ -2216,6 +2216,7 @@ mod test {
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
+                println!("{}", i);
                 assert_eq!(btree.remove(&b(i.to_le_bytes().as_slice())), Some(b(&[])));
             }
 
@@ -2235,6 +2236,7 @@ mod test {
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
+                println!("{i}");
                 assert_eq!(btree.pop_first().unwrap().1, b(&i.to_le_bytes()));
             }
 

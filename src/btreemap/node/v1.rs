@@ -44,8 +44,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         Node {
             address,
             node_type,
-            keys: vec![],
-            encoded_values: RefCell::default(),
+            keys_encoded_values: vec![],
             children: vec![],
             version: Version::V1(page_size),
             overflows: Vec::with_capacity(0),
@@ -64,8 +63,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let _p = canbench::profile("node_load_v1");
 
         // Load the entries.
-        let mut keys = Vec::with_capacity(header.num_entries as usize);
-        let mut encoded_values = Vec::with_capacity(header.num_entries as usize);
+        let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
         let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
         for _ in 0..header.num_entries {
@@ -78,10 +76,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory.read((address + offset).get(), &mut buf);
             offset += Bytes::from(max_key_size);
             let key = K::from_bytes(Cow::Borrowed(&buf));
-            keys.push(key);
-
             // Values are loaded lazily. Store a reference and skip loading it.
-            encoded_values.push(Value::ByRef(offset));
+            keys_encoded_values.push((key, RefCell::new(Value::ByRef(offset))));
+
             offset += U32_SIZE + Bytes::from(max_value_size);
         }
 
@@ -95,13 +92,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 children.push(child);
             }
 
-            assert_eq!(children.len(), keys.len() + 1);
+            assert_eq!(children.len(), keys_encoded_values.len() + 1);
         }
 
         Self {
             address,
-            keys,
-            encoded_values: RefCell::new(encoded_values),
+            keys_encoded_values,
             children,
             node_type: match header.node_type {
                 LEAF_NODE_TYPE => NodeType::Leaf,
@@ -125,15 +121,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 assert!(self.children.is_empty());
             }
             NodeType::Internal => {
-                assert_eq!(self.children.len(), self.keys.len() + 1);
+                assert_eq!(self.children.len(), self.keys_encoded_values.len() + 1);
             }
         };
 
         // We should never be saving an empty node.
-        assert!(!self.keys.is_empty() || !self.children.is_empty());
+        assert!(!self.keys_encoded_values.is_empty() || !self.children.is_empty());
 
         // Assert entries are sorted in strictly increasing order.
-        assert!(self.keys.windows(2).all(|e| e[0] < e[1]));
+        assert!(self.keys_encoded_values.windows(2).all(|e| e[0].0 < e[1].0));
 
         let (max_key_size, max_value_size) = match self.version {
             Version::V1(DerivedPageSize {
@@ -150,7 +146,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 NodeType::Leaf => LEAF_NODE_TYPE,
                 NodeType::Internal => INTERNAL_NODE_TYPE,
             },
-            num_entries: self.keys.len() as u16,
+            num_entries: self.keys_encoded_values.len() as u16,
         };
 
         write_struct(&header, self.address, memory);
@@ -159,12 +155,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
-        for i in 0..self.keys.len() {
+        for i in 0..self.keys_encoded_values.len() {
             self.value(i, memory);
         }
 
         // Write the entries.
-        for (idx, key) in self.keys.iter().enumerate() {
+        for (idx, (key, _)) in self.keys_encoded_values.iter().enumerate() {
             // Write the size of the key.
             let key_bytes = key.to_bytes_checked();
             write_u32(memory, self.address + offset, key_bytes.len() as u32);
