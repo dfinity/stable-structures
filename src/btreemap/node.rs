@@ -159,13 +159,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn swap_entry<M: Memory>(
         &mut self,
         idx: usize,
-        (mut key, value): Entry<K>,
+        (key, value): Entry<K>,
         memory: &M,
     ) -> Entry<K> {
-        let old_value = self.value(idx, memory).to_vec();
-        core::mem::swap(&mut self.keys_encoded_values[idx].0, &mut key);
-        self.keys_encoded_values[idx].1 = RefCell::new(Value::ByVal(value));
-        (key, old_value)
+        let mut swap_with = (key, RefCell::new(Value::ByVal(value)));
+        core::mem::swap(&mut self.keys_encoded_values[idx], &mut swap_with);
+        (
+            swap_with.0,
+            self.resolve_value(RefCell::into_inner(swap_with.1), memory),
+        )
     }
 
     /// Returns a copy of the entry at the specified index.
@@ -179,10 +181,26 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Returns a reference to the encoded value at the specified index.
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> Ref<[u8]> {
         // Load and cache the value from the underlying memory if needed.
-        {
-            let mut value = self.keys_encoded_values[idx].1.borrow_mut();
+        let mut value = self.keys_encoded_values[idx].1.borrow_mut();
+        if let Value::ByRef(offset) = *value {
+            // Cache the value internally.
+            *value = Value::ByVal(self.resolve_value(Value::ByRef(offset), memory));
+        }
+        drop(value); // drop borrow because it's reborrowed below
 
-            if let Value::ByRef(offset) = *value {
+        // Return a reference to the value.
+        Ref::map(self.keys_encoded_values[idx].1.borrow(), |values| {
+            if let Value::ByVal(v) = values {
+                &v[..]
+            } else {
+                unreachable!("value must have been loaded already.");
+            }
+        })
+    }
+
+    fn resolve_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
+        match value {
+            Value::ByRef(offset) => {
                 // Value isn't loaded yet.
                 let reader = NodeReader {
                     address: self.address,
@@ -195,19 +213,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 let mut bytes = vec![0; value_len];
                 reader.read((offset + U32_SIZE).get(), &mut bytes);
 
-                // Cache the value internally.
-                *value = Value::ByVal(bytes);
+                bytes
             }
+            Value::ByVal(bytes) => bytes,
         }
-
-        // Return a reference to the value.
-        Ref::map(self.keys_encoded_values[idx].1.borrow(), |values| {
-            if let Value::ByVal(v) = values {
-                &v[..]
-            } else {
-                unreachable!("value must have been loaded already.");
-            }
-        })
     }
 
     fn page_size(&self) -> PageSize {
@@ -257,9 +266,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Removes the entry at the specified index.
     pub fn remove_entry<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
-        let value = self.value(idx, memory).to_vec();
-        let (key, _) = self.keys_encoded_values.remove(idx);
-        (key, value)
+        let (key, value) = self.keys_encoded_values.remove(idx);
+        (key, self.resolve_value(RefCell::into_inner(value), memory))
     }
 
     /// Adds a new entry at the back of the node.
@@ -275,13 +283,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
             return None;
         }
 
-        let last_value = self.value(len - 1, memory).to_vec();
-        let (key, _) = self
+        let (key, last_value) = self
             .keys_encoded_values
             .pop()
             .expect("node must not be empty");
 
-        Some((key, last_value))
+        Some((
+            key,
+            self.resolve_value(RefCell::into_inner(last_value), memory),
+        ))
     }
 
     /// Merges the entries and children of the `source` node into self, along with the median entry.
