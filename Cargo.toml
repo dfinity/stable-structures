@@ -12,6 +12,7 @@ include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 repository = "https://github.com/dfinity/stable-structures"
 
 [dependencies]
+bit-vec = "0.6"
 ic_principal = { version = "0.1.1", default-features = false }
 # An optional dependency to benchmark parts of the code.
 canbench-rs = { version = "0.1.7", optional = true }

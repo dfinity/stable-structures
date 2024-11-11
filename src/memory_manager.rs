@@ -40,18 +40,21 @@
 //! memory_1.read(0, &mut bytes);
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
+use bit_vec::BitVec;
+
 use crate::{
     read_struct,
     types::{Address, Bytes},
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
-use std::cell::RefCell;
 use std::cmp::min;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::{cell::RefCell, collections::BTreeSet};
 
 const MAGIC: &[u8; 3] = b"MGR";
-const LAYOUT_VERSION: u8 = 1;
+const LAYOUT_VERSION_V1: u8 = 1;
+const LAYOUT_VERSION_V2: u8 = 2;
 
 // The maximum number of memories that can be created.
 const MAX_NUM_MEMORIES: u8 = 255;
@@ -71,6 +74,9 @@ const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
 
 // Reserved bytes in the header for future extensions.
 const HEADER_RESERVED_BYTES: usize = 32;
+
+// Size of the bucket ID in the header.
+const BUCKET_ID_LEN_IN_BITS: usize = 15;
 
 /// A memory manager simulates multiple memories within a single memory.
 ///
@@ -127,6 +133,58 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// ...
 /// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
+///
+/// # V2 layout
+///
+/// ```text
+/// -------------------------------------------------- <- Address 0
+/// Magic "MGR"                             ↕ 3 bytes
+/// --------------------------------------------------
+/// Layout version                          ↕ 1 byte
+/// --------------------------------------------------
+/// Number of allocated buckets             ↕ 2 bytes
+/// --------------------------------------------------
+/// Bucket size (in pages) = N              ↕ 2 bytes
+/// --------------------------------------------------
+/// Reserved space                          ↕ 32 bytes
+/// --------------------------------------------------
+/// Size of memory 0 (in pages)             ↕ 8 bytes
+/// --------------------------------------------------
+/// Size of memory 1 (in pages)             ↕ 8 bytes
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Size of memory 254 (in pages)           ↕ 8 bytes
+/// -------------------------------------------------- <- IDs of buckets
+/// Bucket 1 belonging to memory 0          ↕ 15 bits
+/// --------------------------------------------------
+/// Bucket 2 belonging to memory 0          ↕ 15 bits
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Bucket 1 belonging to memory 1          ↕ 15 bits
+/// --------------------------------------------------
+/// Bucket 2 belonging to memory 1          ↕ 15 bits
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// ...
+/// ---------------------------------------------------
+/// Bucket 1 belonging to memory 254        ↕ 15 bits
+/// --------------------------------------------------
+/// Bucket 2 belonging to memory 254        ↕ 15 bits
+/// --------------------------------------------------
+/// ...
+/// --------------------------------------------------
+/// Unallocated space                       ↕ 2'016 bytes
+/// -------------------------------------------------- <- Buckets (Page 1)
+/// Bucket 1                                ↕ N pages
+/// -------------------------------------------------- <- Page N + 1
+/// Bucket 2                                ↕ N pages
+/// --------------------------------------------------
+/// ...
+/// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
+/// Bucket MAX_NUM_BUCKETS                  ↕ N pages
 /// ```
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
@@ -148,6 +206,16 @@ impl<M: Memory> MemoryManager<M> {
         }
     }
 
+    #[cfg(test)]
+    pub fn init_with_bucket_size_v1(memory: M, bucket_size_in_pages: u16) -> Self {
+        Self {
+            inner: Rc::new(RefCell::new(MemoryManagerInner::init_v1(
+                memory,
+                bucket_size_in_pages,
+            ))),
+        }
+    }
+
     /// Returns the memory associated with the given ID.
     pub fn get(&self, id: MemoryId) -> VirtualMemory<M> {
         VirtualMemory {
@@ -163,6 +231,13 @@ impl<M: Memory> MemoryManager<M> {
     /// - None otherwise.
     pub fn into_memory(self) -> Option<M> {
         Rc::into_inner(self.inner).map(|inner| inner.into_inner().into_memory())
+    }
+
+    /// Frees the specified memory.
+    /// Note that the underlying physical memory doesn't shrink, but the space previously
+    /// occupied by the given memory will be reused.
+    pub fn free(&mut self, id: MemoryId) {
+        self.inner.borrow_mut().free(id);
     }
 }
 
@@ -229,6 +304,10 @@ struct MemoryManagerInner<M: Memory> {
 
     // A map mapping each managed memory to the bucket ids that are allocated to it.
     memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
+
+    // Tracks the buckets that were freed to be reused in future calls to `grow`.
+    // NOTE: A BTreeSet is used so that bucket IDs are maintained in sorted order.
+    freed_buckets: BTreeSet<BucketId>,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -257,9 +336,45 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
+            freed_buckets: BTreeSet::new(),
         };
 
         mem_mgr.save_header();
+
+        mem_mgr
+    }
+
+    #[cfg(test)]
+    fn init_v1(memory: M, bucket_size_in_pages: u16) -> Self {
+        if memory.size() == 0 {
+            // Memory is empty. Create a new map.
+            return Self::new(memory, bucket_size_in_pages);
+        }
+
+        // Check if the magic in the memory corresponds to this object.
+        let mut dst = vec![0; 3];
+        memory.read(0, &mut dst);
+        if dst != MAGIC {
+            // No memory manager found. Create a new instance.
+            MemoryManagerInner::new_v1(memory, bucket_size_in_pages)
+        } else {
+            // The memory already contains a memory manager. Load it.
+            MemoryManagerInner::load(memory)
+        }
+    }
+
+    #[cfg(test)]
+    fn new_v1(memory: M, bucket_size_in_pages: u16) -> Self {
+        let mem_mgr = Self {
+            memory,
+            allocated_buckets: 0,
+            memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
+            memory_buckets: BTreeMap::new(),
+            bucket_size_in_pages,
+            freed_buckets: BTreeSet::new(),
+        };
+
+        mem_mgr.save_header_v1();
 
         // Mark all the buckets as unallocated.
         write(
@@ -271,16 +386,11 @@ impl<M: Memory> MemoryManagerInner<M> {
         mem_mgr
     }
 
-    fn load(memory: M) -> Self {
-        // Read the header from memory.
-        let header: Header = read_struct(Address::from(0), &memory);
-        assert_eq!(&header.magic, MAGIC, "Bad magic.");
-        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
-
+    fn load_layout_v1(memory: M, header: Header) -> Self {
         let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
         memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
-
         let mut memory_buckets = BTreeMap::new();
+
         for (bucket_idx, memory) in buckets.into_iter().enumerate() {
             if memory != UNALLOCATED_BUCKET_MARKER {
                 memory_buckets
@@ -296,13 +406,88 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
+            freed_buckets: BTreeSet::new(),
+        }
+    }
+
+    fn load_layout_v2(memory: M, header: Header) -> Self {
+        let mut memory_size_in_buckets = vec![];
+        let mut number_of_used_buckets = 0;
+
+        // Translate memory sizes expressed in pages to sizes expressed in buckets.
+        for memory_size_in_pages in header.memory_sizes_in_pages.into_iter() {
+            let size_in_buckets = memory_size_in_pages.div_ceil(header.bucket_size_in_pages as u64);
+            memory_size_in_buckets.push(size_in_buckets);
+            number_of_used_buckets += size_in_buckets;
+        }
+
+        // Load the buckets.
+        let buckets = {
+            const BYTE_SIZE_IN_BITS: usize = 8;
+            let buckets_index_size_in_bytes: usize = (number_of_used_buckets as usize
+                * BUCKET_ID_LEN_IN_BITS)
+                .div_ceil(BYTE_SIZE_IN_BITS);
+
+            let mut buckets = vec![0; buckets_index_size_in_bytes];
+            memory.read(bucket_indexes_offset().get(), &mut buckets);
+
+            bytes_to_bucket_indexes(&buckets)
+        };
+
+        // Map of all memories with their assigned buckets.
+        let mut memory_buckets = BTreeMap::new();
+
+        // The last bucket that's accessed.
+        let mut max_bucket_id: u16 = 0;
+
+        let mut bucket_idx: usize = 0;
+
+        // Assign buckets to the memories they are part of.
+        for (memory, size_in_buckets) in memory_size_in_buckets.into_iter().enumerate() {
+            let mut vec_buckets = vec![];
+            for _ in 0..size_in_buckets {
+                let bucket = buckets[bucket_idx];
+                max_bucket_id = std::cmp::max(bucket.0, max_bucket_id);
+                vec_buckets.push(bucket);
+                bucket_idx += 1;
+            }
+            memory_buckets
+                .entry(MemoryId(memory as u8))
+                .or_insert(vec_buckets);
+        }
+
+        // Set of all buckets with ID smaller than 'max_bucket_id' which were allocated and freed.
+        let mut freed_buckets: BTreeSet<BucketId> = (0..max_bucket_id).map(BucketId).collect();
+
+        for id in buckets.iter() {
+            freed_buckets.remove(id);
+        }
+
+        Self {
+            memory,
+            allocated_buckets: header.num_allocated_buckets,
+            bucket_size_in_pages: header.bucket_size_in_pages,
+            memory_sizes_in_pages: header.memory_sizes_in_pages,
+            memory_buckets,
+            freed_buckets,
+        }
+    }
+
+    fn load(memory: M) -> Self {
+        // Read the header from memory.
+        let header: Header = read_struct(Address::from(0), &memory);
+        assert_eq!(&header.magic, MAGIC, "Bad magic.");
+        match header.version {
+            LAYOUT_VERSION_V1 => MemoryManagerInner::load_layout_v1(memory, header),
+            LAYOUT_VERSION_V2 => MemoryManagerInner::load_layout_v2(memory, header),
+            _ => panic!("Unsupported version."),
         }
     }
 
     fn save_header(&self) {
         let header = Header {
             magic: *MAGIC,
-            version: LAYOUT_VERSION,
+            version: LAYOUT_VERSION_V2,
             num_allocated_buckets: self.allocated_buckets,
             bucket_size_in_pages: self.bucket_size_in_pages,
             _reserved: [0; HEADER_RESERVED_BYTES],
@@ -326,28 +511,28 @@ impl<M: Memory> MemoryManagerInner<M> {
         let required_buckets = self.num_buckets_needed(new_size);
         let new_buckets_needed = required_buckets - current_buckets;
 
-        if new_buckets_needed + self.allocated_buckets as u64 > MAX_NUM_BUCKETS {
+        if new_buckets_needed + self.allocated_buckets as u64 - self.freed_buckets.len() as u64
+            > MAX_NUM_BUCKETS
+        {
             // Exceeded the memory that can be managed.
             return -1;
         }
 
         // Allocate new buckets as needed.
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = BucketId(self.allocated_buckets);
+            let new_bucket_id = match self.freed_buckets.pop_first() {
+                Some(t) => t,
+                None => {
+                    let new_id = self.allocated_buckets;
+                    self.allocated_buckets += 1;
+                    BucketId(new_id)
+                }
+            };
 
             self.memory_buckets
                 .entry(id)
                 .or_default()
                 .push(new_bucket_id);
-
-            // Write in stable store that this bucket belongs to the memory with the provided `id`.
-            write(
-                &self.memory,
-                bucket_allocations_address(new_bucket_id).get(),
-                &[id.0],
-            );
-
-            self.allocated_buckets += 1;
         }
 
         // Grow the underlying memory if necessary.
@@ -364,9 +549,33 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Update the memory with the new size.
         self.memory_sizes_in_pages[id.0 as usize] = new_size;
 
-        // Update the header and return the old size.
+        // Update the header.
         self.save_header();
+
+        // Write in stable store that this bucket belongs to the memory with the provided `id`.
+        write(
+            &self.memory,
+            bucket_indexes_offset().get(),
+            self.get_bucket_ids_in_bytes().as_ref(),
+        );
+
+        // Return the old size.
         old_size as i64
+    }
+
+    fn get_bucket_ids_in_bytes(&self) -> Vec<u8> {
+        let mut bit_vec = BitVec::new();
+        for memory in self.memory_buckets.iter() {
+            for bucket in memory.1 {
+                let bucket_ind = bucket.0;
+                // Splits bit_vec returning the slice [1, .., bit_vec.size() - 1].
+                // This is precisely what we need since the BucketId can be represented
+                // using only 15 bits, instead of 16.
+                let mut bit_vec_temp = BitVec::from_bytes(&bucket_ind.to_be_bytes()).split_off(1);
+                bit_vec.append(&mut bit_vec_temp);
+            }
+        }
+        bit_vec.to_bytes()
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8]) {
@@ -433,6 +642,56 @@ impl<M: Memory> MemoryManagerInner<M> {
     pub fn into_memory(self) -> M {
         self.memory
     }
+
+    fn free(&mut self, id: MemoryId) {
+        self.memory_sizes_in_pages[id.0 as usize] = 0;
+        let buckets = self.memory_buckets.remove(&id);
+        if let Some(vec_buckets) = buckets {
+            for bucket in vec_buckets {
+                self.freed_buckets.insert(bucket);
+            }
+        }
+        // Update the header.
+        self.save_header();
+
+        // Write in stable store that no bucket belongs to the memory with the provided `id`.
+        write(
+            &self.memory,
+            bucket_indexes_offset().get(),
+            self.get_bucket_ids_in_bytes().as_ref(),
+        );
+    }
+
+    #[cfg(test)]
+    fn save_header_v1(&self) {
+        let header = Header {
+            magic: *MAGIC,
+            version: LAYOUT_VERSION_V1,
+            num_allocated_buckets: self.allocated_buckets,
+            bucket_size_in_pages: self.bucket_size_in_pages,
+            _reserved: [0; HEADER_RESERVED_BYTES],
+            memory_sizes_in_pages: self.memory_sizes_in_pages,
+        };
+
+        write_struct(&header, Address::from(0), &self.memory);
+    }
+}
+
+fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<BucketId> {
+    let mut bucket_ids = vec![];
+    let bit_vec = BitVec::from_bytes(input);
+    for bucket_order_number in 0..bit_vec.len() / BUCKET_ID_LEN_IN_BITS {
+        let mut bucket_id: u16 = 0;
+        for bucket_id_bit in 0..BUCKET_ID_LEN_IN_BITS {
+            let next_bit = BUCKET_ID_LEN_IN_BITS * bucket_order_number + bucket_id_bit;
+            bucket_id <<= 1;
+            if bit_vec.get(next_bit) == Some(true) {
+                bucket_id |= 1;
+            }
+        }
+        bucket_ids.push(BucketId(bucket_id));
+    }
+    bucket_ids
 }
 
 struct Segment {
@@ -533,11 +792,15 @@ impl MemoryId {
 }
 
 // Referring to a bucket.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct BucketId(u16);
 
 fn bucket_allocations_address(id: BucketId) -> Address {
     Address::from(0) + Header::size() + Bytes::from(id.0)
+}
+
+fn bucket_indexes_offset() -> Address {
+    Address::from(0) + Header::size()
 }
 
 #[cfg(test)]
@@ -866,5 +1129,267 @@ mod test {
 
         memory_1.read(0, &mut buf);
         assert_eq!(buf, vec![2; 1000]);
+    }
+
+    #[test]
+    fn free_memory_works() {
+        let mem = make_memory();
+        let mut mem_mgr = MemoryManager::init(mem.clone());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+
+        // Grow the memory by 1 page.
+        assert_eq!(memory_0.grow(1), 0);
+        assert_eq!(mem.size(), BUCKET_SIZE_IN_PAGES + 1);
+
+        // Grow the memory by 1 page.
+        assert_eq!(memory_1.grow(1), 0);
+        assert_eq!(mem.size(), 2 * BUCKET_SIZE_IN_PAGES + 1);
+
+        // Grow the memory by BUCKET_SIZE_IN_PAGES more pages, which will cause the underlying
+        // allocation to increase.
+        assert_eq!(memory_0.grow(BUCKET_SIZE_IN_PAGES), 1);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 3);
+        assert_eq!(memory_1.grow(BUCKET_SIZE_IN_PAGES), 1);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 4);
+        assert_eq!(mem_mgr.get(MemoryId(1)).size(), 1 + BUCKET_SIZE_IN_PAGES);
+
+        // Free Memory ID 1.
+        mem_mgr.free(MemoryId(1));
+        assert_eq!(mem_mgr.get(MemoryId(1)).size(), 0);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 4);
+
+        let memory_2 = mem_mgr.get(MemoryId(2));
+        // When growing memory_2, mem.size() should stay the same since
+        // MemoryManager should use the memory that is freed above.
+        assert_eq!(memory_2.grow(1), 0);
+        assert_eq!(mem_mgr.get(MemoryId(2)).size(), 1);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 4);
+        assert_eq!(memory_2.grow(BUCKET_SIZE_IN_PAGES), 1);
+        assert_eq!(mem_mgr.get(MemoryId(2)).size(), 1 + BUCKET_SIZE_IN_PAGES);
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 4);
+
+        // When trying to grow memory_2 again, we need more pages,
+        // because we have already used all that is left from Memory ID 1.
+        assert_ne!(memory_2.grow(BUCKET_SIZE_IN_PAGES), 0);
+        assert_eq!(
+            mem_mgr.get(MemoryId(2)).size(),
+            1 + 2 * BUCKET_SIZE_IN_PAGES
+        );
+        assert_eq!(mem.size(), 1 + BUCKET_SIZE_IN_PAGES * 5);
+    }
+
+    #[test]
+    #[should_panic = "MemoryId(1): read out of bounds"]
+    fn reading_freed_memory_panics() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init(mem.clone());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+        let memory_2 = mem_mgr.get(MemoryId(2));
+
+        assert_eq!(memory_0.grow(1), 0);
+        assert_eq!(memory_1.grow(1), 0);
+        assert_eq!(memory_2.grow(1), 0);
+
+        memory_0.write(0, &[1, 2, 3]);
+        memory_1.write(0, &[4, 5, 6]);
+        memory_2.write(0, &[7, 8, 9]);
+
+        let mut mem_mgr = MemoryManager::init(mem);
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        let memory_1 = mem_mgr.get(MemoryId(1));
+        let memory_2 = mem_mgr.get(MemoryId(2));
+
+        let mut bytes = vec![0; 3];
+        // Check that data is correctly reinitialized.
+        memory_0.read(0, &mut bytes);
+        assert_eq!(bytes, vec![1, 2, 3]);
+
+        memory_1.read(0, &mut bytes);
+        assert_eq!(bytes, vec![4, 5, 6]);
+
+        memory_2.read(0, &mut bytes);
+        assert_eq!(bytes, vec![7, 8, 9]);
+
+        // Free MemoryId 1.
+        mem_mgr.free(MemoryId(1));
+
+        // Check that data of MemoryId 0 and 2 is correctly reinitialized.
+        memory_0.read(0, &mut bytes);
+        assert_eq!(bytes, vec![1, 2, 3]);
+
+        memory_2.read(0, &mut bytes);
+        assert_eq!(bytes, vec![7, 8, 9]);
+
+        // Check that date of MemoryId 1 is freed.
+        assert_eq!(memory_1.size(), 0);
+        memory_1.read(0, &mut bytes);
+    }
+
+    #[test]
+    fn freeing_already_free_memory() {
+        let mut mem_mgr = MemoryManager::init(make_memory());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+
+        assert_eq!(memory_0.grow(1), 0);
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 1);
+
+        mem_mgr.free(MemoryId(0));
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 0);
+
+        mem_mgr.free(MemoryId(0));
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 0);
+    }
+
+    #[test]
+    fn grow_memory_after_freeing_it() {
+        let mut mem_mgr = MemoryManager::init(make_memory());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+
+        // grow and write to memory
+        assert_eq!(memory_0.grow(1), 0);
+        memory_0.write(0, &[7, 1, 5]);
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 1);
+
+        let mut bytes = vec![0; 3];
+
+        // read from memory
+        memory_0.read(0, &mut bytes);
+        assert_eq!(bytes, &[7, 1, 5]);
+
+        // free memory
+        mem_mgr.free(MemoryId(0));
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 0);
+
+        // grow memory
+        assert_eq!(memory_0.grow(1), 0);
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 1);
+
+        // check that old bucket is reassign to the memory
+        memory_0.read(0, &mut bytes);
+        assert_eq!(bytes, &[7, 1, 5]);
+
+        // try growing once more
+        assert_eq!(memory_0.grow(1), 1);
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 2);
+    }
+
+    #[test]
+    fn test_freed_buckets_assignment_order() {
+        let mut mem_mgr = MemoryManager::init(make_memory());
+        let memory_a: VirtualMemory<Rc<RefCell<Vec<u8>>>> = mem_mgr.get(MemoryId(0));
+        let memory_b: VirtualMemory<Rc<RefCell<Vec<u8>>>> = mem_mgr.get(MemoryId(1));
+
+        // grow and write to memory
+        assert_eq!(memory_a.grow(1), 0);
+        assert_eq!(memory_b.grow(1), 0);
+        memory_a.write(0, &[7, 1, 5]);
+        memory_b.write(0, &[9, 4, 8]);
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 1);
+        assert_eq!(mem_mgr.get(MemoryId(1)).size(), 1);
+
+        let mut bytes = vec![0; 3];
+
+        // free memory
+        mem_mgr.free(MemoryId(0));
+        mem_mgr.free(MemoryId(1));
+
+        assert_eq!(mem_mgr.get(MemoryId(0)).size(), 0);
+        assert_eq!(mem_mgr.get(MemoryId(1)).size(), 0);
+
+        let memory_c: VirtualMemory<Rc<RefCell<Vec<u8>>>> = mem_mgr.get(MemoryId(2));
+        let memory_d: VirtualMemory<Rc<RefCell<Vec<u8>>>> = mem_mgr.get(MemoryId(3));
+
+        // grow memory
+        assert_eq!(memory_c.grow(1), 0);
+        assert_eq!(memory_d.grow(1), 0);
+
+        assert_eq!(mem_mgr.get(MemoryId(2)).size(), 1);
+        assert_eq!(mem_mgr.get(MemoryId(3)).size(), 1);
+
+        // check that old bucket is reassign to the memory
+        memory_c.read(0, &mut bytes);
+        assert_eq!(bytes, &[7, 1, 5]);
+
+        // check that old bucket is reassign to the memory
+        memory_d.read(0, &mut bytes);
+        assert_eq!(bytes, &[9, 4, 8]);
+    }
+
+    #[test]
+    fn free_memory_that_was_not_used() {
+        let mut mem_mgr = MemoryManager::init(make_memory());
+        let memory_0 = mem_mgr.get(MemoryId(0));
+        assert_eq!(memory_0.grow(1), 0);
+
+        mem_mgr.free(MemoryId(5));
+    }
+
+    #[test]
+    fn freed_memories_are_tracked() {
+        let mem = make_memory();
+        let mut mem_mgr = MemoryManager::init(mem.clone());
+        mem_mgr.get(MemoryId(0)).grow(1);
+        mem_mgr.get(MemoryId(1)).grow(1);
+        mem_mgr.get(MemoryId(2)).grow(1);
+        mem_mgr.get(MemoryId(3)).grow(1);
+        mem_mgr.get(MemoryId(4)).grow(1);
+
+        mem_mgr.free(MemoryId(0));
+        mem_mgr.free(MemoryId(2));
+        mem_mgr.free(MemoryId(4));
+
+        let mem_mgr = MemoryManager::init(mem);
+        // Only Memory 0 and 2 buckets should be counted as freed_buckets.
+        // The bucket belonging to Memory 4 should not be counted as
+        // freed because it has the biggest Bucket ID of all allocated
+        // buckets hence it should become part of unallocated buckets.
+        assert_eq!(
+            mem_mgr.inner.borrow().freed_buckets,
+            maplit::btreeset! { BucketId(0), BucketId(2) }
+        );
+    }
+
+    #[test]
+    fn upgrade_from_v1_to_v2() {
+        let mem = make_memory();
+        // Initialize with layout v1.
+        let mem_mgr = MemoryManager::init_with_bucket_size_v1(mem.clone(), 1); // very small bucket size.
+
+        let memories_v1: Vec<_> = (0..MAX_NUM_MEMORIES)
+            .map(|id| mem_mgr.get(MemoryId(id)))
+            .collect();
+
+        proptest!(|(
+            num_memories in 0..255usize,
+            data in proptest::collection::vec(0..u8::MAX, 0..2*WASM_PAGE_SIZE as usize),
+            offset in 0..10*WASM_PAGE_SIZE
+        )| {
+            for memory_v1 in memories_v1.iter().take(num_memories) {
+                // Write a random blob into the memory, growing the memory as it needs to.
+                write(memory_v1, offset, &data);
+            }
+
+            // Load layout v1 and convert it to layout v2.
+            let mem_mgr_v2 = MemoryManager::init_with_bucket_size(mem.clone(), 1);
+            let memories_v2: Vec<_> = (0..MAX_NUM_MEMORIES)
+                .map(|id| mem_mgr_v2.get(MemoryId(id)))
+                .collect();
+
+            for memory_v2 in memories_v2.iter().take(num_memories) {
+                // Verify the blob can be read back.
+                let mut bytes = vec![0; data.len()];
+                memory_v2.read(offset, &mut bytes);
+                assert_eq!(bytes, data);
+            }
+        });
     }
 }
