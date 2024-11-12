@@ -335,7 +335,9 @@ where
                     NodeType::Internal => Index::Child(entry_idx + 1),
                     // If this is a leaf node, and it contains another entry, add the
                     // next entry to the cursors.
-                    NodeType::Leaf if entry_idx + 1 < node.entries_len() => Index::Entry(entry_idx + 1),
+                    NodeType::Leaf if entry_idx + 1 < node.entries_len() => {
+                        Index::Entry(entry_idx + 1)
+                    }
                     _ => return Some(res),
                 };
 
