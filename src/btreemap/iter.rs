@@ -330,17 +330,19 @@ where
                 let res = map(&node, entry_idx);
                 self.range.0 = Bound::Excluded(node.key(entry_idx).clone());
 
-                if let Some(next) = match node.node_type() {
+                let (next, length_exceeded) = match node.node_type() {
                     // If this is an internal node, add the next child to the cursors.
-                    NodeType::Internal => Some(Index::Child(entry_idx + 1)),
+                    NodeType::Internal => (Index::Child(entry_idx + 1), false),
                     // If this is a leaf node, add the next entry to the cursors.
-                    NodeType::Leaf if entry_idx + 1 < node.entries_len() => {
-                        Some(Index::Entry(entry_idx + 1))
-                    }
-                    _ => None,
-                } {
+                    NodeType::Leaf => (Index::Entry(entry_idx + 1), entry_idx + 1 >= node.entries_len()),
+                };
+
+                if !length_exceeded {
                     // Add to the cursors the next element to be traversed.
-                    self.forward_cursors.push(Cursor::Node { next, node });
+                    self.forward_cursors.push(Cursor::Node {
+                        next,
+                        node,
+                    });
                 }
 
                 Some(res)
