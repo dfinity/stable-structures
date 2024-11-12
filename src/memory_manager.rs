@@ -838,15 +838,19 @@ struct BucketBitsPacked {
 }
 
 impl BucketBits {
+    // Gets the first bucket assigned to a memory.
+    // Only call this if you know that there are buckets assigned to the memory.
     fn get_first(&self, memory_id: MemoryId) -> BucketId {
         BucketId(self.inner.first_bucket_per_memory[memory_id.0 as usize])
     }
 
+    // Sets the first bucket assigned to a memory
     fn set_first(&mut self, memory_id: MemoryId, value: BucketId) {
         self.inner.first_bucket_per_memory[memory_id.0 as usize] = value.0;
         self.dirty_first_buckets.insert(memory_id);
     }
 
+    // Gets the next bucket in the linked list of buckets
     fn get_next(&self, bucket: BucketId) -> BucketId {
         let start_bit_index = bucket.0 as usize * 15;
         let mut next_bits: BitArray<[u8; 2]> = BitArray::new([0u8; 2]);
@@ -865,6 +869,7 @@ impl BucketBits {
         BucketId(u16::from_be_bytes(next_bits.data))
     }
 
+    // Sets the next bucket in the linked list of buckets
     fn set_next(&mut self, bucket: BucketId, next: BucketId) {
         let start_bit_index = bucket.0 as usize * 15;
         let next_bits: BitArray<[u8; 2]> = BitArray::from(next.0.to_be_bytes());
@@ -882,6 +887,7 @@ impl BucketBits {
             .extend((start_byte_index..=end_byte_index).map(|i| i as u16))
     }
 
+    // Calculates the buckets for a given memory by iterating over its linked list
     fn buckets_for_memory(&self, memory_id: MemoryId, count: u16) -> Vec<BucketId> {
         if count == 0 {
             return Vec::new();
@@ -896,6 +902,7 @@ impl BucketBits {
         buckets
     }
 
+    // Flushes only the dirty bytes to memory
     fn flush_dirty_bytes<M: Memory>(&mut self, memory: &M, start_offset: u64) {
         const FIRST_BUCKET_PER_MEMORY_LEN: usize = 2 * MAX_NUM_MEMORIES as usize;
 
@@ -927,6 +934,7 @@ impl BucketBits {
         }
     }
 
+    // Flushes all bytes to memory
     fn flush_all<M: Memory>(&mut self, memory: &M, start_offset: u64) {
         write_struct(&self.inner, Address::from(start_offset), memory);
         self.dirty_first_buckets.clear();
