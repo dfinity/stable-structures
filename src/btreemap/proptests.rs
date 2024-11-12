@@ -207,11 +207,13 @@ fn execute_operation<M: Memory>(
 
             eprintln!("Iterate({}, {})", from, len);
             let std_iter = std_btree.iter().skip(from).take(len);
-            let stable_iter = btree.iter().skip(from).take(len);
-            for ((k1, v1), (k2, v2)) in std_iter.zip(stable_iter) {
+            let mut stable_iter = btree.iter().skip(from).take(len);
+            for (k1, v1) in std_iter {
+                let (k2, v2) = stable_iter.next().unwrap();
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
             }
+            assert!(stable_iter.next().is_none());
         }
         Operation::IterRev { from, len } => {
             assert_eq!(std_btree.len(), btree.len() as usize);
@@ -224,11 +226,13 @@ fn execute_operation<M: Memory>(
 
             eprintln!("Iterate({}, {})", from, len);
             let std_iter = std_btree.iter().rev().skip(from).take(len);
-            let stable_iter = btree.iter().rev().skip(from).take(len);
-            for ((k1, v1), (k2, v2)) in std_iter.zip(stable_iter) {
+            let mut stable_iter = btree.iter().rev().skip(from).take(len);
+            for (k1, v1) in std_iter {
+                let (k2, v2) = stable_iter.next().unwrap();
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
             }
+            assert!(stable_iter.next().is_none());
         }
         Operation::Get(idx) => {
             assert_eq!(std_btree.len(), btree.len() as usize);
