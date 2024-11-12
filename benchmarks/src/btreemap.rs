@@ -221,6 +221,26 @@ pub fn btreemap_insert_10mib_values() -> BenchResult {
 }
 
 #[bench(raw)]
+pub fn btreemap_iter_small_values() -> BenchResult {
+    iter_helper(10_000, 0)
+}
+
+#[bench(raw)]
+pub fn btreemap_iter_rev_small_values() -> BenchResult {
+    iter_rev_helper(10_000, 0)
+}
+
+#[bench(raw)]
+pub fn btreemap_iter_10mib_values() -> BenchResult {
+    iter_helper(200, 10 * 1024)
+}
+
+#[bench(raw)]
+pub fn btreemap_iter_rev_10mib_values() -> BenchResult {
+    iter_rev_helper(200, 10 * 1024)
+}
+
+#[bench(raw)]
 pub fn btreemap_iter_count_small_values() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let size: u32 = 10_000;
@@ -515,6 +535,26 @@ fn insert_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
             btree.insert(k, v);
         }
     })
+}
+
+// Profiles iterating over a btreemap.
+fn iter_helper(size: u32, value_size: u32) -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    for i in 0..size {
+        btree.insert(i, vec![0u8; value_size as usize]);
+    }
+
+    bench_fn(|| for _ in btree.iter() {})
+}
+
+// Profiles iterating in reverse over a btreemap.
+fn iter_rev_helper(size: u32, value_size: u32) -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    for i in 0..size {
+        btree.insert(i, vec![0u8; value_size as usize]);
+    }
+
+    bench_fn(|| for _ in btree.iter().rev() {})
 }
 
 // Profiles getting a large number of random blobs from a btreemap.

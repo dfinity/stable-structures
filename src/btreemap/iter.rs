@@ -334,15 +334,15 @@ where
                     // If this is an internal node, add the next child to the cursors.
                     NodeType::Internal => (Index::Child(entry_idx + 1), false),
                     // If this is a leaf node, add the next entry to the cursors.
-                    NodeType::Leaf => (Index::Entry(entry_idx + 1), entry_idx + 1 >= node.entries_len()),
+                    NodeType::Leaf => (
+                        Index::Entry(entry_idx + 1),
+                        entry_idx + 1 >= node.entries_len(),
+                    ),
                 };
 
                 if !length_exceeded {
                     // Add to the cursors the next element to be traversed.
-                    self.forward_cursors.push(Cursor::Node {
-                        next,
-                        node,
-                    });
+                    self.forward_cursors.push(Cursor::Node { next, node });
                 }
 
                 Some(res)
