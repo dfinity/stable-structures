@@ -1026,18 +1026,23 @@ where
         }
     }
 
+    /// Returns an iterator over the keys of the map.
     pub fn keys(&self) -> KeysIter<K, V, M> {
         self.iter_internal().into()
     }
 
+    /// Returns an iterator over the keys of the map which belong to the specified range.
     pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<K, V, M> {
         self.range_internal(key_range).into()
     }
 
+    /// Returns an iterator over the values of the map, sorted by key.
     pub fn values(&self) -> ValuesIter<K, V, M> {
         self.iter_internal().into()
     }
 
+    /// Returns an iterator over the values of the map where keys
+    /// belong to the specified range.
     pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<K, V, M> {
         self.range_internal(key_range).into()
     }
