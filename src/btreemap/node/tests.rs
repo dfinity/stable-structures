@@ -293,3 +293,19 @@ fn overflows_end_with_null_after_nodes_growing_and_shrinking() {
         NULL.get()
     );
 }
+
+#[test]
+fn can_call_node_value_multiple_times_on_same_index() {
+    let mem = make_memory();
+    let allocator_addr = Address::from(0);
+    let page_size = PageSize::Value(500);
+    let mut allocator = Allocator::new(mem.clone(), allocator_addr, page_size.get().into());
+
+    let node_addr = allocator.allocate();
+    let mut node = Node::new_v2(node_addr, NodeType::Leaf, page_size);
+    node.push_entry((1u32, vec![1, 2, 3]));
+
+    let value1 = node.value(0, &mem);
+    let value2 = node.value(0, &mem);
+    assert_eq!(&value1[..], &value2[..]);
+}

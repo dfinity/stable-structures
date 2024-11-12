@@ -181,16 +181,19 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Returns a reference to the encoded value at the specified index.
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> Ref<[u8]> {
         // Load and cache the value from the underlying memory if needed.
-        let mut value = self.keys_encoded_values[idx].1.borrow_mut();
-        if let Value::ByRef(offset) = *value {
+        let encoded_value = &self.keys_encoded_values[idx].1;
+        // We borrow the value immutably first. We only borrow the value mutably if it hasn't been
+        // cached yet. This is to ensure that no references have been given out to the cached value
+        // when we call .borrow_mut().
+        if let Value::ByRef(offset) = *encoded_value.borrow() {
             // Cache the value internally.
-            *value = Value::ByVal(self.resolve_value(Value::ByRef(offset), memory));
+            *encoded_value.borrow_mut() =
+                Value::ByVal(self.resolve_value(Value::ByRef(offset), memory));
         }
-        drop(value); // drop borrow because it's reborrowed below
 
         // Return a reference to the value.
-        Ref::map(self.keys_encoded_values[idx].1.borrow(), |values| {
-            if let Value::ByVal(v) = values {
+        Ref::map(encoded_value.borrow(), |value| {
+            if let Value::ByVal(v) = value {
                 &v[..]
             } else {
                 unreachable!("value must have been loaded already.");
