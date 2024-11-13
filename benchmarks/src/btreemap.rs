@@ -222,62 +222,62 @@ pub fn btreemap_insert_10mib_values() -> BenchResult {
 
 #[bench(raw)]
 pub fn btreemap_iter_small_values() -> BenchResult {
-    iter_helper(10_000, 0)
+    iter_helper(10_000, 0, IterType::Iter)
 }
 
 #[bench(raw)]
 pub fn btreemap_iter_rev_small_values() -> BenchResult {
-    iter_rev_helper(10_000, 0)
+    iter_helper(10_000, 0, IterType::IterRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_iter_10mib_values() -> BenchResult {
-    iter_helper(200, 10 * 1024)
+    iter_helper(200, 10 * 1024, IterType::Iter)
 }
 
 #[bench(raw)]
 pub fn btreemap_iter_rev_10mib_values() -> BenchResult {
-    iter_rev_helper(200, 10 * 1024)
+    iter_helper(200, 10 * 1024, IterType::IterRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_keys_small_values() -> BenchResult {
-    keys_helper(10_000, 0)
+    iter_helper(10_000, 0, IterType::Keys)
 }
 
 #[bench(raw)]
 pub fn btreemap_keys_rev_small_values() -> BenchResult {
-    keys_rev_helper(10_000, 0)
+    iter_helper(10_000, 0, IterType::KeysRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_keys_10mib_values() -> BenchResult {
-    keys_helper(200, 10 * 1024)
+    iter_helper(200, 10 * 1024, IterType::Keys)
 }
 
 #[bench(raw)]
 pub fn btreemap_keys_rev_10mib_values() -> BenchResult {
-    keys_rev_helper(200, 10 * 1024)
+    iter_helper(200, 10 * 1024, IterType::KeysRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_values_small_values() -> BenchResult {
-    values_helper(10_000, 0)
+    iter_helper(10_000, 0, IterType::Values)
 }
 
 #[bench(raw)]
 pub fn btreemap_values_rev_small_values() -> BenchResult {
-    values_rev_helper(10_000, 0)
+    iter_helper(10_000, 0, IterType::ValuesRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_values_10mib_values() -> BenchResult {
-    values_helper(200, 10 * 1024)
+    iter_helper(200, 10 * 1024, IterType::Values)
 }
 
 #[bench(raw)]
 pub fn btreemap_values_rev_10mib_values() -> BenchResult {
-    values_rev_helper(200, 10 * 1024)
+    iter_helper(200, 10 * 1024, IterType::ValuesRev)
 }
 
 #[bench(raw)]
@@ -578,63 +578,20 @@ fn insert_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
 }
 
 // Profiles iterating over a btreemap.
-fn iter_helper(size: u32, value_size: u32) -> BenchResult {
+fn iter_helper(size: u32, value_size: u32, iter_type: IterType) -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     for i in 0..size {
         btree.insert(i, vec![0u8; value_size as usize]);
     }
 
-    bench_fn(|| for _ in btree.iter() {})
-}
-
-// Profiles iterating in reverse over a btreemap.
-fn iter_rev_helper(size: u32, value_size: u32) -> BenchResult {
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for i in 0..size {
-        btree.insert(i, vec![0u8; value_size as usize]);
+    match iter_type {
+        IterType::Iter => bench_fn(|| for _ in btree.iter() {}),
+        IterType::IterRev => bench_fn(|| for _ in btree.iter().rev() {}),
+        IterType::Keys => bench_fn(|| for _ in btree.keys() {}),
+        IterType::KeysRev => bench_fn(|| for _ in btree.keys().rev() {}),
+        IterType::Values => bench_fn(|| for _ in btree.values() {}),
+        IterType::ValuesRev => bench_fn(|| for _ in btree.values().rev() {}),
     }
-
-    bench_fn(|| for _ in btree.iter().rev() {})
-}
-
-// Profiles iterating over the keys of a btreemap.
-fn keys_helper(size: u32, value_size: u32) -> BenchResult {
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for i in 0..size {
-        btree.insert(i, vec![0u8; value_size as usize]);
-    }
-
-    bench_fn(|| for _ in btree.keys() {})
-}
-
-// Profiles iterating in reverse over the keys of a btreemap.
-fn keys_rev_helper(size: u32, value_size: u32) -> BenchResult {
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for i in 0..size {
-        btree.insert(i, vec![0u8; value_size as usize]);
-    }
-
-    bench_fn(|| for _ in btree.keys().rev() {})
-}
-
-// Profiles iterating over the values of a btreemap.
-fn values_helper(size: u32, value_size: u32) -> BenchResult {
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for i in 0..size {
-        btree.insert(i, vec![0u8; value_size as usize]);
-    }
-
-    bench_fn(|| for _ in btree.values() {})
-}
-
-// Profiles iterating in reverse over the values of a btreemap.
-fn values_rev_helper(size: u32, value_size: u32) -> BenchResult {
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for i in 0..size {
-        btree.insert(i, vec![0u8; value_size as usize]);
-    }
-
-    bench_fn(|| for _ in btree.values().rev() {})
 }
 
 // Profiles getting a large number of random blobs from a btreemap.
@@ -709,4 +666,13 @@ fn remove_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
             btree.remove(&k);
         }
     })
+}
+
+enum IterType {
+    Iter,
+    IterRev,
+    Keys,
+    KeysRev,
+    Values,
+    ValuesRev,
 }
