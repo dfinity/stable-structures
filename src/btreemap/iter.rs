@@ -20,7 +20,7 @@ pub(crate) enum Index {
 
 /// An iterator over the entries of a [`BTreeMap`].
 #[must_use = "iterators are lazy and do nothing unless consumed"]
-pub struct Iter<'a, K, V, M>
+pub(crate) struct IterInternal<'a, K, V, M>
 where
     K: Storable + Ord + Clone,
     V: Storable,
@@ -43,7 +43,7 @@ where
     range: (Bound<K>, Bound<K>),
 }
 
-impl<'a, K, V, M> Iter<'a, K, V, M>
+impl<'a, K, V, M> IterInternal<'a, K, V, M>
 where
     K: Storable + Ord + Clone,
     V: Storable,
@@ -428,7 +428,21 @@ where
             }
         }
     }
+
+    fn count(&mut self) -> usize {
+        let mut cnt = 0;
+        while self.next_map(|_, _| ()).is_some() {
+            cnt += 1;
+        }
+        cnt
+    }
 }
+
+pub struct Iter<'a, K, V, M>(IterInternal<'a, K, V, M>)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory;
 
 impl<K, V, M> Iterator for Iter<'_, K, V, M>
 where
@@ -439,8 +453,8 @@ where
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_map(|node, entry_idx| {
-            let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
+        self.0.next_map(|node, entry_idx| {
+            let (key, encoded_value) = node.entry(entry_idx, self.0.map.memory());
             (key, V::from_bytes(Cow::Owned(encoded_value)))
         })
     }
@@ -449,11 +463,7 @@ where
     where
         Self: Sized,
     {
-        let mut cnt = 0;
-        while self.next_map(|_, _| ()).is_some() {
-            cnt += 1;
-        }
-        cnt
+        self.0.count()
     }
 }
 
@@ -464,10 +474,125 @@ where
     M: Memory,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.next_back_map(|node, entry_idx| {
-            let (key, encoded_value) = node.entry(entry_idx, self.map.memory());
+        self.0.next_back_map(|node, entry_idx| {
+            let (key, encoded_value) = node.entry(entry_idx, self.0.map.memory());
             (key, V::from_bytes(Cow::Owned(encoded_value)))
         })
+    }
+}
+
+pub struct KeysIter<'a, K, V, M>(IterInternal<'a, K, V, M>)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory;
+
+impl<K, V, M> Iterator for KeysIter<'_, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    type Item = K;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0
+            .next_map(|node, entry_idx| node.key(entry_idx).clone())
+    }
+
+    fn count(mut self) -> usize
+    where
+        Self: Sized,
+    {
+        self.0.count()
+    }
+}
+
+impl<K, V, M> DoubleEndedIterator for KeysIter<'_, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0
+            .next_back_map(|node, entry_idx| node.key(entry_idx).clone())
+    }
+}
+
+pub struct ValuesIter<'a, K, V, M>(IterInternal<'a, K, V, M>)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory;
+
+impl<K, V, M> Iterator for ValuesIter<'_, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    type Item = V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next_map(|node, entry_idx| {
+            let encoded_value = node.value(entry_idx, self.0.map.memory());
+            V::from_bytes(Cow::Borrowed(&encoded_value))
+        })
+    }
+
+    fn count(mut self) -> usize
+    where
+        Self: Sized,
+    {
+        self.0.count()
+    }
+}
+
+impl<K, V, M> DoubleEndedIterator for ValuesIter<'_, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back_map(|node, entry_idx| {
+            let encoded_value = node.value(entry_idx, self.0.map.memory());
+            V::from_bytes(Cow::Borrowed(&encoded_value))
+        })
+    }
+}
+
+impl<'a, K, V, M> From<IterInternal<'a, K, V, M>> for Iter<'a, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    fn from(value: IterInternal<'a, K, V, M>) -> Self {
+        Iter(value)
+    }
+}
+
+impl<'a, K, V, M> From<IterInternal<'a, K, V, M>> for KeysIter<'a, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    fn from(value: IterInternal<'a, K, V, M>) -> Self {
+        KeysIter(value)
+    }
+}
+
+impl<'a, K, V, M> From<IterInternal<'a, K, V, M>> for ValuesIter<'a, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    fn from(value: IterInternal<'a, K, V, M>) -> Self {
+        ValuesIter(value)
     }
 }
 
@@ -629,6 +754,102 @@ mod test {
 
             let (key, value) = iter.next_back().unwrap();
             assert_eq!(key, 69 - i);
+            assert_eq!(value, 70 - i);
+        }
+
+        assert!(iter.next().is_none());
+        assert!(iter.next_back().is_none());
+    }
+
+    #[test]
+    fn keys_from_both_ends() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        // Insert the elements in reverse order.
+        for i in (0..100u64).rev() {
+            btree.insert(i, i + 1);
+        }
+
+        let mut iter = btree.keys();
+
+        for i in 0..50 {
+            let key = iter.next().unwrap();
+            assert_eq!(key, i);
+
+            let key = iter.next_back().unwrap();
+            assert_eq!(key, 99 - i);
+        }
+
+        assert!(iter.next().is_none());
+        assert!(iter.next_back().is_none());
+    }
+
+    #[test]
+    fn keys_range_from_both_ends() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        // Insert the elements in reverse order.
+        for i in (0..100u64).rev() {
+            btree.insert(i, i + 1);
+        }
+
+        let mut iter = btree.keys_range(30..70);
+
+        for i in 0..20 {
+            let key = iter.next().unwrap();
+            assert_eq!(key, 30 + i);
+
+            let key = iter.next_back().unwrap();
+            assert_eq!(key, 69 - i);
+        }
+
+        assert!(iter.next().is_none());
+        assert!(iter.next_back().is_none());
+    }
+
+    #[test]
+    fn values_from_both_ends() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        // Insert the elements in reverse order.
+        for i in (0..100u64).rev() {
+            btree.insert(i, i + 1);
+        }
+
+        let mut iter = btree.values();
+
+        for i in 0..50 {
+            let value = iter.next().unwrap();
+            assert_eq!(value, i + 1);
+
+            let value = iter.next_back().unwrap();
+            assert_eq!(value, 100 - i);
+        }
+
+        assert!(iter.next().is_none());
+        assert!(iter.next_back().is_none());
+    }
+
+    #[test]
+    fn values_range_from_both_ends() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        // Insert the elements in reverse order.
+        for i in (0..100u64).rev() {
+            btree.insert(i, i + 1);
+        }
+
+        let mut iter = btree.values_range(30..70);
+
+        for i in 0..20 {
+            let value = iter.next().unwrap();
+            assert_eq!(value, 31 + i);
+
+            let value = iter.next_back().unwrap();
             assert_eq!(value, 70 - i);
         }
 
