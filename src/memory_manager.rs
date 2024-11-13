@@ -291,6 +291,7 @@ impl<M: Memory> Memory for VirtualMemory<M> {
 struct MemoryManagerInner<M: Memory> {
     memory: M,
 
+    #[cfg(test)]
     version: u8,
 
     // The number of buckets that have been allocated.
@@ -333,6 +334,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn new(memory: M, bucket_size_in_pages: u16) -> Self {
         let mem_mgr = Self {
             memory,
+            #[cfg(test)]
             version: LAYOUT_VERSION_V2,
             allocated_buckets: 0,
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
@@ -422,6 +424,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let mem_mgr = Self {
             memory,
+            #[cfg(test)]
             version: LAYOUT_VERSION_V2,
             allocated_buckets: header.num_allocated_buckets,
             bucket_size_in_pages: header.bucket_size_in_pages,
@@ -465,6 +468,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         Self {
             memory,
+            #[cfg(test)]
             version: LAYOUT_VERSION_V2,
             allocated_buckets: header.num_allocated_buckets,
             bucket_size_in_pages: header.bucket_size_in_pages,
@@ -489,7 +493,10 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn save_header(&self) {
         let header = Header {
             magic: *MAGIC,
+            #[cfg(test)]
             version: self.version,
+            #[cfg(not(test))]
+            version: LAYOUT_VERSION_V2,
             num_allocated_buckets: self.allocated_buckets,
             bucket_size_in_pages: self.bucket_size_in_pages,
             _reserved: [0; HEADER_RESERVED_BYTES],
@@ -510,8 +517,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         if self.version == LAYOUT_VERSION_V1 {
             return self.grow_v1(id, pages);
         }
-
-        debug_assert_eq!(self.version, LAYOUT_VERSION_V2);
 
         // Compute how many additional buckets are needed.
         let old_size = self.memory_size(id);
