@@ -51,6 +51,7 @@
 mod allocator;
 mod iter;
 mod node;
+use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
     storable::Bound as StorableBound,
     types::{Address, NULL},
@@ -58,7 +59,6 @@ use crate::{
 };
 use allocator::Allocator;
 pub use iter::Iter;
-use iter::{Cursor, Index};
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
 use std::marker::PhantomData;
@@ -1007,15 +1007,54 @@ where
 
     /// Returns an iterator over the entries of the map, sorted by key.
     pub fn iter(&self) -> Iter<K, V, M> {
-        Iter::new(self)
+        self.iter_internal().into()
     }
 
     /// Returns an iterator over the entries in the map where keys
     /// belong to the specified range.
     pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, V, M> {
+        self.range_internal(key_range).into()
+    }
+
+    /// Returns an iterator pointing to the first element below the given bound.
+    /// Returns an empty iterator if there are no keys below the given bound.
+    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
+        if let Some((start_key, _)) = self.range(..bound).next_back() {
+            IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
+        } else {
+            IterInternal::null(self).into()
+        }
+    }
+
+    /// Returns an iterator over the keys of the map.
+    pub fn keys(&self) -> KeysIter<K, V, M> {
+        self.iter_internal().into()
+    }
+
+    /// Returns an iterator over the keys of the map which belong to the specified range.
+    pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<K, V, M> {
+        self.range_internal(key_range).into()
+    }
+
+    /// Returns an iterator over the values of the map, sorted by key.
+    pub fn values(&self) -> ValuesIter<K, V, M> {
+        self.iter_internal().into()
+    }
+
+    /// Returns an iterator over the values of the map where keys
+    /// belong to the specified range.
+    pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<K, V, M> {
+        self.range_internal(key_range).into()
+    }
+
+    fn iter_internal(&self) -> IterInternal<K, V, M> {
+        IterInternal::new(self)
+    }
+
+    fn range_internal(&self, key_range: impl RangeBounds<K>) -> IterInternal<K, V, M> {
         if self.root_addr == NULL {
             // Map is empty.
-            return Iter::null(self);
+            return IterInternal::null(self);
         }
 
         let range = (
@@ -1023,81 +1062,7 @@ where
             key_range.end_bound().cloned(),
         );
 
-        Iter::new_in_range(self, range)
-    }
-
-    /// Returns an iterator pointing to the first element below the given bound.
-    /// Returns an empty iterator if there are no keys below the given bound.
-    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
-        if self.root_addr == NULL {
-            // Map is empty.
-            return Iter::null(self);
-        }
-
-        let dummy_bounds = (Bound::Unbounded, Bound::Unbounded);
-        // INVARIANT: all cursors point to keys greater than or equal to bound.
-        let mut cursors = vec![];
-
-        let mut node = self.load_node(self.root_addr);
-        loop {
-            match node.search(bound) {
-                Ok(idx) | Err(idx) => {
-                    match node.node_type() {
-                        NodeType::Leaf => {
-                            if idx == 0 {
-                                // We descended into a leaf but didn't find a node less than
-                                // the upper bound. Thus we unwind the cursor stack until we
-                                // hit a cursor pointing to an element other than the first key,
-                                // and we shift the position backward. If there is no such cursor,
-                                // the bound must be <= min element, so we return an empty iterator.
-                                while let Some(cursor) = cursors.pop() {
-                                    match cursor {
-                                        Cursor::Node {
-                                            node,
-                                            next: Index::Entry(n),
-                                        } => {
-                                            if n == 0 {
-                                                debug_assert!(node.key(n) >= bound);
-                                                continue;
-                                            } else {
-                                                debug_assert!(node.key(n - 1) < bound);
-                                                cursors.push(Cursor::Node {
-                                                    node,
-                                                    next: Index::Entry(n - 1),
-                                                });
-                                                break;
-                                            }
-                                        }
-                                        _ => panic!("BUG: unexpected cursor shape"),
-                                    }
-                                }
-                                // If the cursors are empty, the iterator will be empty.
-                                return Iter::new_with_cursors(self, dummy_bounds, cursors);
-                            }
-                            debug_assert!(node.key(idx - 1) < bound);
-
-                            cursors.push(Cursor::Node {
-                                node,
-                                next: Index::Entry(idx - 1),
-                            });
-                            return Iter::new_with_cursors(self, dummy_bounds, cursors);
-                        }
-                        NodeType::Internal => {
-                            let child = self.load_node(node.child(idx));
-                            // We push the node even if idx == node.entries_len()
-                            // If we find the position in the child, the iterator will skip this
-                            // cursor. But if the all keys in the child are greater than or equal to
-                            // the bound, we will be able to use this cursor as a fallback.
-                            cursors.push(Cursor::Node {
-                                node,
-                                next: Index::Entry(idx),
-                            });
-                            node = child;
-                        }
-                    }
-                }
-            }
-        }
+        IterInternal::new_in_range(self, range)
     }
 
     // Merges one node (`source`) into another (`into`), along with a median entry.

@@ -10,5 +10,5 @@ members = [
 
 [workspace.dependencies]
 candid = "0.9.11"
-ic-cdk = "0.10.0"
+ic-cdk = "0.10.1"
 ic-cdk-macros = "0.7.1"
