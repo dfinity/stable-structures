@@ -46,10 +46,6 @@ use crate::{
     types::{Address, Bytes},
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
-use bitvec::array::BitArray;
-use bitvec::macros::internal::funty::Fundamental;
-use bitvec::order::Msb0;
-use bitvec::vec::BitVec;
 use std::cmp::min;
 use std::collections::BTreeMap;
 use std::mem::{size_of, transmute};
@@ -828,8 +824,6 @@ fn bucket_allocations_address(id: BucketId) -> Address {
     Address::from(0) + Header::size() + Bytes::from(id.0)
 }
 
-const BUCKET_BITS_LEN: usize = 15 * MAX_NUM_BUCKETS as usize;
-
 #[derive(Clone)]
 struct BucketLinks {
     first_bucket_per_memory: [u16; MAX_NUM_MEMORIES as usize],
@@ -842,7 +836,7 @@ struct BucketLinks {
 #[repr(C, packed)]
 struct BucketLinksPacked {
     first_bucket_per_memory: [u16; MAX_NUM_MEMORIES as usize],
-    bucket_links: BitArray<[u8; BUCKET_BITS_LEN / 8], Msb0>,
+    bucket_links: [u8; 15 * MAX_NUM_BUCKETS as usize / 8],
 }
 
 const FIRST_BUCKET_PER_MEMORY_BYTES_LEN: usize = 2 * MAX_NUM_MEMORIES as usize;
@@ -890,15 +884,15 @@ impl BucketLinks {
     fn flush_dirty_bytes<M: Memory>(&mut self, memory: &M, start_offset: u64) {
         if !self.dirty_first_buckets.is_empty() {
             // SAFETY: This is safe because we simply cast from [u16] to [u8] and double the length.
-            let bytes: [u8; FIRST_BUCKET_PER_MEMORY_BYTES_LEN] =
+            let first_bucket_per_memory_bytes: [u8; FIRST_BUCKET_PER_MEMORY_BYTES_LEN] =
                 unsafe { transmute(self.first_bucket_per_memory) };
 
             // Multiply by 2 since we've converted from [u16] to [u8].
             let min = 2 * self.dirty_first_buckets.first().unwrap().0 as usize;
             let max = 2 * self.dirty_first_buckets.last().unwrap().0 as usize + 1;
 
-            let slice = &bytes[min..=max];
-            write(memory, start_offset + min as u64, slice);
+            let dirty_bytes = &first_bucket_per_memory_bytes[min..=max];
+            write(memory, start_offset + min as u64, dirty_bytes);
             self.dirty_first_buckets.clear();
         }
 
@@ -906,44 +900,21 @@ impl BucketLinks {
             let min = self.dirty_bucket_links.first().unwrap().0 as usize;
             let max = self.dirty_bucket_links.last().unwrap().0 as usize;
 
-            let start_bit_index = 15 * min;
-            let start_byte_index = start_bit_index / 8;
-            let end_bit_index = 15 * max + 14;
-            let end_byte_index = end_bit_index / 8;
+            let start_segment = min / 8;
+            let end_segment = (max / 8) + 1;
 
-            let mut bits: BitVec<u8, Msb0> =
-                BitVec::with_capacity(8 * (end_byte_index - start_byte_index + 1));
-
-            let prefix_bits = start_bit_index % 8;
-            if prefix_bits > 0 {
-                let previous: BitArray<[u16; 1], Msb0> =
-                    BitArray::new([self.bucket_links[min - 1]]);
-
-                for i in 0..prefix_bits {
-                    bits.push(previous.get(15 - prefix_bits + i).unwrap().as_bool());
-                }
-            }
-
-            for bucket_id in &self.bucket_links[min..=max] {
-                let bucket_bits: BitArray<[u16; 1], Msb0> = BitArray::new([*bucket_id]);
-                for bit in bucket_bits.iter().by_vals().skip(1) {
-                    bits.push(bit);
-                }
-            }
-
-            let suffix_bits = end_bit_index % 8;
-            if prefix_bits > 0 {
-                let next: BitArray<[u16; 1], Msb0> = BitArray::new([self.bucket_links[max + 1]]);
-
-                for i in 0..suffix_bits {
-                    bits.push(next.get(i).unwrap().as_bool());
-                }
+            let mut dirty_bucket_link_bytes_15bit =
+                Vec::with_capacity(15 * (end_segment - start_segment + 1));
+            for segment in self.bucket_links[8 * start_segment..8 * end_segment].chunks(8) {
+                dirty_bucket_link_bytes_15bit.extend_from_slice(&convert_16bit_to_15bit(segment));
             }
 
             write(
                 memory,
-                start_offset + FIRST_BUCKET_PER_MEMORY_BYTES_LEN as u64 + start_byte_index as u64,
-                bits.as_raw_slice(),
+                start_offset
+                    + FIRST_BUCKET_PER_MEMORY_BYTES_LEN as u64
+                    + (8 * start_segment) as u64,
+                &dirty_bucket_link_bytes_15bit,
             );
             self.dirty_bucket_links.clear();
         }
@@ -957,19 +928,17 @@ impl BucketLinks {
 
         write(memory, start_offset, &first_bucket_per_memory_bytes);
 
-        let mut bits: BitArray<[u8; 15 * MAX_NUM_BUCKETS as usize / 8], Msb0> = BitArray::default();
-        let mut bit_index = 0;
-        for next in self.bucket_links.iter() {
-            let next_bits: BitArray<[u16; 1], Msb0> = BitArray::new([*next]);
-            for bit in next_bits.iter().by_vals().skip(1) {
-                bits.set(bit_index, bit);
-                bit_index += 1;
-            }
+        let mut bucket_link_bytes_15bit = [0; 15 * MAX_NUM_BUCKETS as usize / 8];
+
+        for (index, segment) in self.bucket_links.chunks(8).enumerate() {
+            let start = 15 * index;
+            let end = start + 15;
+            bucket_link_bytes_15bit[start..end].copy_from_slice(&convert_16bit_to_15bit(segment));
         }
         write(
             memory,
             start_offset + first_bucket_per_memory_bytes.len() as u64,
-            &bits.data,
+            &bucket_link_bytes_15bit,
         );
 
         self.dirty_first_buckets.clear();
@@ -992,25 +961,87 @@ impl Default for BucketLinksPacked {
     fn default() -> Self {
         BucketLinksPacked {
             first_bucket_per_memory: [0; MAX_NUM_MEMORIES as usize],
-            bucket_links: BitArray::new([0u8; BUCKET_BITS_LEN / 8]),
+            bucket_links: [0; 15 * MAX_NUM_BUCKETS as usize / 8],
         }
     }
 }
 
+fn convert_15bit_to_16bit(i: &[u8]) -> [u16; 8] {
+    assert_eq!(i.len(), 15);
+
+    let mut o = [0u16; 8];
+
+    o[0] = u16::from_be_bytes([
+        (i[0] & 0b11111110).rotate_right(1),
+        ((i[0] & 0b00000001) + (i[1] & 0b11111110)).rotate_right(1),
+    ]);
+    o[1] = u16::from_be_bytes([
+        ((i[1] & 0b00000001) + (i[2] & 0b11111100)).rotate_right(2),
+        ((i[2] & 0b00000011) + (i[3] & 0b11111100)).rotate_right(2),
+    ]);
+    o[2] = u16::from_be_bytes([
+        ((i[3] & 0b00000011) + (i[4] & 0b11111000)).rotate_right(3),
+        ((i[4] & 0b00000111) + (i[5] & 0b11111000)).rotate_right(3),
+    ]);
+    o[3] = u16::from_be_bytes([
+        ((i[5] & 0b00000111) + (i[6] & 0b11110000)).rotate_right(4),
+        ((i[6] & 0b00001111) + (i[7] & 0b11110000)).rotate_right(4),
+    ]);
+    o[4] = u16::from_be_bytes([
+        ((i[7] & 0b00001111) + (i[8] & 0b11100000)).rotate_right(5),
+        ((i[8] & 0b00011111) + (i[9] & 0b11100000)).rotate_right(5),
+    ]);
+    o[5] = u16::from_be_bytes([
+        ((i[9] & 0b00011111) + (i[10] & 0b11000000)).rotate_right(6),
+        ((i[10] & 0b00111111) + (i[11] & 0b11000000)).rotate_right(6),
+    ]);
+    o[6] = u16::from_be_bytes([
+        ((i[11] & 0b00111111) + (i[12] & 0b10000000)).rotate_right(7),
+        ((i[12] & 0b01111111) + (i[13] & 0b10000000)).rotate_right(7),
+    ]);
+    o[7] = u16::from_be_bytes([i[13] & 0b01111111, i[14] & 0b11111111]);
+    o
+}
+
+fn convert_16bit_to_15bit(i_u16: &[u16]) -> [u8; 15] {
+    assert_eq!(i_u16.len(), 8);
+
+    let mut o = [0u8; 15];
+
+    let mut i = [0u8; 16];
+    for (index, value) in i_u16.iter().enumerate() {
+        let start = 2 * index;
+        let end = start + 2;
+        i[start..end].copy_from_slice(&value.to_be_bytes());
+    }
+
+    o[0] = ((i[0] & 0b01111111) + (i[1] & 0b10000000)).rotate_left(1);
+    o[1] = (i[1] & 0b01111111).rotate_left(1) + (i[2] & 0b01000000).rotate_left(2);
+    o[2] = ((i[2] & 0b00111111) + (i[3] & 0b11000000)).rotate_left(2);
+    o[3] = (i[3] & 0b00111111).rotate_left(2) + (i[4] & 0b01100000).rotate_left(3);
+    o[4] = ((i[4] & 0b00011111) + (i[5] & 0b11100000)).rotate_left(3);
+    o[5] = (i[5] & 0b00011111).rotate_left(3) + (i[6] & 0b01110000).rotate_left(4);
+    o[6] = ((i[6] & 0b00001111) + (i[7] & 0b11110000)).rotate_left(4);
+    o[7] = (i[7] & 0b00001111).rotate_left(4) + (i[8] & 0b01111000).rotate_left(5);
+    o[8] = ((i[8] & 0b00000111) + (i[9] & 0b11111000)).rotate_left(5);
+    o[9] = (i[9] & 0b00000111).rotate_left(5) + (i[10] & 0b01111100).rotate_left(6);
+    o[10] = ((i[10] & 0b00000011) + (i[11] & 0b11111100)).rotate_left(6);
+    o[11] = (i[11] & 0b00000011).rotate_left(6) + (i[12] & 0b01111110).rotate_left(7);
+    o[12] = ((i[12] & 0b00000001) + (i[13] & 0b11111110)).rotate_left(7);
+    o[13] = (i[13] & 0b00000001).rotate_left(7) + (i[14] & 0b01111111);
+    o[14] = i[15];
+    o
+}
+
 impl From<BucketLinksPacked> for BucketLinks {
     fn from(value: BucketLinksPacked) -> Self {
+        let bucket_link_bytes_15bit = value.bucket_links;
         let mut bucket_links = [0u16; MAX_NUM_BUCKETS as usize];
 
-        let mut bucket_id = 0;
-        let mut next_bucket: BitArray<[u16; 1], Msb0> = BitArray::new([0u16]);
-        for (index, bit) in value.bucket_links.iter().by_vals().enumerate() {
-            let bit_index = (index % 15) + 1;
-            next_bucket.set(bit_index, bit);
-
-            if bit_index == 15 {
-                bucket_links[bucket_id] = next_bucket.data[0];
-                bucket_id += 1;
-            }
+        for (index, segment) in bucket_link_bytes_15bit.chunks(15).enumerate() {
+            let start = 8 * index;
+            let end = start + 8;
+            bucket_links[start..end].copy_from_slice(&convert_15bit_to_16bit(segment));
         }
 
         BucketLinks {
@@ -1027,6 +1058,7 @@ mod test {
     use super::*;
     use maplit::btreemap;
     use proptest::prelude::*;
+    use rand::random;
 
     const MAX_MEMORY_IN_PAGES: u64 = MAX_NUM_BUCKETS * BUCKET_SIZE_IN_PAGES;
 
@@ -1609,5 +1641,17 @@ mod test {
                 assert_eq!(bytes, data);
             }
         });
+    }
+
+    #[test]
+    fn roundtrip_16bit_to_15bit() {
+        for _ in 0..10 {
+            let mut input = [0u16; 8];
+            input.copy_from_slice(&(0..8).map(|_| random::<u16>() % 32768).collect::<Vec<_>>());
+
+            let as_15bit = convert_16bit_to_15bit(&input);
+            let output = convert_15bit_to_16bit(&as_15bit);
+            assert_eq!(input, output);
+        }
     }
 }
