@@ -40,7 +40,6 @@
 //! memory_1.read(0, &mut bytes);
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
-use bit_vec::BitVec;
 
 use crate::{
     read_struct,
@@ -49,6 +48,7 @@ use crate::{
 };
 use std::cmp::min;
 use std::collections::BTreeMap;
+use std::mem::{size_of, transmute};
 use std::rc::Rc;
 use std::{cell::RefCell, collections::BTreeSet};
 
@@ -72,11 +72,10 @@ const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
 const BUCKETS_OFFSET_IN_PAGES: u64 = 1;
 const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
 
+const BUCKET_BITS_OFFSET: u64 = size_of::<Header>() as u64;
+
 // Reserved bytes in the header for future extensions.
 const HEADER_RESERVED_BYTES: usize = 32;
-
-// Size of the bucket ID in the header.
-const BUCKET_ID_LEN_IN_BITS: usize = 15;
 
 /// A memory manager simulates multiple memories within a single memory.
 ///
@@ -156,27 +155,23 @@ const BUCKET_ID_LEN_IN_BITS: usize = 15;
 /// --------------------------------------------------
 /// Size of memory 254 (in pages)           ↕ 8 bytes
 /// -------------------------------------------------- <- IDs of buckets
-/// Bucket 1 belonging to memory 0          ↕ 15 bits
+/// First bucket belonging to memory 0      ↕ 2 bytes
 /// --------------------------------------------------
-/// Bucket 2 belonging to memory 0          ↕ 15 bits
-/// --------------------------------------------------
-/// ...
-/// --------------------------------------------------
-/// Bucket 1 belonging to memory 1          ↕ 15 bits
-/// --------------------------------------------------
-/// Bucket 2 belonging to memory 1          ↕ 15 bits
+/// First bucket belonging to memory 1      ↕ 2 bytes
 /// --------------------------------------------------
 /// ...
+/// --------------------------------------------------
+/// First bucket belonging to memory 254    ↕ 2 bytes
+/// --------------------------------------------------
+/// Next bucket in linked list after bucket 1 ↕ 15 bits
+/// --------------------------------------------------
+/// Next bucket in linked list after bucket 2 ↕ 15 bits
 /// --------------------------------------------------
 /// ...
 /// ---------------------------------------------------
-/// Bucket 1 belonging to memory 254        ↕ 15 bits
+/// Next bucket in linked list after bucket MAX_NUM_BUCKETS ↕ 15 bits
 /// --------------------------------------------------
-/// Bucket 2 belonging to memory 254        ↕ 15 bits
-/// --------------------------------------------------
-/// ...
-/// --------------------------------------------------
-/// Unallocated space                       ↕ 2'016 bytes
+/// Unallocated space                       ↕ 1'506 bytes
 /// -------------------------------------------------- <- Buckets (Page 1)
 /// Bucket 1                                ↕ N pages
 /// -------------------------------------------------- <- Page N + 1
@@ -294,6 +289,9 @@ impl<M: Memory> Memory for VirtualMemory<M> {
 struct MemoryManagerInner<M: Memory> {
     memory: M,
 
+    #[cfg(test)]
+    version: u8,
+
     // The number of buckets that have been allocated.
     allocated_buckets: u16,
 
@@ -308,6 +306,8 @@ struct MemoryManagerInner<M: Memory> {
     // Tracks the buckets that were freed to be reused in future calls to `grow`.
     // NOTE: A BTreeSet is used so that bucket IDs are maintained in sorted order.
     freed_buckets: BTreeSet<BucketId>,
+
+    bucket_bits: BucketLinks,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -332,11 +332,14 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn new(memory: M, bucket_size_in_pages: u16) -> Self {
         let mem_mgr = Self {
             memory,
+            #[cfg(test)]
+            version: LAYOUT_VERSION_V2,
             allocated_buckets: 0,
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
             freed_buckets: BTreeSet::new(),
+            bucket_bits: BucketLinks::default(),
         };
 
         mem_mgr.save_header();
@@ -348,7 +351,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn init_v1(memory: M, bucket_size_in_pages: u16) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
-            return Self::new(memory, bucket_size_in_pages);
+            return Self::new_v1(memory, bucket_size_in_pages);
         }
 
         // Check if the magic in the memory corresponds to this object.
@@ -367,17 +370,19 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn new_v1(memory: M, bucket_size_in_pages: u16) -> Self {
         let mem_mgr = Self {
             memory,
+            version: LAYOUT_VERSION_V1,
             allocated_buckets: 0,
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: BTreeMap::new(),
             bucket_size_in_pages,
             freed_buckets: BTreeSet::new(),
+            bucket_bits: BucketLinks::default(),
         };
 
         mem_mgr.save_header_v1();
 
         // Mark all the buckets as unallocated.
-        write(
+        crate::write(
             &mem_mgr.memory,
             bucket_allocations_address(BucketId(0)).get(),
             &[UNALLOCATED_BUCKET_MARKER; MAX_NUM_BUCKETS as usize],
@@ -400,76 +405,75 @@ impl<M: Memory> MemoryManagerInner<M> {
             }
         }
 
-        Self {
+        let mut bucket_bits = BucketLinks::default();
+        for (memory_id, buckets) in memory_buckets.iter() {
+            let mut previous = BucketId(0);
+            for (index, bucket) in buckets.iter().enumerate() {
+                if index == 0 {
+                    bucket_bits.set_first(*memory_id, *bucket)
+                } else {
+                    bucket_bits.set_next(previous, *bucket);
+                }
+                previous = *bucket;
+            }
+        }
+
+        bucket_bits.flush_all(&memory, BUCKET_BITS_OFFSET);
+
+        let mem_mgr = Self {
             memory,
+            #[cfg(test)]
+            version: LAYOUT_VERSION_V2,
             allocated_buckets: header.num_allocated_buckets,
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
             freed_buckets: BTreeSet::new(),
-        }
+            bucket_bits,
+        };
+        mem_mgr.save_header();
+        mem_mgr
     }
 
     fn load_layout_v2(memory: M, header: Header) -> Self {
         let mut memory_size_in_buckets = vec![];
-        let mut number_of_used_buckets = 0;
-
-        // Translate memory sizes expressed in pages to sizes expressed in buckets.
-        for memory_size_in_pages in header.memory_sizes_in_pages.into_iter() {
-            let size_in_buckets = memory_size_in_pages.div_ceil(header.bucket_size_in_pages as u64);
-            memory_size_in_buckets.push(size_in_buckets);
-            number_of_used_buckets += size_in_buckets;
-        }
-
-        // Load the buckets.
-        let buckets = {
-            const BYTE_SIZE_IN_BITS: usize = 8;
-            let buckets_index_size_in_bytes: usize = (number_of_used_buckets as usize
-                * BUCKET_ID_LEN_IN_BITS)
-                .div_ceil(BYTE_SIZE_IN_BITS);
-
-            let mut buckets = vec![0; buckets_index_size_in_bytes];
-            memory.read(bucket_indexes_offset().get(), &mut buckets);
-
-            bytes_to_bucket_indexes(&buckets)
-        };
 
         // Map of all memories with their assigned buckets.
         let mut memory_buckets = BTreeMap::new();
 
-        // The last bucket that's accessed.
-        let mut max_bucket_id: u16 = 0;
+        let bucket_bits: BucketLinks =
+            read_struct::<BucketLinksPacked, _>(Address::from(BUCKET_BITS_OFFSET), &memory).into();
 
-        let mut bucket_idx: usize = 0;
+        // Translate memory sizes expressed in pages to sizes expressed in buckets.
+        for (index, memory_size_in_pages) in header.memory_sizes_in_pages.into_iter().enumerate() {
+            let memory_id = MemoryId(index as u8);
+            let size_in_buckets = memory_size_in_pages.div_ceil(header.bucket_size_in_pages as u64);
+            memory_size_in_buckets.push(size_in_buckets);
 
-        // Assign buckets to the memories they are part of.
-        for (memory, size_in_buckets) in memory_size_in_buckets.into_iter().enumerate() {
-            let mut vec_buckets = vec![];
-            for _ in 0..size_in_buckets {
-                let bucket = buckets[bucket_idx];
-                max_bucket_id = std::cmp::max(bucket.0, max_bucket_id);
-                vec_buckets.push(bucket);
-                bucket_idx += 1;
+            if size_in_buckets > 0 {
+                let buckets = bucket_bits.buckets_for_memory(memory_id, size_in_buckets as u16);
+                memory_buckets.insert(memory_id, buckets);
             }
-            memory_buckets
-                .entry(MemoryId(memory as u8))
-                .or_insert(vec_buckets);
         }
 
         // Set of all buckets with ID smaller than 'max_bucket_id' which were allocated and freed.
-        let mut freed_buckets: BTreeSet<BucketId> = (0..max_bucket_id).map(BucketId).collect();
+        let mut freed_buckets: BTreeSet<BucketId> =
+            (0..header.num_allocated_buckets).map(BucketId).collect();
 
-        for id in buckets.iter() {
-            freed_buckets.remove(id);
+        for bucket_id in memory_buckets.values().flat_map(|buckets| buckets.iter()) {
+            freed_buckets.remove(bucket_id);
         }
 
         Self {
             memory,
+            #[cfg(test)]
+            version: LAYOUT_VERSION_V2,
             allocated_buckets: header.num_allocated_buckets,
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
             freed_buckets,
+            bucket_bits,
         }
     }
 
@@ -487,6 +491,9 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn save_header(&self) {
         let header = Header {
             magic: *MAGIC,
+            #[cfg(test)]
+            version: self.version,
+            #[cfg(not(test))]
             version: LAYOUT_VERSION_V2,
             num_allocated_buckets: self.allocated_buckets,
             bucket_size_in_pages: self.bucket_size_in_pages,
@@ -504,6 +511,11 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     // Grows the memory with the given id by the given number of pages.
     fn grow(&mut self, id: MemoryId, pages: u64) -> i64 {
+        #[cfg(test)]
+        if self.version == LAYOUT_VERSION_V1 {
+            return self.grow_v1(id, pages);
+        }
+
         // Compute how many additional buckets are needed.
         let old_size = self.memory_size(id);
         let new_size = old_size + pages;
@@ -529,10 +541,13 @@ impl<M: Memory> MemoryManagerInner<M> {
                 }
             };
 
-            self.memory_buckets
-                .entry(id)
-                .or_default()
-                .push(new_bucket_id);
+            let buckets = self.memory_buckets.entry(id).or_default();
+            if let Some(last_bucket) = buckets.last() {
+                self.bucket_bits.set_next(*last_bucket, new_bucket_id);
+            } else {
+                self.bucket_bits.set_first(id, new_bucket_id);
+            }
+            buckets.push(new_bucket_id);
         }
 
         // Grow the underlying memory if necessary.
@@ -553,29 +568,63 @@ impl<M: Memory> MemoryManagerInner<M> {
         self.save_header();
 
         // Write in stable store that this bucket belongs to the memory with the provided `id`.
-        write(
-            &self.memory,
-            bucket_indexes_offset().get(),
-            self.get_bucket_ids_in_bytes().as_ref(),
-        );
+        self.bucket_bits
+            .flush_dirty_bytes(&self.memory, BUCKET_BITS_OFFSET);
 
         // Return the old size.
         old_size as i64
     }
 
-    fn get_bucket_ids_in_bytes(&self) -> Vec<u8> {
-        let mut bit_vec = BitVec::new();
-        for memory in self.memory_buckets.iter() {
-            for bucket in memory.1 {
-                let bucket_ind = bucket.0;
-                // Splits bit_vec returning the slice [1, .., bit_vec.size() - 1].
-                // This is precisely what we need since the BucketId can be represented
-                // using only 15 bits, instead of 16.
-                let mut bit_vec_temp = BitVec::from_bytes(&bucket_ind.to_be_bytes()).split_off(1);
-                bit_vec.append(&mut bit_vec_temp);
+    #[cfg(test)]
+    fn grow_v1(&mut self, id: MemoryId, pages: u64) -> i64 {
+        // Compute how many additional buckets are needed.
+        let old_size = self.memory_size(id);
+        let new_size = old_size + pages;
+        let current_buckets = self.num_buckets_needed(old_size);
+        let required_buckets = self.num_buckets_needed(new_size);
+        let new_buckets_needed = required_buckets - current_buckets;
+
+        if new_buckets_needed + self.allocated_buckets as u64 > MAX_NUM_BUCKETS {
+            // Exceeded the memory that can be managed.
+            return -1;
+        }
+
+        // Allocate new buckets as needed.
+        for _ in 0..new_buckets_needed {
+            let new_bucket_id = BucketId(self.allocated_buckets);
+
+            self.memory_buckets
+                .entry(id)
+                .or_default()
+                .push(new_bucket_id);
+
+            // Write in stable store that this bucket belongs to the memory with the provided `id`.
+            write(
+                &self.memory,
+                bucket_allocations_address(new_bucket_id).get(),
+                &[id.0],
+            );
+
+            self.allocated_buckets += 1;
+        }
+
+        // Grow the underlying memory if necessary.
+        let pages_needed = BUCKETS_OFFSET_IN_PAGES
+            + self.bucket_size_in_pages as u64 * self.allocated_buckets as u64;
+        if pages_needed > self.memory.size() {
+            let additional_pages_needed = pages_needed - self.memory.size();
+            let prev_pages = self.memory.grow(additional_pages_needed);
+            if prev_pages == -1 {
+                panic!("{id:?}: grow failed");
             }
         }
-        bit_vec.to_bytes()
+
+        // Update the memory with the new size.
+        self.memory_sizes_in_pages[id.0 as usize] = new_size;
+
+        // Update the header and return the old size.
+        self.save_header();
+        old_size as i64
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8]) {
@@ -653,13 +702,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
         // Update the header.
         self.save_header();
-
-        // Write in stable store that no bucket belongs to the memory with the provided `id`.
-        write(
-            &self.memory,
-            bucket_indexes_offset().get(),
-            self.get_bucket_ids_in_bytes().as_ref(),
-        );
     }
 
     #[cfg(test)]
@@ -675,23 +717,6 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         write_struct(&header, Address::from(0), &self.memory);
     }
-}
-
-fn bytes_to_bucket_indexes(input: &[u8]) -> Vec<BucketId> {
-    let mut bucket_ids = vec![];
-    let bit_vec = BitVec::from_bytes(input);
-    for bucket_order_number in 0..bit_vec.len() / BUCKET_ID_LEN_IN_BITS {
-        let mut bucket_id: u16 = 0;
-        for bucket_id_bit in 0..BUCKET_ID_LEN_IN_BITS {
-            let next_bit = BUCKET_ID_LEN_IN_BITS * bucket_order_number + bucket_id_bit;
-            bucket_id <<= 1;
-            if bit_vec.get(next_bit) == Some(true) {
-                bucket_id |= 1;
-            }
-        }
-        bucket_ids.push(BucketId(bucket_id));
-    }
-    bucket_ids
 }
 
 struct Segment {
@@ -799,8 +824,233 @@ fn bucket_allocations_address(id: BucketId) -> Address {
     Address::from(0) + Header::size() + Bytes::from(id.0)
 }
 
-fn bucket_indexes_offset() -> Address {
-    Address::from(0) + Header::size()
+#[derive(Clone)]
+struct BucketLinks {
+    first_bucket_per_memory: [u16; MAX_NUM_MEMORIES as usize],
+    bucket_links: [u16; MAX_NUM_BUCKETS as usize],
+    dirty_first_buckets: BTreeSet<MemoryId>,
+    dirty_bucket_links: BTreeSet<BucketId>,
+}
+
+#[derive(Clone)]
+#[repr(C, packed)]
+struct BucketLinksPacked {
+    first_bucket_per_memory: [u16; MAX_NUM_MEMORIES as usize],
+    bucket_links: [u8; 15 * MAX_NUM_BUCKETS as usize / 8],
+}
+
+const FIRST_BUCKET_PER_MEMORY_BYTES_LEN: usize = 2 * MAX_NUM_MEMORIES as usize;
+
+impl BucketLinks {
+    // Gets the first bucket assigned to a memory.
+    // Only call this if you know that there are buckets assigned to the memory.
+    fn get_first(&self, memory_id: MemoryId) -> BucketId {
+        BucketId(self.first_bucket_per_memory[memory_id.0 as usize])
+    }
+
+    // Sets the first bucket assigned to a memory
+    fn set_first(&mut self, memory_id: MemoryId, value: BucketId) {
+        self.first_bucket_per_memory[memory_id.0 as usize] = value.0;
+        self.dirty_first_buckets.insert(memory_id);
+    }
+
+    // Gets the next bucket in the linked list of buckets
+    fn get_next(&self, bucket: BucketId) -> BucketId {
+        BucketId(self.bucket_links[bucket.0 as usize])
+    }
+
+    // Sets the next bucket in the linked list of buckets
+    fn set_next(&mut self, bucket: BucketId, next: BucketId) {
+        self.bucket_links[bucket.0 as usize] = next.0;
+        self.dirty_bucket_links.insert(bucket);
+    }
+
+    // Calculates the buckets for a given memory by iterating over its linked list
+    fn buckets_for_memory(&self, memory_id: MemoryId, count: u16) -> Vec<BucketId> {
+        if count == 0 {
+            return Vec::new();
+        }
+
+        let mut bucket = self.get_first(memory_id);
+        let mut buckets = vec![bucket];
+        for _ in 1..count {
+            bucket = self.get_next(bucket);
+            buckets.push(bucket);
+        }
+        buckets
+    }
+
+    // Flushes only the dirty bytes to memory
+    fn flush_dirty_bytes<M: Memory>(&mut self, memory: &M, start_offset: u64) {
+        if !self.dirty_first_buckets.is_empty() {
+            // SAFETY: This is safe because we simply cast from [u16] to [u8] and double the length.
+            let first_bucket_per_memory_bytes: [u8; FIRST_BUCKET_PER_MEMORY_BYTES_LEN] =
+                unsafe { transmute(self.first_bucket_per_memory) };
+
+            // Multiply by 2 since we've converted from [u16] to [u8].
+            let min = 2 * self.dirty_first_buckets.first().unwrap().0 as usize;
+            let max = 2 * self.dirty_first_buckets.last().unwrap().0 as usize + 1;
+
+            let dirty_bytes = &first_bucket_per_memory_bytes[min..=max];
+            write(memory, start_offset + min as u64, dirty_bytes);
+            self.dirty_first_buckets.clear();
+        }
+
+        if !self.dirty_bucket_links.is_empty() {
+            let min = self.dirty_bucket_links.first().unwrap().0 as usize;
+            let max = self.dirty_bucket_links.last().unwrap().0 as usize;
+
+            let start_segment = min / 8;
+            let end_segment = (max / 8) + 1;
+
+            let mut dirty_bucket_link_bytes_15bit =
+                Vec::with_capacity(15 * (end_segment - start_segment + 1));
+            for segment in self.bucket_links[8 * start_segment..8 * end_segment].chunks(8) {
+                dirty_bucket_link_bytes_15bit.extend_from_slice(&convert_16bit_to_15bit(segment));
+            }
+
+            write(
+                memory,
+                start_offset
+                    + FIRST_BUCKET_PER_MEMORY_BYTES_LEN as u64
+                    + (8 * start_segment) as u64,
+                &dirty_bucket_link_bytes_15bit,
+            );
+            self.dirty_bucket_links.clear();
+        }
+    }
+
+    // Flushes all bytes to memory
+    fn flush_all<M: Memory>(&mut self, memory: &M, start_offset: u64) {
+        // SAFETY: This is safe because we simply cast from [u16] to [u8] and double the length.
+        let first_bucket_per_memory_bytes: [u8; FIRST_BUCKET_PER_MEMORY_BYTES_LEN] =
+            unsafe { transmute(self.first_bucket_per_memory) };
+
+        write(memory, start_offset, &first_bucket_per_memory_bytes);
+
+        let mut bucket_link_bytes_15bit = [0; 15 * MAX_NUM_BUCKETS as usize / 8];
+
+        for (index, segment) in self.bucket_links.chunks(8).enumerate() {
+            let start = 15 * index;
+            let end = start + 15;
+            bucket_link_bytes_15bit[start..end].copy_from_slice(&convert_16bit_to_15bit(segment));
+        }
+        write(
+            memory,
+            start_offset + first_bucket_per_memory_bytes.len() as u64,
+            &bucket_link_bytes_15bit,
+        );
+
+        self.dirty_first_buckets.clear();
+        self.dirty_bucket_links.clear();
+    }
+}
+
+impl Default for BucketLinks {
+    fn default() -> Self {
+        BucketLinks {
+            first_bucket_per_memory: [0; MAX_NUM_MEMORIES as usize],
+            bucket_links: [0; MAX_NUM_BUCKETS as usize],
+            dirty_first_buckets: BTreeSet::new(),
+            dirty_bucket_links: BTreeSet::new(),
+        }
+    }
+}
+
+impl Default for BucketLinksPacked {
+    fn default() -> Self {
+        BucketLinksPacked {
+            first_bucket_per_memory: [0; MAX_NUM_MEMORIES as usize],
+            bucket_links: [0; 15 * MAX_NUM_BUCKETS as usize / 8],
+        }
+    }
+}
+
+fn convert_15bit_to_16bit(i: &[u8]) -> [u16; 8] {
+    assert_eq!(i.len(), 15);
+
+    let mut o = [0u16; 8];
+
+    o[0] = u16::from_be_bytes([
+        (i[0] & 0b11111110).rotate_right(1),
+        ((i[0] & 0b00000001) + (i[1] & 0b11111110)).rotate_right(1),
+    ]);
+    o[1] = u16::from_be_bytes([
+        ((i[1] & 0b00000001) + (i[2] & 0b11111100)).rotate_right(2),
+        ((i[2] & 0b00000011) + (i[3] & 0b11111100)).rotate_right(2),
+    ]);
+    o[2] = u16::from_be_bytes([
+        ((i[3] & 0b00000011) + (i[4] & 0b11111000)).rotate_right(3),
+        ((i[4] & 0b00000111) + (i[5] & 0b11111000)).rotate_right(3),
+    ]);
+    o[3] = u16::from_be_bytes([
+        ((i[5] & 0b00000111) + (i[6] & 0b11110000)).rotate_right(4),
+        ((i[6] & 0b00001111) + (i[7] & 0b11110000)).rotate_right(4),
+    ]);
+    o[4] = u16::from_be_bytes([
+        ((i[7] & 0b00001111) + (i[8] & 0b11100000)).rotate_right(5),
+        ((i[8] & 0b00011111) + (i[9] & 0b11100000)).rotate_right(5),
+    ]);
+    o[5] = u16::from_be_bytes([
+        ((i[9] & 0b00011111) + (i[10] & 0b11000000)).rotate_right(6),
+        ((i[10] & 0b00111111) + (i[11] & 0b11000000)).rotate_right(6),
+    ]);
+    o[6] = u16::from_be_bytes([
+        ((i[11] & 0b00111111) + (i[12] & 0b10000000)).rotate_right(7),
+        ((i[12] & 0b01111111) + (i[13] & 0b10000000)).rotate_right(7),
+    ]);
+    o[7] = u16::from_be_bytes([i[13] & 0b01111111, i[14] & 0b11111111]);
+    o
+}
+
+fn convert_16bit_to_15bit(i_u16: &[u16]) -> [u8; 15] {
+    assert_eq!(i_u16.len(), 8);
+
+    let mut o = [0u8; 15];
+
+    let mut i = [0u8; 16];
+    for (index, value) in i_u16.iter().enumerate() {
+        let start = 2 * index;
+        let end = start + 2;
+        i[start..end].copy_from_slice(&value.to_be_bytes());
+    }
+
+    o[0] = ((i[0] & 0b01111111) + (i[1] & 0b10000000)).rotate_left(1);
+    o[1] = (i[1] & 0b01111111).rotate_left(1) + (i[2] & 0b01000000).rotate_left(2);
+    o[2] = ((i[2] & 0b00111111) + (i[3] & 0b11000000)).rotate_left(2);
+    o[3] = (i[3] & 0b00111111).rotate_left(2) + (i[4] & 0b01100000).rotate_left(3);
+    o[4] = ((i[4] & 0b00011111) + (i[5] & 0b11100000)).rotate_left(3);
+    o[5] = (i[5] & 0b00011111).rotate_left(3) + (i[6] & 0b01110000).rotate_left(4);
+    o[6] = ((i[6] & 0b00001111) + (i[7] & 0b11110000)).rotate_left(4);
+    o[7] = (i[7] & 0b00001111).rotate_left(4) + (i[8] & 0b01111000).rotate_left(5);
+    o[8] = ((i[8] & 0b00000111) + (i[9] & 0b11111000)).rotate_left(5);
+    o[9] = (i[9] & 0b00000111).rotate_left(5) + (i[10] & 0b01111100).rotate_left(6);
+    o[10] = ((i[10] & 0b00000011) + (i[11] & 0b11111100)).rotate_left(6);
+    o[11] = (i[11] & 0b00000011).rotate_left(6) + (i[12] & 0b01111110).rotate_left(7);
+    o[12] = ((i[12] & 0b00000001) + (i[13] & 0b11111110)).rotate_left(7);
+    o[13] = (i[13] & 0b00000001).rotate_left(7) + (i[14] & 0b01111111);
+    o[14] = i[15];
+    o
+}
+
+impl From<BucketLinksPacked> for BucketLinks {
+    fn from(value: BucketLinksPacked) -> Self {
+        let bucket_link_bytes_15bit = value.bucket_links;
+        let mut bucket_links = [0u16; MAX_NUM_BUCKETS as usize];
+
+        for (index, segment) in bucket_link_bytes_15bit.chunks(15).enumerate() {
+            let start = 8 * index;
+            let end = start + 8;
+            bucket_links[start..end].copy_from_slice(&convert_15bit_to_16bit(segment));
+        }
+
+        BucketLinks {
+            first_bucket_per_memory: value.first_bucket_per_memory,
+            bucket_links,
+            dirty_first_buckets: BTreeSet::new(),
+            dirty_bucket_links: BTreeSet::new(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -808,6 +1058,7 @@ mod test {
     use super::*;
     use maplit::btreemap;
     use proptest::prelude::*;
+    use rand::random;
 
     const MAX_MEMORY_IN_PAGES: u64 = MAX_NUM_BUCKETS * BUCKET_SIZE_IN_PAGES;
 
@@ -1081,7 +1332,7 @@ mod test {
         )| {
             for memory in memories.iter().take(num_memories) {
                 // Write a random blob into the memory, growing the memory as it needs to.
-                write(memory, offset, &data);
+                crate::write(memory, offset, &data);
 
                 // Verify the blob can be read back.
                 let mut bytes = vec![0; data.len()];
@@ -1336,11 +1587,11 @@ mod test {
     #[test]
     fn freed_memories_are_tracked() {
         let mem = make_memory();
-        let mut mem_mgr = MemoryManager::init(mem.clone());
+        let mut mem_mgr = MemoryManager::init_with_bucket_size(mem.clone(), 1);
         mem_mgr.get(MemoryId(0)).grow(1);
-        mem_mgr.get(MemoryId(1)).grow(1);
-        mem_mgr.get(MemoryId(2)).grow(1);
-        mem_mgr.get(MemoryId(3)).grow(1);
+        mem_mgr.get(MemoryId(1)).grow(2);
+        mem_mgr.get(MemoryId(2)).grow(3);
+        mem_mgr.get(MemoryId(3)).grow(2);
         mem_mgr.get(MemoryId(4)).grow(1);
 
         mem_mgr.free(MemoryId(0));
@@ -1348,13 +1599,9 @@ mod test {
         mem_mgr.free(MemoryId(4));
 
         let mem_mgr = MemoryManager::init(mem);
-        // Only Memory 0 and 2 buckets should be counted as freed_buckets.
-        // The bucket belonging to Memory 4 should not be counted as
-        // freed because it has the biggest Bucket ID of all allocated
-        // buckets hence it should become part of unallocated buckets.
         assert_eq!(
             mem_mgr.inner.borrow().freed_buckets,
-            maplit::btreeset! { BucketId(0), BucketId(2) }
+            maplit::btreeset! { BucketId(0), BucketId(3), BucketId(4), BucketId(5), BucketId(8) }
         );
     }
 
@@ -1369,17 +1616,20 @@ mod test {
             .collect();
 
         proptest!(|(
-            num_memories in 0..255usize,
+            num_memories in 0..10usize,
             data in proptest::collection::vec(0..u8::MAX, 0..2*WASM_PAGE_SIZE as usize),
             offset in 0..10*WASM_PAGE_SIZE
         )| {
             for memory_v1 in memories_v1.iter().take(num_memories) {
                 // Write a random blob into the memory, growing the memory as it needs to.
-                write(memory_v1, offset, &data);
+                crate::write(memory_v1, offset, &data);
             }
 
+            // Copy the underlying memory because loading a v1 memory manager will convert it to v2
+            let mem_clone = Rc::new(RefCell::new(mem.borrow().clone()));
+
             // Load layout v1 and convert it to layout v2.
-            let mem_mgr_v2 = MemoryManager::init_with_bucket_size(mem.clone(), 1);
+            let mem_mgr_v2 = MemoryManager::init_with_bucket_size(mem_clone, 1);
             let memories_v2: Vec<_> = (0..MAX_NUM_MEMORIES)
                 .map(|id| mem_mgr_v2.get(MemoryId(id)))
                 .collect();
@@ -1391,5 +1641,17 @@ mod test {
                 assert_eq!(bytes, data);
             }
         });
+    }
+
+    #[test]
+    fn roundtrip_16bit_to_15bit() {
+        for _ in 0..10 {
+            let mut input = [0u16; 8];
+            input.copy_from_slice(&(0..8).map(|_| random::<u16>() % 32768).collect::<Vec<_>>());
+
+            let as_15bit = convert_16bit_to_15bit(&input);
+            let output = convert_15bit_to_16bit(&as_15bit);
+            assert_eq!(input, output);
+        }
     }
 }

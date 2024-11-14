@@ -296,7 +296,6 @@ dependencies = [
 name = "ic-stable-structures"
 version = "0.6.5"
 dependencies = [
- "bit-vec",
  "canbench-rs",
  "candid",
  "hex",
@@ -305,6 +304,7 @@ dependencies = [
  "ic_principal",
  "maplit",
  "proptest",
+ "rand",
  "tempfile",
  "test-strategy",
 ]
