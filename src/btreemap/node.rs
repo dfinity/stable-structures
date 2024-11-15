@@ -162,11 +162,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         (key, value): Entry<K>,
         memory: &M,
     ) -> Entry<K> {
-        let mut swap_with = (key, RefCell::new(Value::ByVal(value)));
-        core::mem::swap(&mut self.keys_and_encoded_values[idx], &mut swap_with);
+        let (old_key, old_value) = core::mem::replace(
+            &mut self.keys_and_encoded_values[idx],
+            (key, RefCell::new(Value::ByVal(value))),
+        );
         (
-            swap_with.0,
-            self.resolve_value(RefCell::into_inner(swap_with.1), memory),
+            old_key,
+            self.resolve_value(RefCell::into_inner(old_value), memory),
         )
     }
 
@@ -182,11 +184,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> Ref<[u8]> {
         // Load and cache the value from the underlying memory if needed.
         let encoded_value = &self.keys_and_encoded_values[idx].1;
+
         // We borrow the value immutably first. We only borrow the value mutably if it hasn't been
         // cached yet. This is to ensure that no references have been given out to the cached value
         // when we call .borrow_mut().
-        if let Value::ByRef(offset) = *encoded_value.borrow() {
-            // Cache the value internally.
+        let encoded_value_borrow = encoded_value.borrow();
+        if let Value::ByRef(offset) = *encoded_value_borrow {
+            // We drop the borrow explicitly because we want to borrow mutably on the next line.
+            drop(encoded_value_borrow);
             *encoded_value.borrow_mut() =
                 Value::ByVal(self.resolve_value(Value::ByRef(offset), memory));
         }
