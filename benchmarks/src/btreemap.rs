@@ -220,6 +220,41 @@ pub fn btreemap_insert_10mib_values() -> BenchResult {
     })
 }
 
+// Read a range of entries but only process the key of each entry.
+#[bench(raw)]
+pub fn btreemap_read_keys_from_range() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let size: u32 = 10_000;
+    for i in 0..size {
+        btree.insert(i, vec![0; 1024]);
+    }
+
+    bench_fn(|| {
+        btree
+            .range((Bound::Included(0), Bound::Included(size)))
+            .map(|entry| entry.0)
+            .sum::<u32>()
+    })
+}
+
+// Read a range of entries but only process the value from every third entry.
+#[bench(raw)]
+pub fn btreemap_read_every_third_value_from_range() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let size: u32 = 10_000;
+    for i in 0..size {
+        btree.insert(i, vec![0; 1024]);
+    }
+
+    bench_fn(|| {
+        btree
+            .range((Bound::Included(0), Bound::Included(size)))
+            .filter(|entry| entry.0 % 3 == 0)
+            .map(|entry| entry.1.len())
+            .sum::<usize>()
+    })
+}
+
 #[bench(raw)]
 pub fn btreemap_iter_small_values() -> BenchResult {
     iter_helper(10_000, 0, IterType::Iter)
