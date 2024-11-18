@@ -460,44 +460,52 @@ impl NodeHeader {
 
 /// The value in a K/V pair.
 #[derive(Debug)]
-pub(crate) struct Value {
-    /// The value's offset in the node.
-    /// When value.get().is_none(), the offset must be set.
-    offset: Option<Bytes>,
+enum Value {
+    /// The value's encoded bytes.
+    ByVal(Vec<u8>),
 
-    /// The value's encoded bytes. It can be loaded lazily using offset.
-    value: OnceCell<Vec<u8>>,
+    ByRef {
+        /// The value's offset in the node.
+        offset: Bytes,
+        /// The lazily loaded encoded bytes.
+        loaded_value: OnceCell<Vec<u8>>,
+    },
 }
 
 impl Value {
     pub fn by_ref(offset: Bytes) -> Self {
-        Self {
-            offset: Some(offset),
-            value: Default::default(),
+        Self::ByRef {
+            offset,
+            loaded_value: Default::default(),
         }
     }
 
     pub fn by_value(value: Vec<u8>) -> Self {
-        Self {
-            offset: None,
-            value: value.into(),
-        }
+        Self::ByVal(value)
     }
 
     /// Returns a reference to the value if the value has been loaded or runs the given function to
     /// load the value.
     pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Vec<u8>) -> &[u8] {
-        // The unwrap() must not fail because of the invariant (see in the struct def).
-        self.value.get_or_init(|| load(self.offset.unwrap()))
+        match self {
+            Value::ByVal(v) => &v[..],
+            Value::ByRef {
+                offset,
+                loaded_value: value,
+            } => value.get_or_init(|| load(*offset)),
+        }
     }
 
     /// Extracts the value while consuming self if the value has been loaded or runs the given
     /// function to load the value.
     pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Vec<u8>) -> Vec<u8> {
-        self.value
-            .into_inner()
-            // The unwrap() must not fail because of the invariant (see in the struct def).
-            .unwrap_or_else(|| load(self.offset.unwrap()))
+        match self {
+            Value::ByVal(v) => v,
+            Value::ByRef {
+                offset,
+                loaded_value: mut value,
+            } => value.take().unwrap_or_else(|| load(offset)),
+        }
     }
 }
 
