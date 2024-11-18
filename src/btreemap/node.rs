@@ -49,10 +49,11 @@ pub type Entry<K> = (K, Vec<u8>);
 #[derive(Debug)]
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
-    keys: Vec<K>,
+    // List of tuples consisting of a key and the encoded value.
     // Values are stored in a Refcell as they are loaded lazily.
     // A RefCell allows loading the value and caching it without requiring exterior mutability.
-    encoded_values: RefCell<Vec<Value>>,
+    // INVARIANT: the list is sorted by key.
+    keys_and_encoded_values: Vec<(K, RefCell<Value>)>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
@@ -106,9 +107,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
         match self.node_type {
             NodeType::Leaf => {
-                let last_idx = self.encoded_values.borrow().len() - 1;
+                let last_idx = self.keys_and_encoded_values.len() - 1;
                 (
-                    self.keys.last().expect("A node can never be empty").clone(),
+                    self.keys_and_encoded_values
+                        .last()
+                        .expect("A node can never be empty")
+                        .0
+                        .clone(),
                     self.value(last_idx, memory).to_vec(),
                 )
             }
@@ -147,34 +152,62 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns true if the node cannot store anymore entries, false otherwise.
     pub fn is_full(&self) -> bool {
-        self.keys.len() >= CAPACITY
+        self.keys_and_encoded_values.len() >= CAPACITY
     }
 
     /// Swaps the entry at index `idx` with the given entry, returning the old entry.
     pub fn swap_entry<M: Memory>(
         &mut self,
         idx: usize,
-        (mut key, value): Entry<K>,
+        (key, value): Entry<K>,
         memory: &M,
     ) -> Entry<K> {
-        core::mem::swap(&mut self.keys[idx], &mut key);
-        let old_value = self.value(idx, memory).to_vec();
-        self.encoded_values.borrow_mut()[idx] = Value::ByVal(value);
-        (key, old_value)
+        let (old_key, old_value) = core::mem::replace(
+            &mut self.keys_and_encoded_values[idx],
+            (key, RefCell::new(Value::ByVal(value))),
+        );
+        (
+            old_key,
+            self.resolve_value(RefCell::into_inner(old_value), memory),
+        )
     }
 
     /// Returns a copy of the entry at the specified index.
     pub fn entry<M: Memory>(&self, idx: usize, memory: &M) -> Entry<K> {
-        (self.keys[idx].clone(), self.value(idx, memory).to_vec())
+        (
+            self.keys_and_encoded_values[idx].0.clone(),
+            self.value(idx, memory).to_vec(),
+        )
     }
 
     /// Returns a reference to the encoded value at the specified index.
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> Ref<[u8]> {
         // Load and cache the value from the underlying memory if needed.
-        {
-            let mut values = self.encoded_values.borrow_mut();
+        let encoded_value = &self.keys_and_encoded_values[idx].1;
 
-            if let Value::ByRef(offset) = values[idx] {
+        // We borrow the value immutably first. We only borrow the value mutably if it hasn't been
+        // cached yet. This is to ensure that no references have been given out to the cached value
+        // when we call .borrow_mut().
+        let encoded_value_borrow = encoded_value.borrow();
+        if let Value::ByRef(offset) = *encoded_value_borrow {
+            // We drop the borrow explicitly because we want to borrow mutably on the next line.
+            drop(encoded_value_borrow);
+            *encoded_value.borrow_mut() =
+                Value::ByVal(self.resolve_value(Value::ByRef(offset), memory));
+        }
+
+        // Return a reference to the value.
+        Ref::map(encoded_value.borrow(), |value| match value {
+            Value::ByVal(v) => &v[..],
+            Value::ByRef(_) => {
+                unreachable!("value must have been loaded already in the code above.")
+            }
+        })
+    }
+
+    fn resolve_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
+        match value {
+            Value::ByRef(offset) => {
                 // Value isn't loaded yet.
                 let reader = NodeReader {
                     address: self.address,
@@ -184,22 +217,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 };
 
                 let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
-                let mut value = vec![0; value_len];
-                reader.read((offset + U32_SIZE).get(), &mut value);
+                let mut bytes = vec![0; value_len];
+                reader.read((offset + U32_SIZE).get(), &mut bytes);
 
-                // Cache the value internally.
-                values[idx] = Value::ByVal(value);
+                bytes
             }
+            Value::ByVal(bytes) => bytes,
         }
-
-        // Return a reference to the value.
-        Ref::map(self.encoded_values.borrow(), |values| {
-            if let Value::ByVal(v) = &values[idx] {
-                &v[..]
-            } else {
-                unreachable!("value must have been loaded already.");
-            }
-        })
     }
 
     fn page_size(&self) -> PageSize {
@@ -208,7 +232,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns a reference to the key at the specified index.
     pub fn key(&self, idx: usize) -> &K {
-        &self.keys[idx]
+        &self.keys_and_encoded_values[idx].0
     }
 
     /// Returns the child's address at the given index.
@@ -243,25 +267,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
-        self.keys.insert(idx, key);
-        self.encoded_values
-            .borrow_mut()
-            .insert(idx, Value::ByVal(encoded_value));
+        self.keys_and_encoded_values
+            .insert(idx, (key, RefCell::new(Value::ByVal(encoded_value))));
     }
 
     /// Removes the entry at the specified index.
     pub fn remove_entry<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
-        let value = self.value(idx, memory).to_vec();
-        self.encoded_values.borrow_mut().remove(idx);
-        (self.keys.remove(idx), value)
+        let (key, value) = self.keys_and_encoded_values.remove(idx);
+        (key, self.resolve_value(RefCell::into_inner(value), memory))
     }
 
     /// Adds a new entry at the back of the node.
     pub fn push_entry(&mut self, (key, encoded_value): Entry<K>) {
-        self.keys.push(key);
-        self.encoded_values
-            .borrow_mut()
-            .push(Value::ByVal(encoded_value));
+        self.keys_and_encoded_values
+            .push((key, RefCell::new(Value::ByVal(encoded_value))));
     }
 
     /// Removes an entry from the back of the node.
@@ -271,14 +290,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
             return None;
         }
 
-        let key = self.keys.pop().expect("node must not be empty");
-        let last_value = self.value(len - 1, memory).to_vec();
-        self.encoded_values
-            .borrow_mut()
+        let (key, last_value) = self
+            .keys_and_encoded_values
             .pop()
             .expect("node must not be empty");
 
-        Some((key, last_value))
+        Some((
+            key,
+            self.resolve_value(RefCell::into_inner(last_value), memory),
+        ))
     }
 
     /// Merges the entries and children of the `source` node into self, along with the median entry.
@@ -313,8 +333,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             Self::append(&mut source, self, median);
 
             // Move the entries and children into self.
-            self.keys = core::mem::take(&mut source.keys);
-            self.encoded_values = core::mem::take(&mut source.encoded_values);
+            self.keys_and_encoded_values = core::mem::take(&mut source.keys_and_encoded_values);
             self.children = core::mem::take(&mut source.children);
         }
 
@@ -343,32 +362,32 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         a.push_entry(median);
 
-        a.keys.append(&mut b.keys);
-        a.encoded_values
-            .borrow_mut()
-            .append(&mut b.encoded_values.borrow_mut());
+        a.keys_and_encoded_values
+            .append(&mut b.keys_and_encoded_values);
 
         // Move the children (if any exist).
         a.children.append(&mut b.children);
 
         // Assert postconditions.
-        assert_eq!(b.keys.len(), 0);
-        assert_eq!(b.encoded_values.borrow().len(), 0);
+        assert_eq!(b.keys_and_encoded_values.len(), 0);
         assert_eq!(b.children.len(), 0);
     }
 
     #[cfg(test)]
     pub fn entries<M: Memory>(&self, memory: &M) -> Vec<Entry<K>> {
-        self.keys
+        self.keys_and_encoded_values
             .iter()
-            .cloned()
-            .zip((0..self.keys.len()).map(|idx| self.value(idx, memory).to_vec()))
+            .enumerate()
+            .map(|(idx, (key, _))| (key.clone(), self.value(idx, memory).to_vec()))
             .collect()
     }
 
     #[cfg(test)]
-    pub fn keys(&self) -> &[K] {
-        &self.keys
+    pub fn keys(&self) -> Vec<K> {
+        self.keys_and_encoded_values
+            .iter()
+            .map(|(key, _)| key.clone())
+            .collect()
     }
 
     #[cfg(test)]
@@ -378,7 +397,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns the number of entries in the node.
     pub fn entries_len(&self) -> usize {
-        self.keys.len()
+        self.keys_and_encoded_values.len()
     }
 
     /// Searches for the key in the node's entries.
@@ -388,7 +407,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// returned, containing the index where a matching key could be inserted
     /// while maintaining sorted order.
     pub fn search(&self, key: &K) -> Result<usize, usize> {
-        self.keys.binary_search(key)
+        self.keys_and_encoded_values
+            .binary_search_by_key(&key, |entry| &entry.0)
     }
 
     /// Returns the maximum size a node can be if it has bounded keys and values.
@@ -400,7 +420,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns true if the node is at the minimum required size, false otherwise.
     pub fn at_minimum(&self) -> bool {
-        self.keys.len() < B
+        self.keys_and_encoded_values.len() < B
     }
 
     /// Returns true if an entry can be removed without having to merge it into another node
@@ -419,8 +439,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Move the entries and children above the median into the new sibling.
-        sibling.keys = self.keys.split_off(B);
-        *sibling.encoded_values.borrow_mut() = self.encoded_values.borrow_mut().split_off(B);
+        sibling.keys_and_encoded_values = self.keys_and_encoded_values.split_off(B);
         if self.node_type == NodeType::Internal {
             sibling.children = self.children.split_off(B);
         }
