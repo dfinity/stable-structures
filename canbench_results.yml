@@ -427,13 +427,13 @@ benches:
     scopes: {}
   btreemap_read_every_third_value_from_range:
     total:
-      instructions: 167219433
+      instructions: 160211242
       heap_increase: 0
       stable_memory_increase: 0
     scopes: { }
   btreemap_read_keys_from_range:
     total:
-      instructions: 167219433
+      instructions: 160211242
       heap_increase: 0
       stable_memory_increase: 0
     scopes: { }
