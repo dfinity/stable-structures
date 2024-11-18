@@ -161,10 +161,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 let value = read_u32(&reader, offset);
                 offset += U32_SIZE;
                 value
-            };
+            } as usize;
 
             // Load the key.
-            buf.resize(key_size as usize, 0);
+            buf.clear();
+            buf.reserve(key_size);
+            unsafe {
+                // SAFETY: buf will contain uninitialized bytes but reader.read must not make
+                // assumptions about its content.
+                buf.set_len(key_size);
+            }
             reader.read(offset.get(), &mut buf);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             offset += Bytes::from(key_size);

@@ -53,6 +53,7 @@ pub trait Memory {
 
     /// Copies the data referred to by offset out of the stable memory
     /// and replaces the corresponding bytes in dst.
+    /// Implementations must not make any assumptions about the contents of dst.
     fn read(&self, offset: u64, dst: &mut [u8]);
 
     /// Copies the data referred to by src and replaces the

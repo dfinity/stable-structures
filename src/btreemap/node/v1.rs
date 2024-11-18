@@ -68,11 +68,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
         for _ in 0..header.num_entries {
             // Read the key's size.
-            let key_size = read_u32(memory, address + offset);
+            let key_size = read_u32(memory, address + offset) as usize;
             offset += U32_SIZE;
 
             // Read the key.
-            buf.resize(key_size as usize, 0);
+            buf.clear();
+            buf.reserve(key_size);
+            unsafe {
+                // SAFETY: buf will contain uninitialized bytes but memory.read must not make
+                // assumptions about its content.
+                buf.set_len(key_size);
+            }
             memory.read((address + offset).get(), &mut buf);
             offset += Bytes::from(max_key_size);
             let key = K::from_bytes(Cow::Borrowed(&buf));

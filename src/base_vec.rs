@@ -239,16 +239,22 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
 
     /// Reads the item at the specified index without any bound checks.
     fn read_entry(&self, index: u64) -> T {
-        let mut data = std::vec::Vec::new();
+        let mut data = Vec::new();
         self.read_entry_to(index, &mut data);
         T::from_bytes(Cow::Owned(data))
     }
 
     /// Reads the item at the specified index without any bound checks.
-    fn read_entry_to(&self, index: u64, buf: &mut std::vec::Vec<u8>) {
+    fn read_entry_to(&self, index: u64, buf: &mut Vec<u8>) {
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let (data_offset, data_size) = self.read_entry_size(offset);
-        buf.resize(data_size, 0);
+        buf.clear();
+        buf.reserve(data_size);
+        unsafe {
+            // SAFETY: buf will contain uninitialized bytes but self.memory.read must not make
+            // assumptions about its content.
+            buf.set_len(data_size);
+        }
         self.memory.read(data_offset, &mut buf[..]);
     }
 

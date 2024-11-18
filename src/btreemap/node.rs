@@ -217,7 +217,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 };
 
                 let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
-                let mut bytes = vec![0; value_len];
+                let mut bytes = Vec::with_capacity(value_len);
+                unsafe {
+                    // SAFETY: bytes will contain uninitialized bytes but reader.read must not make
+                    // assumptions about its content.
+                    bytes.set_len(value_len);
+                }
                 reader.read((offset + U32_SIZE).get(), &mut bytes);
 
                 bytes
