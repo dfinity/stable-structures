@@ -98,7 +98,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             address,
             node_type,
             version: Version::V2(page_size),
-            keys_encoded_values: vec![],
+            keys_and_encoded_values: vec![],
             children: vec![],
             overflows: Vec::with_capacity(0),
         }
@@ -181,7 +181,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         Self {
             address,
-            keys_encoded_values,
+            keys_and_encoded_values: keys_encoded_values,
             children,
             node_type,
             version: Version::V2(page_size),
@@ -199,7 +199,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
-        for i in 0..self.keys_encoded_values.len() {
+        for i in 0..self.keys_and_encoded_values.len() {
             self.value(i, allocator.memory());
         }
 
@@ -221,7 +221,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 NodeType::Leaf => LEAF_NODE_TYPE,
                 NodeType::Internal => INTERNAL_NODE_TYPE,
             },
-            num_entries: self.keys_encoded_values.len() as u16,
+            num_entries: self.keys_and_encoded_values.len() as u16,
         };
 
         writer.write_struct(&header, offset);
@@ -239,7 +239,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the keys.
-        for (key, _) in self.keys_encoded_values.iter() {
+        for (key, _) in self.keys_and_encoded_values.iter() {
             let key_bytes = key.to_bytes_checked();
 
             // Write the size of the key if it isn't fixed in size.
