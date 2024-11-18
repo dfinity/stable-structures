@@ -425,6 +425,18 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
+  btreemap_read_every_third_value_from_range:
+    total:
+      instructions: 167219433
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: { }
+  btreemap_read_keys_from_range:
+    total:
+      instructions: 167219433
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: { }
   btreemap_remove_blob_128_1024:
     total:
       instructions: 1916049094

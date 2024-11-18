@@ -222,7 +222,7 @@ pub fn btreemap_insert_10mib_values() -> BenchResult {
 
 // Read a range of entries but only process the key of each entry.
 #[bench(raw)]
-pub fn btreemap_read_keys_from_entries() -> BenchResult {
+pub fn btreemap_read_keys_from_range() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let size: u32 = 10_000;
     for i in 0..size {
@@ -239,7 +239,7 @@ pub fn btreemap_read_keys_from_entries() -> BenchResult {
 
 // Read a range of entries but only process the value from every third entry.
 #[bench(raw)]
-pub fn btreemap_read_every_third_value() -> BenchResult {
+pub fn btreemap_read_every_third_value_from_range() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let size: u32 = 10_000;
     for i in 0..size {
