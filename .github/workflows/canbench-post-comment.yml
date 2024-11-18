@@ -33,6 +33,6 @@ jobs:
         with:
           message: |
             ${{ matrix.benchmark.result }}
-          comment_tag: ${{ matrix.benchmark.title }}
-          pr_number: ${{ needs.download-results.outputs.pr_number }}
+          comment-tag: ${{ matrix.benchmark.title }}
+          pr-number: ${{ needs.download-results.outputs.pr_number }}
 

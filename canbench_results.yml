@@ -365,27 +365,63 @@ benches:
       heap_increase: 0
       stable_memory_increase: 6
     scopes: {}
+  btreemap_iter_10mib_values:
+    total:
+      instructions: 25583733
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
   btreemap_iter_count_10mib_values:
     total:
-      instructions: 521270
+      instructions: 544088
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_count_small_values:
     total:
-      instructions: 10242765
+      instructions: 11007833
       heap_increase: 0
       stable_memory_increase: 0
-    scopes: { }
-  btreemap_read_every_third_value_from_range:
+    scopes: {}
+  btreemap_iter_rev_10mib_values:
     total:
-      instructions: 174611905
+      instructions: 25584039
       heap_increase: 0
       stable_memory_increase: 0
-    scopes: { }
-  btreemap_read_keys_from_range:
+    scopes: {}
+  btreemap_iter_rev_small_values:
     total:
-      instructions: 174611905
+      instructions: 23800315
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_iter_small_values:
+    total:
+      instructions: 23721014
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_keys_10mib_values:
+    total:
+      instructions: 534290
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_keys_rev_10mib_values:
+    total:
+      instructions: 595467
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_keys_rev_small_values:
+    total:
+      instructions: 14369449
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_keys_small_values:
+    total:
+      instructions: 11184261
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -518,6 +554,30 @@ benches:
   btreemap_remove_u64_u64_v2:
     total:
       instructions: 739939423
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_values_10mib_values:
+    total:
+      instructions: 17277830
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_values_rev_10mib_values:
+    total:
+      instructions: 17276742
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_values_rev_small_values:
+    total:
+      instructions: 22619653
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_values_small_values:
+    total:
+      instructions: 22560352
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
