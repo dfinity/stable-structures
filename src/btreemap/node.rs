@@ -189,7 +189,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Extracts the contents of value (by loading it first if it's not loaded yet).
     fn value_into_vec<M: Memory>(&self, mut value: Value, memory: &M) -> Vec<u8> {
-        value.take_or_else(|offset| self.load_value_from_memory(offset, memory))
+        value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
     /// Loads a value from stable memory at the given offset.
@@ -495,7 +495,7 @@ impl Value {
 
     /// Extracts the value while consuming self if the value has been loaded or runs the given
     /// function to load the value.
-    pub fn take_or_else(self, load: impl FnOnce(Bytes) -> Vec<u8>) -> Vec<u8> {
+    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Vec<u8>) -> Vec<u8> {
         self.value
             .into_inner()
             // The unwrap() must not fail because of the invariant (see in the struct def).
