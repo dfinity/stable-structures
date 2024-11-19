@@ -521,7 +521,7 @@ where
     }
 
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let mut node = self.load_node(node_addr);
+        let node = self.load_node(node_addr);
         match node.search(key) {
             Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
             Err(idx) => {
