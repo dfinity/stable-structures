@@ -6,7 +6,7 @@ use crate::{
     write, write_struct, write_u32, Memory,
 };
 use std::borrow::{Borrow, Cow};
-use std::cell::{OnceCell, Ref, RefCell};
+use std::cell::OnceCell;
 
 mod io;
 #[cfg(test)]
@@ -51,8 +51,6 @@ pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
-    // Values are stored in a Refcell as they are loaded lazily.
-    // A RefCell allows loading the value and caching it without requiring exterior mutability.
     // INVARIANT: the list is sorted by key.
     keys_and_encoded_values: Vec<(K, Value)>,
     // For the key at position I, children[I] points to the left
@@ -456,7 +454,7 @@ struct NodeHeader {
 
 impl NodeHeader {
     fn size() -> Bytes {
-        Bytes::from(core::mem::size_of::<Self>() as u64)
+        Bytes::from(size_of::<Self>() as u64)
     }
 }
 
