@@ -166,7 +166,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) -> Entry<K> {
         let (old_key, old_value) = core::mem::replace(
             &mut self.keys_and_encoded_values[idx],
-            (key, Value::from_value(value)),
+            (key, Value::by_value(value)),
         );
         (old_key, self.value_into_vec(old_value, memory))
     }
@@ -250,7 +250,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .insert(idx, (key, Value::from_value(encoded_value)));
+            .insert(idx, (key, Value::by_value(encoded_value)));
     }
 
     /// Returns the entry at the specified index while consuming this node.
@@ -269,7 +269,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Adds a new entry at the back of the node.
     pub fn push_entry(&mut self, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .push((key, Value::from_value(encoded_value)));
+            .push((key, Value::by_value(encoded_value)));
     }
 
     /// Removes an entry from the back of the node.
@@ -472,14 +472,14 @@ pub(crate) struct Value {
 }
 
 impl Value {
-    pub fn from_offset(offset: Bytes) -> Self {
+    pub fn by_ref(offset: Bytes) -> Self {
         Self {
             offset: Some(offset),
             value: Default::default(),
         }
     }
 
-    pub fn from_value(value: Vec<u8>) -> Self {
+    pub fn by_value(value: Vec<u8>) -> Self {
         Self {
             offset: None,
             value: value.into(),
