@@ -166,7 +166,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             &mut self.keys_and_encoded_values[idx],
             (key, Value::by_value(value)),
         );
-        (old_key, self.value_into_vec(old_value, memory))
+        (old_key, self.extract_value(old_value, memory))
     }
 
     /// Returns a reference to the entry at the specified index.
@@ -186,7 +186,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Extracts the contents of value (by loading it first if it's not loaded yet).
-    fn value_into_vec<M: Memory>(&self, mut value: Value, memory: &M) -> Vec<u8> {
+    fn extract_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
         value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
@@ -255,13 +255,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn into_entry<M: Memory>(mut self, idx: usize, memory: &M) -> Entry<K> {
         let keys_and_encoded_values = core::mem::take(&mut self.keys_and_encoded_values);
         let (key, value) = keys_and_encoded_values.into_iter().nth(idx).unwrap();
-        (key, self.value_into_vec(value, memory))
+        (key, self.extract_value(value, memory))
     }
 
     /// Removes the entry at the specified index.
     pub fn remove_entry<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
         let (key, value) = self.keys_and_encoded_values.remove(idx);
-        (key, self.value_into_vec(value, memory))
+        (key, self.extract_value(value, memory))
     }
 
     /// Adds a new entry at the back of the node.
@@ -282,7 +282,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .pop()
             .expect("node must not be empty");
 
-        Some((key, self.value_into_vec(last_value, memory)))
+        Some((key, self.extract_value(last_value, memory)))
     }
 
     /// Merges the entries and children of the `source` node into self, along with the median entry.

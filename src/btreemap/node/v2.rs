@@ -261,7 +261,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += U32_SIZE;
 
             // Write the value.
-            writer.write(offset, &value);
+            writer.write(offset, value);
             offset += Bytes::from(value.len());
         }
 

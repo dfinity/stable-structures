@@ -180,7 +180,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += U32_SIZE;
 
             // Write the value.
-            write(memory, (self.address + offset).get(), &value);
+            write(memory, (self.address + offset).get(), value);
             offset += Bytes::from(max_value_size);
         }
 
