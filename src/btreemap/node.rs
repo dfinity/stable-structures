@@ -454,7 +454,7 @@ struct NodeHeader {
 
 impl NodeHeader {
     fn size() -> Bytes {
-        Bytes::from(size_of::<Self>() as u64)
+        Bytes::from(core::mem::size_of::<Self>() as u64)
     }
 }
 
