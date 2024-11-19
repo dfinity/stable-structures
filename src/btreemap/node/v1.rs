@@ -77,7 +77,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Bytes::from(max_key_size);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             // Values are loaded lazily. Store a reference and skip loading it.
-            keys_encoded_values.push((key, RefCell::new(Value::ByRef(offset))));
+            keys_encoded_values.push((key, Value::from_offset(offset)));
 
             offset += U32_SIZE + Bytes::from(max_value_size);
         }

@@ -168,13 +168,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
             reader.read(offset.get(), &mut buf);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             offset += Bytes::from(key_size);
-            keys_encoded_values.push((key, RefCell::new(Value::ByRef(Bytes::from(0usize)))));
+            keys_encoded_values.push((key, Value::from_offset(Bytes::from(0usize))));
         }
 
         // Load the values
         for (_key, value) in keys_encoded_values.iter_mut() {
             // Load the values lazily.
-            *value = RefCell::new(Value::ByRef(Bytes::from(offset.get())));
+            *value = Value::from_offset(Bytes::from(offset.get()));
             let value_size = read_u32(&reader, offset) as usize;
             offset += U32_SIZE + Bytes::from(value_size as u64);
         }
