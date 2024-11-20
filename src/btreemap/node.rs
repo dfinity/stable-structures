@@ -503,8 +503,8 @@ impl Value {
             Value::ByVal(v) => v,
             Value::ByRef {
                 offset,
-                loaded_value: mut value,
-            } => value.take().unwrap_or_else(|| load(offset)),
+                loaded_value: value,
+            } => value.into_inner().unwrap_or_else(|| load(offset)),
         }
     }
 }
