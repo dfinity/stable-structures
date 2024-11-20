@@ -307,5 +307,5 @@ fn can_call_node_value_multiple_times_on_same_index() {
 
     let value1 = node.value(0, &mem);
     let value2 = node.value(0, &mem);
-    assert_eq!(&value1[..], &value2[..]);
+    assert_eq!(value1, value2);
 }
