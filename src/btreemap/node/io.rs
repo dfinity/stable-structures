@@ -59,6 +59,18 @@ impl<'a, M: Memory> Memory for NodeReader<'a, M> {
         }
     }
 
+    fn read_to_vec(&self, offset: u64, len: usize, dst: &mut Vec<u8>) {
+        // If the read is only in the initial page, then read it directly in one go.
+        // This is a performance enhancement.
+        if (offset + len as u64) < self.page_size.get() as u64 {
+            self.memory
+                .read_to_vec(self.address.get() + offset, len, dst);
+        } else {
+            dst.resize(len, 0);
+            self.read(offset, &mut dst[..]);
+        }
+    }
+
     fn write(&self, _: u64, _: &[u8]) {
         unreachable!("NodeReader does not support write")
     }

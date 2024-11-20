@@ -331,8 +331,8 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     /// ignores the result.
     pub fn read_entry(&self, idx: u64, buf: &mut Vec<u8>) -> Result<(), NoSuchEntry> {
         let (offset, len) = self.entry_meta(idx).ok_or(NoSuchEntry)?;
-        buf.resize(len, 0);
-        self.data_memory.read(HEADER_OFFSET + offset, buf);
+        self.data_memory
+            .read_to_vec(HEADER_OFFSET + offset, len, buf);
         Ok(())
     }
 

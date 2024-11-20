@@ -132,8 +132,8 @@ impl<T: Storable, M: Memory> Cell<T, M> {
     ///
     /// PRECONDITION: memory is large enough to contain the value.
     fn read_value(memory: &M, len: u32) -> T {
-        let mut buf = vec![0; len as usize];
-        memory.read(HEADER_V1_SIZE, &mut buf);
+        let mut buf = vec![];
+        memory.read_to_vec(HEADER_V1_SIZE, len as usize, &mut buf);
         T::from_bytes(Cow::Owned(buf))
     }
 

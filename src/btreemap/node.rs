@@ -200,8 +200,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
-        let mut bytes = vec![0; value_len];
-        reader.read((offset + U32_SIZE).get(), &mut bytes);
+        let mut bytes = vec![];
+        reader.read_to_vec((offset + U32_SIZE).get(), value_len, &mut bytes);
 
         bytes
     }

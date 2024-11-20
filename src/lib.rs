@@ -55,6 +55,16 @@ pub trait Memory {
     /// and replaces the corresponding bytes in dst.
     fn read(&self, offset: u64, dst: &mut [u8]);
 
+    /// Copies len bytes of data starting from offset out of the stable memory into dst.
+    /// Implementations must not make any assumptions about dst (e.g. length, contents, capacity).
+    /// Callers are allowed to pass empty vectors. After the method returns, dst.len() == len.
+    /// This method is an alternative to read which does not require initializing a buffer and may
+    /// therefore be faster.
+    fn read_to_vec(&self, offset: u64, len: usize, dst: &mut std::vec::Vec<u8>) {
+        dst.resize(len, 0);
+        self.read(offset, &mut dst[..]);
+    }
+
     /// Copies the data referred to by src and replaces the
     /// corresponding segment starting at offset in the stable memory.
     fn write(&self, offset: u64, src: &[u8]);

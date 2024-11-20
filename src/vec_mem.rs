@@ -39,6 +39,16 @@ impl Memory for RefCell<Vec<u8>> {
         dst.copy_from_slice(&self.borrow()[offset as usize..n as usize]);
     }
 
+    fn read_to_vec(&self, offset: u64, len: usize, dst: &mut Vec<u8>) {
+        let n = offset.checked_add(len as u64).expect("read: out of bounds");
+
+        if n as usize > self.borrow().len() {
+            panic!("read: out of bounds");
+        }
+        dst.clear();
+        dst.extend_from_slice(&self.borrow()[offset as usize..n as usize]);
+    }
+
     fn write(&self, offset: u64, src: &[u8]) {
         let n = offset
             .checked_add(src.len() as u64)
@@ -60,6 +70,9 @@ impl<M: Memory> Memory for Rc<M> {
     }
     fn read(&self, offset: u64, dst: &mut [u8]) {
         self.deref().read(offset, dst)
+    }
+    fn read_to_vec(&self, offset: u64, len: usize, dst: &mut Vec<u8>) {
+        self.deref().read_to_vec(offset, len, dst)
     }
     fn write(&self, offset: u64, src: &[u8]) {
         self.deref().write(offset, src)
