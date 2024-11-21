@@ -1,9 +1,9 @@
 use crate::{
     btreemap::Allocator,
-    read_struct, read_u32, read_u64,
+    read_struct, read_to_vec, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
-    write, write_struct, write_u32, Memory, MemoryExt,
+    write, write_struct, write_u32, Memory,
 };
 use std::borrow::{Borrow, Cow};
 use std::cell::OnceCell;
@@ -190,7 +190,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
-    /// Loads a value from stable memory at the given offset.
+    /// Loads a value from stable memory at the given offset of this node.
     fn load_value_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> Vec<u8> {
         let reader = NodeReader {
             address: self.address,
@@ -201,7 +201,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
         let mut bytes = vec![];
-        reader.read_to_vec((offset + U32_SIZE).get(), &mut bytes, value_len);
+        read_to_vec(
+            &reader,
+            Address::from((offset + U32_SIZE).get()),
+            &mut bytes,
+            value_len,
+        );
 
         bytes
     }

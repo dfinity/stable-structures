@@ -72,7 +72,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += U32_SIZE;
 
             // Read the key.
-            memory.read_to_vec((address + offset).get(), &mut buf, key_size as usize);
+            read_to_vec(memory, address + offset, &mut buf, key_size as usize);
             offset += Bytes::from(max_key_size);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             // Values are loaded lazily. Store a reference and skip loading it.

@@ -1,6 +1,6 @@
 //! A serializable value stored in the stable memory.
 use crate::storable::Storable;
-use crate::{Memory, MemoryExt, WASM_PAGE_SIZE};
+use crate::{read_to_vec, Memory, WASM_PAGE_SIZE};
 use std::borrow::{Borrow, Cow};
 use std::fmt;
 
@@ -133,7 +133,7 @@ impl<T: Storable, M: Memory> Cell<T, M> {
     /// PRECONDITION: memory is large enough to contain the value.
     fn read_value(memory: &M, len: u32) -> T {
         let mut buf = vec![];
-        memory.read_to_vec(HEADER_V1_SIZE, &mut buf, len as usize);
+        read_to_vec(memory, HEADER_V1_SIZE.into(), &mut buf, len as usize);
         T::from_bytes(Cow::Owned(buf))
     }
 

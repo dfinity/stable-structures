@@ -41,9 +41,9 @@
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 use crate::{
-    read_struct,
+    read_struct, read_to_vec,
     types::{Address, Bytes},
-    write, write_struct, Memory, MemoryExt, WASM_PAGE_SIZE,
+    write, write_struct, Memory, WASM_PAGE_SIZE,
 };
 use std::cell::RefCell;
 use std::cmp::min;
@@ -278,8 +278,9 @@ impl<M: Memory> MemoryManagerInner<M> {
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
         let mut buckets = vec![];
-        memory.read_to_vec(
-            bucket_allocations_address(BucketId(0)).get(),
+        read_to_vec(
+            &memory,
+            bucket_allocations_address(BucketId(0)),
             &mut buckets,
             MAX_NUM_BUCKETS as usize,
         );
