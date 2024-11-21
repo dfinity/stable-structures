@@ -12,21 +12,25 @@ extern "C" {
 pub struct Ic0StableMemory;
 
 impl Memory for Ic0StableMemory {
+    #[inline]
     fn size(&self) -> u64 {
         // SAFETY: This is safe because of the ic0 api guarantees.
         unsafe { stable64_size() }
     }
 
+    #[inline]
     fn grow(&self, pages: u64) -> i64 {
         // SAFETY: This is safe because of the ic0 api guarantees.
         unsafe { stable64_grow(pages) }
     }
 
+    #[inline]
     fn read(&self, offset: u64, dst: &mut [u8]) {
         // SAFETY: This is safe because of the ic0 api guarantees.
         unsafe { stable64_read(dst.as_ptr() as u64, offset, dst.len() as u64) }
     }
 
+    #[inline]
     fn write(&self, offset: u64, src: &[u8]) {
         // SAFETY: This is safe because of the ic0 api guarantees.
         unsafe { stable64_write(offset, src.as_ptr() as u64, src.len() as u64) }
