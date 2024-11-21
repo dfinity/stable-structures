@@ -83,7 +83,7 @@ pub trait Memory {
 pub trait MemoryExt {
     /// Copies `count` bytes of data starting from offset out of the stable memory into `dst`.
     ///
-    /// Callers are allowed to pass vectors in state (e.g. empty vectors).
+    /// Callers are allowed to pass vectors in any state (e.g. empty vectors).
     /// After the method returns, `dst.len() == count`.
     /// This method is an alternative to `read` which does not require initializing a buffer and may
     /// therefore be faster.
