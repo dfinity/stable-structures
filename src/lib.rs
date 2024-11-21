@@ -55,11 +55,13 @@ pub trait Memory {
     /// and replaces the corresponding bytes in `dst`.
     fn read(&self, offset: u64, dst: &mut [u8]);
 
-    /// Copies `count` bytes of the data starting from `offset` out of the stable memory into the
-    /// buffer starting at `dst`.
+    /// Copies `count` number of bytes of the data starting from `offset` out of the stable memory
+    /// into the buffer starting at `dst`.
     ///
     /// This method is an alternative to `read` which does not require initializing a buffer and may
     /// therefore be faster.
+    ///
+    /// # Safety
     ///
     /// Callers must guarantee that
     ///   * it is valid to write `count` number of bytes starting from `dst`,
