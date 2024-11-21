@@ -45,7 +45,7 @@ impl<'a, M: Memory> Memory for NodeReader<'a, M> {
         } in iter
         {
             // SAFETY: read_unsafe() is safe to call iff bytes_read + length <= count since the
-            // caller guarantees that we can write `count` number of bytes from `dst`.
+            // caller guarantees that we can write `count` number of bytes to `dst`.
             assert!(bytes_read + length.get() as usize <= count);
             if page_idx == 0 {
                 self.memory.read_unsafe(
