@@ -190,12 +190,15 @@ fn write<M: Memory>(memory: &M, offset: u64, bytes: &[u8]) {
 
 /// Reads a struct from memory.
 fn read_struct<T, M: Memory>(addr: Address, memory: &M) -> T {
-    let mut t: T = unsafe { core::mem::zeroed() };
-    let t_slice = unsafe {
-        core::slice::from_raw_parts_mut(&mut t as *mut _ as *mut u8, core::mem::size_of::<T>())
-    };
-    memory.read(addr.get(), t_slice);
-    t
+    let mut value = MaybeUninit::<T>::uninit();
+    unsafe {
+        memory.read_unsafe(
+            addr.get(),
+            value.as_mut_ptr() as *mut u8,
+            core::mem::size_of::<T>(),
+        );
+        value.assume_init()
+    }
 }
 
 /// Writes a struct to memory.
