@@ -164,8 +164,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             };
 
             // Load the key.
-            buf.resize(key_size as usize, 0);
-            reader.read(offset.get(), &mut buf);
+            reader.read_to_vec(offset.get(), &mut buf, key_size as usize);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             offset += Bytes::from(key_size);
             keys_encoded_values.push((key, Value::by_ref(Bytes::from(0usize))));

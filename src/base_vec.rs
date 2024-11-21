@@ -34,7 +34,7 @@
 use crate::storable::{bounds, bytes_to_store_size_bounded};
 use crate::{
     read_u32, read_u64, safe_write, write, write_u32, write_u64, Address, GrowFailed, Memory,
-    Storable,
+    MemoryExt, Storable,
 };
 use std::borrow::{Borrow, Cow};
 use std::cmp::min;
@@ -245,11 +245,10 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     }
 
     /// Reads the item at the specified index without any bound checks.
-    fn read_entry_to(&self, index: u64, buf: &mut std::vec::Vec<u8>) {
+    fn read_entry_to(&self, index: u64, buf: &mut Vec<u8>) {
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let (data_offset, data_size) = self.read_entry_size(offset);
-        buf.resize(data_size, 0);
-        self.memory.read(data_offset, &mut buf[..]);
+        self.memory.read_to_vec(data_offset, buf, data_size);
     }
 
     /// Sets the vector's length.

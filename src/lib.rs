@@ -46,18 +46,60 @@ pub trait Memory {
     /// pages. (One WebAssembly page is 64Ki bytes.)
     fn size(&self) -> u64;
 
-    /// Tries to grow the memory by new_pages many pages containing
+    /// Tries to grow the memory by `pages` many pages containing
     /// zeroes.  If successful, returns the previous size of the
     /// memory (in pages).  Otherwise, returns -1.
     fn grow(&self, pages: u64) -> i64;
 
-    /// Copies the data referred to by offset out of the stable memory
-    /// and replaces the corresponding bytes in dst.
+    /// Copies the data referred to by `offset` out of the stable memory
+    /// and replaces the corresponding bytes in `dst`.
     fn read(&self, offset: u64, dst: &mut [u8]);
 
-    /// Copies the data referred to by src and replaces the
+    /// Copies `count` bytes of the data starting from `offset` out of the stable memory into the
+    /// buffer starting at `dst`.
+    ///
+    /// This method is an alternative to `read` which does not require initializing a buffer and may
+    /// therefore be faster.
+    ///
+    /// Callers must guarantee that
+    ///   * it is valid to write `count` number of bytes starting from `dst`,
+    ///   * `dst..dst + count` does not overlap with `self`.
+    ///
+    /// Implementations must guarantee that before the method returns, `count` number of bytes
+    /// starting from `dst` will be initialized.
+    #[inline]
+    unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
+        // Initialize the buffer to make the slice valid.
+        std::ptr::write_bytes(dst, 0, count);
+        let slice = std::slice::from_raw_parts_mut(dst, count);
+        self.read(offset, slice)
+    }
+
+    /// Copies the data referred to by `src` and replaces the
     /// corresponding segment starting at offset in the stable memory.
     fn write(&self, offset: u64, src: &[u8]);
+}
+
+pub trait MemoryExt {
+    /// Copies `count` bytes of data starting from offset out of the stable memory into `dst`.
+    ///
+    /// Callers are allowed to pass vectors in state (e.g. empty vectors).
+    /// After the method returns, `dst.len() == count`.
+    /// This method is an alternative to `read` which does not require initializing a buffer and may
+    /// therefore be faster.
+    fn read_to_vec(&self, offset: u64, dst: &mut std::vec::Vec<u8>, count: usize);
+}
+
+impl<M: Memory> MemoryExt for M {
+    #[inline]
+    fn read_to_vec(&self, offset: u64, dst: &mut std::vec::Vec<u8>, count: usize) {
+        dst.clear();
+        dst.reserve(count);
+        unsafe {
+            self.read_unsafe(offset, dst.as_mut_ptr(), count);
+            dst.set_len(count);
+        }
+    }
 }
 
 // A helper function that reads a single 32bit integer encoded as

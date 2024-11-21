@@ -3,7 +3,7 @@ use crate::{
     read_struct, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
-    write, write_struct, write_u32, Memory,
+    write, write_struct, write_u32, Memory, MemoryExt,
 };
 use std::borrow::{Borrow, Cow};
 use std::cell::OnceCell;
@@ -200,8 +200,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
-        let mut bytes = vec![0; value_len];
-        reader.read((offset + U32_SIZE).get(), &mut bytes);
+        let mut bytes = vec![];
+        reader.read_to_vec((offset + U32_SIZE).get(), &mut bytes, value_len);
 
         bytes
     }

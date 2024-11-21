@@ -31,6 +31,12 @@ impl Memory for Ic0StableMemory {
     }
 
     #[inline]
+    unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
+        // SAFETY: This is safe because of the ic0 api guarantees.
+        stable64_read(dst as u64, offset, count as u64);
+    }
+
+    #[inline]
     fn write(&self, offset: u64, src: &[u8]) {
         // SAFETY: This is safe because of the ic0 api guarantees.
         unsafe { stable64_write(offset, src.as_ptr() as u64, src.len() as u64) }

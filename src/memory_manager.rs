@@ -43,7 +43,7 @@
 use crate::{
     read_struct,
     types::{Address, Bytes},
-    write, write_struct, Memory, WASM_PAGE_SIZE,
+    write, write_struct, Memory, MemoryExt, WASM_PAGE_SIZE,
 };
 use std::cell::RefCell;
 use std::cmp::min;
@@ -239,9 +239,9 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         // Check if the magic in the memory corresponds to this object.
-        let mut dst = vec![0; 3];
+        let mut dst = [0; 3];
         memory.read(0, &mut dst);
-        if dst != MAGIC {
+        if &dst != MAGIC {
             // No memory manager found. Create a new instance.
             MemoryManagerInner::new(memory, bucket_size_in_pages)
         } else {
@@ -277,8 +277,12 @@ impl<M: Memory> MemoryManagerInner<M> {
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
-        let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
-        memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
+        let mut buckets = vec![];
+        memory.read_to_vec(
+            bucket_allocations_address(BucketId(0)).get(),
+            &mut buckets,
+            MAX_NUM_BUCKETS as usize,
+        );
 
         let mut memory_buckets = BTreeMap::new();
         for (bucket_idx, memory) in buckets.into_iter().enumerate() {
