@@ -18,20 +18,21 @@ pub struct NodeReader<'a, M: Memory> {
 // Note: The `Memory` interface is implemented so that helper methods such `read_u32`,
 // `read_struct`, etc. can be used with a `NodeReader` directly.
 impl<'a, M: Memory> Memory for NodeReader<'a, M> {
-    fn read(&self, offset: u64, dst: &mut [u8]) {
+    unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
         // If the read is only in the initial page, then read it directly in one go.
         // This is a performance enhancement to avoid the cost of creating a `NodeIterator`.
-        if (offset + dst.len() as u64) < self.page_size.get() as u64 {
-            self.memory.read(self.address.get() + offset, dst);
+        if (offset + count as u64) < self.page_size.get() as u64 {
+            self.memory
+                .read_unsafe(self.address.get() + offset, dst, count);
             return;
         }
 
-        // The read is split across several pages. Create a `NodeIterator` to to read from
+        // The read is split across several pages. Create a `NodeIterator` to read from
         // each of the individual pages.
         let iter = NodeIterator::new(
             VirtualSegment {
                 address: Address::from(offset),
-                length: Bytes::from(dst.len() as u64),
+                length: Bytes::from(count as u64),
             },
             Bytes::from(self.page_size.get()),
         );
@@ -43,20 +44,31 @@ impl<'a, M: Memory> Memory for NodeReader<'a, M> {
             length,
         } in iter
         {
+            // SAFETY: read_unsafe() is safe to call iff bytes_read + length <= count since the
+            // caller guarantees that we can write `count` number of bytes to `dst`.
+            assert!(bytes_read + length.get() as usize <= count);
             if page_idx == 0 {
-                self.memory.read(
+                self.memory.read_unsafe(
                     (self.address + offset).get(),
-                    &mut dst[bytes_read as usize..(bytes_read + length.get()) as usize],
+                    dst.add(bytes_read),
+                    length.get() as usize,
                 );
             } else {
-                self.memory.read(
+                self.memory.read_unsafe(
                     (self.overflows[page_idx - 1] + offset).get(),
-                    &mut dst[bytes_read as usize..(bytes_read + length.get()) as usize],
+                    dst.add(bytes_read),
+                    length.get() as usize,
                 );
             }
 
-            bytes_read += length.get();
+            bytes_read += length.get() as usize;
         }
+    }
+
+    #[inline]
+    fn read(&self, offset: u64, dst: &mut [u8]) {
+        // SAFETY: since dst is dst.len() long, it fulfills the safety requirements of read_unsafe.
+        unsafe { self.read_unsafe(offset, dst.as_mut_ptr(), dst.len()) }
     }
 
     fn write(&self, _: u64, _: &[u8]) {
