@@ -85,7 +85,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut children = vec![];
         if header.node_type == INTERNAL_NODE_TYPE {
             // The number of children is equal to the number of entries + 1.
-            children.reserve(header.num_entries as usize + 1);
+            children.reserve_exact(header.num_entries as usize + 1);
             for _ in 0..header.num_entries + 1 {
                 let child = Address::from(read_u64(memory, address + offset));
                 offset += Address::size();

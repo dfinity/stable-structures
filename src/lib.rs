@@ -92,7 +92,7 @@ pub trait Memory {
 #[inline]
 fn read_to_vec<M: Memory>(m: &M, addr: Address, dst: &mut std::vec::Vec<u8>, count: usize) {
     dst.clear();
-    dst.reserve(count);
+    dst.reserve_exact(count);
     unsafe {
         m.read_unsafe(addr.get(), dst.as_mut_ptr(), count);
         // SAFETY: read_unsafe guarantees to initialize the first `count` bytes
