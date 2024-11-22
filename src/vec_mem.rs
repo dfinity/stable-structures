@@ -39,6 +39,22 @@ impl Memory for RefCell<Vec<u8>> {
         dst.copy_from_slice(&self.borrow()[offset as usize..n as usize]);
     }
 
+    unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
+        let n = offset
+            .checked_add(count as u64)
+            .expect("read: out of bounds");
+
+        if n as usize > self.borrow().len() {
+            panic!("read: out of bounds");
+        }
+
+        // SAFETY:
+        //  - we just checked that self is long enough
+        //  - the caller guarantees that there are at least count byte space after dst
+        //  - we are copying bytes so the pointers are automatically aligned
+        std::ptr::copy(self.borrow().as_ptr().add(offset as usize), dst, count);
+    }
+
     fn write(&self, offset: u64, src: &[u8]) {
         let n = offset
             .checked_add(src.len() as u64)
@@ -60,6 +76,9 @@ impl<M: Memory> Memory for Rc<M> {
     }
     fn read(&self, offset: u64, dst: &mut [u8]) {
         self.deref().read(offset, dst)
+    }
+    unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
+        self.deref().read_unsafe(offset, dst, count)
     }
     fn write(&self, offset: u64, src: &[u8]) {
         self.deref().write(offset, src)

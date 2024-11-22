@@ -54,7 +54,7 @@
 //! ----------------------------------------
 //! Unallocated space
 //! ```
-use crate::{read_u64, safe_write, write_u64, Address, GrowFailed, Memory, Storable};
+use crate::{read_to_vec, read_u64, safe_write, write_u64, Address, GrowFailed, Memory, Storable};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt;
@@ -331,8 +331,7 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     /// ignores the result.
     pub fn read_entry(&self, idx: u64, buf: &mut Vec<u8>) -> Result<(), NoSuchEntry> {
         let (offset, len) = self.entry_meta(idx).ok_or(NoSuchEntry)?;
-        buf.resize(len, 0);
-        self.data_memory.read(HEADER_OFFSET + offset, buf);
+        read_to_vec(&self.data_memory, (HEADER_OFFSET + offset).into(), buf, len);
         Ok(())
     }
 

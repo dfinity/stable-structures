@@ -65,15 +65,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the entries.
         let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
-        let mut buf = Vec::with_capacity(max_key_size.max(max_value_size) as usize);
+        let mut buf = vec![];
         for _ in 0..header.num_entries {
             // Read the key's size.
             let key_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
 
             // Read the key.
-            buf.resize(key_size as usize, 0);
-            memory.read((address + offset).get(), &mut buf);
+            read_to_vec(memory, address + offset, &mut buf, key_size as usize);
             offset += Bytes::from(max_key_size);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             // Values are loaded lazily. Store a reference and skip loading it.
@@ -86,7 +85,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut children = vec![];
         if header.node_type == INTERNAL_NODE_TYPE {
             // The number of children is equal to the number of entries + 1.
-            children.reserve(header.num_entries as usize + 1);
+            children.reserve_exact(header.num_entries as usize + 1);
             for _ in 0..header.num_entries + 1 {
                 let child = Address::from(read_u64(memory, address + offset));
                 offset += Address::size();
