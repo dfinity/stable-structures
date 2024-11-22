@@ -353,7 +353,7 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let value = value.to_bytes_checked().into_owned();
+        let value = value.into_bytes_checked();
 
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.

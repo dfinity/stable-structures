@@ -10,7 +10,7 @@ mod tuples;
 mod tests;
 
 /// A trait with convenience methods for storing an element into a stable structure.
-pub trait Storable {
+pub trait Storable: Sized {
     /// Converts an element into bytes.
     ///
     /// NOTE: `Cow` is used here to avoid unnecessary cloning.
@@ -22,33 +22,52 @@ pub trait Storable {
     /// The size bounds of the type.
     const BOUND: Bound;
 
+    /// Consumes self and converts it into bytes.
+    /// Uses `to_bytes` by default.
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_bytes().into_owned()
+    }
+
     /// Like `to_bytes`, but includes additional checks to ensure the element's serialized bytes
     /// are within the element's bounds.
     fn to_bytes_checked(&self) -> Cow<[u8]> {
         let bytes = self.to_bytes();
-        if let Bound::Bounded {
-            max_size,
-            is_fixed_size,
-        } = Self::BOUND
-        {
-            if is_fixed_size {
-                assert_eq!(
-                    bytes.len(),
-                    max_size as usize,
-                    "expected a fixed-size element with length {} bytes, but found {} bytes",
-                    max_size,
-                    bytes.len()
-                );
-            } else {
-                assert!(
-                    bytes.len() <= max_size as usize,
-                    "expected an element with length <= {} bytes, but found {} bytes",
-                    max_size,
-                    bytes.len()
-                );
-            }
-        }
+        check_bounds(&bytes, Self::BOUND);
         bytes
+    }
+
+    /// Like `into_bytes`, but includes additional checks to ensure the element's serialized bytes
+    /// are within the element's bounds.
+    fn into_bytes_checked(self) -> Vec<u8> {
+        let bytes = self.into_bytes();
+        check_bounds(&bytes, Self::BOUND);
+        bytes
+    }
+}
+
+#[inline]
+fn check_bounds(bytes: &[u8], bounds: Bound) {
+    if let Bound::Bounded {
+        max_size,
+        is_fixed_size,
+    } = bounds
+    {
+        if is_fixed_size {
+            assert_eq!(
+                bytes.len(),
+                max_size as usize,
+                "expected a fixed-size element with length {} bytes, but found {} bytes",
+                max_size,
+                bytes.len()
+            );
+        } else {
+            assert!(
+                bytes.len() <= max_size as usize,
+                "expected an element with length <= {} bytes, but found {} bytes",
+                max_size,
+                bytes.len()
+            );
+        }
     }
 }
 
@@ -225,6 +244,10 @@ impl Storable for Vec<u8> {
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         bytes.to_vec()
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        self
     }
 
     const BOUND: Bound = Bound::Unbounded;
