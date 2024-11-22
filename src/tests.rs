@@ -66,3 +66,37 @@ fn should_fail_to_recover_memory_from_memory_manager_if_memory_is_in_use() {
     let recovered_memory = memory_manager.into_memory();
     assert!(recovered_memory.is_none());
 }
+
+#[test]
+fn test_read_to_vec_roundtrip() {
+    let memory = DefaultMemoryImpl::default();
+    memory.grow(1);
+    memory.write(0, &[5, 6, 7, 8, 9]);
+
+    let mut out = vec![];
+    read_to_vec(&memory, Address::from(0), &mut out, 5);
+    assert_eq!(out, vec![5, 6, 7, 8, 9]);
+}
+
+#[test]
+fn test_read_write_struct_roundtrip() {
+    #[derive(Eq, PartialEq, Debug)]
+    struct Foo {
+        a: i32,
+        b: [char; 5],
+    }
+
+    let foo = Foo {
+        a: 42,
+        b: ['a', 'b', 'c', 'd', 'e'],
+    };
+
+    let memory = DefaultMemoryImpl::default();
+    memory.grow(1);
+    write_struct(&foo, Address::from(3), &memory);
+
+    assert_eq!(
+        read_struct::<Foo, DefaultMemoryImpl>(Address::from(3), &memory),
+        foo
+    )
+}
