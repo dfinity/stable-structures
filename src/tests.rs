@@ -100,3 +100,27 @@ fn test_read_write_struct_roundtrip() {
         foo
     )
 }
+
+#[test]
+fn test_vector_memory_read() {
+    let memory = VectorMemory::default();
+    memory.grow(1);
+    memory.write(1, &[4, 6, 8]);
+
+    {
+        let mut buffer = [0; 3];
+        memory.read(1, &mut buffer[..]);
+        assert_eq!(buffer, [4, 6, 8]);
+    }
+
+    {
+        let mut buffer = std::vec::Vec::with_capacity(3);
+        unsafe {
+            let ptr = buffer.as_mut_ptr();
+            memory.read_unsafe(1, buffer.as_mut_ptr(), 3);
+            assert_eq!(std::ptr::read(ptr), 4);
+            assert_eq!(std::ptr::read(ptr.add(1)), 6);
+            assert_eq!(std::ptr::read(ptr.add(2)), 8);
+        }
+    }
+}
