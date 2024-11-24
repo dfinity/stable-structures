@@ -227,11 +227,25 @@ fn test_iter() {
     assert_eq!(sv.iter().skip(3).count(), 0);
     assert_eq!(sv.iter().skip(4).count(), 0);
     assert_eq!(sv.iter().skip(usize::MAX).count(), 0);
+}
 
+#[test]
+fn test_iter_count() {
+    let sv = StableVec::<u64, M>::new(M::default()).unwrap();
+    sv.push(&1).unwrap();
+    sv.push(&2).unwrap();
+    sv.push(&3).unwrap();
+    sv.push(&4).unwrap();
     {
-        assert_eq!(sv.len(), 3);
         let mut iter = sv.iter();
         iter.next_back();
+        assert_eq!(iter.count(), 3);
+    }
+    {
+        let mut iter = sv.iter();
+        iter.next_back();
+        sv.pop(); // this pops the element that we iterated through on the previous line
+        sv.pop();
         assert_eq!(iter.count(), 2);
     }
 }

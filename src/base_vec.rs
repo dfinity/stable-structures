@@ -379,7 +379,10 @@ where
     }
 
     fn count(self) -> usize {
-        self.range.count()
+        min(self.vec.len(), self.range.end)
+            .saturating_sub(self.range.start)
+            .try_into()
+            .expect("Cannot express count as usize")
     }
 
     fn nth(&mut self, n: usize) -> Option<T> {
