@@ -227,6 +227,13 @@ fn test_iter() {
     assert_eq!(sv.iter().skip(3).count(), 0);
     assert_eq!(sv.iter().skip(4).count(), 0);
     assert_eq!(sv.iter().skip(usize::MAX).count(), 0);
+
+    {
+        assert_eq!(sv.len(), 3);
+        let mut iter = sv.iter();
+        iter.next_back();
+        assert_eq!(iter.count(), 2);
+    }
 }
 
 // A struct with a bugg implementation of storable where the max_size can
