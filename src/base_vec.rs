@@ -379,11 +379,10 @@ where
     }
 
     fn count(self) -> usize {
-        let n = self.vec.len().saturating_sub(self.range.start);
-        if n > usize::MAX as u64 {
-            panic!("The number of items in the vec {n} does not fit into usize");
-        }
-        n as usize
+        min(self.vec.len(), self.range.end)
+            .saturating_sub(self.range.start)
+            .try_into()
+            .expect("Cannot express count as usize")
     }
 
     fn nth(&mut self, n: usize) -> Option<T> {
