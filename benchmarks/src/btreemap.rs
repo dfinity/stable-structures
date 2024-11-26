@@ -232,7 +232,7 @@ pub fn btreemap_read_keys_from_range() -> BenchResult {
     bench_fn(|| {
         btree
             .range((Bound::Included(0), Bound::Included(size)))
-            .map(|entry| entry.0)
+            .map(|entry| entry.key().clone())
             .sum::<u32>()
     })
 }
@@ -249,8 +249,8 @@ pub fn btreemap_read_every_third_value_from_range() -> BenchResult {
     bench_fn(|| {
         btree
             .range((Bound::Included(0), Bound::Included(size)))
-            .filter(|entry| entry.0 % 3 == 0)
-            .map(|entry| entry.1.len())
+            .filter(|entry| entry.key() % 3 == 0)
+            .map(|entry| entry.value().len())
             .sum::<usize>()
     })
 }
@@ -620,8 +620,16 @@ fn iter_helper(size: u32, value_size: u32, iter_type: IterType) -> BenchResult {
     }
 
     match iter_type {
-        IterType::Iter => bench_fn(|| for _ in btree.iter() {}),
-        IterType::IterRev => bench_fn(|| for _ in btree.iter().rev() {}),
+        IterType::Iter => bench_fn(|| {
+            for entry in btree.iter() {
+                std::hint::black_box((entry.key(), entry.value()));
+            }
+        }),
+        IterType::IterRev => bench_fn(|| {
+            for entry in btree.iter().rev() {
+                std::hint::black_box((entry.key(), entry.value()));
+            }
+        }),
         IterType::Keys => bench_fn(|| for _ in btree.keys() {}),
         IterType::KeysRev => bench_fn(|| for _ in btree.keys().rev() {}),
         IterType::Values => bench_fn(|| for _ in btree.values() {}),

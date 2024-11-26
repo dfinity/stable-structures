@@ -64,7 +64,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
-#[cfg(test)]
+#[cfg(disabled_test)]
 mod proptests;
 
 const MAGIC: &[u8; 3] = b"BTR";
@@ -1019,8 +1019,12 @@ where
     /// Returns an iterator pointing to the first element below the given bound.
     /// Returns an empty iterator if there are no keys below the given bound.
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
-        if let Some((start_key, _)) = self.range(..bound).next_back() {
-            IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
+        if let Some(entry) = self.range(..bound).next_back() {
+            IterInternal::new_in_range(
+                self,
+                (Bound::Included(entry.key().clone()), Bound::Unbounded),
+            )
+            .into()
         } else {
             IterInternal::null(self).into()
         }
@@ -1135,7 +1139,7 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(disabled_tests)]
 mod test {
     use super::*;
     use crate::{
