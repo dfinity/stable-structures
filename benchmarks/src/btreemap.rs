@@ -1,6 +1,7 @@
 use crate::Random;
 use canbench_rs::{bench, bench_fn, BenchResult};
-use ic_stable_structures::{storable::Blob, BTreeMap, DefaultMemoryImpl, Storable};
+use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
+use ic_stable_structures::{storable::Blob, BTreeMap, DefaultMemoryImpl, Memory, Storable};
 use std::ops::Bound;
 use tiny_rng::{Rand, Rng};
 
@@ -165,8 +166,20 @@ pub fn btreemap_insert_blob_1024_512_v2() -> BenchResult {
 }
 
 #[bench(raw)]
+pub fn btreemap_insert_blob_1024_512_v2_mem_manager() -> BenchResult {
+    insert_blob_helper_v2_mem_manager::<1024, 512>()
+}
+
+#[bench(raw)]
 pub fn btreemap_insert_u64_u64() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
+    insert_helper::<u64, u64>(btree)
+}
+
+#[bench(raw)]
+pub fn btreemap_insert_u64_u64_mem_manager() -> BenchResult {
+    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
     insert_helper::<u64, u64>(btree)
 }
 
@@ -204,16 +217,20 @@ pub fn btreemap_insert_blob_8_u64_v2() -> BenchResult {
 pub fn btreemap_insert_10mib_values() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
 
-    // Insert 200 10MiB values.
+    // Insert 20 10MiB values.
     let mut rng = Rng::from_seed(0);
     let mut values = vec![];
-    for _ in 0..200 {
-        values.push(rng.iter(Rand::rand_u8).take(10 * 1024).collect::<Vec<_>>());
+    for _ in 0..20 {
+        values.push(
+            rng.iter(Rand::rand_u8)
+                .take(10 * 1024 * 1024)
+                .collect::<Vec<_>>(),
+        );
     }
 
     bench_fn(|| {
         let mut i = 0u64;
-        for value in values.into_iter() {
+        for value in values {
             btree.insert(i, value);
             i += 1;
         }
@@ -544,6 +561,11 @@ pub fn btreemap_get_blob_512_1024_v2() -> BenchResult {
 }
 
 #[bench(raw)]
+pub fn btreemap_get_blob_512_1024_v2_mem_manager() -> BenchResult {
+    get_blob_helper_v2_mem_manager::<512, 1024>()
+}
+
+#[bench(raw)]
 pub fn btreemap_get_u64_u64() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     get_helper::<u64, u64>(btree)
@@ -552,6 +574,13 @@ pub fn btreemap_get_u64_u64() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_get_u64_u64_v2() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    get_helper::<u64, u64>(btree)
+}
+
+#[bench(raw)]
+pub fn btreemap_get_u64_u64_v2_mem_manager() -> BenchResult {
+    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
     get_helper::<u64, u64>(btree)
 }
 
@@ -590,9 +619,15 @@ fn insert_blob_helper_v2<const K: usize, const V: usize>() -> BenchResult {
     insert_helper::<Blob<K>, Blob<V>>(btree)
 }
 
+fn insert_blob_helper_v2_mem_manager<const K: usize, const V: usize>() -> BenchResult {
+    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
+    insert_helper::<Blob<K>, Blob<V>>(btree)
+}
+
 // Profiles inserting a large number of random blobs into a btreemap.
 fn insert_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
-    mut btree: BTreeMap<K, V, DefaultMemoryImpl>,
+    mut btree: BTreeMap<K, V, impl Memory>,
 ) -> BenchResult {
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
@@ -640,8 +675,14 @@ fn get_blob_helper_v2<const K: usize, const V: usize>() -> BenchResult {
     get_helper::<Blob<K>, Blob<V>>(btree)
 }
 
+fn get_blob_helper_v2_mem_manager<const K: usize, const V: usize>() -> BenchResult {
+    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
+    get_helper::<Blob<K>, Blob<V>>(btree)
+}
+
 fn get_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
-    mut btree: BTreeMap<K, V, DefaultMemoryImpl>,
+    mut btree: BTreeMap<K, V, impl Memory>,
 ) -> BenchResult {
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
