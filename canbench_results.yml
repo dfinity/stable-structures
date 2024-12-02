@@ -73,7 +73,7 @@ benches:
     scopes: {}
   btreemap_get_blob_512_1024_v2_mem_manager:
     total:
-      instructions: 3164909208
+      instructions: 3093928908
       heap_increase: 0
       stable_memory_increase: 0
     scopes: { }
@@ -139,7 +139,7 @@ benches:
     scopes: { }
   btreemap_get_u64_u64_v2_mem_manager:
     total:
-      instructions: 673752904
+      instructions: 619036864
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -223,7 +223,7 @@ benches:
     scopes: { }
   btreemap_insert_blob_1024_512_v2_mem_manager:
     total:
-      instructions: 6292667075
+      instructions: 6188501297
       heap_increase: 0
       stable_memory_increase: 256
     scopes: {}
@@ -379,7 +379,7 @@ benches:
     scopes: {}
   btreemap_insert_u64_u64_mem_manager:
     total:
-      instructions: 1019612837
+      instructions: 937850849
       heap_increase: 0
       stable_memory_increase: 0
     scopes: { }
@@ -625,13 +625,13 @@ benches:
     scopes: {}
   memory_manager_grow:
     total:
-      instructions: 349384162
+      instructions: 346632000
       heap_increase: 2
       stable_memory_increase: 32000
     scopes: {}
   memory_manager_overhead:
     total:
-      instructions: 1182116368
+      instructions: 1182056741
       heap_increase: 0
       stable_memory_increase: 8320
     scopes: {}
@@ -661,7 +661,7 @@ benches:
     scopes: {}
   vec_get_blob_4_mem_manager:
     total:
-      instructions: 14476122
+      instructions: 12856122
       heap_increase: 0
       stable_memory_increase: 0
     scopes: { }
@@ -673,7 +673,7 @@ benches:
     scopes: { }
   vec_get_blob_64_mem_manager:
     total:
-      instructions: 24146389
+      instructions: 22526389
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}

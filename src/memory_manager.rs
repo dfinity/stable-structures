@@ -47,7 +47,6 @@ use crate::{
 };
 use std::cell::RefCell;
 use std::cmp::min;
-use std::collections::BTreeMap;
 use std::rc::Rc;
 
 const MAGIC: &[u8; 3] = b"MGR";
@@ -228,7 +227,7 @@ struct MemoryManagerInner<M: Memory> {
     memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
 
     // A map mapping each managed memory to the bucket ids that are allocated to it.
-    memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
+    memory_buckets: Vec<Vec<BucketId>>,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -255,7 +254,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory,
             allocated_buckets: 0,
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
-            memory_buckets: BTreeMap::new(),
+            memory_buckets: vec![vec![]; MAX_NUM_MEMORIES as usize],
             bucket_size_in_pages,
         };
 
@@ -285,13 +284,10 @@ impl<M: Memory> MemoryManagerInner<M> {
             MAX_NUM_BUCKETS as usize,
         );
 
-        let mut memory_buckets = BTreeMap::new();
+        let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
         for (bucket_idx, memory) in buckets.into_iter().enumerate() {
             if memory != UNALLOCATED_BUCKET_MARKER {
-                memory_buckets
-                    .entry(MemoryId(memory))
-                    .or_insert_with(Vec::new)
-                    .push(BucketId(bucket_idx as u16));
+                memory_buckets[memory as usize].push(BucketId(bucket_idx as u16));
             }
         }
 
@@ -336,14 +332,12 @@ impl<M: Memory> MemoryManagerInner<M> {
             return -1;
         }
 
+        let memory_bucket = &mut self.memory_buckets[id.0 as usize];
         // Allocate new buckets as needed.
+        memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
             let new_bucket_id = BucketId(self.allocated_buckets);
-
-            self.memory_buckets
-                .entry(id)
-                .or_default()
-                .push(new_bucket_id);
+            memory_bucket.push(new_bucket_id);
 
             // Write in stable store that this bucket belongs to the memory with the provided `id`.
             write(
@@ -407,12 +401,9 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 
     // Initializes a [`BucketIterator`].
-    fn bucket_iter(&self, id: MemoryId, offset: u64, length: usize) -> BucketIterator {
+    fn bucket_iter(&self, MemoryId(id): MemoryId, offset: u64, length: usize) -> BucketIterator {
         // Get the buckets allocated to the given memory id.
-        let buckets = match self.memory_buckets.get(&id) {
-            Some(s) => s.as_slice(),
-            None => &[],
-        };
+        let buckets = self.memory_buckets[id as usize].as_slice();
 
         BucketIterator {
             virtual_segment: Segment {
@@ -548,7 +539,6 @@ fn bucket_allocations_address(id: BucketId) -> Address {
 #[cfg(test)]
 mod test {
     use super::*;
-    use maplit::btreemap;
     use proptest::prelude::*;
 
     const MAX_MEMORY_IN_PAGES: u64 = MAX_NUM_BUCKETS * BUCKET_SIZE_IN_PAGES;
@@ -577,12 +567,11 @@ mod test {
         memory.read(0, &mut bytes);
         assert_eq!(bytes, vec![1, 2, 3]);
 
-        assert_eq!(
-            mem_mgr.inner.borrow().memory_buckets,
-            btreemap! {
-                MemoryId(0) => vec![BucketId(0)]
-            }
-        );
+        assert_eq!(mem_mgr.inner.borrow().memory_buckets[0], vec![BucketId(0)]);
+
+        assert!(mem_mgr.inner.borrow().memory_buckets[1..]
+            .iter()
+            .all(|x| x.is_empty()));
     }
 
     #[test]
@@ -599,12 +588,13 @@ mod test {
         assert_eq!(memory_1.size(), 1);
 
         assert_eq!(
-            mem_mgr.inner.borrow().memory_buckets,
-            btreemap! {
-                MemoryId(0) => vec![BucketId(0)],
-                MemoryId(1) => vec![BucketId(1)],
-            }
+            &mem_mgr.inner.borrow().memory_buckets[..2],
+            &[vec![BucketId(0)], vec![BucketId(1)],]
         );
+
+        assert!(mem_mgr.inner.borrow().memory_buckets[2..]
+            .iter()
+            .all(|x| x.is_empty()));
 
         memory_0.write(0, &[1, 2, 3]);
         memory_0.write(0, &[1, 2, 3]);
