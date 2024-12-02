@@ -397,13 +397,13 @@ benches:
     scopes: {}
   btreemap_iter_count_10mib_values:
     total:
-      instructions: 475842
+      instructions: 21376
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_count_small_values:
     total:
-      instructions: 9366511
+      instructions: 14049692
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
