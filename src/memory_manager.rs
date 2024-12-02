@@ -380,14 +380,14 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         let mut bytes_written = 0;
-        for Segment { address, length } in self.bucket_iter(id, offset, src.len()) {
+        self.for_each_bucket(id, offset, src.len(), |Segment { address, length }| {
             self.memory.write(
                 address.get(),
                 &src[bytes_written as usize..(bytes_written + length.get()) as usize],
             );
 
             bytes_written += length.get();
-        }
+        });
     }
 
     #[inline]
@@ -407,7 +407,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         let mut bytes_read: usize = 0;
-        for Segment { address, length } in self.bucket_iter(id, offset, count) {
+        self.for_each_bucket(id, offset, count, |Segment { address, length }| {
             let length = length.get().try_into().expect("Length overflows usize");
             self.memory
                 .read_unsafe(address.get(), dst.add(bytes_read), length);
@@ -415,22 +415,74 @@ impl<M: Memory> MemoryManagerInner<M> {
             bytes_read = bytes_read
                 .checked_add(length)
                 .expect("Bytes read overflowed usize");
-        }
+        })
     }
 
     /// Initializes a [`BucketIterator`].
-    fn bucket_iter(&self, MemoryId(id): MemoryId, offset: u64, length: usize) -> BucketIterator {
-        // Get the buckets allocated to the given memory id.
-        let buckets = self.memory_buckets[id as usize].as_slice();
-
-        BucketIterator {
-            virtual_segment: Segment {
-                address: Address::from(offset),
-                length: Bytes::from(length as u64),
-            },
-            buckets,
-            bucket_size_in_bytes: self.bucket_size_in_bytes(),
+    fn for_each_bucket(
+        &self,
+        MemoryId(id): MemoryId,
+        offset: u64,
+        length: usize,
+        mut func: impl FnMut(Segment),
+    ) {
+        if length == 0 {
+            return;
         }
+
+        // TODO: check length
+        // Get the buckets allocated to the given memory id.
+        let mut buckets = self.memory_buckets[id as usize].as_slice();
+        let mut virtual_segment = Segment {
+            address: Address::from(offset),
+            length: Bytes::from(length as u64),
+        };
+
+        let bucket_size_in_bytes = self.bucket_size_in_bytes().get();
+        // starting bucket index
+        let mut bucket_idx = (offset / bucket_size_in_bytes) as usize;
+        let start_offset = offset % bucket_size_in_bytes;
+        let remaining_bytes = bucket_size_in_bytes - start_offset;
+
+        let bucket_address =
+            self.bucket_address(buckets.get(bucket_idx).expect("bucket idx out of bounds"));
+
+        let first_segment_len = remaining_bytes.min(length as u64);
+        func(Segment {
+            address: bucket_address + start_offset.into(),
+            length: first_segment_len.into(),
+        });
+
+        virtual_segment.length -= first_segment_len.into();
+        virtual_segment.address += first_segment_len.into();
+
+        if virtual_segment.length.get() == 0 {
+            return;
+        }
+
+        for _ in 0..(virtual_segment.length.get() / self.bucket_size_in_bytes().get()) {
+            bucket_idx += 1;
+            let bucket_address =
+                self.bucket_address(buckets.get(bucket_idx).expect("bucket idx out of bounds"));
+            func(Segment {
+                address: bucket_address,
+                length: self.bucket_size_in_bytes(),
+            });
+        }
+
+        if virtual_segment.length.get() == 0 {
+            return;
+        }
+
+        bucket_idx += 1;
+
+        let bucket_address =
+            self.bucket_address(buckets.get(bucket_idx).expect("bucket idx out of bounds"));
+
+        func(Segment {
+            address: bucket_address,
+            length: virtual_segment.length % self.bucket_size_in_bytes(),
+        });
     }
 
     fn bucket_size_in_bytes(&self) -> Bytes {
@@ -446,6 +498,11 @@ impl<M: Memory> MemoryManagerInner<M> {
     /// Returns the underlying memory.
     pub fn into_memory(self) -> M {
         self.memory
+    }
+
+    #[inline]
+    fn bucket_address(&self, id: &BucketId) -> Address {
+        Address::from(BUCKETS_OFFSET_IN_BYTES) + self.bucket_size_in_bytes() * Bytes::from(id.0)
     }
 }
 
@@ -477,61 +534,44 @@ struct Segment {
 //
 // Each of the segments above can then be translated into the real address space by looking up
 // the underlying buckets' addresses in real memory.
-struct BucketIterator<'a> {
-    virtual_segment: Segment,
-    buckets: &'a [BucketId],
-    bucket_size_in_bytes: Bytes,
-}
-
-impl Iterator for BucketIterator<'_> {
-    type Item = Segment;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.virtual_segment.length == Bytes::from(0u64) {
-            return None;
-        }
-
-        // Map the virtual segment's address to a real address.
-        let bucket_idx =
-            (self.virtual_segment.address.get() / self.bucket_size_in_bytes.get()) as usize;
-        let bucket_address = self.bucket_address(
-            *self
-                .buckets
-                .get(bucket_idx)
-                .expect("bucket idx out of bounds"),
-        );
-
-        let real_address = bucket_address
-            + Bytes::from(self.virtual_segment.address.get() % self.bucket_size_in_bytes.get());
-
-        // Compute how many bytes are in this real segment.
-        let bytes_in_segment = {
-            let next_bucket_address = bucket_address + self.bucket_size_in_bytes;
-
-            // Write up to either the end of the bucket, or the end of the segment.
-            min(
-                Bytes::from(next_bucket_address.get() - real_address.get()),
-                self.virtual_segment.length,
-            )
-        };
-
-        // Update the virtual segment to exclude the portion we're about to return.
-        self.virtual_segment.length -= bytes_in_segment;
-        self.virtual_segment.address += bytes_in_segment;
-
-        Some(Segment {
-            address: real_address,
-            length: bytes_in_segment,
-        })
-    }
-}
-
-impl<'a> BucketIterator<'a> {
-    /// Returns the address of a given bucket.
-    fn bucket_address(&self, id: BucketId) -> Address {
-        Address::from(BUCKETS_OFFSET_IN_BYTES) + self.bucket_size_in_bytes * Bytes::from(id.0)
-    }
-}
+// struct BucketIterator<'a> {
+//     virtual_segment: Segment,
+//     buckets: &'a [BucketId],
+//     remaining_space_in_bucket: Bytes,
+//     bucket_size_in_bytes: Bytes,
+// }
+//
+// impl Iterator for BucketIterator<'_> {
+//     type Item = Segment;
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         if self.virtual_segment.length == Bytes::from(0u64) {
+//             return None;
+//         }
+//
+//         // Map the virtual segment's address to a real address.
+//         let bucket_address =
+//             self.bucket_address(*self.buckets.get(0).expect("bucket idx out of bounds"));
+//
+//         let real_address = bucket_address
+//             + Bytes::from(self.virtual_segment.address.get() % self.bucket_size_in_bytes.get());
+//
+//         // Compute how many bytes are in this real segment.
+//         // Write up to either the remaining space in current bucket, or the end of the segment.
+//         let bytes_in_segment = min(self.remaining_space_in_bucket, self.virtual_segment.length);
+//
+//         // Update the virtual segment to exclude the portion we're about to return.
+//         self.virtual_segment.length -= bytes_in_segment;
+//         self.virtual_segment.address += bytes_in_segment;
+//         self.buckets = &self.buckets[1..];
+//         self.remaining_space_in_bucket = self.bucket_size_in_bytes;
+//
+//         Some(Segment {
+//             address: real_address,
+//             length: bytes_in_segment,
+//         })
+//     }
+// }
 
 #[derive(Clone, Copy, Ord, Eq, PartialEq, PartialOrd, Debug)]
 pub struct MemoryId(u8);
