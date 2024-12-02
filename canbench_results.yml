@@ -71,6 +71,12 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
+  btreemap_get_blob_512_1024_v2_mem_manager:
+    total:
+      instructions: 3164909208
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: { }
   btreemap_get_blob_64_1024:
     total:
       instructions: 572513751
@@ -130,12 +136,18 @@ benches:
       instructions: 255485892
       heap_increase: 0
       stable_memory_increase: 0
+    scopes: { }
+  btreemap_get_u64_u64_v2_mem_manager:
+    total:
+      instructions: 673752904
+      heap_increase: 0
+      stable_memory_increase: 0
     scopes: {}
   btreemap_insert_10mib_values:
     total:
-      instructions: 82015559
+      instructions: 5251584111
       heap_increase: 0
-      stable_memory_increase: 32
+      stable_memory_increase: 3613
     scopes: {}
   btreemap_insert_blob_1024_128:
     total:
@@ -208,6 +220,12 @@ benches:
       instructions: 5070548871
       heap_increase: 0
       stable_memory_increase: 261
+    scopes: { }
+  btreemap_insert_blob_1024_512_v2_mem_manager:
+    total:
+      instructions: 6292667075
+      heap_increase: 0
+      stable_memory_increase: 256
     scopes: {}
   btreemap_insert_blob_1024_64:
     total:
@@ -359,6 +377,12 @@ benches:
       heap_increase: 0
       stable_memory_increase: 7
     scopes: {}
+  btreemap_insert_u64_u64_mem_manager:
+    total:
+      instructions: 1019612837
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: { }
   btreemap_insert_u64_u64_v2:
     total:
       instructions: 421501977
@@ -635,9 +659,21 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
+  vec_get_blob_4_mem_manager:
+    total:
+      instructions: 14476122
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: { }
   vec_get_blob_64:
     total:
       instructions: 12960294
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: { }
+  vec_get_blob_64_mem_manager:
+    total:
+      instructions: 24146389
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
