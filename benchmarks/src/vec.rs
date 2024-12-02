@@ -1,7 +1,8 @@
 use crate::Random;
 use canbench_rs::{bench, bench_fn, BenchResult};
+use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::storable::Blob;
-use ic_stable_structures::{DefaultMemoryImpl, StableVec, Storable};
+use ic_stable_structures::{DefaultMemoryImpl, Memory, StableVec, Storable};
 use tiny_rng::{Rand, Rng};
 
 #[bench(raw)]
@@ -45,6 +46,11 @@ pub fn vec_get_blob_4() -> BenchResult {
 }
 
 #[bench(raw)]
+pub fn vec_get_blob_4_mem_manager() -> BenchResult {
+    vec_get_blob_mem_manager::<4>()
+}
+
+#[bench(raw)]
 pub fn vec_get_blob_8() -> BenchResult {
     vec_get_blob::<8>()
 }
@@ -65,13 +71,18 @@ pub fn vec_get_blob_64() -> BenchResult {
 }
 
 #[bench(raw)]
+pub fn vec_get_blob_64_mem_manager() -> BenchResult {
+    vec_get_blob_mem_manager::<64>()
+}
+
+#[bench(raw)]
 pub fn vec_get_blob_128() -> BenchResult {
     vec_get_blob::<128>()
 }
 
 #[bench(raw)]
 pub fn vec_get_u64() -> BenchResult {
-    vec_get::<u64>()
+    vec_get::<u64>(DefaultMemoryImpl::default())
 }
 
 fn vec_insert_blob<const N: usize>() -> BenchResult {
@@ -97,12 +108,17 @@ fn vec_insert<T: Storable + Random>() -> BenchResult {
 }
 
 fn vec_get_blob<const N: usize>() -> BenchResult {
-    vec_get::<Blob<N>>()
+    vec_get::<Blob<N>>(DefaultMemoryImpl::default())
 }
 
-fn vec_get<T: Storable + Random>() -> BenchResult {
+fn vec_get_blob_mem_manager<const N: usize>() -> BenchResult {
+    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+    vec_get::<Blob<N>>(memory_manager.get(MemoryId::new(42)))
+}
+
+fn vec_get<T: Storable + Random>(memory: impl Memory) -> BenchResult {
     let num_items = 10_000;
-    let svec: StableVec<T, _> = StableVec::new(DefaultMemoryImpl::default()).unwrap();
+    let svec: StableVec<T, _> = StableVec::new(memory).unwrap();
 
     let mut rng = Rng::from_seed(0);
 
