@@ -455,7 +455,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next_map(|node, entry_idx| {
             let (key, encoded_value) = node.entry(entry_idx, self.0.map.memory());
-            (key, V::from_bytes(Cow::Owned(encoded_value)))
+            (key.clone(), V::from_bytes(Cow::Borrowed(encoded_value)))
         })
     }
 
@@ -476,7 +476,7 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back_map(|node, entry_idx| {
             let (key, encoded_value) = node.entry(entry_idx, self.0.map.memory());
-            (key, V::from_bytes(Cow::Owned(encoded_value)))
+            (key.clone(), V::from_bytes(Cow::Borrowed(encoded_value)))
         })
     }
 }
@@ -537,7 +537,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next_map(|node, entry_idx| {
             let encoded_value = node.value(entry_idx, self.0.map.memory());
-            V::from_bytes(Cow::Borrowed(&encoded_value))
+            V::from_bytes(Cow::Borrowed(encoded_value))
         })
     }
 
@@ -558,7 +558,7 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back_map(|node, entry_idx| {
             let encoded_value = node.value(entry_idx, self.0.map.memory());
-            V::from_bytes(Cow::Borrowed(&encoded_value))
+            V::from_bytes(Cow::Borrowed(encoded_value))
         })
     }
 }

@@ -229,6 +229,27 @@ fn test_iter() {
     assert_eq!(sv.iter().skip(usize::MAX).count(), 0);
 }
 
+#[test]
+fn test_iter_count() {
+    let sv = StableVec::<u64, M>::new(M::default()).unwrap();
+    sv.push(&1).unwrap();
+    sv.push(&2).unwrap();
+    sv.push(&3).unwrap();
+    sv.push(&4).unwrap();
+    {
+        let mut iter = sv.iter();
+        iter.next_back();
+        assert_eq!(iter.count(), 3);
+    }
+    {
+        let mut iter = sv.iter();
+        iter.next_back();
+        sv.pop(); // this pops the element that we iterated through on the previous line
+        sv.pop();
+        assert_eq!(iter.count(), 2);
+    }
+}
+
 // A struct with a bugg implementation of storable where the max_size can
 // smaller than the serialized size.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]

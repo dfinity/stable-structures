@@ -1,12 +1,12 @@
 use crate::{
     btreemap::Allocator,
-    read_struct, read_u32, read_u64,
+    read_struct, read_to_vec, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
     write, write_struct, write_u32, Memory,
 };
 use std::borrow::{Borrow, Cow};
-use std::cell::{Ref, RefCell};
+use std::cell::OnceCell;
 
 mod io;
 #[cfg(test)]
@@ -37,6 +37,7 @@ pub enum NodeType {
 }
 
 pub type Entry<K> = (K, Vec<u8>);
+pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 
 /// A node of a B-Tree.
 ///
@@ -50,10 +51,8 @@ pub type Entry<K> = (K, Vec<u8>);
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
-    // Values are stored in a Refcell as they are loaded lazily.
-    // A RefCell allows loading the value and caching it without requiring exterior mutability.
     // INVARIANT: the list is sorted by key.
-    keys_and_encoded_values: Vec<(K, RefCell<Value>)>,
+    keys_and_encoded_values: Vec<(K, Value)>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
@@ -136,7 +135,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         match self.node_type {
             NodeType::Leaf => {
                 // NOTE: a node can never be empty, so this access is safe.
-                self.entry(0, memory)
+                let entry = self.entry(0, memory);
+                (entry.0.clone(), entry.1.to_vec())
             }
             NodeType::Internal => {
                 let first_child = Self::load(
@@ -164,66 +164,51 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) -> Entry<K> {
         let (old_key, old_value) = core::mem::replace(
             &mut self.keys_and_encoded_values[idx],
-            (key, RefCell::new(Value::ByVal(value))),
+            (key, Value::by_value(value)),
         );
-        (
-            old_key,
-            self.resolve_value(RefCell::into_inner(old_value), memory),
-        )
+        (old_key, self.extract_value(old_value, memory))
     }
 
-    /// Returns a copy of the entry at the specified index.
-    pub fn entry<M: Memory>(&self, idx: usize, memory: &M) -> Entry<K> {
+    /// Returns a reference to the entry at the specified index.
+    pub fn entry<M: Memory>(&self, idx: usize, memory: &M) -> EntryRef<K> {
         (
-            self.keys_and_encoded_values[idx].0.clone(),
-            self.value(idx, memory).to_vec(),
+            &self.keys_and_encoded_values[idx].0,
+            self.value(idx, memory),
         )
     }
 
     /// Returns a reference to the encoded value at the specified index.
-    pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> Ref<[u8]> {
+    pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> &[u8] {
         // Load and cache the value from the underlying memory if needed.
-        let encoded_value = &self.keys_and_encoded_values[idx].1;
-
-        // We borrow the value immutably first. We only borrow the value mutably if it hasn't been
-        // cached yet. This is to ensure that no references have been given out to the cached value
-        // when we call .borrow_mut().
-        let encoded_value_borrow = encoded_value.borrow();
-        if let Value::ByRef(offset) = *encoded_value_borrow {
-            // We drop the borrow explicitly because we want to borrow mutably on the next line.
-            drop(encoded_value_borrow);
-            *encoded_value.borrow_mut() =
-                Value::ByVal(self.resolve_value(Value::ByRef(offset), memory));
-        }
-
-        // Return a reference to the value.
-        Ref::map(encoded_value.borrow(), |value| match value {
-            Value::ByVal(v) => &v[..],
-            Value::ByRef(_) => {
-                unreachable!("value must have been loaded already in the code above.")
-            }
-        })
+        self.keys_and_encoded_values[idx]
+            .1
+            .get_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
-    fn resolve_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
-        match value {
-            Value::ByRef(offset) => {
-                // Value isn't loaded yet.
-                let reader = NodeReader {
-                    address: self.address,
-                    overflows: &self.overflows,
-                    page_size: self.page_size(),
-                    memory,
-                };
+    /// Extracts the contents of value (by loading it first if it's not loaded yet).
+    fn extract_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
+        value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
+    }
 
-                let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
-                let mut bytes = vec![0; value_len];
-                reader.read((offset + U32_SIZE).get(), &mut bytes);
+    /// Loads a value from stable memory at the given offset of this node.
+    fn load_value_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> Vec<u8> {
+        let reader = NodeReader {
+            address: self.address,
+            overflows: &self.overflows,
+            page_size: self.page_size(),
+            memory,
+        };
 
-                bytes
-            }
-            Value::ByVal(bytes) => bytes,
-        }
+        let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
+        let mut bytes = vec![];
+        read_to_vec(
+            &reader,
+            Address::from((offset + U32_SIZE).get()),
+            &mut bytes,
+            value_len,
+        );
+
+        bytes
     }
 
     fn page_size(&self) -> PageSize {
@@ -268,19 +253,26 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .insert(idx, (key, RefCell::new(Value::ByVal(encoded_value))));
+            .insert(idx, (key, Value::by_value(encoded_value)));
+    }
+
+    /// Returns the entry at the specified index while consuming this node.
+    pub fn into_entry<M: Memory>(mut self, idx: usize, memory: &M) -> Entry<K> {
+        let keys_and_encoded_values = core::mem::take(&mut self.keys_and_encoded_values);
+        let (key, value) = keys_and_encoded_values.into_iter().nth(idx).unwrap();
+        (key, self.extract_value(value, memory))
     }
 
     /// Removes the entry at the specified index.
     pub fn remove_entry<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
         let (key, value) = self.keys_and_encoded_values.remove(idx);
-        (key, self.resolve_value(RefCell::into_inner(value), memory))
+        (key, self.extract_value(value, memory))
     }
 
     /// Adds a new entry at the back of the node.
     pub fn push_entry(&mut self, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .push((key, RefCell::new(Value::ByVal(encoded_value))));
+            .push((key, Value::by_value(encoded_value)));
     }
 
     /// Removes an entry from the back of the node.
@@ -295,10 +287,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .pop()
             .expect("node must not be empty");
 
-        Some((
-            key,
-            self.resolve_value(RefCell::into_inner(last_value), memory),
-        ))
+        Some((key, self.extract_value(last_value, memory)))
     }
 
     /// Merges the entries and children of the `source` node into self, along with the median entry.
@@ -474,14 +463,55 @@ impl NodeHeader {
     }
 }
 
-// The value in a K/V pair.
+/// The value in a K/V pair.
 #[derive(Debug)]
 enum Value {
-    // The value's encoded bytes.
+    /// The value's encoded bytes.
     ByVal(Vec<u8>),
 
-    // The value's offset in the node.
-    ByRef(Bytes),
+    ByRef {
+        /// The value's offset in the node.
+        offset: Bytes,
+        /// The lazily loaded encoded bytes.
+        loaded_value: OnceCell<Vec<u8>>,
+    },
+}
+
+impl Value {
+    pub fn by_ref(offset: Bytes) -> Self {
+        Self::ByRef {
+            offset,
+            loaded_value: Default::default(),
+        }
+    }
+
+    pub fn by_value(value: Vec<u8>) -> Self {
+        Self::ByVal(value)
+    }
+
+    /// Returns a reference to the value if the value has been loaded or runs the given function to
+    /// load the value.
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Vec<u8>) -> &[u8] {
+        match self {
+            Value::ByVal(v) => &v[..],
+            Value::ByRef {
+                offset,
+                loaded_value: value,
+            } => value.get_or_init(|| load(*offset)),
+        }
+    }
+
+    /// Extracts the value while consuming self if the value has been loaded or runs the given
+    /// function to load the value.
+    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Vec<u8>) -> Vec<u8> {
+        match self {
+            Value::ByVal(v) => v,
+            Value::ByRef {
+                offset,
+                loaded_value: value,
+            } => value.into_inner().unwrap_or_else(|| load(offset)),
+        }
+    }
 }
 
 /// Stores version-specific data.

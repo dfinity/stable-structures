@@ -353,7 +353,7 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let value = value.to_bytes_checked().to_vec();
+        let value = value.to_bytes_checked().into_owned();
 
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.
@@ -523,7 +523,7 @@ where
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         let node = self.load_node(node_addr);
         match node.search(key) {
-            Ok(idx) => Some(node.value(idx, self.memory()).to_vec()),
+            Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
             Err(idx) => {
                 match node.node_type() {
                     NodeType::Leaf => None, // Key not found.
