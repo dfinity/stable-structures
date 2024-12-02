@@ -69,12 +69,17 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   fi
 fi
 
+# Add emojis for visualization (as of December 2024, Github does not support colored text)
+FORMATTED_CANBENCH_OUTPUT=$(cat "$CANBENCH_OUTPUT" \
+                            | sed -E 's/.*improved.*/\0 🟢/g' \
+                            | sed -E 's/.*regress.*/\0 🔴/g')
+
 ## Add the output of canbench to the file.
 {
   echo "$UPDATED_MSG"
   echo ""
   echo "\`\`\`"
-  cat "$CANBENCH_OUTPUT"
+  echo "$FORMATTED_CANBENCH_OUTPUT"
   echo "\`\`\`"
 } >> "$COMMENT_MESSAGE_PATH"
 
