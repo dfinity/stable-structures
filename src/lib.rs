@@ -270,6 +270,11 @@ impl<M: Memory> Memory for RestrictedMemory<M> {
             .read(self.page_range.start * WASM_PAGE_SIZE + offset, dst)
     }
 
+    unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
+        self.memory
+            .read_unsafe(self.page_range.start * WASM_PAGE_SIZE + offset, dst, count)
+    }
+
     fn write(&self, offset: u64, src: &[u8]) {
         self.memory
             .write(self.page_range.start * WASM_PAGE_SIZE + offset, src)
