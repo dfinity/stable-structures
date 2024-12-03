@@ -46,7 +46,6 @@ use crate::{
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
 use std::cell::RefCell;
-use std::cmp::min;
 use std::rc::Rc;
 
 const MAGIC: &[u8; 3] = b"MGR";
@@ -380,14 +379,21 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         let mut bytes_written = 0;
-        self.for_each_bucket(id, offset, src.len(), |Segment { address, length }| {
-            self.memory.write(
-                address.get(),
-                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-            );
+        self.for_each_bucket(
+            id,
+            VirtualSegment {
+                address: offset.into(),
+                length: src.len().into(),
+            },
+            |RealSegment { address, length }| {
+                self.memory.write(
+                    address.get(),
+                    &src[bytes_written as usize..(bytes_written + length.get()) as usize],
+                );
 
-            bytes_written += length.get();
-        });
+                bytes_written += length.get();
+            },
+        );
     }
 
     #[inline]
@@ -406,83 +412,85 @@ impl<M: Memory> MemoryManagerInner<M> {
             panic!("{id:?}: read out of bounds");
         }
 
-        let mut bytes_read: usize = 0;
-        self.for_each_bucket(id, offset, count, |Segment { address, length }| {
-            let length = length.get().try_into().expect("Length overflows usize");
-            self.memory
-                .read_unsafe(address.get(), dst.add(bytes_read), length);
+        let mut bytes_read = Bytes::new(0);
+        self.for_each_bucket(
+            id,
+            VirtualSegment {
+                address: offset.into(),
+                length: count.into(),
+            },
+            |RealSegment { address, length }| {
+                self.memory.read_unsafe(
+                    address.get(),
+                    // The cast to usize is safe because `bytes_read` and `length` are bounded by
+                    // usize `count`.
+                    dst.add(bytes_read.get() as usize),
+                    length.get() as usize,
+                );
 
-            bytes_read = bytes_read
-                .checked_add(length)
-                .expect("Bytes read overflowed usize");
-        })
+                bytes_read += length;
+            },
+        )
     }
 
-    /// Initializes a [`BucketIterator`].
+    /// Maps a segment of virtual memory to segments of real memory.
+    ///
+    /// `func` is invoked with real memory segments of real memory that `virtual_segment` is mapped
+    /// to.
+    ///
+    /// A segment in virtual memory can map to multiple segments of real memory. Here's an example:
+    ///
+    /// Virtual Memory
+    /// ```text
+    /// --------------------------------------------------------
+    ///          (A) ---------- SEGMENT ---------- (B)
+    /// --------------------------------------------------------
+    /// ↑               ↑               ↑               ↑
+    /// Bucket 0        Bucket 1        Bucket 2        Bucket 3
+    /// ```
+    ///
+    /// The [`VirtualMemory`] is internally divided into fixed-size buckets. In the memory's virtual
+    /// address space, all these buckets are consecutive, but in real memory this may not be the case.
+    ///
+    /// A virtual segment would first be split at the bucket boundaries. The example virtual segment
+    /// above would be split into the following segments:
+    ///
+    ///    (A, end of bucket 0)
+    ///    (start of bucket 1, end of bucket 1)
+    ///    (start of bucket 2, B)
+    ///
+    /// Each of the segments above can then be translated into the real address space by looking up
+    /// the underlying buckets' addresses in real memory.
     fn for_each_bucket(
         &self,
         MemoryId(id): MemoryId,
-        offset: u64,
-        length: usize,
-        mut func: impl FnMut(Segment),
+        virtual_segment: VirtualSegment,
+        mut func: impl FnMut(RealSegment),
     ) {
-        if length == 0 {
-            return;
-        }
-
-        // TODO: check length
+        let virtual_offset = virtual_segment.address.get();
+        let mut length = virtual_segment.length.get();
         // Get the buckets allocated to the given memory id.
-        let mut buckets = self.memory_buckets[id as usize].as_slice();
-        let mut virtual_segment = Segment {
-            address: Address::from(offset),
-            length: Bytes::from(length as u64),
-        };
-
+        let buckets = self.memory_buckets[id as usize].as_slice();
         let bucket_size_in_bytes = self.bucket_size_in_bytes().get();
-        // starting bucket index
-        let mut bucket_idx = (offset / bucket_size_in_bytes) as usize;
-        let start_offset = offset % bucket_size_in_bytes;
-        let remaining_bytes = bucket_size_in_bytes - start_offset;
 
-        let bucket_address =
-            self.bucket_address(buckets.get(bucket_idx).expect("bucket idx out of bounds"));
-
-        let first_segment_len = remaining_bytes.min(length as u64);
-        func(Segment {
-            address: bucket_address + start_offset.into(),
-            length: first_segment_len.into(),
-        });
-
-        virtual_segment.length -= first_segment_len.into();
-        virtual_segment.address += first_segment_len.into();
-
-        if virtual_segment.length.get() == 0 {
-            return;
-        }
-
-        for _ in 0..(virtual_segment.length.get() / self.bucket_size_in_bytes().get()) {
-            bucket_idx += 1;
+        // The start offset where we start reading from in a bucket. In the first iteration the
+        // value is calculated from `virtual_offset`, in later iterations, it's always 0.
+        let mut start_offset_in_bucket = virtual_offset % bucket_size_in_bytes;
+        let mut bucket_idx = (virtual_offset / bucket_size_in_bytes) as usize;
+        while length > 0 {
             let bucket_address =
                 self.bucket_address(buckets.get(bucket_idx).expect("bucket idx out of bounds"));
-            func(Segment {
-                address: bucket_address,
-                length: self.bucket_size_in_bytes(),
+
+            let segment_len = (bucket_size_in_bytes - start_offset_in_bucket).min(length);
+            func(RealSegment {
+                address: bucket_address + start_offset_in_bucket.into(),
+                length: segment_len.into(),
             });
+
+            length -= segment_len;
+            bucket_idx += 1;
+            start_offset_in_bucket = 0;
         }
-
-        if virtual_segment.length.get() == 0 {
-            return;
-        }
-
-        bucket_idx += 1;
-
-        let bucket_address =
-            self.bucket_address(buckets.get(bucket_idx).expect("bucket idx out of bounds"));
-
-        func(Segment {
-            address: bucket_address,
-            length: virtual_segment.length % self.bucket_size_in_bytes(),
-        });
     }
 
     fn bucket_size_in_bytes(&self) -> Bytes {
@@ -506,72 +514,15 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 }
 
-struct Segment {
+struct VirtualSegment {
     address: Address,
     length: Bytes,
 }
 
-// An iterator that maps a segment of virtual memory to segments of real memory.
-//
-// A segment in virtual memory can map to multiple segments of real memory. Here's an example:
-//
-// Virtual Memory
-// --------------------------------------------------------
-//          (A) ---------- SEGMENT ---------- (B)
-// --------------------------------------------------------
-// ↑               ↑               ↑               ↑
-// Bucket 0        Bucket 1        Bucket 2        Bucket 3
-//
-// The [`VirtualMemory`] is internally divided into fixed-size buckets. In the memory's virtual
-// address space, all these buckets are consecutive, but in real memory this may not be the case.
-//
-// A virtual segment would first be split at the bucket boundaries. The example virtual segment
-// above would be split into the following segments:
-//
-//    (A, end of bucket 0)
-//    (start of bucket 1, end of bucket 1)
-//    (start of bucket 2, B)
-//
-// Each of the segments above can then be translated into the real address space by looking up
-// the underlying buckets' addresses in real memory.
-// struct BucketIterator<'a> {
-//     virtual_segment: Segment,
-//     buckets: &'a [BucketId],
-//     remaining_space_in_bucket: Bytes,
-//     bucket_size_in_bytes: Bytes,
-// }
-//
-// impl Iterator for BucketIterator<'_> {
-//     type Item = Segment;
-//
-//     fn next(&mut self) -> Option<Self::Item> {
-//         if self.virtual_segment.length == Bytes::from(0u64) {
-//             return None;
-//         }
-//
-//         // Map the virtual segment's address to a real address.
-//         let bucket_address =
-//             self.bucket_address(*self.buckets.get(0).expect("bucket idx out of bounds"));
-//
-//         let real_address = bucket_address
-//             + Bytes::from(self.virtual_segment.address.get() % self.bucket_size_in_bytes.get());
-//
-//         // Compute how many bytes are in this real segment.
-//         // Write up to either the remaining space in current bucket, or the end of the segment.
-//         let bytes_in_segment = min(self.remaining_space_in_bucket, self.virtual_segment.length);
-//
-//         // Update the virtual segment to exclude the portion we're about to return.
-//         self.virtual_segment.length -= bytes_in_segment;
-//         self.virtual_segment.address += bytes_in_segment;
-//         self.buckets = &self.buckets[1..];
-//         self.remaining_space_in_bucket = self.bucket_size_in_bytes;
-//
-//         Some(Segment {
-//             address: real_address,
-//             length: bytes_in_segment,
-//         })
-//     }
-// }
+struct RealSegment {
+    address: Address,
+    length: Bytes,
+}
 
 #[derive(Clone, Copy, Ord, Eq, PartialEq, PartialOrd, Debug)]
 pub struct MemoryId(u8);
