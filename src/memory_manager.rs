@@ -910,7 +910,7 @@ mod test {
 
         let data: Vec<_> = (0u8..=255u8)
             .cycle()
-            .take((WASM_PAGE_SIZE * 2) as usize)
+            .take((WASM_PAGE_SIZE * 2 + 901) as usize)
             .collect();
 
         const MEMORIES: u8 = 3;
