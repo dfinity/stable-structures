@@ -467,21 +467,23 @@ impl<M: Memory> MemoryManagerInner<M> {
         virtual_segment: VirtualSegment,
         mut func: impl FnMut(RealSegment),
     ) {
-        let virtual_offset = virtual_segment.address.get();
-        let mut length = virtual_segment.length.get();
         // Get the buckets allocated to the given memory id.
         let buckets = self.memory_buckets[id as usize].as_slice();
         let bucket_size_in_bytes = self.bucket_size_in_bytes().get();
 
+        let virtual_offset = virtual_segment.address.get();
+
+        let mut length = virtual_segment.length.get();
+        let mut bucket_idx = (virtual_offset / bucket_size_in_bytes) as usize;
         // The start offset where we start reading from in a bucket. In the first iteration the
         // value is calculated from `virtual_offset`, in later iterations, it's always 0.
         let mut start_offset_in_bucket = virtual_offset % bucket_size_in_bytes;
-        let mut bucket_idx = (virtual_offset / bucket_size_in_bytes) as usize;
+
         while length > 0 {
             let bucket_address =
                 self.bucket_address(buckets.get(bucket_idx).expect("bucket idx out of bounds"));
-
             let segment_len = (bucket_size_in_bytes - start_offset_in_bucket).min(length);
+
             func(RealSegment {
                 address: bucket_address + start_offset_in_bucket.into(),
                 length: segment_len.into(),
