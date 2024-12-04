@@ -550,6 +550,7 @@ fn bucket_allocations_address(id: BucketId) -> Address {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::safe_write;
     use proptest::prelude::*;
 
     const MAX_MEMORY_IN_PAGES: u64 = MAX_NUM_BUCKETS * BUCKET_SIZE_IN_PAGES;
@@ -890,5 +891,63 @@ mod test {
 
         memory_1.read(0, &mut buf);
         assert_eq!(buf, vec![2; 1000]);
+    }
+
+    // Make a few reads and writes and compare the results against golden files that should stay
+    // stable between commits.
+    // The operations were chosen so that they exercise most of the implementation.
+    #[test]
+    fn stability() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init_with_bucket_size(mem.clone(), 1); // very small bucket size.
+
+        let data: Vec<_> = (0u8..=255u8)
+            .cycle()
+            .take((WASM_PAGE_SIZE * 2 + 901) as usize)
+            .collect();
+
+        const MEMORIES: u8 = 3;
+        let mut memory_id = 0;
+        let mut next_memory = || {
+            memory_id += 1;
+            memory_id %= MEMORIES;
+            mem_mgr.get(MemoryId(memory_id))
+        };
+
+        // There are 5 operations
+        for _ in 0..MEMORIES * 5 {
+            safe_write(&next_memory(), 0, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE / 2, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE - 1, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE + 1, data.as_slice()).unwrap();
+            safe_write(
+                &next_memory(),
+                2 * WASM_PAGE_SIZE + WASM_PAGE_SIZE / 2,
+                data.as_slice(),
+            )
+            .unwrap();
+        }
+
+        let expected_write = include_bytes!("memory_manager/stability_write.golden");
+        assert!(expected_write.as_slice() == mem.borrow().as_slice());
+
+        let mut read = vec![0; 4 * WASM_PAGE_SIZE as usize];
+
+        // There are 4 operations
+        for _ in 0..MEMORIES * 4 {
+            next_memory().read(0, &mut read[0..WASM_PAGE_SIZE as usize / 2]);
+            next_memory().read(
+                WASM_PAGE_SIZE / 2 - 150,
+                &mut read[WASM_PAGE_SIZE as usize / 2..WASM_PAGE_SIZE as usize],
+            );
+            next_memory().read(
+                WASM_PAGE_SIZE - 473,
+                &mut read[WASM_PAGE_SIZE as usize..WASM_PAGE_SIZE as usize * 2],
+            );
+            next_memory().read(WASM_PAGE_SIZE * 2, &mut read[WASM_PAGE_SIZE as usize * 2..]);
+        }
+
+        let expected_read = include_bytes!("memory_manager/stability_read.golden");
+        assert!(expected_read.as_slice() == read.as_slice());
     }
 }
