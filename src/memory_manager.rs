@@ -47,7 +47,6 @@ use crate::{
 };
 use std::cell::RefCell;
 use std::cmp::min;
-use std::collections::BTreeMap;
 use std::rc::Rc;
 
 const MAGIC: &[u8; 3] = b"MGR";
@@ -172,16 +171,16 @@ struct Header {
 
     version: u8,
 
-    // The number of buckets allocated by the memory manager.
+    /// The number of buckets allocated by the memory manager.
     num_allocated_buckets: u16,
 
-    // The size of a bucket in Wasm pages.
+    /// The size of a bucket in Wasm pages.
     bucket_size_in_pages: u16,
 
-    // Reserved bytes for future extensions
+    /// Reserved bytes for future extensions
     _reserved: [u8; HEADER_RESERVED_BYTES],
 
-    // The size of each individual memory that can be created by the memory manager.
+    /// The size of each individual memory that can be created by the memory manager.
     memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
 }
 
@@ -210,6 +209,12 @@ impl<M: Memory> Memory for VirtualMemory<M> {
         self.memory_manager.borrow().read(self.id, offset, dst)
     }
 
+    unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
+        self.memory_manager
+            .borrow()
+            .read_unsafe(self.id, offset, dst, count)
+    }
+
     fn write(&self, offset: u64, src: &[u8]) {
         self.memory_manager.borrow().write(self.id, offset, src)
     }
@@ -219,16 +224,16 @@ impl<M: Memory> Memory for VirtualMemory<M> {
 struct MemoryManagerInner<M: Memory> {
     memory: M,
 
-    // The number of buckets that have been allocated.
+    /// The number of buckets that have been allocated.
     allocated_buckets: u16,
 
     bucket_size_in_pages: u16,
 
-    // An array storing the size (in pages) of each of the managed memories.
+    /// An array storing the size (in pages) of each of the managed memories.
     memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
 
-    // A map mapping each managed memory to the bucket ids that are allocated to it.
-    memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
+    /// A map mapping each managed memory to the bucket ids that are allocated to it.
+    memory_buckets: Vec<Vec<BucketId>>,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -255,7 +260,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory,
             allocated_buckets: 0,
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
-            memory_buckets: BTreeMap::new(),
+            memory_buckets: vec![vec![]; MAX_NUM_MEMORIES as usize],
             bucket_size_in_pages,
         };
 
@@ -285,13 +290,10 @@ impl<M: Memory> MemoryManagerInner<M> {
             MAX_NUM_BUCKETS as usize,
         );
 
-        let mut memory_buckets = BTreeMap::new();
+        let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
         for (bucket_idx, memory) in buckets.into_iter().enumerate() {
             if memory != UNALLOCATED_BUCKET_MARKER {
-                memory_buckets
-                    .entry(MemoryId(memory))
-                    .or_insert_with(Vec::new)
-                    .push(BucketId(bucket_idx as u16));
+                memory_buckets[memory as usize].push(BucketId(bucket_idx as u16));
             }
         }
 
@@ -317,12 +319,12 @@ impl<M: Memory> MemoryManagerInner<M> {
         write_struct(&header, Address::from(0), &self.memory);
     }
 
-    // Returns the size of a memory (in pages).
+    /// Returns the size of a memory (in pages).
     fn memory_size(&self, id: MemoryId) -> u64 {
         self.memory_sizes_in_pages[id.0 as usize]
     }
 
-    // Grows the memory with the given id by the given number of pages.
+    /// Grows the memory with the given id by the given number of pages.
     fn grow(&mut self, id: MemoryId, pages: u64) -> i64 {
         // Compute how many additional buckets are needed.
         let old_size = self.memory_size(id);
@@ -336,14 +338,12 @@ impl<M: Memory> MemoryManagerInner<M> {
             return -1;
         }
 
+        let memory_bucket = &mut self.memory_buckets[id.0 as usize];
         // Allocate new buckets as needed.
+        memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
             let new_bucket_id = BucketId(self.allocated_buckets);
-
-            self.memory_buckets
-                .entry(id)
-                .or_default()
-                .push(new_bucket_id);
+            memory_bucket.push(new_bucket_id);
 
             // Write in stable store that this bucket belongs to the memory with the provided `id`.
             write(
@@ -390,29 +390,38 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
     }
 
+    #[inline]
     fn read(&self, id: MemoryId, offset: u64, dst: &mut [u8]) {
-        if (offset + dst.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
+        // SAFETY: this is trivially safe because dst has dst.len() space.
+        unsafe { self.read_unsafe(id, offset, dst.as_mut_ptr(), dst.len()) }
+    }
+
+    /// # Safety
+    ///
+    /// Callers must guarantee that
+    ///   * it is valid to write `count` number of bytes starting from `dst`,
+    ///   * `dst..dst + count` does not overlap with `self`.
+    unsafe fn read_unsafe(&self, id: MemoryId, offset: u64, dst: *mut u8, count: usize) {
+        if (offset + count as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
             panic!("{id:?}: read out of bounds");
         }
 
-        let mut bytes_read = 0;
-        for Segment { address, length } in self.bucket_iter(id, offset, dst.len()) {
-            self.memory.read(
-                address.get(),
-                &mut dst[bytes_read as usize..(bytes_read + length.get()) as usize],
-            );
+        let mut bytes_read: usize = 0;
+        for Segment { address, length } in self.bucket_iter(id, offset, count) {
+            let length = length.get().try_into().expect("Length overflows usize");
+            self.memory
+                .read_unsafe(address.get(), dst.add(bytes_read), length);
 
-            bytes_read += length.get();
+            bytes_read = bytes_read
+                .checked_add(length)
+                .expect("Bytes read overflowed usize");
         }
     }
 
-    // Initializes a [`BucketIterator`].
-    fn bucket_iter(&self, id: MemoryId, offset: u64, length: usize) -> BucketIterator {
+    /// Initializes a [`BucketIterator`].
+    fn bucket_iter(&self, MemoryId(id): MemoryId, offset: u64, length: usize) -> BucketIterator {
         // Get the buckets allocated to the given memory id.
-        let buckets = match self.memory_buckets.get(&id) {
-            Some(s) => s.as_slice(),
-            None => &[],
-        };
+        let buckets = self.memory_buckets[id as usize].as_slice();
 
         BucketIterator {
             virtual_segment: Segment {
@@ -428,13 +437,13 @@ impl<M: Memory> MemoryManagerInner<M> {
         Bytes::from(self.bucket_size_in_pages as u64 * WASM_PAGE_SIZE)
     }
 
-    // Returns the number of buckets needed to accommodate the given number of pages.
+    /// Returns the number of buckets needed to accommodate the given number of pages.
     fn num_buckets_needed(&self, num_pages: u64) -> u64 {
         // Ceiling division.
         (num_pages + self.bucket_size_in_pages as u64 - 1) / self.bucket_size_in_pages as u64
     }
 
-    // Returns the underlying memory.
+    /// Returns the underlying memory.
     pub fn into_memory(self) -> M {
         self.memory
     }
@@ -518,7 +527,7 @@ impl Iterator for BucketIterator<'_> {
 }
 
 impl<'a> BucketIterator<'a> {
-    // Returns the address of a given bucket.
+    /// Returns the address of a given bucket.
     fn bucket_address(&self, id: BucketId) -> Address {
         Address::from(BUCKETS_OFFSET_IN_BYTES) + self.bucket_size_in_bytes * Bytes::from(id.0)
     }
@@ -548,7 +557,6 @@ fn bucket_allocations_address(id: BucketId) -> Address {
 #[cfg(test)]
 mod test {
     use super::*;
-    use maplit::btreemap;
     use proptest::prelude::*;
 
     const MAX_MEMORY_IN_PAGES: u64 = MAX_NUM_BUCKETS * BUCKET_SIZE_IN_PAGES;
@@ -577,12 +585,11 @@ mod test {
         memory.read(0, &mut bytes);
         assert_eq!(bytes, vec![1, 2, 3]);
 
-        assert_eq!(
-            mem_mgr.inner.borrow().memory_buckets,
-            btreemap! {
-                MemoryId(0) => vec![BucketId(0)]
-            }
-        );
+        assert_eq!(mem_mgr.inner.borrow().memory_buckets[0], vec![BucketId(0)]);
+
+        assert!(mem_mgr.inner.borrow().memory_buckets[1..]
+            .iter()
+            .all(|x| x.is_empty()));
     }
 
     #[test]
@@ -599,12 +606,13 @@ mod test {
         assert_eq!(memory_1.size(), 1);
 
         assert_eq!(
-            mem_mgr.inner.borrow().memory_buckets,
-            btreemap! {
-                MemoryId(0) => vec![BucketId(0)],
-                MemoryId(1) => vec![BucketId(1)],
-            }
+            &mem_mgr.inner.borrow().memory_buckets[..2],
+            &[vec![BucketId(0)], vec![BucketId(1)],]
         );
+
+        assert!(mem_mgr.inner.borrow().memory_buckets[2..]
+            .iter()
+            .all(|x| x.is_empty()));
 
         memory_0.write(0, &[1, 2, 3]);
         memory_0.write(0, &[1, 2, 3]);
@@ -825,10 +833,28 @@ mod test {
                 // Write a random blob into the memory, growing the memory as it needs to.
                 write(memory, offset, &data);
 
-                // Verify the blob can be read back.
-                let mut bytes = vec![0; data.len()];
-                memory.read(offset, &mut bytes);
-                assert_eq!(bytes, data);
+                {
+                    // Verify the blob can be read back using read.
+                    let mut bytes = vec![0; data.len()];
+                    memory.read(offset, &mut bytes);
+                    assert_eq!(bytes, data);
+                }
+
+                {
+                    // Verify the blob can be read back using read_to_vec.
+                    let mut bytes = vec![];
+                    read_to_vec(memory, offset.into(), &mut bytes, data.len());
+                    assert_eq!(bytes, data);
+                }
+
+                {
+                    // Verify the blob can be read back using read_unsafe.
+                    let mut bytes = vec![0; data.len()];
+                    unsafe {
+                        memory.read_unsafe(offset, bytes.as_mut_ptr(), data.len());
+                    }
+                    assert_eq!(bytes, data);
+                }
             }
         });
     }
