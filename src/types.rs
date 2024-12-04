@@ -31,6 +31,14 @@ impl Add<Bytes> for Address {
     }
 }
 
+impl Sub<Address> for Address {
+    type Output = Bytes;
+
+    fn sub(self, address: Address) -> Self::Output {
+        Bytes(self.0 - address.0)
+    }
+}
+
 impl Sub<Bytes> for Address {
     type Output = Self;
 
