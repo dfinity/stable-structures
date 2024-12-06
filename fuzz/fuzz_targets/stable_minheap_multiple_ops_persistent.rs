@@ -12,7 +12,7 @@ use std::time::SystemTime;
 use tempfile::{tempdir, TempDir};
 
 mod data;
-// Unbouned is not supported for MinHeap
+// Unbounded is not supported for MinHeap
 use data::{BoundedFuzzStruct, MAX_VALUE_SIZE};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
