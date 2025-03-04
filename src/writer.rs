@@ -36,7 +36,7 @@ impl<'a, M: Memory> Writer<'a, M> {
     }
 }
 
-impl<'a, M: Memory> io::Write for Writer<'a, M> {
+impl<M: Memory> io::Write for Writer<'_, M> {
     fn write(&mut self, buf: &[u8]) -> Result<usize, io::Error> {
         self.write(buf)
             .map_err(|e| io::Error::new(io::ErrorKind::OutOfMemory, e))?;
@@ -61,7 +61,7 @@ pub struct BufferedWriter<'a, M: Memory> {
     inner: io::BufWriter<Writer<'a, M>>,
 }
 
-impl<'a, M: Memory> BufferedWriter<'a, M> {
+impl<M: Memory> BufferedWriter<'_, M> {
     /// Creates a new `BufferedStableWriter` which writes to the selected memory
     pub fn new(buffer_size: usize, writer: Writer<M>) -> BufferedWriter<M> {
         BufferedWriter {
@@ -70,7 +70,7 @@ impl<'a, M: Memory> BufferedWriter<'a, M> {
     }
 }
 
-impl<'a, M: Memory> io::Write for BufferedWriter<'a, M> {
+impl<M: Memory> io::Write for BufferedWriter<'_, M> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
     }

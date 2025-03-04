@@ -5,8 +5,8 @@
 //!
 //! 1. The developer needs to put in advance an upper bound on the memory of each stable structure.
 //! 2. It wastes the canister's memory allocation. For example, if a canister creates two stable
-//! structures A and B, and gives each one of them a 1GiB region of memory, then writing to B will
-//! require growing > 1GiB of memory just to be able to write to it.
+//!    structures A and B, and gives each one of them a 1GiB region of memory, then writing to B will
+//!    require growing > 1GiB of memory just to be able to write to it.
 //!
 //! The [`MemoryManager`] in this module solves both of these problems. It simulates having
 //! multiple memories, each being able to grow without bound. That way, a developer doesn't need to
@@ -546,7 +546,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     /// Returns the number of buckets needed to accommodate the given number of pages.
     fn num_buckets_needed(&self, num_pages: u64) -> u64 {
         // Ceiling division.
-        (num_pages + self.bucket_size_in_pages as u64 - 1) / self.bucket_size_in_pages as u64
+        num_pages.div_ceil(self.bucket_size_in_pages as u64)
     }
 
     /// Returns the underlying memory.
