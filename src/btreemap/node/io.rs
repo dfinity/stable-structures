@@ -17,7 +17,7 @@ pub struct NodeReader<'a, M: Memory> {
 
 // Note: The `Memory` interface is implemented so that helper methods such `read_u32`,
 // `read_struct`, etc. can be used with a `NodeReader` directly.
-impl<'a, M: Memory> Memory for NodeReader<'a, M> {
+impl<M: Memory> Memory for NodeReader<'_, M> {
     unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
         // If the read is only in the initial page, then read it directly in one go.
         // This is a performance enhancement to avoid the cost of creating a `NodeIterator`.
@@ -365,7 +365,7 @@ fn compute_num_overflow_pages_needed(size: u64, page_size: u64) -> u64 {
         let overflow_page_capacity = page_size - PAGE_OVERFLOW_DATA_OFFSET.get();
 
         // Ceiling division
-        (overflow_data_len + overflow_page_capacity - 1) / overflow_page_capacity
+        overflow_data_len.div_ceil(overflow_page_capacity)
     } else {
         0
     }
