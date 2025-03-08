@@ -1,15 +1,15 @@
 [package]
-name = "ic-stable-structures"
-version = "0.6.7"
-edition = "2021"
 description = "A collection of data structures for fearless canister upgrades."
-homepage = "https://docs.rs/ic-stable-structures"
 documentation = "https://docs.rs/ic-stable-structures"
+edition = "2021"
+homepage = "https://docs.rs/ic-stable-structures"
+include = ["Cargo.toml", "LICENSE", "README.md", "src"]
+keywords = ["dfinity", "internet-computer", "stable-structures"]
 license = "Apache-2.0"
+name = "ic-stable-structures"
 readme = "README.md"
-keywords = ["internet-computer", "dfinity", "stable-structures"]
-include = ["src", "Cargo.toml", "LICENSE", "README.md"]
 repository = "https://github.com/dfinity/stable-structures"
+version = "0.6.8"
 
 [dependencies]
 ic_principal = { version = "0.1.1", default-features = false }
