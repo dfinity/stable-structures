@@ -22,11 +22,11 @@ For more information about the philosophy behind the library, see [Roman's tutor
 
 ## Available Data Structures
 
-- [BTreeMap]: A Key-Value store
-- [Vec]: A growable array
-- [Log]: An append-only list of variable-size entries
-- [Cell]: A serializable value
-- [MinHeap]: A priority queue.
+- `BTreeMap`: A Key-Value store
+- `Vec`: A growable array
+- `Log`: An append-only list of variable-size entries
+- `Cell`: A serializable value
+- `MinHeap`: A priority queue.
 
 ## Tutorials
 
@@ -48,11 +48,11 @@ map.insert(1, 2);
 assert_eq!(map.get(&1), Some(2));
 ```
 
-Memories are abstracted with the [Memory] trait, and stable structures can work with any storage
+Memories are abstracted with the `Memory` trait, and stable structures can work with any storage
 backend that implements this trait.
-This includes stable memory, a vector ([VectorMemory]), or even a flat file ([FileMemory]).
+This includes stable memory, a vector (`VectorMemory`), or even a flat file (`FileMemory`).
 
-The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which maps to stable memory when used in a canister and to a [VectorMemory] otherwise.
+The example above initializes a `BTreeMap` with a `DefaultMemoryImpl`, which maps to stable memory when used in a canister and to a `VectorMemory` otherwise.
 
 
 Note that **stable structures cannot share memories.**
