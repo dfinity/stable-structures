@@ -538,7 +538,18 @@ where
 
     /// Returns `true` if the key exists in the map, `false` otherwise.
     pub fn contains_key(&self, key: &K) -> bool {
-        self.root_addr != NULL && self.get_helper(self.root_addr, key).is_some()
+        self.root_addr != NULL && self.contains_key_helper(self.root_addr, key)
+    }
+
+    fn contains_key_helper(&self, node_addr: Address, key: &K) -> bool {
+        let node = self.load_node(node_addr);
+        match node.search(key) {
+            Ok(_) => true,
+            Err(idx) => match node.node_type() {
+                NodeType::Leaf => false,
+                NodeType::Internal => self.contains_key_helper(node.child(idx), key),
+            },
+        }
     }
 
     /// Returns `true` if the map contains no elements.
