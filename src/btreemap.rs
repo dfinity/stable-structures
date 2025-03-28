@@ -514,40 +514,34 @@ where
         if self.root_addr == NULL {
             return None;
         }
-
-        self.get_helper(self.root_addr, key)
-            .map(Cow::Owned)
-            .map(V::from_bytes)
-    }
-
-    fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let node = self.load_node(node_addr);
-        match node.search(key) {
-            Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
-            Err(idx) => {
-                match node.node_type() {
-                    NodeType::Leaf => None, // Key not found.
-                    NodeType::Internal => {
-                        // The key isn't in the node. Look for the key in the child.
-                        self.get_helper(node.child(idx), key)
-                    }
-                }
-            }
-        }
+        self.traverse(self.root_addr, key, |node, idx| {
+            node.into_entry(idx, self.memory()).1
+        })
+        .map(Cow::Owned)
+        .map(V::from_bytes)
     }
 
     /// Returns `true` if the key exists in the map, `false` otherwise.
     pub fn contains_key(&self, key: &K) -> bool {
-        self.root_addr != NULL && self.contains_key_helper(self.root_addr, key)
+        if self.root_addr == NULL {
+            return false;
+        }
+        self.traverse(self.root_addr, key, |_, _| ()).is_some()
     }
 
-    fn contains_key_helper(&self, node_addr: Address, key: &K) -> bool {
+    /// Generic recursive traversal helper.
+    ///
+    /// Recursively traverses from `node_addr`, invoking `f` when a matching key is found, or stops at a leaf.
+    fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
+    where
+        F: Fn(Node<K>, usize) -> R + Clone,
+    {
         let node = self.load_node(node_addr);
         match node.search(key) {
-            Ok(_) => true,
+            Ok(idx) => Some(f(node, idx)),
             Err(idx) => match node.node_type() {
-                NodeType::Leaf => false,
-                NodeType::Internal => self.contains_key_helper(node.child(idx), key),
+                NodeType::Leaf => None, // Key not found.
+                NodeType::Internal => self.traverse(node.child(idx), key, f),
             },
         }
     }
