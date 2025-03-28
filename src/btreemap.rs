@@ -538,7 +538,7 @@ where
 
     /// Returns `true` if the key exists in the map, `false` otherwise.
     pub fn contains_key(&self, key: &K) -> bool {
-        self.get(key).is_some()
+        self.root_addr != NULL && self.get_helper(self.root_addr, key).is_some()
     }
 
     /// Returns `true` if the map contains no elements.
