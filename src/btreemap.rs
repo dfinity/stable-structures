@@ -51,7 +51,12 @@
 mod allocator;
 mod iter;
 mod node;
-use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
+mod node_cache;
+
+use crate::btreemap::{
+    iter::{IterInternal, KeysIter, ValuesIter},
+    node_cache::NodeCache,
+};
 use crate::{
     storable::Bound as StorableBound,
     types::{Address, NULL},
@@ -105,6 +110,9 @@ where
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
+
+    // A cache for storing recently accessed nodes.
+    node_cache: NodeCache<K>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -214,6 +222,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
+            node_cache: NodeCache::new(100),
         };
 
         btree.save();
@@ -241,6 +250,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
+            node_cache: NodeCache::new(100),
         };
 
         btree.save();
@@ -290,6 +300,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
+            node_cache: NodeCache::new(100),
         }
     }
 
@@ -1090,7 +1101,11 @@ where
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
-        Node::load(address, self.version.page_size(), self.memory())
+        self.node_cache.read_node(address).unwrap_or_else(|| {
+            let node = Node::load(address, self.version.page_size(), self.memory());
+            self.node_cache.write_node(address, node.clone());
+            node
+        })
     }
 
     // Saves the map to memory.

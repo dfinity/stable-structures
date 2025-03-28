@@ -448,6 +448,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 }
 
+// Implement Clone for Node
+impl<K: Storable + Ord + Clone> Clone for Node<K> {
+    fn clone(&self) -> Self {
+        Self {
+            address: self.address,
+            keys_and_encoded_values: self.keys_and_encoded_values.clone(),
+            children: self.children.clone(),
+            node_type: self.node_type,
+            version: self.version,
+            overflows: self.overflows.clone(),
+        }
+    }
+}
+
 // A transient data structure for reading/writing metadata into/from stable memory.
 #[repr(C, packed)]
 struct NodeHeader {
@@ -464,7 +478,7 @@ impl NodeHeader {
 }
 
 /// The value in a K/V pair.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Value {
     /// The value's encoded bytes.
     ByVal(Vec<u8>),
