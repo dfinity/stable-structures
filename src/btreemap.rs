@@ -2111,14 +2111,14 @@ mod test {
     fn len() {
         btree_test(|mut btree| {
             for i in 0..1000u32 {
-                assert_eq!(btree.insert(b(i.to_le_bytes().as_slice()), b(&[])), None);
+                assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
             }
 
             assert_eq!(btree.len(), 1000);
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
-                assert_eq!(btree.remove(&b(i.to_le_bytes().as_slice())), Some(b(&[])));
+                assert_eq!(btree.remove(&b(&i.to_le_bytes())), Some(b(&[])));
             }
 
             assert_eq!(btree.len(), 0);
@@ -2169,16 +2169,13 @@ mod test {
         btree_test(|mut btree| {
             // Insert even numbers from 0 to 1000.
             for i in (0..1000u32).step_by(2) {
-                assert_eq!(btree.insert(b(i.to_le_bytes().as_slice()), b(&[])), None);
+                assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
             }
 
             // Contains key should return true on all the even numbers and false on all the odd
             // numbers.
             for i in 0..1000u32 {
-                assert_eq!(
-                    btree.contains_key(&b(i.to_le_bytes().as_slice())),
-                    i % 2 == 0
-                );
+                assert_eq!(btree.contains_key(&b(&i.to_le_bytes())), i % 2 == 0);
             }
         });
     }
