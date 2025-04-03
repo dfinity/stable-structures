@@ -89,17 +89,15 @@ where
 
     /// Updates the LRU order for the given address by assigning a new usage counter.
     fn touch(&self, address: Address) {
-        let current_counter = self.counter.borrow_mut();
-        let new_counter = Counter(current_counter.0 + 1);
-
-        let mut usage = self.usage.borrow_mut();
-        let mut lru_order = self.lru_order.borrow_mut();
+        let mut current_counter = self.counter.borrow_mut();
+        *current_counter = Counter(current_counter.0 + 1);
+        let new_counter = *current_counter;
 
         // Remove previous counter value if it exists.
-        if let Some(old_counter) = usage.insert(address, new_counter) {
-            lru_order.remove(&old_counter);
+        if let Some(old_counter) = self.usage.borrow_mut().insert(address, new_counter) {
+            self.lru_order.borrow_mut().remove(&old_counter);
         }
-        lru_order.insert(new_counter, address);
+        self.lru_order.borrow_mut().insert(new_counter, address);
     }
 
     // TODO: remove debug code.
@@ -108,6 +106,7 @@ where
         let lru_order = self.lru_order.borrow();
         let usage = self.usage.borrow();
 
+        assert!(cache.len() <= self.capacity);
         assert_eq!(cache.len(), usage.len());
         assert_eq!(cache.len(), lru_order.len());
 
