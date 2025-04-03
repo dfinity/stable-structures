@@ -86,7 +86,7 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-const NODE_CACHE_SIZE: usize = 1;
+const NODE_CACHE_SIZE: usize = 1_000;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -1127,7 +1127,7 @@ where
 
     fn swap_entry(&mut self, node: &mut Node<K>, idx: usize, entry: Entry<K>) -> Entry<K> {
         let result = node.swap_entry(idx, entry, self.memory());
-        self.node_cache.remove_node(node.address());
+        //self.node_cache.remove_node(node.address());
         result
     }
 
