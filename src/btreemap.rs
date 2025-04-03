@@ -380,7 +380,7 @@ where
             if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                root.save(self.allocator_mut());
+                self.save_node(&mut root);
                 return Some(V::from_bytes(Cow::Owned(previous_value)));
             }
 
@@ -426,7 +426,7 @@ where
                 // Overwrite it and return the previous value.
                 let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
 
-                node.save(self.allocator_mut());
+                self.save_node(&mut node);
                 Some(previous_value)
             }
             Err(idx) => {
@@ -437,7 +437,7 @@ where
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
                         node.insert_entry(idx, (key, value));
-                        node.save(self.allocator_mut());
+                        self.save_node(&mut node);
 
                         // Update the length.
                         self.length += 1;
@@ -457,7 +457,7 @@ where
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) =
                                     child.swap_entry(idx, (key, value), self.memory());
-                                child.save(self.allocator_mut());
+                                self.save_node(&mut child);
                                 return Some(previous_value);
                             }
 
@@ -515,9 +515,9 @@ where
 
         node.insert_entry(full_child_idx, (median_key, median_value));
 
-        sibling.save(self.allocator_mut());
-        full_child.save(self.allocator_mut());
-        node.save(self.allocator_mut());
+        self.save_node(&mut sibling);
+        self.save_node(&mut full_child);
+        self.save_node(node);
     }
 
     /// Returns the value associated with the given key if it exists.
@@ -677,7 +677,7 @@ where
                             node.deallocate(&mut self.allocator);
                             self.root_addr = NULL;
                         } else {
-                            node.save(self.allocator_mut());
+                            self.save_node(&mut node);
                         }
 
                         self.save_header();
@@ -722,7 +722,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
 
                             // Save the parent node.
-                            node.save(self.allocator_mut());
+                            self.save_node(&mut node);
                             return Some(old_value);
                         }
 
@@ -757,7 +757,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, successor, self.memory());
 
                             // Save the parent node.
-                            node.save(self.allocator_mut());
+                            self.save_node(&mut node);
                             return Some(old_value);
                         }
 
@@ -805,10 +805,10 @@ where
                             node.deallocate(&mut self.allocator);
                             self.save_header();
                         } else {
-                            node.save(self.allocator_mut());
+                            self.save_node(&mut node);
                         }
 
-                        new_child.save(self.allocator_mut());
+                        self.save_node(&mut new_child);
 
                         // Recursively delete the key.
                         self.remove_helper(new_child, key)
@@ -888,9 +888,9 @@ where
                                     assert_eq!(child.node_type(), NodeType::Leaf);
                                 }
 
-                                left_sibling.save(self.allocator_mut());
-                                child.save(self.allocator_mut());
-                                node.save(self.allocator_mut());
+                                self.save_node(left_sibling);
+                                self.save_node(&mut child);
+                                self.save_node(&mut node);
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -943,9 +943,9 @@ where
                                     }
                                 }
 
-                                right_sibling.save(self.allocator_mut());
-                                child.save(self.allocator_mut());
-                                node.save(self.allocator_mut());
+                                self.save_node(right_sibling);
+                                self.save_node(&mut child);
+                                self.save_node(&mut node);
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -974,7 +974,7 @@ where
                                     self.save_header();
                                 }
                             } else {
-                                node.save(self.allocator_mut());
+                                self.save_node(&mut node);
                             }
 
                             return self.remove_helper(left_sibling, key);
@@ -1003,7 +1003,7 @@ where
                                     self.save_header();
                                 }
                             } else {
-                                node.save(self.allocator_mut());
+                                self.save_node(&mut node);
                             }
 
                             return self.remove_helper(right_sibling, key);
@@ -1106,6 +1106,10 @@ where
             self.node_cache.write_node(address, node.clone());
             node
         })
+    }
+
+    fn save_node(&mut self, node: &mut Node<K>) {
+        node.save(self.allocator_mut());
     }
 
     // Saves the map to memory.
