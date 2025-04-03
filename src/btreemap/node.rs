@@ -473,7 +473,7 @@ where
         // Overflows: (address, address), (address, address), ...
 
         write!(f, "Node: A:{} {:?}", self.address().get(), self.node_type())?;
-        write!(f, "\nK: ")?;
+        write!(f, "\nK: len={} ", self.keys_and_encoded_values.len())?;
         for (key, _value) in &self.keys_and_encoded_values {
             write!(f, "{:?} ", key.to_bytes())?;
         }

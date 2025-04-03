@@ -1079,20 +1079,22 @@ where
         IterInternal::new_in_range(self, range)
     }
 
-    // Merges one node (`source`) into another (`into`), along with a median entry.
-    //
-    // Example (values are not included for brevity):
-    //
-    // Input:
-    //   Source: [1, 2, 3]
-    //   Into: [5, 6, 7]
-    //   Median: 4
-    //
-    // Output:
-    //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
-    //   `source` is deallocated.
+    /// Merges one node (`source`) into another (`into`), along with a median entry.
+    ///
+    /// Example (values are not included for brevity):
+    ///
+    /// Input:
+    ///   Source: [1, 2, 3]
+    ///   Into: [5, 6, 7]
+    ///   Median: 4
+    ///
+    /// Output:
+    ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
+    ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
+        self.node_cache.remove_node(source.address());
         into.merge(source, median, &mut self.allocator);
+        self.node_cache.write_node(into.address(), into.clone());
         into
     }
 
@@ -2148,48 +2150,47 @@ mod test {
     #[test]
     fn len() {
         btree_test(|mut btree| {
-            //  const N: u64 = 100;
-            //  for k in 1..=N {
+            const N: u64 = 100;
+            for k in 1..=N {
+                //let k: u64 = 78;
+                println!("k = {k}");
+                for i in 0..k {
+                    assert_eq!(
+                        btree.insert(b(&i.to_le_bytes()), b(&[])),
+                        None,
+                        "Failed at {i}"
+                    );
+                }
 
-            let k: u64 = 78;
-            println!("k = {k}");
-            for i in 0..k {
-                assert_eq!(
-                    btree.insert(b(&i.to_le_bytes()), b(&[])),
-                    None,
-                    "Failed at {i}"
-                );
+                assert_eq!(btree.len(), k);
+                assert!(!btree.is_empty());
+
+                for i in 0..k {
+                    assert_eq!(
+                        btree.get(&b(&i.to_le_bytes())),
+                        Some(b(&[])),
+                        "Failed at {i}"
+                    );
+                }
+
+                for i in 0..k {
+                    println!("\n\ni:{i}\n{btree:?}");
+
+                    assert_eq!(
+                        btree.get(&b(&i.to_le_bytes())),
+                        Some(b(&[])),
+                        "Failed at {i}"
+                    );
+                    assert_eq!(
+                        btree.remove(&b(&i.to_le_bytes())),
+                        Some(b(&[])),
+                        "Failed at {i}"
+                    );
+                }
+
+                assert_eq!(btree.len(), 0);
+                assert!(btree.is_empty());
             }
-
-            assert_eq!(btree.len(), k);
-            assert!(!btree.is_empty());
-
-            for i in 0..k {
-                assert_eq!(
-                    btree.get(&b(&i.to_le_bytes())),
-                    Some(b(&[])),
-                    "Failed at {i}"
-                );
-            }
-
-            for i in 0..k {
-                println!("\n\ni:{i}\n{btree:?}");
-
-                assert_eq!(
-                    btree.get(&b(&i.to_le_bytes())),
-                    Some(b(&[])),
-                    "Failed at {i}"
-                );
-                assert_eq!(
-                    btree.remove(&b(&i.to_le_bytes())),
-                    Some(b(&[])),
-                    "Failed at {i}"
-                );
-            }
-
-            assert_eq!(btree.len(), 0);
-            assert!(btree.is_empty());
-            //}
         });
     }
 
