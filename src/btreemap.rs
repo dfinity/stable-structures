@@ -381,7 +381,7 @@ where
             // Check if the key already exists in the root.
             if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
-                let (_, previous_value) = self.swap_entry(&mut root, idx, (key, value));
+                let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
                 self.save_node(&mut root);
                 return Some(V::from_bytes(Cow::Owned(previous_value)));
             }
@@ -426,7 +426,7 @@ where
             Ok(idx) => {
                 // The key is already in the node.
                 // Overwrite it and return the previous value.
-                let (_, previous_value) = self.swap_entry(&mut node, idx, (key, value));
+                let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
 
                 self.save_node(&mut node);
                 Some(previous_value)
@@ -458,7 +458,7 @@ where
                             if let Ok(idx) = child.search(&key) {
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) =
-                                    self.swap_entry(&mut child, idx, (key, value));
+                                    child.swap_entry(idx, (key, value), self.memory());
                                 self.save_node(&mut child);
                                 return Some(previous_value);
                             }
@@ -723,7 +723,7 @@ where
                             self.remove_helper(left_child, &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
-                            let (_, old_value) = self.swap_entry(&mut node, idx, predecessor);
+                            let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
 
                             // Save the parent node.
                             self.save_node(&mut node);
@@ -758,7 +758,7 @@ where
                             self.remove_helper(right_child, &successor.0)?;
 
                             // Replace the `key` with its successor.
-                            let (_, old_value) = self.swap_entry(&mut node, idx, successor);
+                            let (_, old_value) = node.swap_entry(idx, successor, self.memory());
 
                             // Save the parent node.
                             self.save_node(&mut node);
@@ -872,10 +872,10 @@ where
                                     left_sibling.pop_entry(self.memory()).unwrap();
 
                                 // Replace the parent's entry with the one from the left sibling.
-                                let (parent_key, parent_value) = self.swap_entry(
-                                    &mut node,
+                                let (parent_key, parent_value) = node.swap_entry(
                                     idx - 1,
                                     (left_sibling_key, left_sibling_value),
+                                    self.memory(),
                                 );
 
                                 // Move the entry from the parent into the child.
@@ -927,10 +927,10 @@ where
                                     right_sibling.remove_entry(0, self.memory());
 
                                 // Replace the parent's entry with the one from the right sibling.
-                                let parent_entry = self.swap_entry(
-                                    &mut node,
+                                let parent_entry = node.swap_entry(
                                     idx,
                                     (right_sibling_key, right_sibling_value),
+                                    self.memory(),
                                 );
 
                                 // Move the entry from the parent into the child.
@@ -1123,12 +1123,6 @@ where
     fn save_node(&mut self, node: &mut Node<K>) {
         self.node_cache.remove_node(node.address());
         node.save(self.allocator_mut());
-    }
-
-    fn swap_entry(&mut self, node: &mut Node<K>, idx: usize, entry: Entry<K>) -> Entry<K> {
-        let result = node.swap_entry(idx, entry, self.memory());
-        //self.node_cache.remove_node(node.address());
-        result
     }
 
     /// Saves the map to memory.
