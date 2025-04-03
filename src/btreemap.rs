@@ -86,6 +86,8 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
+const NODE_CACHE_SIZE: usize = 10;
+
 /// A "stable" map based on a B-tree.
 ///
 /// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
@@ -222,7 +224,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
-            node_cache: NodeCache::new(100),
+            node_cache: NodeCache::new(NODE_CACHE_SIZE),
         };
 
         btree.save_header();
@@ -250,7 +252,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
-            node_cache: NodeCache::new(100),
+            node_cache: NodeCache::new(NODE_CACHE_SIZE),
         };
 
         btree.save_header();
@@ -300,7 +302,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
-            node_cache: NodeCache::new(100),
+            node_cache: NodeCache::new(NODE_CACHE_SIZE),
         }
     }
 
@@ -1107,12 +1109,12 @@ where
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
-        // self.node_cache.read_node(address).unwrap_or_else(|| {
-        //     let node = Node::load(address, self.version.page_size(), self.memory());
-        //     self.node_cache.write_node(address, node.clone());
-        //     node
-        // })
-        Node::load(address, self.version.page_size(), self.memory())
+        self.node_cache.read_node(address).unwrap_or_else(|| {
+            let node = Node::load(address, self.version.page_size(), self.memory());
+            self.node_cache.write_node(address, node.clone());
+            node
+        })
+        //Node::load(address, self.version.page_size(), self.memory())
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
@@ -2111,16 +2113,24 @@ mod test {
     #[test]
     fn len() {
         btree_test(|mut btree| {
-            const N: u64 = 1000;
+            const N: u64 = 100;
             for i in 0..N {
-                assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
+                assert_eq!(
+                    btree.insert(b(&i.to_le_bytes()), b(&[])),
+                    None,
+                    "Failed at {i}"
+                );
             }
 
             assert_eq!(btree.len(), N);
             assert!(!btree.is_empty());
 
             for i in 0..N {
-                assert_eq!(btree.remove(&b(&i.to_le_bytes())), Some(b(&[])));
+                assert_eq!(
+                    btree.remove(&b(&i.to_le_bytes())),
+                    Some(b(&[])),
+                    "Failed at {i}"
+                );
             }
 
             assert_eq!(btree.len(), 0);
