@@ -60,19 +60,21 @@ where
     /// Inserts a node into the cache, evicting the least recently used node if capacity is exceeded.
     pub fn write_node(&self, address: Address, node: Node<K>) {
         self.validate();
-        {
-            let mut cache = self.cache.borrow_mut();
-            if cache.len() >= self.capacity {
-                // Evict the least recently used node.
-                let mut lru_order = self.lru_order.borrow_mut();
-                if let Some((&old_counter, &lru_address)) = lru_order.iter().next() {
-                    lru_order.remove(&old_counter);
-                    cache.remove(&lru_address);
-                    self.usage.borrow_mut().remove(&lru_address);
-                }
-            }
-            cache.insert(address, node);
+        if self.capacity == 0 {
+            return; // If capacity is zero, do nothing.
         }
+
+        let mut cache = self.cache.borrow_mut();
+        if cache.len() >= self.capacity {
+            // Evict the least recently used node.
+            let mut lru_order = self.lru_order.borrow_mut();
+            if let Some((&old_counter, &lru_address)) = lru_order.iter().next() {
+                lru_order.remove(&old_counter);
+                cache.remove(&lru_address);
+                self.usage.borrow_mut().remove(&lru_address);
+            }
+        }
+        cache.insert(address, node);
         self.touch(address);
     }
 
