@@ -47,7 +47,6 @@ pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 /// 2. `V2`, which supports both bounded and unbounded types.
 ///
 /// See `v1.rs` and `v2.rs` for more details.
-#[derive(Debug)]
 pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
@@ -459,6 +458,36 @@ impl<K: Storable + Ord + Clone> Clone for Node<K> {
             version: self.version,
             overflows: self.overflows.clone(),
         }
+    }
+}
+
+impl<K: Storable + Ord + Clone> std::fmt::Debug for Node<K>
+where
+    K: Storable + Ord + Clone,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // Format
+        // Node: address, type
+        // KV: (key, value), ...
+        // Children: (left, right), (left, right), ...
+        // Overflows: (address, address), (address, address), ...
+
+        write!(f, "Node: A:{} {:?}", self.address().get(), self.node_type())?;
+        write!(f, "\nK: ")?;
+        for (key, _value) in &self.keys_and_encoded_values {
+            write!(f, "{:?} ", key.to_bytes())?;
+        }
+        if !self.children.is_empty() {
+            write!(f, "\nChildren: ")?;
+            for child in &self.children {
+                write!(f, "A:{}, ", child.get())?;
+            }
+        }
+        // write!(f, "\nOverflows: ")?;
+        // for overflow in &self.overflows {
+        //     write!(f, "A:{}, ", overflow.get())?;
+        // }
+        write!(f, "\n")
     }
 }
 
