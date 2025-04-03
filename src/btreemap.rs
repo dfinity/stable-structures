@@ -580,6 +580,7 @@ where
         self.length = 0;
         self.allocator.clear();
         self.save_header();
+        self.node_cache.clear();
     }
 
     /// Returns the first key-value pair in the map. The key in this
@@ -674,7 +675,7 @@ where
                             );
 
                             // Deallocate the empty node.
-                            node.deallocate(&mut self.allocator);
+                            self.deallocate_node(node);
                             self.root_addr = NULL;
                         } else {
                             self.save_node(&mut node);
@@ -802,7 +803,7 @@ where
                             self.root_addr = new_child.address();
 
                             // Deallocate the root node.
-                            node.deallocate(&mut self.allocator);
+                            self.deallocate_node(node);
                             self.save_header();
                         } else {
                             self.save_node(&mut node);
@@ -966,7 +967,7 @@ where
 
                             if node.entries_len() == 0 {
                                 let node_address = node.address();
-                                node.deallocate(&mut self.allocator);
+                                self.deallocate_node(node);
 
                                 if node_address == self.root_addr {
                                     // Update the root.
@@ -995,7 +996,7 @@ where
 
                             if node.entries_len() == 0 {
                                 let node_address = node.address();
-                                node.deallocate(&mut self.allocator);
+                                self.deallocate_node(node);
 
                                 if node_address == self.root_addr {
                                     // Update the root.
@@ -1111,6 +1112,11 @@ where
     fn save_node(&mut self, node: &mut Node<K>) {
         self.node_cache.write_node(node.address(), node.clone());
         node.save(self.allocator_mut());
+    }
+
+    fn deallocate_node(&mut self, node: Node<K>) {
+        self.node_cache.remove_node(node.address());
+        node.deallocate(&mut self.allocator);
     }
 
     // Saves the map to memory.

@@ -36,6 +36,13 @@ where
         }
     }
 
+    pub fn clear(&self) {
+        self.cache.borrow_mut().clear();
+        self.lru_order.borrow_mut().clear();
+        self.usage.borrow_mut().clear();
+        *self.counter.borrow_mut() = 0;
+    }
+
     /// Returns a cloned node from the cache for the given address, if it exists.
     /// Updates the LRU order if the node is found.
     pub fn read_node(&self, address: Address) -> Option<Node<K>> {
