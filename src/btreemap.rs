@@ -2156,22 +2156,14 @@ mod test {
     fn len() {
         btree_test(|mut btree| {
             for i in 0..1000u32 {
-                assert_eq!(
-                    btree.insert(b(&i.to_le_bytes()), b(&[])),
-                    None,
-                    "Failed at {i}"
-                );
+                assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
             }
 
             assert_eq!(btree.len(), 1000);
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
-                assert_eq!(
-                    btree.remove(&b(&i.to_le_bytes())),
-                    Some(b(&[])),
-                    "Failed at {i}"
-                );
+                assert_eq!(btree.remove(&b(&i.to_le_bytes())), Some(b(&[])));
             }
 
             assert_eq!(btree.len(), 0);
