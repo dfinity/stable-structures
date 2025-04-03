@@ -264,7 +264,7 @@ where
         Self::load_helper(memory, true)
     }
 
-    // Loads the map from memory, potentially migrating the map from V1 to V2.
+    /// Loads the map from memory, potentially migrating the map from V1 to V2.
     fn load_helper(memory: M, migrate_to_v2: bool) -> Self {
         // Read the header from memory.
         let header = Self::read_header(&memory);
@@ -416,7 +416,7 @@ where
             .map(V::from_bytes)
     }
 
-    // Inserts an entry into a node that is *not full*.
+    /// Inserts an entry into a node that is *not full*.
     fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
@@ -482,22 +482,22 @@ where
         }
     }
 
-    // Takes as input a nonfull internal `node` and index to its full child, then
-    // splits this child into two, adding an additional child to `node`.
-    //
-    // Example:
-    //
-    //                          [ ... M   Y ... ]
-    //                                  |
-    //                 [ N  O  P  Q  R  S  T  U  V  W  X ]
-    //
-    //
-    // After splitting becomes:
-    //
-    //                         [ ... M  S  Y ... ]
-    //                                 / \
-    //                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
-    //
+    /// Takes as input a nonfull internal `node` and index to its full child, then
+    /// splits this child into two, adding an additional child to `node`.
+    ///
+    /// Example:
+    ///
+    ///                          [ ... M   Y ... ]
+    ///                                  |
+    ///                 [ N  O  P  Q  R  S  T  U  V  W  X ]
+    ///
+    ///
+    /// After splitting becomes:
+    ///
+    ///                         [ ... M  S  Y ... ]
+    ///                                 / \
+    ///                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
+    ///
     fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
         // The node must not be full.
         assert!(!node.is_full());
@@ -651,7 +651,7 @@ where
             .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
 
-    // A helper method for recursively removing a key from the B-tree.
+    /// A helper method for recursively removing a key from the B-tree.
     fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
         if node.address() != self.root_addr {
             // We're guaranteed that whenever this method is called an entry can be
@@ -1124,7 +1124,7 @@ where
         node.save(self.allocator_mut());
     }
 
-    // Saves the map to memory.
+    /// Saves the map to memory.
     fn save_header(&self) {
         let header = BTreeHeader {
             version: self.version,
@@ -1215,16 +1215,17 @@ mod test {
         Rc::new(RefCell::new(Vec::new()))
     }
 
-    // A helper method to succinctly create an entry.
+    /// A helper method to succinctly create an entry.
     fn e(x: u8) -> (Blob<10>, Vec<u8>) {
         (b(&[x]), vec![])
     }
 
+    /// A helper method to succinctly create a blob.
     pub(crate) fn b(x: &[u8]) -> Blob<10> {
         Blob::<10>::try_from(x).unwrap()
     }
 
-    // A test runner that runs the test using both V1 and V2 btrees.
+    /// A test runner that runs the test using both V1 and V2 btrees.
     pub fn btree_test<K, V, R, F>(f: F)
     where
         K: Storable + Ord + Clone,

@@ -330,16 +330,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
         source.deallocate(allocator);
     }
 
-    // Appends the entries and children of node `b` into `a`, along with the median entry.
-    //
-    // PRECONDITION:
-    //   * `a` is not empty.
-    //   * `b` is not empty.
-    //   * `a` and `b` are of the same node type.
-    //   * keys of `a` < median < keys of `b`
-    //
-    // POSTCONDITION:
-    //   * `b` is empty.
+    /// Appends the entries and children of node `b` into `a`, along with the median entry.
+    ///
+    /// PRECONDITION:
+    ///   * `a` is not empty.
+    ///   * `b` is not empty.
+    ///   * `a` and `b` are of the same node type.
+    ///   * keys of `a` < median < keys of `b`
+    ///
+    /// POSTCONDITION:
+    ///   * `b` is empty.
     fn append(a: &mut Node<K>, b: &mut Node<K>, median: Entry<K>) {
         // Assert preconditions.
         let a_len = a.entries_len();
@@ -606,7 +606,7 @@ pub struct DerivedPageSize {
 }
 
 impl DerivedPageSize {
-    // Returns the page size derived from the max key/value sizes.
+    /// Returns the page size derived from the max key/value sizes.
     fn get(&self) -> u32 {
         v1::size_v1(self.max_key_size, self.max_value_size).get() as u32
     }
