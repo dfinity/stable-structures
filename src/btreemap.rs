@@ -535,7 +535,7 @@ where
     }
 
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let node = self.load_node(node_addr);
+        let node = self.load_cached_node(node_addr);
         match node.search(key) {
             Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
             Err(idx) => {
@@ -1112,12 +1112,15 @@ where
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
+        Node::load(address, self.version.page_size(), self.memory())
+    }
+
+    fn load_cached_node(&self, address: Address) -> Node<K> {
         self.node_cache.read_node(address).unwrap_or_else(|| {
             let node = Node::load(address, self.version.page_size(), self.memory());
             self.node_cache.write_node(address, node.clone());
             node
         })
-        //Node::load(address, self.version.page_size(), self.memory())
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
