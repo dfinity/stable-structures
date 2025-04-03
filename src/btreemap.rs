@@ -1093,8 +1093,8 @@ where
     ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         self.node_cache.remove_node(source.address());
+        self.node_cache.remove_node(into.address());
         into.merge(source, median, &mut self.allocator);
-        self.node_cache.write_node(into.address(), into.clone());
         into
     }
 
@@ -1120,13 +1120,13 @@ where
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
-        self.node_cache.write_node(node.address(), node.clone());
+        self.node_cache.remove_node(node.address());
         node.save(self.allocator_mut());
     }
 
     fn swap_entry(&mut self, node: &mut Node<K>, idx: usize, entry: Entry<K>) -> Entry<K> {
         let result = node.swap_entry(idx, entry, self.memory());
-        self.node_cache.write_node(node.address(), node.clone());
+        self.node_cache.remove_node(node.address());
         result
     }
 
