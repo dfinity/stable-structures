@@ -86,7 +86,7 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-const NODE_CACHE_SIZE: usize = 1_000;
+const NODE_CACHE_SIZE: usize = 0;
 
 /// A "stable" map based on a B-tree.
 ///
