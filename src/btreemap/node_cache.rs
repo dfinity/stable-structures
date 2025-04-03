@@ -89,9 +89,8 @@ where
 
     /// Updates the LRU order for the given address by assigning a new usage counter.
     fn touch(&self, address: Address) {
-        let mut counter = self.counter.borrow_mut();
-        *counter = Counter(counter.0 + 1);
-        let new_counter = *counter;
+        let current_counter = self.counter.borrow_mut();
+        let new_counter = Counter(current_counter.0 + 1);
 
         let mut usage = self.usage.borrow_mut();
         let mut lru_order = self.lru_order.borrow_mut();
