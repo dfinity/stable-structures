@@ -1105,7 +1105,7 @@ where
 
     fn deallocate_node(&mut self, node: Node<K>) {
         self.node_cache.remove_node(node.address());
-        node.deallocate(&mut self.allocator);
+        node.deallocate(self.allocator_mut());
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
