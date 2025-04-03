@@ -225,7 +225,7 @@ where
             node_cache: NodeCache::new(100),
         };
 
-        btree.save();
+        btree.save_header();
         btree
     }
 
@@ -253,7 +253,7 @@ where
             node_cache: NodeCache::new(100),
         };
 
-        btree.save();
+        btree.save_header();
         btree
     }
 
@@ -370,7 +370,7 @@ where
             // No root present. Allocate one.
             let node = self.allocate_node(NodeType::Leaf);
             self.root_addr = node.address();
-            self.save();
+            self.save_header();
             node
         } else {
             // Load the root from memory.
@@ -398,7 +398,7 @@ where
 
                 // Update the root address.
                 self.root_addr = new_root.address();
-                self.save();
+                self.save_header();
 
                 // Split the old (full) root.
                 self.split_child(&mut new_root, 0);
@@ -441,7 +441,7 @@ where
 
                         // Update the length.
                         self.length += 1;
-                        self.save();
+                        self.save_header();
 
                         // No previous value to return.
                         None
@@ -579,7 +579,7 @@ where
         self.root_addr = NULL;
         self.length = 0;
         self.allocator.clear();
-        self.save();
+        self.save_header();
     }
 
     /// Returns the first key-value pair in the map. The key in this
@@ -680,7 +680,7 @@ where
                             node.save(self.allocator_mut());
                         }
 
-                        self.save();
+                        self.save_header();
                         Some(value)
                     }
                     _ => None, // Key not found.
@@ -803,7 +803,7 @@ where
 
                             // Deallocate the root node.
                             node.deallocate(&mut self.allocator);
-                            self.save();
+                            self.save_header();
                         } else {
                             node.save(self.allocator_mut());
                         }
@@ -971,7 +971,7 @@ where
                                 if node_address == self.root_addr {
                                     // Update the root.
                                     self.root_addr = left_sibling.address();
-                                    self.save();
+                                    self.save_header();
                                 }
                             } else {
                                 node.save(self.allocator_mut());
@@ -1000,7 +1000,7 @@ where
                                 if node_address == self.root_addr {
                                     // Update the root.
                                     self.root_addr = right_sibling.address();
-                                    self.save();
+                                    self.save_header();
                                 }
                             } else {
                                 node.save(self.allocator_mut());
@@ -1109,7 +1109,7 @@ where
     }
 
     // Saves the map to memory.
-    fn save(&self) {
+    fn save_header(&self) {
         let header = BTreeHeader {
             version: self.version,
             root_addr: self.root_addr,
@@ -2920,7 +2920,7 @@ mod test {
 
         // Migrate to v2 and the unbounded type.
         let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
-        btree.save();
+        btree.save_header();
 
         // Reload the BTree again and try to read the value.
         let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
