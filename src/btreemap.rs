@@ -1101,6 +1101,11 @@ where
         }
     }
 
+    fn deallocate_node(&mut self, node: Node<K>) {
+        self.node_cache.remove_node(node.address());
+        node.deallocate(&mut self.allocator);
+    }
+
     fn load_node(&self, address: Address) -> Node<K> {
         self.node_cache.read_node(address).unwrap_or_else(|| {
             let node = Node::load(address, self.version.page_size(), self.memory());
@@ -1112,11 +1117,6 @@ where
     fn save_node(&mut self, node: &mut Node<K>) {
         self.node_cache.write_node(node.address(), node.clone());
         node.save(self.allocator_mut());
-    }
-
-    fn deallocate_node(&mut self, node: Node<K>) {
-        self.node_cache.remove_node(node.address());
-        node.deallocate(&mut self.allocator);
     }
 
     // Saves the map to memory.
