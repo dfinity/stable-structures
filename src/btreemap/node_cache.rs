@@ -3,6 +3,9 @@ use crate::{types::Address, Storable};
 use std::cell::RefCell;
 use std::collections::BTreeMap as StdBTreeMap;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+struct Counter(pub u64);
+
 /// A node cache with LRU tracking that provides interior mutability.
 /// It stores nodes in key-value storage and evicts the least recently used node when full.
 /// This implementation uses a counter-based approach so that updating (touching) a key is O(log n).
@@ -14,11 +17,11 @@ where
     cache: RefCell<StdBTreeMap<Address, Node<K>>>,
     capacity: usize,
     /// Global counter that increases on each access.
-    counter: RefCell<u64>,
+    counter: RefCell<Counter>,
     /// Maps usage counters to addresses. The smallest counter is the least recently used.
-    lru_order: RefCell<StdBTreeMap<u64, Address>>,
+    lru_order: RefCell<StdBTreeMap<Counter, Address>>,
     /// Maps addresses to their current usage counter.
-    usage: RefCell<StdBTreeMap<Address, u64>>,
+    usage: RefCell<StdBTreeMap<Address, Counter>>,
 }
 
 impl<K> NodeCache<K>
@@ -30,7 +33,7 @@ where
         Self {
             cache: RefCell::new(StdBTreeMap::new()),
             capacity,
-            counter: RefCell::new(0),
+            counter: RefCell::new(Counter(0)),
             lru_order: RefCell::new(StdBTreeMap::new()),
             usage: RefCell::new(StdBTreeMap::new()),
         }
@@ -40,7 +43,7 @@ where
         self.cache.borrow_mut().clear();
         self.lru_order.borrow_mut().clear();
         self.usage.borrow_mut().clear();
-        *self.counter.borrow_mut() = 0;
+        *self.counter.borrow_mut() = Counter(0);
     }
 
     /// Returns a cloned node from the cache for the given address, if it exists.
@@ -82,7 +85,7 @@ where
     /// Updates the LRU order for the given address by assigning a new usage counter.
     fn touch(&self, address: Address) {
         let mut counter = self.counter.borrow_mut();
-        *counter += 1;
+        *counter = Counter(counter.0 + 1);
         let new_counter = *counter;
 
         let mut usage = self.usage.borrow_mut();
