@@ -86,7 +86,7 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-const NODE_CACHE_SIZE: usize = 10;
+const NODE_CACHE_SIZE: usize = 10_000;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -2113,32 +2113,45 @@ mod test {
     #[test]
     fn len() {
         btree_test(|mut btree| {
-            // const N: u64 = 100;
-            // for k in 1..=N {
+            //  const N: u64 = 100;
+            //  for k in 1..=N {
 
             let k: u64 = 78;
             println!("k = {k}");
-                for i in 0..k {
-                    assert_eq!(
-                        btree.insert(b(&i.to_le_bytes()), b(&[])),
-                        None,
-                        "Failed at {i}"
-                    );
-                }
+            for i in 0..k {
+                assert_eq!(
+                    btree.insert(b(&i.to_le_bytes()), b(&[])),
+                    None,
+                    "Failed at {i}"
+                );
+            }
 
-                assert_eq!(btree.len(), k);
-                assert!(!btree.is_empty());
+            assert_eq!(btree.len(), k);
+            assert!(!btree.is_empty());
 
-                for i in 0..k {
-                    assert_eq!(
-                        btree.remove(&b(&i.to_le_bytes())),
-                        Some(b(&[])),
-                        "Failed at {i}"
-                    );
-                }
+            for i in 0..k {
+                assert_eq!(
+                    btree.get(&b(&i.to_le_bytes())),
+                    Some(b(&[])),
+                    "Failed at {i}"
+                );
+            }
 
-                assert_eq!(btree.len(), 0);
-                assert!(btree.is_empty());
+            for i in 0..k {
+                assert_eq!(
+                    btree.get(&b(&i.to_le_bytes())),
+                    Some(b(&[])),
+                    "Failed at {i}"
+                );
+                assert_eq!(
+                    btree.remove(&b(&i.to_le_bytes())),
+                    Some(b(&[])),
+                    "Failed at {i}"
+                );
+            }
+
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
             //}
         });
     }
