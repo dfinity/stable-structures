@@ -14,12 +14,18 @@ pub struct NodeCache<K>
 where
     K: Storable + Ord + Clone,
 {
+    /// The cache itself, which maps addresses to nodes.
     cache: RefCell<StdBTreeMap<Address, Node<K>>>,
+
+    /// The maximum number of nodes that can be stored in the cache.
     capacity: usize,
+
     /// Global counter that increases on each access.
     counter: RefCell<Counter>,
+
     /// Maps usage counters to addresses. The smallest counter is the least recently used.
     lru_order: RefCell<StdBTreeMap<Counter, Address>>,
+
     /// Maps addresses to their current usage counter.
     usage: RefCell<StdBTreeMap<Address, Counter>>,
 }
