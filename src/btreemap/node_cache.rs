@@ -49,7 +49,7 @@ where
     /// Returns a cloned node from the cache for the given address, if it exists.
     /// Updates the LRU order if the node is found.
     pub fn read_node(&self, address: Address) -> Option<Node<K>> {
-        self.validate();
+        //self.validate();
         let result = self.cache.borrow().get(&address).cloned();
         if result.is_some() {
             self.touch(address);
@@ -59,7 +59,7 @@ where
 
     /// Inserts a node into the cache, evicting the least recently used node if capacity is exceeded.
     pub fn write_node(&self, address: Address, node: Node<K>) {
-        self.validate();
+        //self.validate();
         if self.capacity == 0 {
             return; // If capacity is zero, do nothing.
         }
@@ -80,7 +80,7 @@ where
 
     /// Removes the node associated with the given address from the cache.
     pub fn remove_node(&self, address: Address) {
-        self.validate();
+        //self.validate();
         self.cache.borrow_mut().remove(&address);
         if let Some(old_counter) = self.usage.borrow_mut().remove(&address) {
             self.lru_order.borrow_mut().remove(&old_counter);
@@ -100,19 +100,19 @@ where
         self.lru_order.borrow_mut().insert(new_counter, address);
     }
 
-    // TODO: remove debug code.
-    fn validate(&self) {
-        let cache = self.cache.borrow();
-        let lru_order = self.lru_order.borrow();
-        let usage = self.usage.borrow();
+    // // TODO: remove debug code.
+    // fn validate(&self) {
+    //     let cache = self.cache.borrow();
+    //     let lru_order = self.lru_order.borrow();
+    //     let usage = self.usage.borrow();
 
-        assert!(cache.len() <= self.capacity);
-        assert_eq!(cache.len(), usage.len());
-        assert_eq!(cache.len(), lru_order.len());
+    //     assert!(cache.len() <= self.capacity);
+    //     assert_eq!(cache.len(), usage.len());
+    //     assert_eq!(cache.len(), lru_order.len());
 
-        for (address, node) in cache.iter() {
-            assert_eq!(node.address(), *address);
-            assert_eq!(lru_order.get(&usage[address]).unwrap(), address);
-        }
-    }
+    //     for (address, node) in cache.iter() {
+    //         assert_eq!(node.address(), *address);
+    //         assert_eq!(lru_order.get(&usage[address]).unwrap(), address);
+    //     }
+    // }
 }
