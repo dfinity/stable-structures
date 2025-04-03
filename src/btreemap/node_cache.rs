@@ -17,6 +17,7 @@ where
     counter: RefCell<Counter>,
     lru_order: RefCell<BTreeMap<Counter, Address>>,
     usage: RefCell<BTreeMap<Address, Counter>>,
+    stats: RefCell<(u32, u32)>, // (hits, misses)
 }
 
 impl<K> NodeCache<K>
@@ -31,6 +32,7 @@ where
             counter: RefCell::new(Counter(0)),
             lru_order: RefCell::new(BTreeMap::new()),
             usage: RefCell::new(BTreeMap::new()),
+            stats: RefCell::new((0, 0)),
         }
     }
 
@@ -44,9 +46,18 @@ where
 
     /// Read node and update LRU order.
     pub fn read_node(&self, address: Address) -> Option<Node<K>> {
-        self.cache.borrow().get(&address).cloned().inspect(|_| {
-            self.touch(address);
-        })
+        let mut stats = self.stats.borrow_mut();
+        match self.cache.borrow().get(&address).cloned() {
+            Some(node) => {
+                self.touch(address);
+                stats.0 += 1; // Increment hits.
+                Some(node)
+            }
+            None => {
+                stats.1 += 1; // Increment misses.
+                None
+            }
+        }
     }
 
     /// Write node; evict LRU if full.
@@ -91,5 +102,21 @@ where
             lru_order.remove(&old_counter);
         }
         lru_order.insert(new_counter, address);
+    }
+}
+
+impl<K> Drop for NodeCache<K>
+where
+    K: Storable + Ord + Clone,
+{
+    fn drop(&mut self) {
+        // cargo test -- --nocapture > ./tmp/output.txt 2>&1
+        let stats = self.stats.borrow();
+        println!(
+            "NodeCache: hits: {}, misses: {} ({:>5.1} %)",
+            stats.0,
+            stats.1,
+            (stats.0 as f64 / (stats.0 + stats.1).max(1) as f64) * 100.0
+        );
     }
 }
