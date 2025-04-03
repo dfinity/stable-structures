@@ -1109,6 +1109,7 @@ where
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
+        self.node_cache.write_node(node.address(), node.clone());
         node.save(self.allocator_mut());
     }
 
