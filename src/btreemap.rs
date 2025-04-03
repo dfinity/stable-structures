@@ -486,17 +486,18 @@ where
     /// splits this child into two, adding an additional child to `node`.
     ///
     /// Example:
-    ///
+    /// ```ignore
     ///                          [ ... M   Y ... ]
     ///                                  |
     ///                 [ N  O  P  Q  R  S  T  U  V  W  X ]
-    ///
+    /// ```
     ///
     /// After splitting becomes:
-    ///
+    /// ```ignore
     ///                         [ ... M  S  Y ... ]
     ///                                 / \
     ///                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
+    /// ```
     ///
     fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
         // The node must not be full.
