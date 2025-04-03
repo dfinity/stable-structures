@@ -3,7 +3,7 @@ use core::ops::{Add, AddAssign, Div, Mul, Rem, Sub, SubAssign};
 pub const NULL: Address = Address(0);
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Address(u64);
 
 impl From<u64> for Address {

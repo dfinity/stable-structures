@@ -3,7 +3,7 @@ use crate::{types::Address, Storable};
 use std::cell::RefCell;
 use std::collections::BTreeMap as StdBTreeMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 struct Counter(pub u64);
 
 /// A node cache with LRU tracking that provides interior mutability.

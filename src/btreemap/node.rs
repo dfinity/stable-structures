@@ -448,7 +448,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 }
 
-// Implement Clone for Node
 impl<K: Storable + Ord + Clone> Clone for Node<K> {
     fn clone(&self) -> Self {
         Self {
@@ -508,7 +507,7 @@ impl NodeHeader {
 }
 
 /// The value in a K/V pair.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 enum Value {
     /// The value's encoded bytes.
     ByVal(Vec<u8>),
