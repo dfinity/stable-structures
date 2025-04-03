@@ -2155,8 +2155,7 @@ mod test {
     #[test]
     fn len() {
         btree_test(|mut btree| {
-            const N: u64 = 1_000;
-            for i in 0..N {
+            for i in 0..1000u32 {
                 assert_eq!(
                     btree.insert(b(&i.to_le_bytes()), b(&[])),
                     None,
@@ -2164,10 +2163,10 @@ mod test {
                 );
             }
 
-            assert_eq!(btree.len(), N);
+            assert_eq!(btree.len(), 1000);
             assert!(!btree.is_empty());
 
-            for i in 0..N {
+            for i in 0..1000u32 {
                 assert_eq!(
                     btree.remove(&b(&i.to_le_bytes())),
                     Some(b(&[])),
