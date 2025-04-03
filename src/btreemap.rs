@@ -1107,11 +1107,12 @@ where
     }
 
     fn load_node(&self, address: Address) -> Node<K> {
-        self.node_cache.read_node(address).unwrap_or_else(|| {
-            let node = Node::load(address, self.version.page_size(), self.memory());
-            self.node_cache.write_node(address, node.clone());
-            node
-        })
+        // self.node_cache.read_node(address).unwrap_or_else(|| {
+        //     let node = Node::load(address, self.version.page_size(), self.memory());
+        //     self.node_cache.write_node(address, node.clone());
+        //     node
+        // })
+        Node::load(address, self.version.page_size(), self.memory())
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
