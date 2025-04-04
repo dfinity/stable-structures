@@ -46,6 +46,10 @@ where
 
     /// Read node and update LRU order.
     pub fn read_node(&self, address: Address) -> Option<Node<K>> {
+        if self.capacity == 0 {
+            return None;
+        }
+
         let mut stats = self.stats.borrow_mut();
         match self.cache.borrow().get(&address).cloned() {
             Some(node) => {
@@ -83,6 +87,10 @@ where
 
     /// Remove node.
     pub fn remove_node(&self, address: Address) {
+        if self.capacity == 0 {
+            return;
+        }
+
         self.cache.borrow_mut().remove(&address);
         if let Some(old_ctr) = self.usage.borrow_mut().remove(&address) {
             self.lru_order.borrow_mut().remove(&old_ctr);
