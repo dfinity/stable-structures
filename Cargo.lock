@@ -26,8 +26,8 @@ version = "0.1.0"
 dependencies = [
  "canbench-rs",
  "candid",
- "ic-cdk 0.12.1",
- "ic-cdk-macros 0.8.4",
+ "ic-cdk",
+ "ic-cdk-macros",
  "ic-stable-structures",
  "maplit",
  "serde",
@@ -107,7 +107,7 @@ checksum = "e85a8f1ee95044a770b3d5166a12f55814283cb3aed71b81439dc59960ab76c1"
 dependencies = [
  "canbench-rs-macros",
  "candid",
- "ic-cdk 0.12.1",
+ "ic-cdk",
  "serde",
 ]
 
@@ -278,21 +278,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f3d204af0b11c45715169c997858edb58fa8407d08f4fae78a6b415dd39a362"
 dependencies = [
  "candid",
- "ic-cdk-macros 0.8.4",
- "ic0 0.21.1",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "ic-cdk"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "122efbcb0af5280d408a75a57b7dc6e9d92893bf6ed9cc98fe4dcff51f18b67c"
-dependencies = [
- "candid",
- "ic-cdk-macros 0.17.1",
- "ic0 0.23.0",
+ "ic-cdk-macros",
+ "ic0",
  "serde",
  "serde_bytes",
 ]
@@ -307,22 +294,8 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "serde_tokenstream 0.1.7",
+ "serde_tokenstream",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "ic-cdk-macros"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c792bf0d1621c893ccf2bcdeac4ee70121103a03030a1827031a6b3c60488944"
-dependencies = [
- "candid",
- "proc-macro2",
- "quote",
- "serde",
- "serde_tokenstream 0.2.2",
- "syn 2.0.48",
 ]
 
 [[package]]
@@ -332,9 +305,8 @@ dependencies = [
  "canbench-rs",
  "candid",
  "hex",
- "ic-cdk 0.12.1",
- "ic-cdk 0.17.1",
- "ic-cdk-macros 0.8.4",
+ "ic-cdk",
+ "ic-cdk-macros",
  "ic_principal",
  "maplit",
  "proptest",
@@ -347,12 +319,6 @@ name = "ic0"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a54b5297861c651551676e8c43df805dad175cc33bc97dbd992edbbb85dcbcdf"
-
-[[package]]
-name = "ic0"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8de254dd67bbd58073e23dc1c8553ba12fa1dc610a19de94ad2bbcd0460c067f"
 
 [[package]]
 name = "ic_principal"
@@ -634,18 +600,6 @@ dependencies = [
  "proc-macro2",
  "serde",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "serde_tokenstream"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64060d864397305347a78851c51588fd283767e7e7589829e8121d65512340f1"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde",
- "syn 2.0.48",
 ]
 
 [[package]]
