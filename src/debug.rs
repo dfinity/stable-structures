@@ -61,8 +61,8 @@ impl Drop for InstructionCounter {
                         .expect("start_instructions is None");
                 entry.start_instructions = None;
                 entry.total_instructions += elapsed;
-                entry.call_count += 1;
             }
+            entry.call_count += 1;
         });
     }
 }
@@ -104,19 +104,19 @@ pub fn print(msg: String) {
 /*
 
 get_helper:
-total_instructions : 1152818806, 
+total_instructions : 1152818806,
 call_count         : 10000
 
 load_node:
-total_instructions : 903703200, 
+total_instructions : 903703200,
 call_count         : 48674
 
 search:
-total_instructions : 108924141, 
+total_instructions : 108924141,
 call_count         : 48674
 
 into_entry:
-total_instructions : 31619452, 
+total_instructions : 31619452,
 call_count         : 10000
 
 ===
