@@ -225,7 +225,6 @@ where
             length: 0,
             _phantom: PhantomData,
             node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
-            //destructor: Destructor::default(),
         };
 
         btree.save_header();
@@ -254,7 +253,6 @@ where
             length: 0,
             _phantom: PhantomData,
             node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
-            //destructor: Destructor::default(),
         };
 
         btree.save_header();
@@ -305,7 +303,6 @@ where
             length: header.length,
             _phantom: PhantomData,
             node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
-            //destructor: Destructor::default(),
         }
     }
 
@@ -537,7 +534,6 @@ where
             .map(V::from_bytes)
     }
 
-    // canbench btreemap_get_blob_8_1024_v2 --show-canister-output > ./tmp/output.txt
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         let node = self.load_cached_node(node_addr);
         match node.search(key) {
@@ -1173,41 +1169,6 @@ where
         crate::write(memory, 0, &buf);
     }
 }
-
-// impl<K, V, M> std::fmt::Debug for BTreeMap<K, V, M>
-// where
-//     K: Storable + Ord + Clone,
-//     V: Storable,
-//     M: Memory,
-// {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         // Start from self.root_addr and traverse the tree in BFS order.
-//         // write code below
-//         use std::collections::BTreeSet;
-//         let mut queue = vec![self.root_addr];
-//         let mut visited = BTreeSet::new();
-//         let mut result = String::new();
-//         while let Some(addr) = queue.pop() {
-//             if visited.contains(&addr) {
-//                 continue;
-//             }
-//             visited.insert(addr);
-//             let node = self.load_node(addr);
-//             result.push_str(&format!("{:?}\n", node));
-//             for i in 0..node.children_len() {
-//                 queue.push(node.child(i));
-//             }
-//         }
-//         write!(
-//             f,
-//             "BTreeMap {{ root_addr: A:{}, length: {}, nodes: len={} [\n{}\n] }}",
-//             self.root_addr.get(),
-//             self.length,
-//             visited.len(),
-//             result
-//         )
-//     }
-// }
 
 #[cfg(test)]
 mod test {

@@ -461,36 +461,6 @@ impl<K: Storable + Ord + Clone> Clone for Node<K> {
     }
 }
 
-// impl<K: Storable + Ord + Clone> std::fmt::Debug for Node<K>
-// where
-//     K: Storable + Ord + Clone,
-// {
-//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-//         // Format
-//         // Node: address, type
-//         // KV: (key, value), ...
-//         // Children: (left, right), (left, right), ...
-//         // Overflows: (address, address), (address, address), ...
-
-//         write!(f, "Node: A:{} {:?}", self.address().get(), self.node_type())?;
-//         write!(f, "\nK: len={} ", self.keys_and_encoded_values.len())?;
-//         for (key, _value) in &self.keys_and_encoded_values {
-//             write!(f, "{:?} ", key.to_bytes())?;
-//         }
-//         if !self.children.is_empty() {
-//             write!(f, "\nChildren: ")?;
-//             for child in &self.children {
-//                 write!(f, "A:{}, ", child.get())?;
-//             }
-//         }
-//         // write!(f, "\nOverflows: ")?;
-//         // for overflow in &self.overflows {
-//         //     write!(f, "A:{}, ", overflow.get())?;
-//         // }
-//         write!(f, "\n")
-//     }
-// }
-
 // A transient data structure for reading/writing metadata into/from stable memory.
 #[repr(C, packed)]
 struct NodeHeader {
