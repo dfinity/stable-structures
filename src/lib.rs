@@ -31,6 +31,7 @@ pub use storable::Storable;
 use types::Address;
 pub use vec_mem::VectorMemory;
 
+#[cfg(target_arch = "wasm32")]
 mod debug; // TODO: remove debug code.
 
 #[cfg(target_arch = "wasm32")]
