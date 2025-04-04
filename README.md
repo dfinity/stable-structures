@@ -60,7 +60,7 @@ Each memory must belong to only one stable structure.
 For example, this fails when run in a canister:
 
 
-```no_run,rust
+```rust,no_run
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
 let mut map_1: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
 let mut map_2: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
