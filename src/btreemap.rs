@@ -1243,7 +1243,7 @@ where
                 {
                     #[cfg(feature = "canbench-rs")]
                     let _p = crate::debug::InstructionCounter::new("write_node");
-                    self.node_cache.write_node(address, node.clone());
+                    self.node_cache.write_node(address, &node);
                 }
                 node
             }

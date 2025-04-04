@@ -65,7 +65,7 @@ where
     }
 
     /// Write node; evict LRU if full.
-    pub fn write_node(&self, address: Address, node: Node<K>) {
+    pub fn write_node(&self, address: Address, node: &Node<K>) {
         if self.capacity == 0 {
             return;
         }
@@ -80,7 +80,7 @@ where
                     self.usage.borrow_mut().remove(&lru_addr);
                 }
             }
-            cache.insert(address, node);
+            cache.insert(address, node.clone());
         }
         self.touch(address);
     }
