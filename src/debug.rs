@@ -7,11 +7,12 @@ thread_local! {
 
 pub struct InstructionCounter {
     name: &'static str,
-    start_instructions: u64,
 }
 
 #[derive(Clone, Copy)]
 pub struct Stats {
+    start_instructions: Option<u64>,
+    running_count: u64,
     total_instructions: u64,
     call_count: u64,
 }
@@ -27,24 +28,41 @@ impl std::fmt::Debug for Stats {
 
 impl InstructionCounter {
     pub fn new(name: &'static str) -> Self {
-        Self {
-            name,
-            start_instructions: instruction_count(),
-        }
+        let start = instruction_count();
+        STATS.with(|c| {
+            let mut stats = c.borrow_mut();
+            let entry = stats.entry(name).or_insert(Stats {
+                start_instructions: Some(start),
+                running_count: 0,
+                total_instructions: 0,
+                call_count: 0,
+            });
+            if entry.running_count == 0 {
+                entry.start_instructions = Some(start);
+            }
+            entry.running_count += 1;
+        });
+        Self { name }
     }
 }
 
 impl Drop for InstructionCounter {
     fn drop(&mut self) {
-        let elapsed = instruction_count() - self.start_instructions;
         STATS.with(|c| {
             let mut stats = c.borrow_mut();
-            let entry = stats.entry(self.name).or_insert(Stats {
-                total_instructions: 0,
-                call_count: 0,
+            let entry = stats.entry(self.name).or_insert_with(|| {
+                panic!("InstructionCounter not initialized");
             });
-            entry.total_instructions += elapsed;
-            entry.call_count += 1;
+            entry.running_count -= 1;
+            if entry.running_count == 0 {
+                let elapsed = instruction_count()
+                    - entry
+                        .start_instructions
+                        .expect("start_instructions is None");
+                entry.start_instructions = None;
+                entry.total_instructions += elapsed;
+                entry.call_count += 1;
+            }
         });
     }
 }
@@ -82,3 +100,41 @@ pub fn print(msg: String) {
         println!("{msg}");
     }
 }
+
+/*
+
+get_helper:
+total_instructions : 1152818806, 
+call_count         : 10000
+
+load_node:
+total_instructions : 903703200, 
+call_count         : 48674
+
+search:
+total_instructions : 108924141, 
+call_count         : 48674
+
+into_entry:
+total_instructions : 31619452, 
+call_count         : 10000
+
+===
+get_helper:
+total_instructions : 3605853485,
+call_count         : 48674
+
+load_node:
+total_instructions : 853224120,
+call_count         : 48674
+
+search:
+total_instructions : 58137654,
+call_count         : 48674
+
+into_entry:
+total_instructions : 22348944,
+call_count         : 10000
+
+===
+*/
