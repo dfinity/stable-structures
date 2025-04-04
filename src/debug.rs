@@ -105,6 +105,23 @@ pub fn print(msg: String) {
 /*
 
 get_helper:
+total_instructions : 1157246368,
+call_count         : 48674
+
+load_node:
+total_instructions : 878538985,
+call_count         : 48674
+
+search:
+total_instructions : 83613904,
+call_count         : 48674
+
+into_entry:
+total_instructions : 26999452,
+call_count         : 10000
+
+===
+get_helper:
 total_instructions : 1152818806,
 call_count         : 10000
 
