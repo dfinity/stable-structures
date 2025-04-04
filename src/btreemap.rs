@@ -86,7 +86,7 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-const NODE_CACHE_SIZE: usize = 1000;
+const NODE_CACHE_SIZE: usize = 10_000;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -1211,6 +1211,14 @@ where
     read_node, 629121228, 65.0%, 48674
     load_node, 68700336, 7.1%, 3235
     write_node, 66013638, 6.8%, 3235
+
+    CS=10000
+    NodeCache: hits: 47346 ( 97.3 %), misses: 1328, total: 48674
+    name, instructions, percent, calls
+    get_helper, 902192945, 100.0%, 48674
+    read_node, 653796096, 72.5%, 48674
+    load_node, 28098232, 3.1%, 1328
+    write_node, 21673642, 2.4%, 1328
     */
     fn load_cached_node(&self, address: Address) -> Node<K> {
         // self.node_cache.read_node(address).unwrap_or_else(|| {
