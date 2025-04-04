@@ -115,6 +115,41 @@ where
 
     // A cache for storing recently accessed nodes.
     node_cache: NodeCache<K>,
+
+    destructor: Destructor,
+}
+
+#[derive(Default, Debug)]
+struct Destructor {}
+
+impl Drop for Destructor {
+    fn drop(&mut self) {
+        let stats = crate::debug::get_stats();
+        let max_instructions = stats.iter().map(|s| s.1.instructions()).max().unwrap_or(0);
+        let table = stats.into_iter().map(|(name, stats)| {
+            let ins = stats.instructions();
+            let percent = (ins as f64 / max_instructions as f64) * 100.0;
+            (name, ins, percent, stats.calls())
+        });
+        let mut lines = vec![vec!["name", "instructions", "percent", "calls"]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()];
+        for (name, ins, percent, calls) in table {
+            lines.push(vec![
+                name.to_string(),
+                format!("{ins}"),
+                format!("{percent:.2}%"),
+                format!("{calls}"),
+            ]);
+        }
+        let mut text = String::from("\n");
+        for line in lines {
+            text.push_str(&line.join(", "));
+            text.push('\n');
+        }
+        crate::debug::print(text);
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -225,6 +260,7 @@ where
             length: 0,
             _phantom: PhantomData,
             node_cache: NodeCache::new(NODE_CACHE_SIZE),
+            destructor: Destructor::default(),
         };
 
         btree.save_header();
@@ -253,6 +289,7 @@ where
             length: 0,
             _phantom: PhantomData,
             node_cache: NodeCache::new(NODE_CACHE_SIZE),
+            destructor: Destructor::default(),
         };
 
         btree.save_header();
@@ -303,6 +340,7 @@ where
             length: header.length,
             _phantom: PhantomData,
             node_cache: NodeCache::new(NODE_CACHE_SIZE),
+            destructor: Destructor::default(),
         }
     }
 
@@ -534,10 +572,56 @@ where
             .map(V::from_bytes)
     }
 
+    /*
+    get_helper:
+    total_instructions : 2616698068,
+    call_count         : 48674
+
+    load_cached_node:
+    total_instructions : 1347150134,
+    call_count         : 48674
+
+    load_node:
+    total_instructions : 889344402,
+    call_count         : 48674
+
+    search:
+    total_instructions : 87596498,
+    call_count         : 48674
+
+    into_entry:
+    total_instructions : 29918448,
+    call_count         : 10000
+     */
+
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let node = self.load_cached_node(node_addr);
-        match node.search(key) {
-            Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
+        #[cfg(feature = "canbench-rs")]
+        let _p = crate::debug::InstructionCounter::new("get_helper");
+        // canbench btreemap_get_blob_128_1024_v2 --show-canister-output
+        // let node = {
+        //     #[cfg(feature = "canbench-rs")]
+        //     let _p = crate::debug::InstructionCounter::new("load_node");
+        //     self.load_node(node_addr)
+        // };
+        let node = {
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("load_cached_node");
+            self.load_cached_node(node_addr)
+        };
+        let search = {
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("search");
+            node.search(key)
+        };
+        match search {
+            Ok(idx) => {
+                let result = {
+                    // #[cfg(feature = "canbench-rs")]
+                    // let _p = crate::debug::InstructionCounter::new("into_entry");
+                    node.into_entry(idx, self.memory()).1
+                };
+                Some(result)
+            }
             Err(idx) => {
                 match node.node_type() {
                     NodeType::Leaf => None, // Key not found.
@@ -1116,11 +1200,33 @@ where
     }
 
     fn load_cached_node(&self, address: Address) -> Node<K> {
-        self.node_cache.read_node(address).unwrap_or_else(|| {
-            let node = Node::load(address, self.version.page_size(), self.memory());
-            self.node_cache.write_node(address, node.clone());
-            node
-        })
+        // self.node_cache.read_node(address).unwrap_or_else(|| {
+        //     let node = Node::load(address, self.version.page_size(), self.memory());
+        //     self.node_cache.write_node(address, node.clone());
+        //     node
+        // })
+
+        let node = {
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("read_node");
+            self.node_cache.read_node(address)
+        };
+        match node {
+            Some(node) => node,
+            None => {
+                let node = {
+                    #[cfg(feature = "canbench-rs")]
+                    let _p = crate::debug::InstructionCounter::new("load_node");
+                    Node::load(address, self.version.page_size(), self.memory())
+                };
+                {
+                    #[cfg(feature = "canbench-rs")]
+                    let _p = crate::debug::InstructionCounter::new("write_node");
+                    self.node_cache.write_node(address, node.clone());
+                }
+                node
+            }
+        }
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
