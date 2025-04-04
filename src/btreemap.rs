@@ -86,7 +86,7 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-const NODE_CACHE_SIZE: usize = 0;
+const DEFAULT_NODE_CACHE_SIZE: usize = 0;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -115,43 +115,7 @@ where
 
     // A cache for storing recently accessed nodes.
     node_cache: Cache<Address, Node<K>>,
-    //destructor: Destructor,
 }
-
-// #[derive(Default, Debug)]
-// struct Destructor {}
-
-// impl Drop for Destructor {
-//     fn drop(&mut self) {
-//         let stats = crate::debug::get_stats();
-//         let max_instructions = stats
-//             .iter()
-//             .map(|(_, s)| s.instructions())
-//             .max()
-//             .unwrap_or(0);
-
-//         // Prepare the header row
-//         let header = "name, instructions, percent, calls";
-
-//         // Build rows from the stats
-//         let rows: Vec<String> = stats
-//             .into_iter()
-//             .map(|(name, stat)| {
-//                 let ins = stat.instructions();
-//                 let percent = if max_instructions == 0 {
-//                     0.0
-//                 } else {
-//                     (ins as f64 / max_instructions as f64) * 100.0
-//                 };
-//                 format!("{}, {}, {:.1}%, {}", name, ins, percent, stat.calls())
-//             })
-//             .collect();
-
-//         // Concatenate the header and rows with newline separators
-//         let output = format!("\n{}\n{}\n", header, rows.join("\n"));
-//         crate::debug::print(output);
-//     }
-// }
 
 #[derive(PartialEq, Debug)]
 /// The packed header size must be <= ALLOCATOR_OFFSET.
@@ -260,7 +224,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
-            node_cache: Cache::new(NODE_CACHE_SIZE),
+            node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
             //destructor: Destructor::default(),
         };
 
@@ -289,7 +253,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
-            node_cache: Cache::new(NODE_CACHE_SIZE),
+            node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
             //destructor: Destructor::default(),
         };
 
@@ -340,7 +304,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
-            node_cache: Cache::new(NODE_CACHE_SIZE),
+            node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
             //destructor: Destructor::default(),
         }
     }
@@ -575,25 +539,9 @@ where
 
     // canbench btreemap_get_blob_8_1024_v2 --show-canister-output > ./tmp/output.txt
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        // #[cfg(feature = "canbench-rs")]
-        // let _p = crate::debug::InstructionCounter::new("get_helper");
-
-        let node = {
-            // #[cfg(feature = "canbench-rs")]
-            // let _p = crate::debug::InstructionCounter::new("load_cached_node");
-            self.load_cached_node(node_addr)
-        };
-        let search = {
-            // #[cfg(feature = "canbench-rs")]
-            // let _p = crate::debug::InstructionCounter::new("search");
-            node.search(key)
-        };
-        match search {
-            Ok(idx) => {
-                // #[cfg(feature = "canbench-rs")]
-                // let _p = crate::debug::InstructionCounter::new("into_entry");
-                Some(node.into_entry(idx, self.memory()).1)
-            }
+        let node = self.load_cached_node(node_addr);
+        match node.search(key) {
+            Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
             Err(idx) => {
                 match node.node_type() {
                     NodeType::Leaf => None, // Key not found.
@@ -1172,36 +1120,11 @@ where
     }
 
     fn load_cached_node(&self, address: Address) -> Node<K> {
-        // #[cfg(feature = "canbench-rs")]
-        // let _p = crate::debug::InstructionCounter::new("load_cached_node");
-
         self.node_cache.get(address).unwrap_or_else(|| {
             let node = Node::load(address, self.version.page_size(), self.memory());
             self.node_cache.insert(address, &node);
             node
         })
-
-        // let node = {
-        //     // #[cfg(feature = "canbench-rs")]
-        //     // let _p = crate::debug::InstructionCounter::new("get");
-        //     self.node_cache.get(address)
-        // };
-        // match node {
-        //     Some(node) => node,
-        //     None => {
-        //         let node = {
-        //             // #[cfg(feature = "canbench-rs")]
-        //             // let _p = crate::debug::InstructionCounter::new("load_node");
-        //             Node::load(address, self.version.page_size(), self.memory())
-        //         };
-        //         {
-        //             // #[cfg(feature = "canbench-rs")]
-        //             // let _p = crate::debug::InstructionCounter::new("insert");
-        //             self.node_cache.insert(address, &node);
-        //         }
-        //         node
-        //     }
-        // }
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
