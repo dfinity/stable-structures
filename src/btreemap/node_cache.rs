@@ -1,5 +1,3 @@
-use crate::btreemap::node::Node;
-use crate::{types::Address, Storable};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -8,21 +6,23 @@ struct Counter(u64);
 
 /// Cache with LRU tracking.
 #[derive(Debug)]
-pub struct NodeCache<K>
+pub struct NodeCache<K, V>
 where
-    K: Storable + Ord + Clone,
+    K: Clone + Ord,
+    V: Clone,
 {
-    cache: RefCell<BTreeMap<Address, Node<K>>>,
+    cache: RefCell<BTreeMap<K, V>>,
     capacity: usize,
     counter: RefCell<Counter>,
-    lru_order: RefCell<BTreeMap<Counter, Address>>,
-    usage: RefCell<BTreeMap<Address, Counter>>,
+    lru_order: RefCell<BTreeMap<Counter, K>>,
+    usage: RefCell<BTreeMap<K, Counter>>,
     stats: RefCell<(u32, u32)>, // (hits, misses)
 }
 
-impl<K> NodeCache<K>
+impl<K, V> NodeCache<K, V>
 where
-    K: Storable + Ord + Clone,
+    K: Clone + Ord,
+    V: Clone,
 {
     /// New cache with given capacity.
     pub fn new(capacity: usize) -> Self {
@@ -45,15 +45,15 @@ where
     }
 
     /// Read node and update LRU order.
-    pub fn read_node(&self, address: Address) -> Option<Node<K>> {
+    pub fn get(&self, key: K) -> Option<V> {
         if self.capacity == 0 {
             return None;
         }
 
         let mut stats = self.stats.borrow_mut();
-        match self.cache.borrow().get(&address).cloned() {
+        match self.cache.borrow().get(&key).cloned() {
             Some(node) => {
-                self.touch(address);
+                self.touch(key);
                 stats.0 += 1; // Increment hits.
                 Some(node)
             }
@@ -65,7 +65,7 @@ where
     }
 
     /// Write node; evict LRU if full.
-    pub fn write_node(&self, address: Address, node: &Node<K>) {
+    pub fn insert(&self, key: K, node: &V) {
         if self.capacity == 0 {
             return;
         }
@@ -74,31 +74,32 @@ where
             let mut cache = self.cache.borrow_mut();
             if cache.len() >= self.capacity {
                 let mut lru_order = self.lru_order.borrow_mut();
-                if let Some((&old_ctr, &lru_addr)) = lru_order.iter().next() {
-                    lru_order.remove(&old_ctr);
-                    cache.remove(&lru_addr);
-                    self.usage.borrow_mut().remove(&lru_addr);
+                if let Some((&old_counter, old_key)) = lru_order.iter().next() {
+                    let old_key = old_key.clone();
+                    lru_order.remove(&old_counter);
+                    cache.remove(&old_key);
+                    self.usage.borrow_mut().remove(&old_key);
                 }
             }
-            cache.insert(address, node.clone());
+            cache.insert(key.clone(), node.clone());
         }
-        self.touch(address);
+        self.touch(key);
     }
 
     /// Remove node.
-    pub fn remove_node(&self, address: Address) {
+    pub fn remove(&self, key: K) {
         if self.capacity == 0 {
             return;
         }
 
-        self.cache.borrow_mut().remove(&address);
-        if let Some(old_ctr) = self.usage.borrow_mut().remove(&address) {
+        self.cache.borrow_mut().remove(&key);
+        if let Some(old_ctr) = self.usage.borrow_mut().remove(&key) {
             self.lru_order.borrow_mut().remove(&old_ctr);
         }
     }
 
     /// Update LRU order by assigning a new counter.
-    fn touch(&self, address: Address) {
+    fn touch(&self, key: K) {
         let new_counter = {
             let mut counter = self.counter.borrow_mut();
             counter.0 += 1;
@@ -106,16 +107,17 @@ where
         };
         let mut usage = self.usage.borrow_mut();
         let mut lru_order = self.lru_order.borrow_mut();
-        if let Some(old_counter) = usage.insert(address, new_counter) {
+        if let Some(old_counter) = usage.insert(key.clone(), new_counter) {
             lru_order.remove(&old_counter);
         }
-        lru_order.insert(new_counter, address);
+        lru_order.insert(new_counter, key);
     }
 }
 
-impl<K> Drop for NodeCache<K>
+impl<K, V> Drop for NodeCache<K, V>
 where
-    K: Storable + Ord + Clone,
+    K: Clone + Ord,
+    V: Clone,
 {
     fn drop(&mut self) {
         // cargo test -- --nocapture > ./tmp/output.txt 2>&1

@@ -114,7 +114,7 @@ where
     _phantom: PhantomData<(K, V)>,
 
     // A cache for storing recently accessed nodes.
-    node_cache: NodeCache<K>,
+    node_cache: NodeCache<Address, Node<K>>,
 
     destructor: Destructor,
 }
@@ -1157,8 +1157,8 @@ where
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
-        self.node_cache.remove_node(source.address());
-        self.node_cache.remove_node(into.address());
+        self.node_cache.remove(source.address());
+        self.node_cache.remove(into.address());
         into.merge(source, median, &mut self.allocator);
         into
     }
@@ -1171,7 +1171,7 @@ where
     }
 
     fn deallocate_node(&mut self, node: Node<K>) {
-        self.node_cache.remove_node(node.address());
+        self.node_cache.remove(node.address());
         node.deallocate(self.allocator_mut());
     }
 
@@ -1179,47 +1179,6 @@ where
         Node::load(address, self.version.page_size(), self.memory())
     }
 
-    /*
-    CS=0
-    NodeCache: hits: 0 (  0.0 %), misses: 48674, total: 48674
-    name, instructions, percent, calls
-    get_helper, 1711419552, 100.0%, 48674
-    load_node, 885305415, 51.7%, 48674
-    write_node, 502147060, 29.3%, 48674
-    read_node, 45656071, 2.7%, 48674
-
-    CS=10
-    NodeCache: hits: 19102 ( 39.2 %), misses: 29572, total: 48674
-    name, instructions, percent, calls
-    get_helper, 1695258654, 100.0%, 48674
-    load_node, 650920734, 38.4%, 29572
-    write_node, 589165576, 34.8%, 29572
-    read_node, 207227624, 12.2%, 48674
-
-    CS=100
-    NodeCache: hits: 32472 ( 66.7 %), misses: 16202, total: 48674
-    name, instructions, percent, calls
-    get_helper, 1349788037, 100.0%, 48674
-    read_node, 417984298, 31.0%, 48674
-    load_node, 354736529, 26.3%, 16202
-    write_node, 352470473, 26.1%, 16202
-
-    CS=1000
-    NodeCache: hits: 45439 ( 93.4 %), misses: 3235, total: 48674
-    name, instructions, percent, calls
-    get_helper, 967386617, 100.0%, 48674
-    read_node, 629121228, 65.0%, 48674
-    load_node, 68700336, 7.1%, 3235
-    write_node, 66013638, 6.8%, 3235
-
-    CS=10000
-    NodeCache: hits: 47346 ( 97.3 %), misses: 1328, total: 48674
-    name, instructions, percent, calls
-    get_helper, 902192945, 100.0%, 48674
-    read_node, 653796096, 72.5%, 48674
-    load_node, 28098232, 3.1%, 1328
-    write_node, 21673642, 2.4%, 1328
-    */
     fn load_cached_node(&self, address: Address) -> Node<K> {
         // self.node_cache.read_node(address).unwrap_or_else(|| {
         //     let node = Node::load(address, self.version.page_size(), self.memory());
@@ -1229,8 +1188,8 @@ where
 
         let node = {
             #[cfg(feature = "canbench-rs")]
-            let _p = crate::debug::InstructionCounter::new("read_node");
-            self.node_cache.read_node(address)
+            let _p = crate::debug::InstructionCounter::new("get");
+            self.node_cache.get(address)
         };
         match node {
             Some(node) => node,
@@ -1242,8 +1201,8 @@ where
                 };
                 {
                     #[cfg(feature = "canbench-rs")]
-                    let _p = crate::debug::InstructionCounter::new("write_node");
-                    self.node_cache.write_node(address, &node);
+                    let _p = crate::debug::InstructionCounter::new("insert");
+                    self.node_cache.insert(address, &node);
                 }
                 node
             }
@@ -1251,7 +1210,7 @@ where
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
-        self.node_cache.remove_node(node.address());
+        self.node_cache.remove(node.address());
         node.save(self.allocator_mut());
     }
 
