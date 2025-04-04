@@ -71,7 +71,7 @@ fn comprehensive(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Op
 
 // A comprehensive fuzz test that runs until it's explicitly terminated. To run:
 //
-// ```
+// ```shell
 // cargo t comprehensive_fuzz -- --ignored --nocapture 2> comprehensive_fuzz.log
 // ```
 //

@@ -4,7 +4,7 @@ An example that showcases how you can incorporate stable structures, and specifi
 
 Example usage:
 
-```
+```bash
 dfx start --background --clean
 
 # Insert some data into the quick_start canister.

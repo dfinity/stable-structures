@@ -60,7 +60,7 @@ Each memory must belong to only one stable structure.
 For example, this fails when run in a canister:
 
 
-```no_run
+```no_run,rust
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
 let mut map_1: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
 let mut map_2: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
@@ -155,7 +155,7 @@ However, it's important to note that if you also intend to perform serialization
 Stable structures requires strong guarantees to work reliably and scale over millions of operations. To that extent, we use fuzzing to emulate such operations on the available data structures.
 
 To run a fuzzer locally, 
-```sh
+```bash
 rustup toolchain install nightly
 cargo install cargo-fuzz
 

@@ -15,7 +15,7 @@
 //!
 //! Example Usage:
 //!
-//! ```
+//! ```rust
 //! use ic_stable_structures::{DefaultMemoryImpl, Memory};
 //! use ic_stable_structures::memory_manager::{MemoryManager, MemoryId};
 //!
