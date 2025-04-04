@@ -112,11 +112,13 @@ where
     fn drop(&mut self) {
         // cargo test -- --nocapture > ./tmp/output.txt 2>&1
         let stats = self.stats.borrow();
-        println!(
-            "NodeCache: hits: {}, misses: {} ({:>5.1} %)",
+        let msg = format!(
+            "\nNodeCache: hits: {} ({:>5.1} %), misses: {}, total: {}",
             stats.0,
+            (stats.0 as f64 / (stats.0 + stats.1).max(1) as f64) * 100.0,
             stats.1,
-            (stats.0 as f64 / (stats.0 + stats.1).max(1) as f64) * 100.0
+            stats.0 + stats.1,
         );
+        crate::debug::print(msg);
     }
 }

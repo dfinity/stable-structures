@@ -86,7 +86,7 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-const NODE_CACHE_SIZE: usize = 0;
+const NODE_CACHE_SIZE: usize = 1000;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -573,28 +573,6 @@ where
             .map(Cow::Owned)
             .map(V::from_bytes)
     }
-
-    /*
-    get_helper:
-    total_instructions : 2616698068,
-    call_count         : 48674
-
-    load_cached_node:
-    total_instructions : 1347150134,
-    call_count         : 48674
-
-    load_node:
-    total_instructions : 889344402,
-    call_count         : 48674
-
-    search:
-    total_instructions : 87596498,
-    call_count         : 48674
-
-    into_entry:
-    total_instructions : 29918448,
-    call_count         : 10000
-     */
 
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         #[cfg(feature = "canbench-rs")]
@@ -1201,6 +1179,39 @@ where
         Node::load(address, self.version.page_size(), self.memory())
     }
 
+    /*
+    CS=0
+    NodeCache: hits: 0 (  0.0 %), misses: 48674, total: 48674
+    name, instructions, percent, calls
+    get_helper, 1711419552, 100.0%, 48674
+    load_node, 885305415, 51.7%, 48674
+    write_node, 502147060, 29.3%, 48674
+    read_node, 45656071, 2.7%, 48674
+
+    CS=10
+    NodeCache: hits: 19102 ( 39.2 %), misses: 29572, total: 48674
+    name, instructions, percent, calls
+    get_helper, 1695258654, 100.0%, 48674
+    load_node, 650920734, 38.4%, 29572
+    write_node, 589165576, 34.8%, 29572
+    read_node, 207227624, 12.2%, 48674
+
+    CS=100
+    NodeCache: hits: 32472 ( 66.7 %), misses: 16202, total: 48674
+    name, instructions, percent, calls
+    get_helper, 1349788037, 100.0%, 48674
+    read_node, 417984298, 31.0%, 48674
+    load_node, 354736529, 26.3%, 16202
+    write_node, 352470473, 26.1%, 16202
+
+    CS=1000
+    NodeCache: hits: 45439 ( 93.4 %), misses: 3235, total: 48674
+    name, instructions, percent, calls
+    get_helper, 967386617, 100.0%, 48674
+    read_node, 629121228, 65.0%, 48674
+    load_node, 68700336, 7.1%, 3235
+    write_node, 66013638, 6.8%, 3235
+    */
     fn load_cached_node(&self, address: Address) -> Node<K> {
         // self.node_cache.read_node(address).unwrap_or_else(|| {
         //     let node = Node::load(address, self.version.page_size(), self.memory());
