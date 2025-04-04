@@ -1093,8 +1093,8 @@ where
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
-        self.node_cache.remove(source.address());
-        self.node_cache.remove(into.address());
+        self.node_cache.remove(&source.address());
+        self.node_cache.remove(&into.address());
         into.merge(source, median, &mut self.allocator);
         into
     }
@@ -1107,7 +1107,7 @@ where
     }
 
     fn deallocate_node(&mut self, node: Node<K>) {
-        self.node_cache.remove(node.address());
+        self.node_cache.remove(&node.address());
         node.deallocate(self.allocator_mut());
     }
 
@@ -1123,15 +1123,17 @@ where
     }
 
     fn load_cached_node(&self, address: Address) -> Node<K> {
-        self.node_cache.get(address).unwrap_or_else(|| {
+        self.node_cache.get(&address).unwrap_or_else(|| {
             let node = Node::load(address, self.version.page_size(), self.memory());
-            self.node_cache.insert(address, &node);
+            if self.node_cache.capacity() > 0 {
+                self.node_cache.insert(address, node.clone());
+            }
             node
         })
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
-        self.node_cache.remove(node.address());
+        self.node_cache.remove(&node.address());
         node.save(self.allocator_mut());
     }
 
