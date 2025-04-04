@@ -175,21 +175,21 @@ where
     }
 }
 
-impl<K, V> Drop for Cache<K, V>
-where
-    K: Clone + Ord,
-    V: Clone,
-{
-    fn drop(&mut self) {
-        // cargo test -- --nocapture > ./tmp/output.txt 2>&1
-        let stats = self.stats();
-        let msg = format!(
-            "\nCache: hits: {} ({:>5.1} %), misses: {}, total: {}",
-            stats.hits,
-            stats.hit_ratio() * 100.0,
-            stats.misses,
-            stats.total(),
-        );
-        crate::debug::print(msg);
-    }
-}
+// impl<K, V> Drop for Cache<K, V>
+// where
+//     K: Clone + Ord,
+//     V: Clone,
+// {
+//     fn drop(&mut self) {
+//         // cargo test -- --nocapture > ./tmp/output.txt 2>&1
+//         let stats = self.stats();
+//         let msg = format!(
+//             "\nCache: hits: {} ({:>5.1} %), misses: {}, total: {}",
+//             stats.hits,
+//             stats.hit_ratio() * 100.0,
+//             stats.misses,
+//             stats.total(),
+//         );
+//         crate::debug::print(msg);
+//     }
+// }
