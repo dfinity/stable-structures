@@ -546,8 +546,20 @@ where
             let _p = crate::debug::InstructionCounter::new("load_node");
             self.load_node(node_addr)
         };
-        match node.search(key) {
-            Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
+        let search = {
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("search");
+            node.search(key)
+        };
+        match search {
+            Ok(idx) => {
+                let result = {
+                    #[cfg(feature = "canbench-rs")]
+                    let _p = crate::debug::InstructionCounter::new("into_entry");
+                    node.into_entry(idx, self.memory()).1
+                };
+                Some(result)
+            }
             Err(idx) => {
                 match node.node_type() {
                     NodeType::Leaf => None, // Key not found.
