@@ -125,30 +125,32 @@ struct Destructor {}
 impl Drop for Destructor {
     fn drop(&mut self) {
         let stats = crate::debug::get_stats();
-        let max_instructions = stats.iter().map(|s| s.1.instructions()).max().unwrap_or(0);
-        let table = stats.into_iter().map(|(name, stats)| {
-            let ins = stats.instructions();
-            let percent = (ins as f64 / max_instructions as f64) * 100.0;
-            (name, ins, percent, stats.calls())
-        });
-        let mut lines = vec![vec!["name", "instructions", "percent", "calls"]
+        let max_instructions = stats
+            .iter()
+            .map(|(_, s)| s.instructions())
+            .max()
+            .unwrap_or(0);
+
+        // Prepare the header row
+        let header = "name, instructions, percent, calls";
+
+        // Build rows from the stats
+        let rows: Vec<String> = stats
             .into_iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()];
-        for (name, ins, percent, calls) in table {
-            lines.push(vec![
-                name.to_string(),
-                format!("{ins}"),
-                format!("{percent:.2}%"),
-                format!("{calls}"),
-            ]);
-        }
-        let mut text = String::from("\n");
-        for line in lines {
-            text.push_str(&line.join(", "));
-            text.push('\n');
-        }
-        crate::debug::print(text);
+            .map(|(name, stat)| {
+                let ins = stat.instructions();
+                let percent = if max_instructions == 0 {
+                    0.0
+                } else {
+                    (ins as f64 / max_instructions as f64) * 100.0
+                };
+                format!("{}, {}, {:.1}%, {}", name, ins, percent, stat.calls())
+            })
+            .collect();
+
+        // Concatenate the header and rows with newline separators
+        let output = format!("\n{}\n{}\n", header, rows.join("\n"));
+        crate::debug::print(output);
     }
 }
 
