@@ -574,33 +574,26 @@ where
             .map(V::from_bytes)
     }
 
+    // canbench btreemap_get_blob_8_1024_v2 --show-canister-output > ./tmp/output.txt
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
         #[cfg(feature = "canbench-rs")]
         let _p = crate::debug::InstructionCounter::new("get_helper");
-        // canbench btreemap_get_blob_128_1024_v2 --show-canister-output
-        // let node = {
-        //     #[cfg(feature = "canbench-rs")]
-        //     let _p = crate::debug::InstructionCounter::new("load_node");
-        //     self.load_node(node_addr)
-        // };
+
         let node = {
-            // #[cfg(feature = "canbench-rs")]
-            // let _p = crate::debug::InstructionCounter::new("load_cached_node");
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("load_cached_node");
             self.load_cached_node(node_addr)
         };
         let search = {
-            // #[cfg(feature = "canbench-rs")]
-            // let _p = crate::debug::InstructionCounter::new("search");
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("search");
             node.search(key)
         };
         match search {
             Ok(idx) => {
-                let result = {
-                    // #[cfg(feature = "canbench-rs")]
-                    // let _p = crate::debug::InstructionCounter::new("into_entry");
-                    node.into_entry(idx, self.memory()).1
-                };
-                Some(result)
+                #[cfg(feature = "canbench-rs")]
+                let _p = crate::debug::InstructionCounter::new("into_entry");
+                Some(node.into_entry(idx, self.memory()).1)
             }
             Err(idx) => {
                 match node.node_type() {
@@ -1180,6 +1173,9 @@ where
     }
 
     fn load_cached_node(&self, address: Address) -> Node<K> {
+        // #[cfg(feature = "canbench-rs")]
+        // let _p = crate::debug::InstructionCounter::new("load_cached_node");
+
         // self.node_cache.read_node(address).unwrap_or_else(|| {
         //     let node = Node::load(address, self.version.page_size(), self.memory());
         //     self.node_cache.write_node(address, node.clone());
@@ -1187,21 +1183,21 @@ where
         // })
 
         let node = {
-            #[cfg(feature = "canbench-rs")]
-            let _p = crate::debug::InstructionCounter::new("get");
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("get");
             self.node_cache.get(address)
         };
         match node {
             Some(node) => node,
             None => {
                 let node = {
-                    #[cfg(feature = "canbench-rs")]
-                    let _p = crate::debug::InstructionCounter::new("load_node");
+                    // #[cfg(feature = "canbench-rs")]
+                    // let _p = crate::debug::InstructionCounter::new("load_node");
                     Node::load(address, self.version.page_size(), self.memory())
                 };
                 {
-                    #[cfg(feature = "canbench-rs")]
-                    let _p = crate::debug::InstructionCounter::new("insert");
+                    // #[cfg(feature = "canbench-rs")]
+                    // let _p = crate::debug::InstructionCounter::new("insert");
                     self.node_cache.insert(address, &node);
                 }
                 node

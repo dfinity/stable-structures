@@ -58,13 +58,13 @@ impl InstructionCounter {
 impl Drop for InstructionCounter {
     fn drop(&mut self) {
         STATS.with(|c| {
-            let now = instruction_count();
             let mut stats = c.borrow_mut();
             let entry = stats.entry(self.name).or_insert_with(|| {
                 panic!("InstructionCounter not initialized");
             });
             entry.running_count -= 1;
             if entry.running_count == 0 {
+                let now = instruction_count();
                 let elapsed = now
                     - entry
                         .start_instructions
