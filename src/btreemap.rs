@@ -49,13 +49,13 @@
 //! ----------------------------------------
 //! ```
 mod allocator;
+mod cache;
 mod iter;
 mod node;
-mod node_cache;
 
 use crate::btreemap::{
+    cache::Cache,
     iter::{IterInternal, KeysIter, ValuesIter},
-    node_cache::NodeCache,
 };
 use crate::{
     storable::Bound as StorableBound,
@@ -114,7 +114,7 @@ where
     _phantom: PhantomData<(K, V)>,
 
     // A cache for storing recently accessed nodes.
-    node_cache: NodeCache<Address, Node<K>>,
+    node_cache: Cache<Address, Node<K>>,
 
     destructor: Destructor,
 }
@@ -261,7 +261,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
-            node_cache: NodeCache::new(NODE_CACHE_SIZE),
+            node_cache: Cache::new(NODE_CACHE_SIZE),
             destructor: Destructor::default(),
         };
 
@@ -290,7 +290,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
-            node_cache: NodeCache::new(NODE_CACHE_SIZE),
+            node_cache: Cache::new(NODE_CACHE_SIZE),
             destructor: Destructor::default(),
         };
 
@@ -341,7 +341,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
-            node_cache: NodeCache::new(NODE_CACHE_SIZE),
+            node_cache: Cache::new(NODE_CACHE_SIZE),
             destructor: Destructor::default(),
         }
     }
