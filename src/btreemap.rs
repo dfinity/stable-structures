@@ -1175,33 +1175,33 @@ where
         // #[cfg(feature = "canbench-rs")]
         // let _p = crate::debug::InstructionCounter::new("load_cached_node");
 
-        // self.node_cache.read_node(address).unwrap_or_else(|| {
-        //     let node = Node::load(address, self.version.page_size(), self.memory());
-        //     self.node_cache.write_node(address, node.clone());
-        //     node
-        // })
+        self.node_cache.get(address).unwrap_or_else(|| {
+            let node = Node::load(address, self.version.page_size(), self.memory());
+            self.node_cache.insert(address, &node);
+            node
+        })
 
-        let node = {
-            // #[cfg(feature = "canbench-rs")]
-            // let _p = crate::debug::InstructionCounter::new("get");
-            self.node_cache.get(address)
-        };
-        match node {
-            Some(node) => node,
-            None => {
-                let node = {
-                    // #[cfg(feature = "canbench-rs")]
-                    // let _p = crate::debug::InstructionCounter::new("load_node");
-                    Node::load(address, self.version.page_size(), self.memory())
-                };
-                {
-                    // #[cfg(feature = "canbench-rs")]
-                    // let _p = crate::debug::InstructionCounter::new("insert");
-                    self.node_cache.insert(address, &node);
-                }
-                node
-            }
-        }
+        // let node = {
+        //     // #[cfg(feature = "canbench-rs")]
+        //     // let _p = crate::debug::InstructionCounter::new("get");
+        //     self.node_cache.get(address)
+        // };
+        // match node {
+        //     Some(node) => node,
+        //     None => {
+        //         let node = {
+        //             // #[cfg(feature = "canbench-rs")]
+        //             // let _p = crate::debug::InstructionCounter::new("load_node");
+        //             Node::load(address, self.version.page_size(), self.memory())
+        //         };
+        //         {
+        //             // #[cfg(feature = "canbench-rs")]
+        //             // let _p = crate::debug::InstructionCounter::new("insert");
+        //             self.node_cache.insert(address, &node);
+        //         }
+        //         node
+        //     }
+        // }
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
