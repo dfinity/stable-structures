@@ -28,17 +28,17 @@ impl std::fmt::Debug for Stats {
 
 impl InstructionCounter {
     pub fn new(name: &'static str) -> Self {
-        let start = instruction_count();
+        let now = instruction_count();
         STATS.with(|c| {
             let mut stats = c.borrow_mut();
             let entry = stats.entry(name).or_insert(Stats {
-                start_instructions: Some(start),
+                start_instructions: Some(now),
                 running_count: 0,
                 total_instructions: 0,
                 call_count: 0,
             });
             if entry.running_count == 0 {
-                entry.start_instructions = Some(start);
+                entry.start_instructions = Some(now);
             }
             entry.running_count += 1;
         });
@@ -49,13 +49,14 @@ impl InstructionCounter {
 impl Drop for InstructionCounter {
     fn drop(&mut self) {
         STATS.with(|c| {
+            let now = instruction_count();
             let mut stats = c.borrow_mut();
             let entry = stats.entry(self.name).or_insert_with(|| {
                 panic!("InstructionCounter not initialized");
             });
             entry.running_count -= 1;
             if entry.running_count == 0 {
-                let elapsed = instruction_count()
+                let elapsed = now
                     - entry
                         .start_instructions
                         .expect("start_instructions is None");
