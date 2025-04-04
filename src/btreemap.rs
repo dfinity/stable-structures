@@ -105,6 +105,20 @@ where
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
+
+    destructor: Destructor,
+}
+
+#[derive(Default, Debug)]
+struct Destructor {}
+
+impl Drop for Destructor {
+    fn drop(&mut self) {
+        let stats = crate::debug::get_stats();
+        for s in stats {
+            crate::debug::print(format!("{}: {:?}", s.0, s.1));
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -214,6 +228,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
+            destructor: Destructor::default(),
         };
 
         btree.save();
@@ -241,6 +256,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
+            destructor: Destructor::default(),
         };
 
         btree.save();
@@ -290,6 +306,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
+            destructor: Destructor::default(),
         }
     }
 
@@ -521,7 +538,14 @@ where
     }
 
     fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let node = self.load_node(node_addr);
+        #[cfg(feature = "canbench-rs")]
+        let _p = crate::debug::InstructionCounter::new("get_helper");
+        //let node = self.load_node(node_addr);
+        let node = {
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("load_node");
+            self.load_node(node_addr)
+        };
         match node.search(key) {
             Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
             Err(idx) => {
