@@ -49,7 +49,7 @@
 //! ----------------------------------------
 //! ```
 mod allocator;
-mod cache;
+pub(crate) mod cache;
 mod iter;
 mod node;
 

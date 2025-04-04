@@ -53,6 +53,12 @@ impl AddAssign<Bytes> for Address {
     }
 }
 
+impl crate::btreemap::cache::ByteSize for Address {
+    fn byte_size(&self) -> usize {
+        std::mem::size_of_val(self)
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub struct Bytes(u64);
 

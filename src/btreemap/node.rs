@@ -64,6 +64,13 @@ pub struct Node<K: Storable + Ord + Clone> {
     overflows: Vec<Address>,
 }
 
+impl<K: Storable + Ord + Clone> crate::btreemap::cache::ByteSize for Node<K> {
+    fn byte_size(&self) -> usize {
+        // The size is not counting overflow pages, but that's close enough.
+        self.page_size().get() as usize
+    }
+}
+
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
