@@ -265,8 +265,8 @@ mod tests {
     #[test]
     fn test_insert_and_get() {
         let mut cache: Cache<u32, u64> = Cache::new(5);
-        cache.insert(1u32, 100u64);
-        cache.insert(2u32, 200u64);
+        cache.insert(1, 100);
+        cache.insert(2, 200);
 
         // Test that values can be retrieved.
         assert_eq!(cache.get(&1), Some(100));
