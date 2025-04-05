@@ -113,12 +113,14 @@ where
         if self.capacity() == 0 || self.size_limit() == 0 {
             return;
         }
-        let delta = key.byte_size() + value.byte_size();
-        while self.len() + 1 > self.capacity() || self.size() + delta > self.size_limit() {
+        let (key_size, value_size) = (key.byte_size(), value.byte_size());
+        let total_delta = 3 * key_size + value_size;
+        while self.len() + 1 > self.capacity() || self.size() + total_delta > self.size_limit() {
             self.evict_one();
         }
-        self.size = self.size.saturating_add(delta);
-        self.cache.insert(key.clone(), value);
+        if self.cache.insert(key.clone(), value).is_none() {
+            self.size = self.size.saturating_add(key_size + value_size);
+        }
         self.touch(key);
     }
 
@@ -127,11 +129,15 @@ where
         if self.capacity() == 0 || self.size_limit() == 0 {
             return;
         }
+        let key_size = key.byte_size();
         if let Some(v) = self.cache.remove(key) {
-            self.size = self.size.saturating_sub(key.byte_size() + v.byte_size());
+            self.size = self.size.saturating_sub(key_size + v.byte_size());
         }
         if let Some(old_counter) = self.usage.remove(key) {
-            self.lru_order.remove(&old_counter);
+            self.size = self.size.saturating_sub(key_size);
+            if self.lru_order.remove(&old_counter).is_some() {
+                self.size = self.size.saturating_sub(key_size);
+            }
         }
     }
 
@@ -187,13 +193,16 @@ where
     fn evict_one(&mut self) -> Option<K> {
         if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
-            self.lru_order.remove(&old_counter);
+            let key_size = old_key.byte_size();
             if let Some(v) = self.cache.remove(&old_key) {
-                self.size = self
-                    .size
-                    .saturating_sub(old_key.byte_size() + v.byte_size());
+                self.size = self.size.saturating_sub(key_size + v.byte_size());
             }
-            self.usage.remove(&old_key);
+            if self.lru_order.remove(&old_counter).is_some() {
+                self.size = self.size.saturating_sub(key_size);
+            }
+            if self.usage.remove(&old_key).is_some() {
+                self.size = self.size.saturating_sub(key_size);
+            }
             return Some(old_key);
         }
         None
@@ -203,10 +212,17 @@ where
     fn touch(&mut self, key: K) {
         self.counter.0 += 1;
         let new_counter = self.counter;
+        let key_size = key.byte_size();
         if let Some(old_counter) = self.usage.insert(key.clone(), new_counter) {
-            self.lru_order.remove(&old_counter);
+            if self.lru_order.remove(&old_counter).is_some() {
+                self.size = self.size.saturating_sub(key_size);
+            }
+        } else {
+            self.size = self.size.saturating_add(key_size);
         }
-        self.lru_order.insert(new_counter, key);
+        if self.lru_order.insert(new_counter, key).is_none() {
+            self.size = self.size.saturating_add(key_size);
+        }
     }
 
     /// Returns the current cache statistics.
@@ -235,6 +251,12 @@ mod tests {
         fn byte_size(&self) -> usize {
             size_of::<u64>()
         }
+    }
+
+    fn entry_size() -> usize {
+        let key_size = size_of::<u32>();
+        let value_size = size_of::<u64>();
+        3 * key_size + value_size
     }
 
     #[test]
@@ -266,27 +288,30 @@ mod tests {
 
     #[test]
     fn test_cache_size_tracking() {
-        // Each entry consists of a u32 key and a u64 value.
-        let entry_size = size_of::<u32>() + size_of::<u64>();
         let mut cache: Cache<u32, u64> = Cache::new(5);
         // Allow at most two entries.
-        cache.set_size_limit(2 * entry_size);
+        cache.set_size_limit(2 * entry_size());
 
         // Insert first entry.
         cache.insert(1, 100);
-        assert_eq!(cache.size(), entry_size);
+        assert_eq!(cache.size(), entry_size());
+        assert_eq!(cache.get(&1), Some(100));
+
+        // Insert the same entry again, should not increase size.
+        cache.insert(1, 100);
+        assert_eq!(cache.size(), entry_size());
         assert_eq!(cache.get(&1), Some(100));
 
         // Insert second entry.
         cache.insert(2, 200);
-        assert_eq!(cache.size(), 2 * entry_size);
+        assert_eq!(cache.size(), 2 * entry_size());
         assert_eq!(cache.get(&1), Some(100));
         assert_eq!(cache.get(&2), Some(200));
 
         // Inserting a third entry should trigger eviction (LRU policy).
         cache.insert(3, 300);
         // Size remains unchanged as an entry was evicted.
-        assert_eq!(cache.size(), 2 * entry_size);
+        assert_eq!(cache.size(), 2 * entry_size());
         // Expect the least-recently used entry (key 1) to be evicted.
         assert_eq!(cache.get(&1), None);
         assert_eq!(cache.get(&2), Some(200));
@@ -294,7 +319,7 @@ mod tests {
 
         // Remove an entry.
         cache.remove(&2);
-        assert_eq!(cache.size(), entry_size);
+        assert_eq!(cache.size(), entry_size());
         cache.remove(&3);
         assert_eq!(cache.size(), 0);
     }
@@ -320,10 +345,8 @@ mod tests {
     #[test]
     fn test_eviction_by_size_limit() {
         let mut cache: Cache<u32, u64> = Cache::new(10);
-        // For u32 and u64, each entry is (size_of(u32) + size_of(u64)) bytes.
-        let entry_size = size_of::<u32>() + size_of::<u64>();
         // Set a size limit to allow only two entries.
-        cache.set_size_limit(2 * entry_size);
+        cache.set_size_limit(2 * entry_size());
 
         cache.insert(1, 10);
         cache.insert(2, 20);
