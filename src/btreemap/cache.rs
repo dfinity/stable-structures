@@ -223,22 +223,30 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::mem::size_of;
 
     impl ByteSize for u32 {
         fn byte_size(&self) -> usize {
-            std::mem::size_of_val(self)
+            size_of::<u32>()
+        }
+    }
+
+    impl ByteSize for u64 {
+        fn byte_size(&self) -> usize {
+            size_of::<u64>()
         }
     }
 
     #[test]
     fn test_insert_and_get() {
-        let mut cache: Cache<u32, u32> = Cache::new(5);
-        cache.insert(1u32, 100u32);
-        cache.insert(2u32, 200u32);
+        let mut cache: Cache<u32, u64> = Cache::new(5);
+        cache.insert(1u32, 100u64);
+        cache.insert(2u32, 200u64);
 
         // Test that values can be retrieved.
         assert_eq!(cache.get(&1), Some(100));
         assert_eq!(cache.get(&2), Some(200));
+
         // Test stats: two successful gets.
         let stats = cache.stats();
         assert_eq!(stats.hits(), 2);
@@ -247,9 +255,10 @@ mod tests {
 
     #[test]
     fn test_miss() {
-        let mut cache: Cache<u32, u32> = Cache::new(5);
+        let mut cache: Cache<u32, u64> = Cache::new(5);
         // Attempt to retrieve a key that was never inserted.
         assert_eq!(cache.get(&1), None);
+
         let stats = cache.stats();
         assert_eq!(stats.hits(), 0);
         assert_eq!(stats.misses(), 1);
@@ -257,8 +266,10 @@ mod tests {
 
     #[test]
     fn test_cache_size_tracking() {
-        let entry_size = 2 * size_of::<u32>(); // Each entry: key + value
-        let mut cache: Cache<u32, u32> = Cache::new(5);
+        // Each entry consists of a u32 key and a u64 value.
+        let entry_size = size_of::<u32>() + size_of::<u64>();
+        let mut cache: Cache<u32, u64> = Cache::new(5);
+        // Allow at most two entries.
         cache.set_size_limit(2 * entry_size);
 
         // Insert first entry.
@@ -272,9 +283,9 @@ mod tests {
         assert_eq!(cache.get(&1), Some(100));
         assert_eq!(cache.get(&2), Some(200));
 
-        // Inserting a third entry should evict one entry (LRU policy).
+        // Inserting a third entry should trigger eviction (LRU policy).
         cache.insert(3, 300);
-        // Size remains unchanged.
+        // Size remains unchanged as an entry was evicted.
         assert_eq!(cache.size(), 2 * entry_size);
         // Expect the least-recently used entry (key 1) to be evicted.
         assert_eq!(cache.get(&1), None);
@@ -290,16 +301,15 @@ mod tests {
 
     #[test]
     fn test_eviction_by_capacity() {
-        // Create a cache with a capacity of 3 entries.
-        let mut cache: Cache<u32, u32> = Cache::new(3);
-        cache.insert(1u32, 10u32);
-        cache.insert(2u32, 20u32);
-        cache.insert(3u32, 30u32);
+        let mut cache: Cache<u32, u64> = Cache::new(3);
+        cache.insert(1, 10);
+        cache.insert(2, 20);
+        cache.insert(3, 30);
 
-        // Inserting a fourth entry should evict one entry (the LRU).
-        cache.insert(4u32, 40u32);
+        // Inserting a fourth entry should evict the LRU entry.
+        cache.insert(4, 40);
 
-        // With LRU eviction, the least recently used key (1) should be gone.
+        // Expect key 1 to be evicted.
         assert_eq!(cache.get(&1), None);
         // The other keys should be available.
         assert_eq!(cache.get(&2), Some(20));
@@ -309,34 +319,34 @@ mod tests {
 
     #[test]
     fn test_eviction_by_size_limit() {
-        // Use a cache with a generous capacity but a small size limit.
-        let mut cache: Cache<u32, u32> = Cache::new(10);
-        // Set a size limit small enough so that only two u32 entries (approx 8 bytes each)
-        // can be kept before eviction kicks in.
-        cache.set_size_limit(16);
-        cache.insert(1u32, 10u32); // approx 8 bytes (key + value)
-        cache.insert(2u32, 20u32); // approx 8 bytes more, total around 16 bytes
+        let mut cache: Cache<u32, u64> = Cache::new(10);
+        // For u32 and u64, each entry is (size_of(u32) + size_of(u64)) bytes.
+        let entry_size = size_of::<u32>() + size_of::<u64>();
+        // Set a size limit to allow only two entries.
+        cache.set_size_limit(2 * entry_size);
 
-        // Inserting another entry should trigger eviction due to size limit.
-        cache.insert(3u32, 30u32);
+        cache.insert(1, 10);
+        cache.insert(2, 20);
 
-        // Expect that one entry is evicted. Assuming LRU policy, key 1 is evicted.
+        // Inserting another entry should trigger eviction due to the size limit.
+        cache.insert(3, 30);
+
+        // Expect that one entry is evicted (key 1, as the LRU).
         assert_eq!(cache.get(&1), None);
-        // The remaining entries should be present.
         assert_eq!(cache.get(&2), Some(20));
         assert_eq!(cache.get(&3), Some(30));
     }
 
     #[test]
     fn test_remove() {
-        let mut cache: Cache<u32, u32> = Cache::new(5);
-        cache.insert(1u32, 10u32);
-        cache.insert(2u32, 20u32);
+        let mut cache: Cache<u32, u64> = Cache::new(5);
+        cache.insert(1, 10);
+        cache.insert(2, 20);
 
         // Remove key 1.
         cache.remove(&1);
         assert_eq!(cache.get(&1), None);
-        // Removing a non-existing key should not cause issues.
+        // Removing a non-existent key should be safe.
         cache.remove(&3);
         // Key 2 should still be retrievable.
         assert_eq!(cache.get(&2), Some(20));
@@ -344,10 +354,10 @@ mod tests {
 
     #[test]
     fn test_clear() {
-        let mut cache: Cache<u32, u32> = Cache::new(5);
-        cache.insert(1u32, 10u32);
-        cache.insert(2u32, 20u32);
-        cache.insert(3u32, 30u32);
+        let mut cache: Cache<u32, u64> = Cache::new(5);
+        cache.insert(1, 10);
+        cache.insert(2, 20);
+        cache.insert(3, 30);
 
         cache.clear();
         assert_eq!(cache.len(), 0);
@@ -358,19 +368,18 @@ mod tests {
 
     #[test]
     fn test_stats() {
-        let mut cache: Cache<u32, u32> = Cache::new(3);
+        let mut cache: Cache<u32, u64> = Cache::new(3);
         // Initially, no hits or misses.
         let stats = cache.stats();
         assert_eq!(stats.hits(), 0);
         assert_eq!(stats.misses(), 0);
 
-        // Inserting and accessing some keys.
-        cache.insert(1u32, 10u32);
-        cache.insert(2u32, 20u32);
+        cache.insert(1, 10);
+        cache.insert(2, 20);
 
-        // A hit.
+        // One hit.
         let _ = cache.get(&1);
-        // A miss.
+        // One miss.
         let _ = cache.get(&3);
 
         let stats = cache.stats();
