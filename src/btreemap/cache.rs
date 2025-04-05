@@ -10,12 +10,13 @@ const GiB: usize = 1024 * MiB;
 const DEFAULT_SIZE_LIMIT: usize = 3 * GiB;
 
 pub trait ByteSize {
+    /// Returns the size (in bytes) of the value.
     fn byte_size(&self) -> usize {
         std::mem::size_of_val(self)
     }
 }
 
-/// Incrementing counter for tracking the order of usage in the cache.
+/// Incrementing counter used for tracking the order of usage.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 struct Counter(u64);
 
@@ -57,6 +58,7 @@ where
 {
     cache: BTreeMap<K, V>,
     capacity: usize,
+    /// Tracks the cumulative bytes for all entries (including duplicated key storage).
     size: usize,
     size_limit: usize,
     counter: Counter,
@@ -70,6 +72,12 @@ where
     K: Clone + Ord + ByteSize,
     V: Clone + ByteSize,
 {
+    /// Computes the total overhead of an entry:
+    /// 3 times the key size (stored in cache, usage, and lru_order) plus the value size.
+    fn entry_overhead(key_size: usize, value_size: usize) -> usize {
+        3 * key_size + value_size
+    }
+
     /// Creates a new cache with the given capacity.
     pub fn new(capacity: usize) -> Self {
         Self {
@@ -84,7 +92,7 @@ where
         }
     }
 
-    /// Clears the cache.
+    /// Clears all entries and resets statistics.
     pub fn clear(&mut self) {
         self.cache.clear();
         self.lru_order.clear();
@@ -94,7 +102,7 @@ where
         self.stats = CacheStats::default();
     }
 
-    /// Retrieves the value associated with the given key and updates the LRU order.
+    /// Retrieves the value for the given key (if any) and updates its LRU status.
     pub fn get(&mut self, key: &K) -> Option<V> {
         if self.capacity() == 0 || self.size_limit() == 0 {
             return None;
@@ -108,14 +116,15 @@ where
         None
     }
 
-    /// Inserts the given key and value; if the cache is full or exceeds the size limit, evicts the least-recently used entry.
+    /// Inserts the given key and value.
+    /// If adding this entry would exceed the capacity or size limit, evicts LRU entries.
     pub fn insert(&mut self, key: K, value: V) {
         if self.capacity() == 0 || self.size_limit() == 0 {
             return;
         }
         let (key_size, value_size) = (key.byte_size(), value.byte_size());
-        let total_delta = 3 * key_size + value_size;
-        while self.len() + 1 > self.capacity() || self.size() + total_delta > self.size_limit() {
+        let overhead = Self::entry_overhead(key_size, value_size);
+        while self.len() + 1 > self.capacity() || self.size + overhead > self.size_limit() {
             self.evict_one();
         }
         if self.cache.insert(key.clone(), value).is_none() {
@@ -129,37 +138,35 @@ where
         if self.capacity() == 0 || self.size_limit() == 0 {
             return;
         }
-        let key_size = key.byte_size();
-        if let Some(v) = self.cache.remove(key) {
-            self.size = self.size.saturating_sub(key_size + v.byte_size());
+        if let Some(value) = self.cache.remove(key) {
+            let (key_size, value_size) = (key.byte_size(), value.byte_size());
+            let overhead = Self::entry_overhead(key_size, value_size);
+            self.size = self.size.saturating_sub(overhead);
         }
-        if let Some(old_counter) = self.usage.remove(key) {
-            self.size = self.size.saturating_sub(key_size);
-            if self.lru_order.remove(&old_counter).is_some() {
-                self.size = self.size.saturating_sub(key_size);
-            }
+        if let Some(counter) = self.usage.remove(key) {
+            self.lru_order.remove(&counter);
         }
     }
 
-    /// Returns the current number of entries in the cache.
+    /// Returns the number of entries in the cache.
     #[inline]
     pub fn len(&self) -> usize {
         self.cache.len()
     }
 
-    /// Returns the cache's size in bytes.
+    /// Returns the total size in bytes of all entries (including duplicate key storage).
     #[inline]
     pub fn size(&self) -> usize {
         self.size
     }
 
-    /// Returns the cache's size limit in bytes.
+    /// Returns the configured size limit (in bytes).
     #[inline]
     pub fn size_limit(&self) -> usize {
         self.size_limit
     }
 
-    /// Sets a new size limit for the cache, evicting entries if necessary.
+    /// Sets a new size limit, evicting entries as necessary.
     pub fn set_size_limit(&mut self, size_limit: usize) {
         self.size_limit = size_limit;
         if size_limit == 0 {
@@ -171,13 +178,13 @@ where
         }
     }
 
-    /// Returns the cache's capacity.
+    /// Returns the cache capacity (number of entries).
     #[inline]
     pub fn capacity(&self) -> usize {
         self.capacity
     }
 
-    /// Sets a new capacity for the cache, evicting entries if necessary.
+    /// Sets a new capacity, evicting entries as needed.
     pub fn set_capacity(&mut self, capacity: usize) {
         self.capacity = capacity;
         if self.capacity == 0 {
@@ -189,37 +196,42 @@ where
         }
     }
 
-    /// Evicts a single entry based on the LRU policy.
+    /// Evicts a single entry using the LRU policy.
+    /// Returns the key that was evicted.
     fn evict_one(&mut self) -> Option<K> {
+        // Find the least-recently used entry.
         if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
             let key_size = old_key.byte_size();
+            // Remove from the main cache and subtract the cache overhead (key + value).
             if let Some(v) = self.cache.remove(&old_key) {
                 self.size = self.size.saturating_sub(key_size + v.byte_size());
             }
-            if self.lru_order.remove(&old_counter).is_some() {
-                self.size = self.size.saturating_sub(key_size);
-            }
-            if self.usage.remove(&old_key).is_some() {
-                self.size = self.size.saturating_sub(key_size);
-            }
+            self.lru_order.remove(&old_counter);
+            self.usage.remove(&old_key);
+            self.size = self.size.saturating_sub(2 * key_size);
             return Some(old_key);
         }
         None
     }
 
-    /// Updates the LRU order by assigning a new counter for the given key.
+    /// Updates the LRU order for the given key.
+    /// If the key is already in the LRU maps, its old counter is replaced.
+    /// For a new key, the overhead for the key (in usage and lru_order) is added.
     fn touch(&mut self, key: K) {
         self.counter.0 += 1;
         let new_counter = self.counter;
         let key_size = key.byte_size();
+        // Update usage: if key was present, remove its old LRU overhead.
         if let Some(old_counter) = self.usage.insert(key.clone(), new_counter) {
             if self.lru_order.remove(&old_counter).is_some() {
                 self.size = self.size.saturating_sub(key_size);
             }
         } else {
+            // New key in usage.
             self.size = self.size.saturating_add(key_size);
         }
+        // Insert into lru_order. If newly inserted, add the overhead.
         if self.lru_order.insert(new_counter, key).is_none() {
             self.size = self.size.saturating_add(key_size);
         }
@@ -253,10 +265,10 @@ mod tests {
         }
     }
 
+    /// Helper: returns the expected overhead (in bytes) for an entry with key type u32 and value type u64.
+    /// Calculation: 3 * size_of(u32) + size_of(u64)
     fn entry_size() -> usize {
-        let key_size = size_of::<u32>();
-        let value_size = size_of::<u64>();
-        3 * key_size + value_size
+        3 * size_of::<u32>() + size_of::<u64>()
     }
 
     #[test]
@@ -297,7 +309,7 @@ mod tests {
         assert_eq!(cache.size(), entry_size());
         assert_eq!(cache.get(&1), Some(100));
 
-        // Insert the same entry again, should not increase size.
+        // Insert the same entry again should not change the overall size.
         cache.insert(1, 100);
         assert_eq!(cache.size(), entry_size());
         assert_eq!(cache.get(&1), Some(100));
@@ -308,9 +320,8 @@ mod tests {
         assert_eq!(cache.get(&1), Some(100));
         assert_eq!(cache.get(&2), Some(200));
 
-        // Inserting a third entry should trigger eviction (LRU policy).
+        // Inserting a third entry should trigger eviction (LRU policy) so that the size remains unchanged.
         cache.insert(3, 300);
-        // Size remains unchanged as an entry was evicted.
         assert_eq!(cache.size(), 2 * entry_size());
         // Expect the least-recently used entry (key 1) to be evicted.
         assert_eq!(cache.get(&1), None);
