@@ -66,6 +66,7 @@ use allocator::Allocator;
 pub use iter::Iter;
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -114,7 +115,7 @@ where
     _phantom: PhantomData<(K, V)>,
 
     // A cache for storing recently accessed nodes.
-    node_cache: Cache<Address, Node<K>>,
+    node_cache: RefCell<Cache<Address, Node<K>>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -224,7 +225,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
-            node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
+            node_cache: RefCell::new(Cache::new(DEFAULT_NODE_CACHE_SIZE)),
         };
 
         btree.save_header();
@@ -252,7 +253,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
-            node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
+            node_cache: RefCell::new(Cache::new(DEFAULT_NODE_CACHE_SIZE)),
         };
 
         btree.save_header();
@@ -302,7 +303,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
-            node_cache: Cache::new(DEFAULT_NODE_CACHE_SIZE),
+            node_cache: RefCell::new(Cache::new(DEFAULT_NODE_CACHE_SIZE)),
         }
     }
 
@@ -583,7 +584,7 @@ where
         self.length = 0;
         self.allocator.clear();
         self.save_header();
-        self.node_cache.clear();
+        self.node_cache.borrow_mut().clear();
     }
 
     /// Returns the first key-value pair in the map. The key in this
@@ -1093,8 +1094,9 @@ where
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
-        self.node_cache.remove(&source.address());
-        self.node_cache.remove(&into.address());
+        let mut node_cache = self.node_cache.borrow_mut();
+        node_cache.remove(&source.address());
+        node_cache.remove(&into.address());
         into.merge(source, median, &mut self.allocator);
         into
     }
@@ -1107,7 +1109,7 @@ where
     }
 
     fn deallocate_node(&mut self, node: Node<K>) {
-        self.node_cache.remove(&node.address());
+        self.node_cache.borrow_mut().remove(&node.address());
         node.deallocate(self.allocator_mut());
     }
 
@@ -1123,17 +1125,18 @@ where
     }
 
     fn load_cached_node(&self, address: Address) -> Node<K> {
-        self.node_cache.get(&address).unwrap_or_else(|| {
+        let mut node_cache = self.node_cache.borrow_mut();
+        node_cache.get(&address).unwrap_or_else(|| {
             let node = Node::load(address, self.version.page_size(), self.memory());
-            if self.node_cache.capacity() > 0 {
-                self.node_cache.insert(address, node.clone());
+            if node_cache.capacity() > 0 {
+                node_cache.insert(address, node.clone());
             }
             node
         })
     }
 
     fn save_node(&mut self, node: &mut Node<K>) {
-        self.node_cache.remove(&node.address());
+        self.node_cache.borrow_mut().remove(&node.address());
         node.save(self.allocator_mut());
     }
 

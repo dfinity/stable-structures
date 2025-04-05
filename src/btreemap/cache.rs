@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 #[allow(non_upper_case_globals)]
@@ -46,14 +45,14 @@ where
     K: Clone + Ord + ByteSize,
     V: Clone + ByteSize,
 {
-    cache: RefCell<BTreeMap<K, V>>,
-    capacity: RefCell<usize>,
-    size: RefCell<usize>,
-    size_limit: RefCell<usize>,
-    counter: RefCell<Counter>,
-    lru_order: RefCell<BTreeMap<Counter, K>>,
-    usage: RefCell<BTreeMap<K, Counter>>,
-    stats: RefCell<CacheStats>,
+    cache: BTreeMap<K, V>,
+    capacity: usize,
+    size: usize,
+    size_limit: usize,
+    counter: Counter,
+    lru_order: BTreeMap<Counter, K>,
+    usage: BTreeMap<K, Counter>,
+    stats: CacheStats,
 }
 
 impl<K, V> Cache<K, V>
@@ -64,43 +63,43 @@ where
     /// Creates a new cache with the given capacity.
     pub fn new(capacity: usize) -> Self {
         Self {
-            cache: RefCell::new(BTreeMap::new()),
-            capacity: RefCell::new(capacity),
-            size: RefCell::new(0),
-            size_limit: RefCell::new(DEFAULT_SIZE_LIMIT),
-            counter: RefCell::new(Counter(0)),
-            lru_order: RefCell::new(BTreeMap::new()),
-            usage: RefCell::new(BTreeMap::new()),
-            stats: RefCell::new(CacheStats::default()),
+            cache: BTreeMap::new(),
+            capacity,
+            size: 0,
+            size_limit: DEFAULT_SIZE_LIMIT,
+            counter: Counter(0),
+            lru_order: BTreeMap::new(),
+            usage: BTreeMap::new(),
+            stats: CacheStats::default(),
         }
     }
 
     /// Clears the cache.
-    pub fn clear(&self) {
-        self.cache.borrow_mut().clear();
-        self.lru_order.borrow_mut().clear();
-        self.usage.borrow_mut().clear();
-        *self.size.borrow_mut() = 0;
-        *self.counter.borrow_mut() = Counter(0);
-        *self.stats.borrow_mut() = CacheStats::default();
+    pub fn clear(&mut self) {
+        self.cache.clear();
+        self.lru_order.clear();
+        self.usage.clear();
+        self.size = 0;
+        self.counter = Counter(0);
+        self.stats = CacheStats::default();
     }
 
     /// Retrieves the value associated with the given key and updates the LRU order.
-    pub fn get(&self, key: &K) -> Option<V> {
+    pub fn get(&mut self, key: &K) -> Option<V> {
         if self.capacity() == 0 && self.size_limit() == 0 {
             return None;
         }
-        if let Some(value) = self.cache.borrow().get(key) {
+        if let Some(value) = self.cache.get(key).cloned() {
             self.touch(key.clone());
-            self.stats.borrow_mut().hits += 1;
-            return Some(value.clone());
+            self.stats.hits += 1;
+            return Some(value);
         }
-        self.stats.borrow_mut().misses += 1;
+        self.stats.misses += 1;
         None
     }
 
     /// Inserts the given key and value; if the cache is full, evicts the least-recently used entry.
-    pub fn insert(&self, key: K, value: V) {
+    pub fn insert(&mut self, key: K, value: V) {
         let capacity = self.capacity();
         if capacity == 0 && self.size_limit() == 0 {
             return;
@@ -109,56 +108,54 @@ where
             self.evict_one();
         }
         self.size_add(key.byte_size() + value.byte_size());
-        self.cache.borrow_mut().insert(key.clone(), value);
+        self.cache.insert(key.clone(), value);
         self.touch(key);
     }
 
     /// Removes the entry associated with the given key.
-    pub fn remove(&self, key: &K) {
+    pub fn remove(&mut self, key: &K) {
         if self.capacity() == 0 && self.size_limit() == 0 {
             return;
         }
-        self.cache.borrow_mut().remove(key).inspect(|v| {
+        self.cache.remove(key).inspect(|v| {
             self.size_add(v.byte_size());
         });
-        if let Some(old_counter) = self.usage.borrow_mut().remove(key) {
-            self.lru_order
-                .borrow_mut()
-                .remove(&old_counter)
-                .inspect(|k| {
-                    self.size_sub(k.byte_size());
-                });
+        if let Some(old_counter) = self.usage.remove(key) {
+            self.lru_order.remove(&old_counter).inspect(|k| {
+                self.size_sub(k.byte_size());
+            });
         }
     }
 
     /// Returns the current number of entries in the cache.
+    #[inline]
     pub fn len(&self) -> usize {
-        self.cache.borrow().len()
+        self.cache.len()
     }
 
     /// Returns the cache's size in bytes.
+    #[inline]
     pub fn size(&self) -> usize {
-        *self.size.borrow()
+        self.size
     }
 
-    fn size_sub(&self, delta: usize) {
-        let mut total = self.size.borrow_mut();
-        *total = total.saturating_sub(delta);
+    fn size_sub(&mut self, delta: usize) {
+        self.size = self.size.saturating_sub(delta);
     }
 
-    fn size_add(&self, delta: usize) {
-        let mut total = self.size.borrow_mut();
-        *total = total.saturating_add(delta);
+    fn size_add(&mut self, delta: usize) {
+        self.size = self.size.saturating_add(delta);
     }
 
     /// Returns the cache's size limit in bytes.
+    #[inline]
     pub fn size_limit(&self) -> usize {
-        *self.size_limit.borrow()
+        self.size_limit
     }
 
     /// Sets a new size limit for the cache, evicting entries if necessary.
     pub fn set_size_limit(&mut self, size_limit: usize) {
-        *self.size_limit.borrow_mut() = size_limit;
+        self.size_limit = size_limit;
         if size_limit == 0 {
             self.clear();
         } else {
@@ -169,61 +166,60 @@ where
     }
 
     /// Returns the cache's capacity.
+    #[inline]
     pub fn capacity(&self) -> usize {
-        *self.capacity.borrow()
+        self.capacity
     }
 
     /// Sets a new capacity for the cache, evicting entries if necessary.
     pub fn set_capacity(&mut self, capacity: usize) {
-        *self.capacity.borrow_mut() = capacity;
-        if capacity == 0 {
+        self.capacity = capacity;
+        if self.capacity == 0 {
             self.clear();
         } else {
-            while self.len() > capacity {
+            while self.len() > self.capacity {
                 self.evict_one();
             }
         }
     }
 
     /// Evicts a single entry based on the LRU policy.
-    fn evict_one(&self) -> bool {
-        let mut lru_order = self.lru_order.borrow_mut();
-        if let Some((&old_counter, old_key)) = lru_order.iter().next() {
+    fn evict_one(&mut self) -> bool {
+        if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
-            lru_order.remove(&old_counter).inspect(|k| {
+            self.lru_order.remove(&old_counter).inspect(|k| {
                 self.size_sub(k.byte_size());
             });
-            self.cache.borrow_mut().remove(&old_key).inspect(|v| {
+            self.cache.remove(&old_key).inspect(|v| {
                 self.size_sub(v.byte_size());
             });
-            self.usage.borrow_mut().remove(&old_key);
+            self.usage.remove(&old_key);
             return true;
         }
         false
     }
 
     /// Updates the LRU order by assigning a new counter for the given id.
-    fn touch(&self, key: K) {
+    fn touch(&mut self, key: K) {
         let new_counter = {
-            let mut counter = self.counter.borrow_mut();
+            let mut counter = self.counter;
             counter.0 += 1;
-            *counter
+            counter
         };
-        let mut lru_order = self.lru_order.borrow_mut();
-        if let Some(old_counter) = self.usage.borrow_mut().insert(key.clone(), new_counter) {
-            lru_order.remove(&old_counter);
+        if let Some(old_counter) = self.usage.insert(key.clone(), new_counter) {
+            self.lru_order.remove(&old_counter);
         }
-        lru_order.insert(new_counter, key);
+        self.lru_order.insert(new_counter, key);
     }
 
     /// Returns the current cache statistics.
     pub fn stats(&self) -> CacheStats {
-        *self.stats.borrow()
+        self.stats
     }
 
     /// Resets the cache statistics.
-    pub fn reset_stats(&self) {
-        *self.stats.borrow_mut() = CacheStats::default();
+    pub fn reset_stats(&mut self) {
+        self.stats = CacheStats::default();
     }
 
     /// Returns the current hit ratio.
