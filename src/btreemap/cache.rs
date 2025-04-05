@@ -22,19 +22,29 @@ struct Counter(u64);
 /// Runtime statistics for the cache.
 #[derive(Default, Debug, Copy, Clone)]
 pub struct CacheStats {
-    pub hits: u64,
-    pub misses: u64,
+    hits: u64,
+    misses: u64,
 }
 
 impl CacheStats {
-    /// Returns the number of reads.
+    #[inline]
+    pub fn hits(&self) -> u64 {
+        self.hits
+    }
+
+    #[inline]
+    pub fn misses(&self) -> u64 {
+        self.misses
+    }
+
+    #[inline]
     pub fn total(&self) -> u64 {
         self.hits + self.misses
     }
 
-    /// Computes and returns the current hit ratio.
+    #[inline]
     pub fn hit_ratio(&self) -> f64 {
-        self.hits as f64 / self.total().max(1) as f64
+        self.hits as f64 / (self.hits + self.misses).max(1) as f64
     }
 }
 
@@ -107,7 +117,9 @@ where
         while self.len() >= capacity || self.size() > self.size_limit() {
             self.evict_one();
         }
-        self.size_add(key.byte_size() + value.byte_size());
+        self.size = self
+            .size
+            .saturating_add(key.byte_size() + value.byte_size());
         self.cache.insert(key.clone(), value);
         self.touch(key);
     }
@@ -118,11 +130,11 @@ where
             return;
         }
         self.cache.remove(key).inspect(|v| {
-            self.size_add(v.byte_size());
+            self.size = self.size.saturating_add(v.byte_size());
         });
         if let Some(old_counter) = self.usage.remove(key) {
             self.lru_order.remove(&old_counter).inspect(|k| {
-                self.size_sub(k.byte_size());
+                self.size = self.size.saturating_add(k.byte_size());
             });
         }
     }
@@ -137,14 +149,6 @@ where
     #[inline]
     pub fn size(&self) -> usize {
         self.size
-    }
-
-    fn size_sub(&mut self, delta: usize) {
-        self.size = self.size.saturating_sub(delta);
-    }
-
-    fn size_add(&mut self, delta: usize) {
-        self.size = self.size.saturating_add(delta);
     }
 
     /// Returns the cache's size limit in bytes.
@@ -188,10 +192,10 @@ where
         if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
             self.lru_order.remove(&old_counter).inspect(|k| {
-                self.size_sub(k.byte_size());
+                self.size = self.size.saturating_sub(k.byte_size());
             });
             self.cache.remove(&old_key).inspect(|v| {
-                self.size_sub(v.byte_size());
+                self.size = self.size.saturating_sub(v.byte_size());
             });
             self.usage.remove(&old_key);
             return true;
@@ -220,10 +224,5 @@ where
     /// Resets the cache statistics.
     pub fn reset_stats(&mut self) {
         self.stats = CacheStats::default();
-    }
-
-    /// Returns the current hit ratio.
-    pub fn hit_ratio(&self) -> f64 {
-        self.stats().hit_ratio()
     }
 }
