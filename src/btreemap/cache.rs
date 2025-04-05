@@ -7,6 +7,7 @@ const MiB: usize = 1024 * KiB;
 #[allow(non_upper_case_globals)]
 const GiB: usize = 1024 * MiB;
 
+const DEFAULT_CAPACITY: usize = 0;
 const DEFAULT_SIZE_LIMIT: usize = 3 * GiB;
 
 pub trait ByteSize {
@@ -79,10 +80,10 @@ where
     }
 
     /// Creates a new cache with the given capacity.
-    pub fn new(capacity: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             cache: BTreeMap::new(),
-            capacity,
+            capacity: DEFAULT_CAPACITY,
             size: 0,
             size_limit: DEFAULT_SIZE_LIMIT,
             counter: Counter(0),
@@ -90,6 +91,16 @@ where
             usage: BTreeMap::new(),
             stats: CacheStats::default(),
         }
+    }
+
+    /// Creates a new cache with the given capacity and size limit.
+    pub fn with_capacity(self, capacity: usize) -> Self {
+        Self { capacity, ..self }
+    }
+
+    /// Creates a new cache with the given size limit.
+    pub fn with_size_limit(self, size_limit: usize) -> Self {
+        Self { size_limit, ..self }
     }
 
     /// Clears all entries and resets statistics.
@@ -264,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_insert_and_get() {
-        let mut cache: Cache<u32, u64> = Cache::new(5);
+        let mut cache: Cache<u32, u64> = Cache::new().with_capacity(5);
         cache.insert(1, 100);
         cache.insert(2, 200);
 
@@ -280,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_miss() {
-        let mut cache: Cache<u32, u64> = Cache::new(5);
+        let mut cache: Cache<u32, u64> = Cache::new().with_capacity(5);
         // Attempt to retrieve a key that was never inserted.
         assert_eq!(cache.get(&1), None);
 
@@ -291,9 +302,10 @@ mod tests {
 
     #[test]
     fn test_cache_size_tracking() {
-        let mut cache: Cache<u32, u64> = Cache::new(5);
         // Allow at most two entries.
-        cache.set_size_limit(2 * entry_size());
+        let mut cache: Cache<u32, u64> = Cache::new()
+            .with_capacity(5)
+            .with_size_limit(2 * entry_size());
 
         // Insert first entry.
         cache.insert(1, 100);
@@ -328,7 +340,7 @@ mod tests {
 
     #[test]
     fn test_eviction_by_capacity() {
-        let mut cache: Cache<u32, u64> = Cache::new(3);
+        let mut cache: Cache<u32, u64> = Cache::new().with_capacity(3);
         cache.insert(1, 10);
         cache.insert(2, 20);
         cache.insert(3, 30);
@@ -346,9 +358,10 @@ mod tests {
 
     #[test]
     fn test_eviction_by_size_limit() {
-        let mut cache: Cache<u32, u64> = Cache::new(10);
         // Set a size limit to allow only two entries.
-        cache.set_size_limit(2 * entry_size());
+        let mut cache: Cache<u32, u64> = Cache::new()
+            .with_capacity(10)
+            .with_size_limit(2 * entry_size());
 
         cache.insert(1, 10);
         cache.insert(2, 20);
@@ -364,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        let mut cache: Cache<u32, u64> = Cache::new(5);
+        let mut cache: Cache<u32, u64> = Cache::new().with_capacity(5);
         cache.insert(1, 10);
         cache.insert(2, 20);
 
@@ -379,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_clear() {
-        let mut cache: Cache<u32, u64> = Cache::new(5);
+        let mut cache: Cache<u32, u64> = Cache::new().with_capacity(5);
         cache.insert(1, 10);
         cache.insert(2, 20);
         cache.insert(3, 30);
@@ -393,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_stats() {
-        let mut cache: Cache<u32, u64> = Cache::new(3);
+        let mut cache: Cache<u32, u64> = Cache::new().with_capacity(3);
         // Initially, no hits or misses.
         let stats = cache.stats();
         assert_eq!(stats.hits(), 0);

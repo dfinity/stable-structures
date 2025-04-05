@@ -87,8 +87,6 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-const DEFAULT_NODE_CACHE_SIZE: usize = 0;
-
 /// A "stable" map based on a B-tree.
 ///
 /// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
@@ -225,7 +223,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
-            node_cache: RefCell::new(Cache::new(DEFAULT_NODE_CACHE_SIZE)),
+            node_cache: RefCell::new(Cache::new()),
         };
 
         btree.save_header();
@@ -253,7 +251,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
-            node_cache: RefCell::new(Cache::new(DEFAULT_NODE_CACHE_SIZE)),
+            node_cache: RefCell::new(Cache::new()),
         };
 
         btree.save_header();
@@ -303,7 +301,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
-            node_cache: RefCell::new(Cache::new(DEFAULT_NODE_CACHE_SIZE)),
+            node_cache: RefCell::new(Cache::new()),
         }
     }
 
