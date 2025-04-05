@@ -75,7 +75,7 @@ where
     /// Computes the total overhead of an entry:
     /// 3 times the key size (stored in cache, usage, and lru_order) plus the value size.
     fn entry_overhead(key_size: usize, value_size: usize) -> usize {
-        3 * key_size + value_size
+        3 * key_size + value_size + 2 * std::mem::size_of::<Counter>()
     }
 
     /// Creates a new cache with the given capacity.
@@ -203,13 +203,13 @@ where
         if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
             let key_size = old_key.byte_size();
-            // Remove from the main cache and subtract the cache overhead (key + value).
+            let overhead = Self::entry_overhead(key_size, 0);
+            self.size = self.size.saturating_sub(overhead);
             if let Some(v) = self.cache.remove(&old_key) {
-                self.size = self.size.saturating_sub(key_size + v.byte_size());
+                self.size = self.size.saturating_sub(v.byte_size());
             }
             self.lru_order.remove(&old_counter);
             self.usage.remove(&old_key);
-            self.size = self.size.saturating_sub(2 * key_size);
             return Some(old_key);
         }
         None
@@ -221,19 +221,19 @@ where
     fn touch(&mut self, key: K) {
         self.counter.0 += 1;
         let new_counter = self.counter;
-        let key_size = key.byte_size();
+        let delta: usize = key.byte_size() + std::mem::size_of::<Counter>();
         // Update usage: if key was present, remove its old LRU overhead.
         if let Some(old_counter) = self.usage.insert(key.clone(), new_counter) {
             if self.lru_order.remove(&old_counter).is_some() {
-                self.size = self.size.saturating_sub(key_size);
+                self.size = self.size.saturating_sub(delta);
             }
         } else {
             // New key in usage.
-            self.size = self.size.saturating_add(key_size);
+            self.size = self.size.saturating_add(delta);
         }
         // Insert into lru_order. If newly inserted, add the overhead.
         if self.lru_order.insert(new_counter, key).is_none() {
-            self.size = self.size.saturating_add(key_size);
+            self.size = self.size.saturating_add(delta);
         }
     }
 
@@ -253,22 +253,13 @@ mod tests {
     use super::*;
     use std::mem::size_of;
 
-    impl ByteSize for u32 {
-        fn byte_size(&self) -> usize {
-            size_of::<u32>()
-        }
-    }
-
-    impl ByteSize for u64 {
-        fn byte_size(&self) -> usize {
-            size_of::<u64>()
-        }
-    }
+    impl ByteSize for u32 {}
+    impl ByteSize for u64 {}
 
     /// Helper: returns the expected overhead (in bytes) for an entry with key type u32 and value type u64.
     /// Calculation: 3 * size_of(u32) + size_of(u64)
     fn entry_size() -> usize {
-        3 * size_of::<u32>() + size_of::<u64>()
+        3 * size_of::<u32>() + size_of::<u64>() + 2 * size_of::<Counter>()
     }
 
     #[test]
