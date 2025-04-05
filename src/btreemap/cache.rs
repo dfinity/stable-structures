@@ -113,7 +113,8 @@ where
         if self.capacity() == 0 || self.size_limit() == 0 {
             return;
         }
-        while self.len() >= self.capacity() || self.size() > self.size_limit() {
+        let delta = key.byte_size() + value.byte_size();
+        while self.len() + 1 > self.capacity() || self.size() + delta > self.size_limit() {
             self.evict_one();
         }
         self.size = self
@@ -187,7 +188,7 @@ where
     }
 
     /// Evicts a single entry based on the LRU policy.
-    fn evict_one(&mut self) -> bool {
+    fn evict_one(&mut self) -> Option<K> {
         if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
             if let Some(k) = self.lru_order.remove(&old_counter) {
@@ -199,9 +200,9 @@ where
                     .saturating_sub(old_key.byte_size() + v.byte_size());
             }
             self.usage.remove(&old_key);
-            return true;
+            return Some(old_key);
         }
-        false
+        None
     }
 
     /// Updates the LRU order by assigning a new counter for the given key.
@@ -222,5 +223,131 @@ where
     /// Resets the cache statistics.
     pub fn reset_stats(&mut self) {
         self.stats = CacheStats::default();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl ByteSize for u32 {
+        fn byte_size(&self) -> usize {
+            std::mem::size_of_val(self)
+        }
+    }
+
+    #[test]
+    fn test_insert_and_get() {
+        let mut cache: Cache<u32, u32> = Cache::new(5);
+        cache.insert(1u32, 100u32);
+        cache.insert(2u32, 200u32);
+
+        // Test that values can be retrieved.
+        assert_eq!(cache.get(&1), Some(100));
+        assert_eq!(cache.get(&2), Some(200));
+        // Test stats: two successful gets.
+        let stats = cache.stats();
+        assert_eq!(stats.hits(), 2);
+        assert_eq!(stats.misses(), 0);
+    }
+
+    #[test]
+    fn test_miss() {
+        let mut cache: Cache<u32, u32> = Cache::new(5);
+        // Attempt to retrieve a key that was never inserted.
+        assert_eq!(cache.get(&1), None);
+        let stats = cache.stats();
+        assert_eq!(stats.hits(), 0);
+        assert_eq!(stats.misses(), 1);
+    }
+
+    #[test]
+    fn test_eviction_by_capacity() {
+        // Create a cache with a capacity of 3 entries.
+        let mut cache: Cache<u32, u32> = Cache::new(3);
+        cache.insert(1u32, 10u32);
+        cache.insert(2u32, 20u32);
+        cache.insert(3u32, 30u32);
+
+        // Inserting a fourth entry should evict one entry (the LRU).
+        cache.insert(4u32, 40u32);
+
+        // With LRU eviction, the least recently used key (1) should be gone.
+        assert_eq!(cache.get(&1), None);
+        // The other keys should be available.
+        assert_eq!(cache.get(&2), Some(20));
+        assert_eq!(cache.get(&3), Some(30));
+        assert_eq!(cache.get(&4), Some(40));
+    }
+
+    #[test]
+    fn test_eviction_by_size_limit() {
+        // Use a cache with a generous capacity but a small size limit.
+        let mut cache: Cache<u32, u32> = Cache::new(10);
+        // Set a size limit small enough so that only two u32 entries (approx 8 bytes each)
+        // can be kept before eviction kicks in.
+        cache.set_size_limit(16);
+        cache.insert(1u32, 10u32); // approx 8 bytes (key + value)
+        cache.insert(2u32, 20u32); // approx 8 bytes more, total around 16 bytes
+
+        // Inserting another entry should trigger eviction due to size limit.
+        cache.insert(3u32, 30u32);
+
+        // Expect that one entry is evicted. Assuming LRU policy, key 1 is evicted.
+        assert_eq!(cache.get(&1), None);
+        // The remaining entries should be present.
+        assert_eq!(cache.get(&2), Some(20));
+        assert_eq!(cache.get(&3), Some(30));
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut cache: Cache<u32, u32> = Cache::new(5);
+        cache.insert(1u32, 10u32);
+        cache.insert(2u32, 20u32);
+
+        // Remove key 1.
+        cache.remove(&1);
+        assert_eq!(cache.get(&1), None);
+        // Removing a non-existing key should not cause issues.
+        cache.remove(&3);
+        // Key 2 should still be retrievable.
+        assert_eq!(cache.get(&2), Some(20));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut cache: Cache<u32, u32> = Cache::new(5);
+        cache.insert(1u32, 10u32);
+        cache.insert(2u32, 20u32);
+        cache.insert(3u32, 30u32);
+
+        cache.clear();
+        assert_eq!(cache.len(), 0);
+        assert_eq!(cache.get(&1), None);
+        assert_eq!(cache.get(&2), None);
+        assert_eq!(cache.get(&3), None);
+    }
+
+    #[test]
+    fn test_stats() {
+        let mut cache: Cache<u32, u32> = Cache::new(3);
+        // Initially, no hits or misses.
+        let stats = cache.stats();
+        assert_eq!(stats.hits(), 0);
+        assert_eq!(stats.misses(), 0);
+
+        // Inserting and accessing some keys.
+        cache.insert(1u32, 10u32);
+        cache.insert(2u32, 20u32);
+
+        // A hit.
+        let _ = cache.get(&1);
+        // A miss.
+        let _ = cache.get(&3);
+
+        let stats = cache.stats();
+        assert_eq!(stats.hits(), 1);
+        assert_eq!(stats.misses(), 1);
     }
 }
