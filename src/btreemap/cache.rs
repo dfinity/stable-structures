@@ -96,7 +96,7 @@ where
 
     /// Retrieves the value associated with the given key and updates the LRU order.
     pub fn get(&mut self, key: &K) -> Option<V> {
-        if self.capacity() == 0 && self.size_limit() == 0 {
+        if self.capacity() == 0 || self.size_limit() == 0 {
             return None;
         }
         if let Some(value) = self.cache.get(key).cloned() {
@@ -108,13 +108,12 @@ where
         None
     }
 
-    /// Inserts the given key and value; if the cache is full, evicts the least-recently used entry.
+    /// Inserts the given key and value; if the cache is full or exceeds the size limit, evicts the least-recently used entry.
     pub fn insert(&mut self, key: K, value: V) {
-        let capacity = self.capacity();
-        if capacity == 0 && self.size_limit() == 0 {
+        if self.capacity() == 0 || self.size_limit() == 0 {
             return;
         }
-        while self.len() >= capacity || self.size() > self.size_limit() {
+        while self.len() >= self.capacity() || self.size() > self.size_limit() {
             self.evict_one();
         }
         self.size = self
@@ -126,16 +125,16 @@ where
 
     /// Removes the entry associated with the given key.
     pub fn remove(&mut self, key: &K) {
-        if self.capacity() == 0 && self.size_limit() == 0 {
+        if self.capacity() == 0 || self.size_limit() == 0 {
             return;
         }
-        self.cache.remove(key).inspect(|v| {
-            self.size = self.size.saturating_add(v.byte_size());
-        });
+        if let Some(v) = self.cache.remove(key) {
+            self.size = self.size.saturating_sub(key.byte_size() + v.byte_size());
+        }
         if let Some(old_counter) = self.usage.remove(key) {
-            self.lru_order.remove(&old_counter).inspect(|k| {
-                self.size = self.size.saturating_add(k.byte_size());
-            });
+            if let Some(removed_key) = self.lru_order.remove(&old_counter) {
+                self.size = self.size.saturating_sub(removed_key.byte_size());
+            }
         }
     }
 
@@ -191,25 +190,24 @@ where
     fn evict_one(&mut self) -> bool {
         if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
-            self.lru_order.remove(&old_counter).inspect(|k| {
+            if let Some(k) = self.lru_order.remove(&old_counter) {
                 self.size = self.size.saturating_sub(k.byte_size());
-            });
-            self.cache.remove(&old_key).inspect(|v| {
-                self.size = self.size.saturating_sub(v.byte_size());
-            });
+            }
+            if let Some(v) = self.cache.remove(&old_key) {
+                self.size = self
+                    .size
+                    .saturating_sub(old_key.byte_size() + v.byte_size());
+            }
             self.usage.remove(&old_key);
             return true;
         }
         false
     }
 
-    /// Updates the LRU order by assigning a new counter for the given id.
+    /// Updates the LRU order by assigning a new counter for the given key.
     fn touch(&mut self, key: K) {
-        let new_counter = {
-            let mut counter = self.counter;
-            counter.0 += 1;
-            counter
-        };
+        self.counter.0 += 1;
+        let new_counter = self.counter;
         if let Some(old_counter) = self.usage.insert(key.clone(), new_counter) {
             self.lru_order.remove(&old_counter);
         }
