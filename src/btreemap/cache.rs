@@ -117,9 +117,7 @@ where
         while self.len() + 1 > self.capacity() || self.size() + delta > self.size_limit() {
             self.evict_one();
         }
-        self.size = self
-            .size
-            .saturating_add(key.byte_size() + value.byte_size());
+        self.size = self.size.saturating_add(delta);
         self.cache.insert(key.clone(), value);
         self.touch(key);
     }
@@ -133,9 +131,7 @@ where
             self.size = self.size.saturating_sub(key.byte_size() + v.byte_size());
         }
         if let Some(old_counter) = self.usage.remove(key) {
-            if let Some(removed_key) = self.lru_order.remove(&old_counter) {
-                self.size = self.size.saturating_sub(removed_key.byte_size());
-            }
+            self.lru_order.remove(&old_counter);
         }
     }
 
@@ -191,9 +187,7 @@ where
     fn evict_one(&mut self) -> Option<K> {
         if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
-            if let Some(k) = self.lru_order.remove(&old_counter) {
-                self.size = self.size.saturating_sub(k.byte_size());
-            }
+            self.lru_order.remove(&old_counter);
             if let Some(v) = self.cache.remove(&old_key) {
                 self.size = self
                     .size
@@ -259,6 +253,39 @@ mod tests {
         let stats = cache.stats();
         assert_eq!(stats.hits(), 0);
         assert_eq!(stats.misses(), 1);
+    }
+
+    #[test]
+    fn test_cache_size_tracking() {
+        let entry_size = 2 * size_of::<u32>(); // Each entry: key + value
+        let mut cache: Cache<u32, u32> = Cache::new(5);
+        cache.set_size_limit(2 * entry_size);
+
+        // Insert first entry.
+        cache.insert(1, 100);
+        assert_eq!(cache.size(), entry_size);
+        assert_eq!(cache.get(&1), Some(100));
+
+        // Insert second entry.
+        cache.insert(2, 200);
+        assert_eq!(cache.size(), 2 * entry_size);
+        assert_eq!(cache.get(&1), Some(100));
+        assert_eq!(cache.get(&2), Some(200));
+
+        // Inserting a third entry should evict one entry (LRU policy).
+        cache.insert(3, 300);
+        // Size remains unchanged.
+        assert_eq!(cache.size(), 2 * entry_size);
+        // Expect the least-recently used entry (key 1) to be evicted.
+        assert_eq!(cache.get(&1), None);
+        assert_eq!(cache.get(&2), Some(200));
+        assert_eq!(cache.get(&3), Some(300));
+
+        // Remove an entry.
+        cache.remove(&2);
+        assert_eq!(cache.size(), entry_size);
+        cache.remove(&3);
+        assert_eq!(cache.size(), 0);
     }
 
     #[test]
