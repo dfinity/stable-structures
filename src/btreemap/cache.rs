@@ -7,7 +7,7 @@ const MiB: usize = 1024 * KiB;
 #[allow(non_upper_case_globals)]
 const GiB: usize = 1024 * MiB;
 
-const DEFAULT_CAPACITY: usize = 10_000;
+const DEFAULT_CAPACITY: usize = 0;
 const DEFAULT_SIZE_LIMIT: usize = 3 * GiB;
 
 pub trait ByteSize {
