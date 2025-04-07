@@ -480,90 +480,292 @@ pub fn btreemap_remove_blob_8_u64_v2() -> BenchResult {
 }
 
 /// Benchmarks getting keys from a BTreeMap.
-#[bench(raw)]
-pub fn btreemap_get_blob_4_1024() -> BenchResult {
-    get_blob_helper::<4, 1024>()
+macro_rules! bench_blob_tests {
+    ($( $fn_name:ident, $helper:ident, $value:expr, $size:expr );+ $(;)?) => {
+        $(
+            #[bench(raw)]
+            pub fn $fn_name() -> BenchResult {
+                $helper::<$value, $size>()
+            }
+        )+
+    };
 }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_4_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<4, 1024>()
+bench_blob_tests! {
+    // x4
+    btreemap_get_blob_4_4,    get_blob_helper,          4, 4;
+    btreemap_get_blob_4_4_v2, get_blob_helper_v2,       4, 4;
+    btreemap_get_blob_8_4,    get_blob_helper,          8, 4;
+    btreemap_get_blob_8_4_v2, get_blob_helper_v2,       8, 4;
+    btreemap_get_blob_16_4,    get_blob_helper,        16, 4;
+    btreemap_get_blob_16_4_v2, get_blob_helper_v2,     16, 4;
+    btreemap_get_blob_32_4,    get_blob_helper,        32, 4;
+    btreemap_get_blob_32_4_v2, get_blob_helper_v2,     32, 4;
+    btreemap_get_blob_64_4,    get_blob_helper,        64, 4;
+    btreemap_get_blob_64_4_v2, get_blob_helper_v2,     64, 4;
+    btreemap_get_blob_128_4,    get_blob_helper,      128, 4;
+    btreemap_get_blob_128_4_v2, get_blob_helper_v2,   128, 4;
+    btreemap_get_blob_256_4,    get_blob_helper,      256, 4;
+    btreemap_get_blob_256_4_v2, get_blob_helper_v2,   256, 4;
+    btreemap_get_blob_512_4,    get_blob_helper,      512, 4;
+    btreemap_get_blob_512_4_v2, get_blob_helper_v2,   512, 4;
+    btreemap_get_blob_1024_4,    get_blob_helper,    1024, 4;
+    btreemap_get_blob_1024_4_v2, get_blob_helper_v2, 1024, 4;
+    btreemap_get_blob_1024_4_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 4;
+
+    // x8
+    btreemap_get_blob_4_8,    get_blob_helper,          4, 8;
+    btreemap_get_blob_4_8_v2, get_blob_helper_v2,       4, 8;
+    btreemap_get_blob_8_8,    get_blob_helper,          8, 8;
+    btreemap_get_blob_8_8_v2, get_blob_helper_v2,       8, 8;
+    btreemap_get_blob_16_8,    get_blob_helper,        16, 8;
+    btreemap_get_blob_16_8_v2, get_blob_helper_v2,     16, 8;
+    btreemap_get_blob_32_8,    get_blob_helper,        32, 8;
+    btreemap_get_blob_32_8_v2, get_blob_helper_v2,     32, 8;
+    btreemap_get_blob_64_8,    get_blob_helper,        64, 8;
+    btreemap_get_blob_64_8_v2, get_blob_helper_v2,     64, 8;
+    btreemap_get_blob_128_8,    get_blob_helper,      128, 8;
+    btreemap_get_blob_128_8_v2, get_blob_helper_v2,   128, 8;
+    btreemap_get_blob_256_8,    get_blob_helper,      256, 8;
+    btreemap_get_blob_256_8_v2, get_blob_helper_v2,   256, 8;
+    btreemap_get_blob_512_8,    get_blob_helper,      512, 8;
+    btreemap_get_blob_512_8_v2, get_blob_helper_v2,   512, 8;
+    btreemap_get_blob_1024_8,    get_blob_helper,    1024, 8;
+    btreemap_get_blob_1024_8_v2, get_blob_helper_v2, 1024, 8;
+    btreemap_get_blob_1024_8_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 8;
+
+    // x16
+    btreemap_get_blob_4_16,    get_blob_helper,          4, 16;
+    btreemap_get_blob_4_16_v2, get_blob_helper_v2,       4, 16;
+    btreemap_get_blob_8_16,    get_blob_helper,          8, 16;
+    btreemap_get_blob_8_16_v2, get_blob_helper_v2,       8, 16;
+    btreemap_get_blob_16_16,    get_blob_helper,        16, 16;
+    btreemap_get_blob_16_16_v2, get_blob_helper_v2,     16, 16;
+    btreemap_get_blob_32_16,    get_blob_helper,        32, 16;
+    btreemap_get_blob_32_16_v2, get_blob_helper_v2,     32, 16;
+    btreemap_get_blob_64_16,    get_blob_helper,        64, 16;
+    btreemap_get_blob_64_16_v2, get_blob_helper_v2,     64, 16;
+    btreemap_get_blob_128_16,    get_blob_helper,      128, 16;
+    btreemap_get_blob_128_16_v2, get_blob_helper_v2,   128, 16;
+    btreemap_get_blob_256_16,    get_blob_helper,      256, 16;
+    btreemap_get_blob_256_16_v2, get_blob_helper_v2,   256, 16;
+    btreemap_get_blob_512_16,    get_blob_helper,      512, 16;
+    btreemap_get_blob_512_16_v2, get_blob_helper_v2,   512, 16;
+    btreemap_get_blob_1024_16,    get_blob_helper,    1024, 16;
+    btreemap_get_blob_1024_16_v2, get_blob_helper_v2, 1024, 16;
+    btreemap_get_blob_1024_16_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 16;
+
+    // x32
+    btreemap_get_blob_4_32,    get_blob_helper,          4, 32;
+    btreemap_get_blob_4_32_v2, get_blob_helper_v2,       4, 32;
+    btreemap_get_blob_8_32,    get_blob_helper,          8, 32;
+    btreemap_get_blob_8_32_v2, get_blob_helper_v2,       8, 32;
+    btreemap_get_blob_16_32,    get_blob_helper,        16, 32;
+    btreemap_get_blob_16_32_v2, get_blob_helper_v2,     16, 32;
+    btreemap_get_blob_32_32,    get_blob_helper,        32, 32;
+    btreemap_get_blob_32_32_v2, get_blob_helper_v2,     32, 32;
+    btreemap_get_blob_64_32,    get_blob_helper,        64, 32;
+    btreemap_get_blob_64_32_v2, get_blob_helper_v2,     64, 32;
+    btreemap_get_blob_128_32,    get_blob_helper,      128, 32;
+    btreemap_get_blob_128_32_v2, get_blob_helper_v2,   128, 32;
+    btreemap_get_blob_256_32,    get_blob_helper,      256, 32;
+    btreemap_get_blob_256_32_v2, get_blob_helper_v2,   256, 32;
+    btreemap_get_blob_512_32,    get_blob_helper,      512, 32;
+    btreemap_get_blob_512_32_v2, get_blob_helper_v2,   512, 32;
+    btreemap_get_blob_1024_32,    get_blob_helper,    1024, 32;
+    btreemap_get_blob_1024_32_v2, get_blob_helper_v2, 1024, 32;
+    btreemap_get_blob_1024_32_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 32;
+
+    // x64
+    btreemap_get_blob_4_64,    get_blob_helper,          4, 64;
+    btreemap_get_blob_4_64_v2, get_blob_helper_v2,       4, 64;
+    btreemap_get_blob_8_64,    get_blob_helper,          8, 64;
+    btreemap_get_blob_8_64_v2, get_blob_helper_v2,       8, 64;
+    btreemap_get_blob_16_64,    get_blob_helper,        16, 64;
+    btreemap_get_blob_16_64_v2, get_blob_helper_v2,     16, 64;
+    btreemap_get_blob_32_64,    get_blob_helper,        32, 64;
+    btreemap_get_blob_32_64_v2, get_blob_helper_v2,     32, 64;
+    btreemap_get_blob_64_64,    get_blob_helper,        64, 64;
+    btreemap_get_blob_64_64_v2, get_blob_helper_v2,     64, 64;
+    btreemap_get_blob_128_64,    get_blob_helper,      128, 64;
+    btreemap_get_blob_128_64_v2, get_blob_helper_v2,   128, 64;
+    btreemap_get_blob_256_64,    get_blob_helper,      256, 64;
+    btreemap_get_blob_256_64_v2, get_blob_helper_v2,   256, 64;
+    btreemap_get_blob_512_64,    get_blob_helper,      512, 64;
+    btreemap_get_blob_512_64_v2, get_blob_helper_v2,   512, 64;
+    btreemap_get_blob_1024_64,    get_blob_helper,    1024, 64;
+    btreemap_get_blob_1024_64_v2, get_blob_helper_v2, 1024, 64;
+    btreemap_get_blob_1024_64_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 64;
+
+    // x128
+    btreemap_get_blob_4_128,    get_blob_helper,          4, 128;
+    btreemap_get_blob_4_128_v2, get_blob_helper_v2,       4, 128;
+    btreemap_get_blob_8_128,    get_blob_helper,          8, 128;
+    btreemap_get_blob_8_128_v2, get_blob_helper_v2,       8, 128;
+    btreemap_get_blob_16_128,    get_blob_helper,        16, 128;
+    btreemap_get_blob_16_128_v2, get_blob_helper_v2,     16, 128;
+    btreemap_get_blob_32_128,    get_blob_helper,        32, 128;
+    btreemap_get_blob_32_128_v2, get_blob_helper_v2,     32, 128;
+    btreemap_get_blob_64_128,    get_blob_helper,        64, 128;
+    btreemap_get_blob_64_128_v2, get_blob_helper_v2,     64, 128;
+    btreemap_get_blob_128_128,    get_blob_helper,      128, 128;
+    btreemap_get_blob_128_128_v2, get_blob_helper_v2,   128, 128;
+    btreemap_get_blob_256_128,    get_blob_helper,      256, 128;
+    btreemap_get_blob_256_128_v2, get_blob_helper_v2,   256, 128;
+    btreemap_get_blob_512_128,    get_blob_helper,      512, 128;
+    btreemap_get_blob_512_128_v2, get_blob_helper_v2,   512, 128;
+    btreemap_get_blob_1024_128,    get_blob_helper,    1024, 128;
+    btreemap_get_blob_1024_128_v2, get_blob_helper_v2, 1024, 128;
+    btreemap_get_blob_1024_128_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 128;
+
+    // x256
+    btreemap_get_blob_4_256,    get_blob_helper,          4, 256;
+    btreemap_get_blob_4_256_v2, get_blob_helper_v2,       4, 256;
+    btreemap_get_blob_8_256,    get_blob_helper,          8, 256;
+    btreemap_get_blob_8_256_v2, get_blob_helper_v2,       8, 256;
+    btreemap_get_blob_16_256,    get_blob_helper,        16, 256;
+    btreemap_get_blob_16_256_v2, get_blob_helper_v2,     16, 256;
+    btreemap_get_blob_32_256,    get_blob_helper,        32, 256;
+    btreemap_get_blob_32_256_v2, get_blob_helper_v2,     32, 256;
+    btreemap_get_blob_64_256,    get_blob_helper,        64, 256;
+    btreemap_get_blob_64_256_v2, get_blob_helper_v2,     64, 256;
+    btreemap_get_blob_128_256,    get_blob_helper,      128, 256;
+    btreemap_get_blob_128_256_v2, get_blob_helper_v2,   128, 256;
+    btreemap_get_blob_256_256,    get_blob_helper,      256, 256;
+    btreemap_get_blob_256_256_v2, get_blob_helper_v2,   256, 256;
+    btreemap_get_blob_512_256,    get_blob_helper,      512, 256;
+    btreemap_get_blob_512_256_v2, get_blob_helper_v2,   512, 256;
+    btreemap_get_blob_1024_256,    get_blob_helper,    1024, 256;
+    btreemap_get_blob_1024_256_v2, get_blob_helper_v2, 1024, 256;
+    btreemap_get_blob_1024_256_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 256;
+
+    // x512
+    btreemap_get_blob_4_512,    get_blob_helper,          4, 512;
+    btreemap_get_blob_4_512_v2, get_blob_helper_v2,       4, 512;
+    btreemap_get_blob_8_512,    get_blob_helper,          8, 512;
+    btreemap_get_blob_8_512_v2, get_blob_helper_v2,       8, 512;
+    btreemap_get_blob_16_512,    get_blob_helper,        16, 512;
+    btreemap_get_blob_16_512_v2, get_blob_helper_v2,     16, 512;
+    btreemap_get_blob_32_512,    get_blob_helper,        32, 512;
+    btreemap_get_blob_32_512_v2, get_blob_helper_v2,     32, 512;
+    btreemap_get_blob_64_512,    get_blob_helper,        64, 512;
+    btreemap_get_blob_64_512_v2, get_blob_helper_v2,     64, 512;
+    btreemap_get_blob_128_512,    get_blob_helper,      128, 512;
+    btreemap_get_blob_128_512_v2, get_blob_helper_v2,   128, 512;
+    btreemap_get_blob_256_512,    get_blob_helper,      256, 512;
+    btreemap_get_blob_256_512_v2, get_blob_helper_v2,   256, 512;
+    btreemap_get_blob_512_512,    get_blob_helper,      512, 512;
+    btreemap_get_blob_512_512_v2, get_blob_helper_v2,   512, 512;
+    btreemap_get_blob_1024_512,    get_blob_helper,    1024, 512;
+    btreemap_get_blob_1024_512_v2, get_blob_helper_v2, 1024, 512;
+    btreemap_get_blob_1024_512_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 512;
+
+    // x1024
+    btreemap_get_blob_4_1024,    get_blob_helper,          4, 1024;
+    btreemap_get_blob_4_1024_v2, get_blob_helper_v2,       4, 1024;
+    btreemap_get_blob_8_1024,    get_blob_helper,          8, 1024;
+    btreemap_get_blob_8_1024_v2, get_blob_helper_v2,       8, 1024;
+    btreemap_get_blob_16_1024,    get_blob_helper,        16, 1024;
+    btreemap_get_blob_16_1024_v2, get_blob_helper_v2,     16, 1024;
+    btreemap_get_blob_32_1024,    get_blob_helper,        32, 1024;
+    btreemap_get_blob_32_1024_v2, get_blob_helper_v2,     32, 1024;
+    btreemap_get_blob_64_1024,    get_blob_helper,        64, 1024;
+    btreemap_get_blob_64_1024_v2, get_blob_helper_v2,     64, 1024;
+    btreemap_get_blob_128_1024,    get_blob_helper,      128, 1024;
+    btreemap_get_blob_128_1024_v2, get_blob_helper_v2,   128, 1024;
+    btreemap_get_blob_256_1024,    get_blob_helper,      256, 1024;
+    btreemap_get_blob_256_1024_v2, get_blob_helper_v2,   256, 1024;
+    btreemap_get_blob_512_1024,    get_blob_helper,      512, 1024;
+    btreemap_get_blob_512_1024_v2, get_blob_helper_v2,   512, 1024;
+    btreemap_get_blob_1024_1024,    get_blob_helper,    1024, 1024;
+    btreemap_get_blob_1024_1024_v2, get_blob_helper_v2, 1024, 1024;
+    btreemap_get_blob_1024_1024_v2_mem_manager, get_blob_helper_v2_mem_manager, 1024, 1024;
 }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_8_1024() -> BenchResult {
-    get_blob_helper::<8, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_4_1024() -> BenchResult {
+//     get_blob_helper::<4, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_8_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<8, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_4_1024_v2() -> BenchResult {
+//     get_blob_helper_v2::<4, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_16_1024() -> BenchResult {
-    get_blob_helper::<16, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_8_1024() -> BenchResult {
+//     get_blob_helper::<8, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_16_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<16, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_8_1024_v2() -> BenchResult {
+//     get_blob_helper_v2::<8, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_32_1024() -> BenchResult {
-    get_blob_helper::<32, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_16_1024() -> BenchResult {
+//     get_blob_helper::<16, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_32_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<32, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_16_1024_v2() -> BenchResult {
+//     get_blob_helper_v2::<16, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_64_1024() -> BenchResult {
-    get_blob_helper::<64, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_32_1024() -> BenchResult {
+//     get_blob_helper::<32, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_64_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<64, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_32_1024_v2() -> BenchResult {
+//     get_blob_helper_v2::<32, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_128_1024() -> BenchResult {
-    get_blob_helper::<128, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_64_1024() -> BenchResult {
+//     get_blob_helper::<64, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_128_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<128, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_64_1024_v2() -> BenchResult {
+//     get_blob_helper_v2::<64, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_256_1024() -> BenchResult {
-    get_blob_helper::<256, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_128_1024() -> BenchResult {
+//     get_blob_helper::<128, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_256_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<256, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_128_1024_v2() -> BenchResult {
+//     get_blob_helper_v2::<128, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_512_1024() -> BenchResult {
-    get_blob_helper::<512, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_256_1024() -> BenchResult {
+//     get_blob_helper::<256, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_512_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<512, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_256_1024_v2() -> BenchResult {
+//     get_blob_helper_v2::<256, 1024>()
+// }
 
-#[bench(raw)]
-pub fn btreemap_get_blob_512_1024_v2_mem_manager() -> BenchResult {
-    get_blob_helper_v2_mem_manager::<512, 1024>()
-}
+// #[bench(raw)]
+// pub fn btreemap_get_blob_512_1024() -> BenchResult {
+//     get_blob_helper::<512, 1024>()
+// }
+
+// #[bench(raw)]
+// pub fn btreemap_get_blob_512_1024_v2() -> BenchResult {
+//     get_blob_helper_v2::<512, 1024>()
+// }
+
+// #[bench(raw)]
+// pub fn btreemap_get_blob_512_1024_v2_mem_manager() -> BenchResult {
+//     get_blob_helper_v2_mem_manager::<512, 1024>()
+// }
 
 #[bench(raw)]
 pub fn btreemap_get_u64_u64() -> BenchResult {
