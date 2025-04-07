@@ -7,7 +7,7 @@ const MiB: usize = 1024 * KiB;
 #[allow(non_upper_case_globals)]
 const GiB: usize = 1024 * MiB;
 
-const DEFAULT_CAPACITY: usize = 0;
+const DEFAULT_CAPACITY: usize = 10_000;
 const DEFAULT_SIZE_LIMIT: usize = 3 * GiB;
 
 pub trait ByteSize {
@@ -51,7 +51,7 @@ impl CacheStats {
 }
 
 /// Cache with eviction policy that minimizes duplication of keys and values.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Cache<K, V>
 where
     K: Clone + Ord + ByteSize,
@@ -81,6 +81,7 @@ where
 
     /// Creates a new cache with the given capacity.
     pub fn new() -> Self {
+        crate::debug::print("ABC cache new");
         Self {
             cache: BTreeMap::new(),
             capacity: DEFAULT_CAPACITY,
@@ -95,12 +96,16 @@ where
 
     /// Creates a new cache with the given capacity and size limit.
     pub fn with_capacity(self, capacity: usize) -> Self {
-        Self { capacity, ..self }
+        let mut this = self.clone();
+        this.capacity = capacity;
+        this
     }
 
     /// Creates a new cache with the given size limit.
     pub fn with_size_limit(self, size_limit: usize) -> Self {
-        Self { size_limit, ..self }
+        let mut this = self.clone();
+        this.size_limit = size_limit;
+        this
     }
 
     /// Clears all entries and resets statistics.
@@ -256,6 +261,21 @@ where
     /// Resets the cache statistics.
     pub fn reset_stats(&mut self) {
         self.stats = CacheStats::default();
+    }
+}
+
+impl<K, V> Drop for Cache<K, V>
+where
+    K: Clone + Ord + ByteSize,
+    V: Clone + ByteSize,
+{
+    fn drop(&mut self) {
+        crate::debug::print(&format!("ABC cache len       : {}", self.len()));
+        crate::debug::print(&format!("ABC cache size      : {}", self.size()));
+        crate::debug::print(&format!(
+            "ABC cache hit ratio : {:>.1} %",
+            self.stats().hit_ratio() * 100.0
+        ));
     }
 }
 

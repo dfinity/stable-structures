@@ -99,7 +99,7 @@ fn instruction_count() -> u64 {
     }
 }
 
-pub fn print(msg: String) {
+pub fn print(msg: &str) {
     #[cfg(target_arch = "wasm32")]
     {
         ic_cdk::api::print(msg);
