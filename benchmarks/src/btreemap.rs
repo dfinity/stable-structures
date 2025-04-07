@@ -479,8 +479,8 @@ pub fn btreemap_remove_blob_8_u64_v2() -> BenchResult {
     remove_helper::<Blob<8>, u64>(btree)
 }
 
-/// Benchmarks getting keys from a BTreeMap.
-macro_rules! bench_blob_tests {
+/// Helper macro to generate benchmarks.
+macro_rules! bench_tests {
     ($( $fn_name:ident, $helper:ident, $value:expr, $size:expr );+ $(;)?) => {
         $(
             #[bench(raw)]
@@ -491,7 +491,8 @@ macro_rules! bench_blob_tests {
     };
 }
 
-bench_blob_tests! {
+// Benchmarks getting keys from a BTreeMap.
+bench_tests! {
     // x4
     btreemap_get_blob_4_4,    get_blob_helper,          4, 4;
     btreemap_get_blob_4_4_v2, get_blob_helper_v2,       4, 4;
