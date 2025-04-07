@@ -509,28 +509,22 @@ where
         node.save(self.allocator_mut());
     }
 
-    /// Returns the value associated with the given key if it exists.
+    /// Returns the value for the given key, if it exists.
     pub fn get(&self, key: &K) -> Option<V> {
         if self.root_addr == NULL {
             return None;
         }
         self.traverse(self.root_addr, key, |node, idx| {
-            // The key exists in the node, get the value.
-            node.into_entry(idx, self.memory()).1
+            node.into_entry(idx, self.memory()).1 // Extract value.
         })
         .map(Cow::Owned)
         .map(V::from_bytes)
     }
 
-    /// Returns `true` if the key exists in the map, `false` otherwise.
+    /// Returns true if the key exists.
     pub fn contains_key(&self, key: &K) -> bool {
-        if self.root_addr == NULL {
-            return false;
-        }
-        self.traverse(self.root_addr, key, |_, _| {
-            // The key exists in the node, do nothing.
-        })
-        .is_some()
+        // An empty closure returns Some(()) if the key is found.
+        self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
     }
 
     /// Recursively traverses from `node_addr`, calling `f` on a match; stops at a leaf.
