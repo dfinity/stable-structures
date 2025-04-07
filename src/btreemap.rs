@@ -515,7 +515,7 @@ where
             return None;
         }
         self.traverse(self.root_addr, key, |node, idx| {
-            // The key exists in the node. Get the value.
+            // The key exists in the node, get the value.
             node.into_entry(idx, self.memory()).1
         })
         .map(Cow::Owned)
@@ -527,7 +527,10 @@ where
         if self.root_addr == NULL {
             return false;
         }
-        self.traverse(self.root_addr, key, |_, _| ()).is_some()
+        self.traverse(self.root_addr, key, |_, _| {
+            // The key exists in the node, do nothing.
+        })
+        .is_some()
     }
 
     /// Recursively traverses from `node_addr`, calling `f` on a match; stops at a leaf.
