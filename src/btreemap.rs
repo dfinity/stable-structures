@@ -515,6 +515,7 @@ where
             return None;
         }
         self.traverse(self.root_addr, key, |node, idx| {
+            // The key exists in the node. Get the value.
             node.into_entry(idx, self.memory()).1
         })
         .map(Cow::Owned)
@@ -529,9 +530,7 @@ where
         self.traverse(self.root_addr, key, |_, _| ()).is_some()
     }
 
-    /// Generic recursive traversal helper.
-    ///
-    /// Recursively traverses from `node_addr`, invoking `f` when a matching key is found, or stops at a leaf.
+    /// Recursively traverses from `node_addr`, calling `f` on a match; stops at a leaf.
     fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
     where
         F: Fn(Node<K>, usize) -> R + Clone,
