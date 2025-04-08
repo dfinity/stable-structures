@@ -49,8 +49,8 @@
 //! ----------------------------------------
 //! ```
 mod allocator;
-mod key_address_cache;
 mod iter;
+mod key_address_cache;
 mod node;
 
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
@@ -1119,6 +1119,7 @@ where
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
         let address = node.address();
+        self.key_address_cache.borrow_mut().remove_address(&address);
         node.keys().iter().for_each(|key| {
             self.key_address_cache
                 .borrow_mut()

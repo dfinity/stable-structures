@@ -87,6 +87,10 @@ where
             self.evict_one();
         }
         self.key_to_address.insert(key.clone(), address);
+        self.address_to_keys
+            .entry(address)
+            .or_default()
+            .push(key.clone());
         self.touch(key);
     }
 
@@ -95,9 +99,31 @@ where
         if self.capacity == 0 {
             return;
         }
-        self.key_to_address.remove(key);
+        if let Some(address) = self.key_to_address.remove(key) {
+            if let Some(keys) = self.address_to_keys.get_mut(&address) {
+                keys.retain(|k| k != key);
+                if keys.is_empty() {
+                    self.address_to_keys.remove(&address);
+                }
+            }
+        }
         if let Some(counter) = self.usage.remove(key) {
             self.lru_order.remove(&counter);
+        }
+    }
+
+    /// Removes all entries associated with the given address.
+    pub fn remove_address(&mut self, address: &Address) {
+        if self.capacity == 0 {
+            return;
+        }
+        if let Some(keys) = self.address_to_keys.remove(address) {
+            for key in keys {
+                self.key_to_address.remove(&key);
+                if let Some(counter) = self.usage.remove(&key) {
+                    self.lru_order.remove(&counter);
+                }
+            }
         }
     }
 
@@ -277,6 +303,19 @@ mod tests {
         cache.remove(&user(3));
         // Key 2 should still be retrievable.
         assert_eq!(cache.get(&user(2)), Some(addr(200)));
+    }
+
+    #[test]
+    fn test_remove_address() {
+        let mut cache = KeyAddressCache::new().with_capacity(5);
+        cache.insert(user(1), addr(100));
+        cache.insert(user(2), addr(100));
+        cache.insert(user(3), addr(200));
+
+        cache.remove_address(&addr(100));
+        assert_eq!(cache.get(&user(1)), None);
+        assert_eq!(cache.get(&user(2)), None);
+        assert_eq!(cache.get(&user(3)), Some(addr(200)));
     }
 
     #[test]
