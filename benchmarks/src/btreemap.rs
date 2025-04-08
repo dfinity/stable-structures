@@ -230,55 +230,31 @@ pub fn btreemap_iter_count_10mib_values() -> BenchResult {
 // Benchmarks removing keys from a BTreeMap.
 bench_tests! {
     // K x 1024
-    btreemap_remove_blob_4_1024,        remove_blob_helper,        4, 1024;
-    btreemap_remove_blob_4_1024_v2,     remove_blob_helper_v2,     4, 1024;
-    btreemap_remove_blob_8_1024,        remove_blob_helper,        8, 1024;
-    btreemap_remove_blob_8_1024_v2,     remove_blob_helper_v2,     8, 1024;
-    btreemap_remove_blob_16_1024,       remove_blob_helper,       16, 1024;
-    btreemap_remove_blob_16_1024_v2,    remove_blob_helper_v2,    16, 1024;
-    btreemap_remove_blob_32_1024,       remove_blob_helper,       32, 1024;
-    btreemap_remove_blob_32_1024_v2,    remove_blob_helper_v2,    32, 1024;
-    btreemap_remove_blob_64_1024,       remove_blob_helper,       64, 1024;
-    btreemap_remove_blob_64_1024_v2,    remove_blob_helper_v2,    64, 1024;
-    btreemap_remove_blob_128_1024,      remove_blob_helper,      128, 1024;
-    btreemap_remove_blob_128_1024_v2,   remove_blob_helper_v2,   128, 1024;
-    btreemap_remove_blob_256_1024,      remove_blob_helper,      256, 1024;
-    btreemap_remove_blob_256_1024_v2,   remove_blob_helper_v2,   256, 1024;
-    btreemap_remove_blob_512_1024,      remove_blob_helper,      512, 1024;
-    btreemap_remove_blob_512_1024_v2,   remove_blob_helper_v2,   512, 1024;
-}
+    btreemap_remove_blob_4_1024,        remove_helper_v1,     Blob4, Blob1024;
+    btreemap_remove_blob_4_1024_v2,     remove_helper_v2,     Blob4, Blob1024;
+    btreemap_remove_blob_8_1024,        remove_helper_v1,     Blob8, Blob1024;
+    btreemap_remove_blob_8_1024_v2,     remove_helper_v2,     Blob8, Blob1024;
+    btreemap_remove_blob_16_1024,       remove_helper_v1,    Blob16, Blob1024;
+    btreemap_remove_blob_16_1024_v2,    remove_helper_v2,    Blob16, Blob1024;
+    btreemap_remove_blob_32_1024,       remove_helper_v1,    Blob32, Blob1024;
+    btreemap_remove_blob_32_1024_v2,    remove_helper_v2,    Blob32, Blob1024;
+    btreemap_remove_blob_64_1024,       remove_helper_v1,    Blob64, Blob1024;
+    btreemap_remove_blob_64_1024_v2,    remove_helper_v2,    Blob64, Blob1024;
+    btreemap_remove_blob_128_1024,      remove_helper_v1,   Blob128, Blob1024;
+    btreemap_remove_blob_128_1024_v2,   remove_helper_v2,   Blob128, Blob1024;
+    btreemap_remove_blob_256_1024,      remove_helper_v1,   Blob256, Blob1024;
+    btreemap_remove_blob_256_1024_v2,   remove_helper_v2,   Blob256, Blob1024;
+    btreemap_remove_blob_512_1024,      remove_helper_v1,   Blob512, Blob1024;
+    btreemap_remove_blob_512_1024_v2,   remove_helper_v2,   Blob512, Blob1024;
 
-#[bench(raw)]
-pub fn btreemap_remove_u64_u64() -> BenchResult {
-    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
-    remove_helper::<u64, u64>(btree)
-}
-#[bench(raw)]
-pub fn btreemap_remove_u64_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    remove_helper::<u64, u64>(btree)
-}
+    btreemap_remove_u64_u64,            remove_helper_v1,   u64,     u64;
+    btreemap_remove_u64_u64_v2,         remove_helper_v2,   u64,     u64;
 
-#[bench(raw)]
-pub fn btreemap_remove_u64_blob_8() -> BenchResult {
-    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
-    remove_helper::<u64, Blob<8>>(btree)
-}
-#[bench(raw)]
-pub fn btreemap_remove_u64_blob_8_v2() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    remove_helper::<u64, Blob<8>>(btree)
-}
+    btreemap_remove_u64_blob_8,         remove_helper_v1,   u64,   Blob8;
+    btreemap_remove_u64_blob_8_v2,      remove_helper_v2,   u64,   Blob8;
 
-#[bench(raw)]
-pub fn btreemap_remove_blob_8_u64() -> BenchResult {
-    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
-    remove_helper::<Blob<8>, u64>(btree)
-}
-#[bench(raw)]
-pub fn btreemap_remove_blob_8_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    remove_helper::<Blob<8>, u64>(btree)
+    btreemap_remove_blob_8_u64,         remove_helper_v1,   Blob8,   u64;
+    btreemap_remove_blob_8_u64_v2,      remove_helper_v2,   Blob8,   u64;
 }
 
 // Benchmarks getting keys from a BTreeMap.
@@ -490,14 +466,14 @@ fn contains_key_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>
 }
 
 // Inserts a large number of random blobs into a btreemap, then profiles removing them.
-fn remove_blob_helper<const K: usize, const V: usize>() -> BenchResult {
+fn remove_helper_v1<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
-    remove_helper::<Blob<K>, Blob<V>>(btree)
+    remove_helper::<K, V>(btree)
 }
 
-fn remove_blob_helper_v2<const K: usize, const V: usize>() -> BenchResult {
+fn remove_helper_v2<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    remove_helper::<Blob<K>, Blob<V>>(btree)
+    remove_helper::<K, V>(btree)
 }
 
 fn remove_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
