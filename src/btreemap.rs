@@ -49,8 +49,10 @@
 //! ----------------------------------------
 //! ```
 mod allocator;
+mod cache;
 mod iter;
 mod node;
+
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
     storable::Bound as StorableBound,
