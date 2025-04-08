@@ -115,8 +115,13 @@ struct Destructor {}
 impl Drop for Destructor {
     fn drop(&mut self) {
         let stats = crate::debug::get_stats();
+        let sum_instructions: u64 = stats.iter().map(|s| s.1.total_instructions).sum();
         for s in stats {
-            crate::debug::print(format!("{}: {:?}", s.0, s.1));
+            let percent = (s.1.total_instructions as f64 / sum_instructions as f64) * 100.0;
+            crate::debug::print(format!(
+                "{}: {:?} ({:>3.1} %), {}",
+                s.0, s.1.total_instructions, percent, s.1.call_count
+            ));
         }
     }
 }
@@ -550,25 +555,25 @@ where
     where
         F: Fn(Node<K>, usize) -> R + Clone,
     {
-        #[cfg(feature = "canbench-rs")]
-        let _p = crate::debug::InstructionCounter::new("traverse");
+        // #[cfg(feature = "canbench-rs")]
+        // let _p = crate::debug::InstructionCounter::new("traverse");
 
         let node = {
-            // #[cfg(feature = "canbench-rs")]
-            // let _p = crate::debug::InstructionCounter::new("load_node");
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("load_node");
             self.load_node(node_addr)
         };
 
         let search = {
-            // #[cfg(feature = "canbench-rs")]
-            // let _p = crate::debug::InstructionCounter::new("search");
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("search");
             node.search(key)
         };
         match search {
             Ok(idx) => {
                 // Key found: apply `f`.
-                // #[cfg(feature = "canbench-rs")]
-                // let _p = crate::debug::InstructionCounter::new("f");
+                #[cfg(feature = "canbench-rs")]
+                let _p = crate::debug::InstructionCounter::new("f");
 
                 Some(f(node, idx))
             }

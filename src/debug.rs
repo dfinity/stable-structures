@@ -17,11 +17,10 @@ pub struct InstructionCounter {
 
 impl InstructionCounter {
     pub fn new(name: &'static str) -> Self {
-        let time = instruction_count();
         ENTRIES.with(|c| {
             c.borrow_mut().push_back(Measurement {
                 name,
-                time,
+                time: instruction_count(),
                 is_start: true,
             });
         });
@@ -31,11 +30,10 @@ impl InstructionCounter {
 
 impl Drop for InstructionCounter {
     fn drop(&mut self) {
-        let time = instruction_count();
         ENTRIES.with(|c| {
             c.borrow_mut().push_back(Measurement {
                 name: self.name,
-                time,
+                time: instruction_count(),
                 is_start: false,
             });
         });
@@ -46,8 +44,8 @@ impl Drop for InstructionCounter {
 pub struct Stats {
     start_instructions: Option<u64>,
     running_count: u64,
-    total_instructions: u64,
-    call_count: u64,
+    pub total_instructions: u64,
+    pub call_count: u64,
 }
 
 impl std::fmt::Debug for Stats {
@@ -89,15 +87,15 @@ pub fn get_stats() -> Vec<(&'static str, Stats)> {
     let mut stats_vec: Vec<_> = stats.iter().map(|(&k, &v)| (k, v)).collect();
     stats_vec.sort_by(|a, b| b.1.total_instructions.cmp(&a.1.total_instructions));
 
-    stats_vec.push((
-        "get_stats",
-        Stats {
-            start_instructions: None,
-            running_count: 0,
-            total_instructions: instruction_count() - start,
-            call_count: 1,
-        },
-    ));
+    // stats_vec.push((
+    //     "get_stats",
+    //     Stats {
+    //         start_instructions: None,
+    //         running_count: 0,
+    //         total_instructions: instruction_count() - start,
+    //         call_count: 1,
+    //     },
+    // ));
 
     stats_vec
 }
