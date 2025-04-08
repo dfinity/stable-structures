@@ -231,7 +231,7 @@ where
             destructor: Destructor::default(),
         };
 
-        btree.save();
+        btree.save_header();
         btree
     }
 
@@ -259,7 +259,7 @@ where
             destructor: Destructor::default(),
         };
 
-        btree.save();
+        btree.save_header();
         btree
     }
 
@@ -268,7 +268,7 @@ where
         Self::load_helper(memory, true)
     }
 
-    // Loads the map from memory, potentially migrating the map from V1 to V2.
+    /// Loads the map from memory, potentially migrating the map from V1 to V2.
     fn load_helper(memory: M, migrate_to_v2: bool) -> Self {
         // Read the header from memory.
         let header = Self::read_header(&memory);
@@ -376,7 +376,7 @@ where
             // No root present. Allocate one.
             let node = self.allocate_node(NodeType::Leaf);
             self.root_addr = node.address();
-            self.save();
+            self.save_header();
             node
         } else {
             // Load the root from memory.
@@ -386,7 +386,7 @@ where
             if let Ok(idx) = root.search(&key) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                root.save(self.allocator_mut());
+                self.save_node(&mut root);
                 return Some(V::from_bytes(Cow::Owned(previous_value)));
             }
 
@@ -404,7 +404,7 @@ where
 
                 // Update the root address.
                 self.root_addr = new_root.address();
-                self.save();
+                self.save_header();
 
                 // Split the old (full) root.
                 self.split_child(&mut new_root, 0);
@@ -420,7 +420,7 @@ where
             .map(V::from_bytes)
     }
 
-    // Inserts an entry into a node that is *not full*.
+    /// Inserts an entry into a node that is *not full*.
     fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
@@ -432,7 +432,7 @@ where
                 // Overwrite it and return the previous value.
                 let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
 
-                node.save(self.allocator_mut());
+                self.save_node(&mut node);
                 Some(previous_value)
             }
             Err(idx) => {
@@ -443,11 +443,11 @@ where
                         // The node is a non-full leaf.
                         // Insert the entry at the proper location.
                         node.insert_entry(idx, (key, value));
-                        node.save(self.allocator_mut());
+                        self.save_node(&mut node);
 
                         // Update the length.
                         self.length += 1;
-                        self.save();
+                        self.save_header();
 
                         // No previous value to return.
                         None
@@ -463,7 +463,7 @@ where
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) =
                                     child.swap_entry(idx, (key, value), self.memory());
-                                child.save(self.allocator_mut());
+                                self.save_node(&mut child);
                                 return Some(previous_value);
                             }
 
@@ -486,22 +486,23 @@ where
         }
     }
 
-    // Takes as input a nonfull internal `node` and index to its full child, then
-    // splits this child into two, adding an additional child to `node`.
-    //
-    // Example:
-    //
-    //                          [ ... M   Y ... ]
-    //                                  |
-    //                 [ N  O  P  Q  R  S  T  U  V  W  X ]
-    //
-    //
-    // After splitting becomes:
-    //
-    //                         [ ... M  S  Y ... ]
-    //                                 / \
-    //                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
-    //
+    /// Takes as input a nonfull internal `node` and index to its full child, then
+    /// splits this child into two, adding an additional child to `node`.
+    ///
+    /// Example:
+    /// ```ignore
+    ///                          [ ... M   Y ... ]
+    ///                                  |
+    ///                 [ N  O  P  Q  R  S  T  U  V  W  X ]
+    /// ```
+    ///
+    /// After splitting becomes:
+    /// ```ignore
+    ///                         [ ... M  S  Y ... ]
+    ///                                 / \
+    ///                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
+    /// ```
+    ///
     fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
         // The node must not be full.
         assert!(!node.is_full());
@@ -521,31 +522,43 @@ where
 
         node.insert_entry(full_child_idx, (median_key, median_value));
 
-        sibling.save(self.allocator_mut());
-        full_child.save(self.allocator_mut());
-        node.save(self.allocator_mut());
+        self.save_node(&mut sibling);
+        self.save_node(&mut full_child);
+        self.save_node(node);
     }
 
-    /// Returns the value associated with the given key if it exists.
+    /// Returns the value for the given key, if it exists.
     pub fn get(&self, key: &K) -> Option<V> {
         if self.root_addr == NULL {
             return None;
         }
-
-        self.get_helper(self.root_addr, key)
-            .map(Cow::Owned)
-            .map(V::from_bytes)
+        self.traverse(self.root_addr, key, |node, idx| {
+            node.into_entry(idx, self.memory()).1 // Extract value.
+        })
+        .map(Cow::Owned)
+        .map(V::from_bytes)
     }
 
-    fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
+    /// Returns true if the key exists.
+    pub fn contains_key(&self, key: &K) -> bool {
+        // An empty closure returns Some(()) if the key is found.
+        self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
+    }
+
+    /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
+    fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
+    where
+        F: Fn(Node<K>, usize) -> R + Clone,
+    {
         #[cfg(feature = "canbench-rs")]
-        let _p = crate::debug::InstructionCounter::new("get_helper");
-        //let node = self.load_node(node_addr);
+        let _p = crate::debug::InstructionCounter::new("traverse");
+
         let node = {
             #[cfg(feature = "canbench-rs")]
             let _p = crate::debug::InstructionCounter::new("load_node");
             self.load_node(node_addr)
         };
+
         let search = {
             #[cfg(feature = "canbench-rs")]
             let _p = crate::debug::InstructionCounter::new("search");
@@ -553,28 +566,17 @@ where
         };
         match search {
             Ok(idx) => {
-                let result = {
-                    #[cfg(feature = "canbench-rs")]
-                    let _p = crate::debug::InstructionCounter::new("into_entry");
-                    node.into_entry(idx, self.memory()).1
-                };
-                Some(result)
-            }
-            Err(idx) => {
-                match node.node_type() {
-                    NodeType::Leaf => None, // Key not found.
-                    NodeType::Internal => {
-                        // The key isn't in the node. Look for the key in the child.
-                        self.get_helper(node.child(idx), key)
-                    }
-                }
-            }
-        }
-    }
+                // Key found: apply `f`.
+                #[cfg(feature = "canbench-rs")]
+                let _p = crate::debug::InstructionCounter::new("f");
 
-    /// Returns `true` if the key exists in the map, `false` otherwise.
-    pub fn contains_key(&self, key: &K) -> bool {
-        self.get(key).is_some()
+                Some(f(node, idx))
+            }
+            Err(idx) => match node.node_type() {
+                NodeType::Leaf => None, // At a leaf: key not present.
+                NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
+            },
+        }
     }
 
     /// Returns `true` if the map contains no elements.
@@ -604,7 +606,7 @@ where
         self.root_addr = NULL;
         self.length = 0;
         self.allocator.clear();
-        self.save();
+        self.save_header();
     }
 
     /// Returns the first key-value pair in the map. The key in this
@@ -673,7 +675,7 @@ where
             .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
 
-    // A helper method for recursively removing a key from the B-tree.
+    /// A helper method for recursively removing a key from the B-tree.
     fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
         if node.address() != self.root_addr {
             // We're guaranteed that whenever this method is called an entry can be
@@ -699,13 +701,13 @@ where
                             );
 
                             // Deallocate the empty node.
-                            node.deallocate(&mut self.allocator);
+                            self.deallocate_node(node);
                             self.root_addr = NULL;
                         } else {
-                            node.save(self.allocator_mut());
+                            self.save_node(&mut node);
                         }
 
-                        self.save();
+                        self.save_header();
                         Some(value)
                     }
                     _ => None, // Key not found.
@@ -747,7 +749,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
 
                             // Save the parent node.
-                            node.save(self.allocator_mut());
+                            self.save_node(&mut node);
                             return Some(old_value);
                         }
 
@@ -782,7 +784,7 @@ where
                             let (_, old_value) = node.swap_entry(idx, successor, self.memory());
 
                             // Save the parent node.
-                            node.save(self.allocator_mut());
+                            self.save_node(&mut node);
                             return Some(old_value);
                         }
 
@@ -827,13 +829,13 @@ where
                             self.root_addr = new_child.address();
 
                             // Deallocate the root node.
-                            node.deallocate(&mut self.allocator);
-                            self.save();
+                            self.deallocate_node(node);
+                            self.save_header();
                         } else {
-                            node.save(self.allocator_mut());
+                            self.save_node(&mut node);
                         }
 
-                        new_child.save(self.allocator_mut());
+                        self.save_node(&mut new_child);
 
                         // Recursively delete the key.
                         self.remove_helper(new_child, key)
@@ -913,9 +915,9 @@ where
                                     assert_eq!(child.node_type(), NodeType::Leaf);
                                 }
 
-                                left_sibling.save(self.allocator_mut());
-                                child.save(self.allocator_mut());
-                                node.save(self.allocator_mut());
+                                self.save_node(left_sibling);
+                                self.save_node(&mut child);
+                                self.save_node(&mut node);
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -968,9 +970,9 @@ where
                                     }
                                 }
 
-                                right_sibling.save(self.allocator_mut());
-                                child.save(self.allocator_mut());
-                                node.save(self.allocator_mut());
+                                self.save_node(right_sibling);
+                                self.save_node(&mut child);
+                                self.save_node(&mut node);
                                 return self.remove_helper(child, key);
                             }
                         }
@@ -991,15 +993,15 @@ where
 
                             if node.entries_len() == 0 {
                                 let node_address = node.address();
-                                node.deallocate(&mut self.allocator);
+                                self.deallocate_node(node);
 
                                 if node_address == self.root_addr {
                                     // Update the root.
                                     self.root_addr = left_sibling.address();
-                                    self.save();
+                                    self.save_header();
                                 }
                             } else {
-                                node.save(self.allocator_mut());
+                                self.save_node(&mut node);
                             }
 
                             return self.remove_helper(left_sibling, key);
@@ -1020,15 +1022,15 @@ where
 
                             if node.entries_len() == 0 {
                                 let node_address = node.address();
-                                node.deallocate(&mut self.allocator);
+                                self.deallocate_node(node);
 
                                 if node_address == self.root_addr {
                                     // Update the root.
                                     self.root_addr = right_sibling.address();
-                                    self.save();
+                                    self.save_header();
                                 }
                             } else {
-                                node.save(self.allocator_mut());
+                                self.save_node(&mut node);
                             }
 
                             return self.remove_helper(right_sibling, key);
@@ -1101,23 +1103,24 @@ where
         IterInternal::new_in_range(self, range)
     }
 
-    // Merges one node (`source`) into another (`into`), along with a median entry.
-    //
-    // Example (values are not included for brevity):
-    //
-    // Input:
-    //   Source: [1, 2, 3]
-    //   Into: [5, 6, 7]
-    //   Median: 4
-    //
-    // Output:
-    //   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
-    //   `source` is deallocated.
+    /// Merges one node (`source`) into another (`into`), along with a median entry.
+    ///
+    /// Example (values are not included for brevity):
+    ///
+    /// Input:
+    ///   Source: [1, 2, 3]
+    ///   Into: [5, 6, 7]
+    ///   Median: 4
+    ///
+    /// Output:
+    ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
+    ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         into.merge(source, median, &mut self.allocator);
         into
     }
 
+    /// Allocates a new node of the given type.
     fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
         match self.version {
             Version::V1(page_size) => Node::new_v1(self.allocator.allocate(), node_type, page_size),
@@ -1125,12 +1128,26 @@ where
         }
     }
 
+    /// Deallocates a node.
+    #[inline]
+    fn deallocate_node(&mut self, node: Node<K>) {
+        node.deallocate(self.allocator_mut());
+    }
+
+    /// Loads a node from memory.
+    #[inline]
     fn load_node(&self, address: Address) -> Node<K> {
         Node::load(address, self.version.page_size(), self.memory())
     }
 
-    // Saves the map to memory.
-    fn save(&self) {
+    /// Saves the node to memory.
+    #[inline]
+    fn save_node(&mut self, node: &mut Node<K>) {
+        node.save(self.allocator_mut());
+    }
+
+    /// Saves the map to memory.
+    fn save_header(&self) {
         let header = BTreeHeader {
             version: self.version,
             root_addr: self.root_addr,
@@ -1185,16 +1202,17 @@ mod test {
         Rc::new(RefCell::new(Vec::new()))
     }
 
-    // A helper method to succinctly create an entry.
+    /// A helper method to succinctly create an entry.
     fn e(x: u8) -> (Blob<10>, Vec<u8>) {
         (b(&[x]), vec![])
     }
 
+    /// A helper method to succinctly create a blob.
     pub(crate) fn b(x: &[u8]) -> Blob<10> {
         Blob::<10>::try_from(x).unwrap()
     }
 
-    // A test runner that runs the test using both V1 and V2 btrees.
+    /// A test runner that runs the test using both V1 and V2 btrees.
     pub fn btree_test<K, V, R, F>(f: F)
     where
         K: Storable + Ord + Clone,
@@ -2121,14 +2139,14 @@ mod test {
     fn len() {
         btree_test(|mut btree| {
             for i in 0..1000u32 {
-                assert_eq!(btree.insert(b(i.to_le_bytes().as_slice()), b(&[])), None);
+                assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
             }
 
             assert_eq!(btree.len(), 1000);
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
-                assert_eq!(btree.remove(&b(i.to_le_bytes().as_slice())), Some(b(&[])));
+                assert_eq!(btree.remove(&b(&i.to_le_bytes())), Some(b(&[])));
             }
 
             assert_eq!(btree.len(), 0);
@@ -2179,16 +2197,13 @@ mod test {
         btree_test(|mut btree| {
             // Insert even numbers from 0 to 1000.
             for i in (0..1000u32).step_by(2) {
-                assert_eq!(btree.insert(b(i.to_le_bytes().as_slice()), b(&[])), None);
+                assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
             }
 
             // Contains key should return true on all the even numbers and false on all the odd
             // numbers.
             for i in 0..1000u32 {
-                assert_eq!(
-                    btree.contains_key(&b(i.to_le_bytes().as_slice())),
-                    i % 2 == 0
-                );
+                assert_eq!(btree.contains_key(&b(&i.to_le_bytes())), i % 2 == 0);
             }
         });
     }
@@ -2941,7 +2956,7 @@ mod test {
 
         // Migrate to v2 and the unbounded type.
         let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
-        btree.save();
+        btree.save_header();
 
         // Reload the BTree again and try to read the value.
         let btree: BTreeMap<T2, T2, _> = BTreeMap::init(btree.into_memory());
