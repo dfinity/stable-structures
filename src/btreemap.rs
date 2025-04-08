@@ -49,7 +49,7 @@
 //! ----------------------------------------
 //! ```
 mod allocator;
-mod cache;
+mod key_address_cache;
 mod iter;
 mod node;
 
@@ -60,8 +60,8 @@ use crate::{
     Memory, Storable,
 };
 use allocator::Allocator;
-use cache::Cache;
 pub use iter::Iter;
+use key_address_cache::KeyAddressCache;
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -84,8 +84,6 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
-
-type KeyAddressCache<K> = Cache<K, Address>;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -1120,6 +1118,12 @@ where
     /// Saves the node to memory.
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
+        let address = node.address();
+        node.keys().iter().for_each(|key| {
+            self.key_address_cache
+                .borrow_mut()
+                .insert(key.clone(), address);
+        });
         node.save(self.allocator_mut());
     }
 

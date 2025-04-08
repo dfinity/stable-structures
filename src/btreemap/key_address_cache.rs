@@ -1,3 +1,4 @@
+use crate::types::Address;
 use std::collections::BTreeMap;
 
 #[allow(non_upper_case_globals)]
@@ -15,12 +16,12 @@ struct Counter(u64);
 
 /// Cache with eviction policy that minimizes duplication of keys and values.
 #[derive(Debug, Default, Clone)]
-pub struct Cache<K, V>
+pub struct KeyAddressCache<K>
 where
     K: Clone + Ord,
-    V: Clone,
 {
-    key_to_value: BTreeMap<K, V>,
+    key_to_address: BTreeMap<K, Address>,
+    address_to_keys: BTreeMap<Address, Vec<K>>,
     capacity: usize,
     counter: Counter,
     lru_order: BTreeMap<Counter, K>,
@@ -28,15 +29,15 @@ where
     stats: CacheStats,
 }
 
-impl<K, V> Cache<K, V>
+impl<K> KeyAddressCache<K>
 where
     K: Clone + Ord,
-    V: Clone,
 {
     /// Creates a new cache with the given capacity.
     pub fn new() -> Self {
         Self {
-            key_to_value: BTreeMap::new(),
+            key_to_address: BTreeMap::new(),
+            address_to_keys: BTreeMap::new(),
             capacity: DEFAULT_CAPACITY,
             counter: Counter(0),
             lru_order: BTreeMap::new(),
@@ -54,37 +55,38 @@ where
 
     /// Clears all entries and resets statistics.
     pub fn clear(&mut self) {
-        self.key_to_value.clear();
+        self.key_to_address.clear();
+        self.address_to_keys.clear();
         self.counter = Counter(0);
         self.lru_order.clear();
         self.usage.clear();
         self.stats = CacheStats::default();
     }
 
-    /// Retrieves the value for the given key (if any) and updates its LRU status.
-    pub fn get(&mut self, key: &K) -> Option<V> {
+    /// Retrieves the address for the given key (if any) and updates its LRU status.
+    pub fn get(&mut self, key: &K) -> Option<Address> {
         if self.capacity == 0 {
             return None;
         }
-        if let Some(value) = self.key_to_value.get(key).cloned() {
+        if let Some(address) = self.key_to_address.get(key).cloned() {
             self.touch(key.clone());
             self.stats.hits += 1;
-            return Some(value);
+            return Some(address);
         }
         self.stats.misses += 1;
         None
     }
 
-    /// Inserts the given key and value.
+    /// Inserts the given key and address.
     /// If adding this entry would exceed the capacity or size limit, evicts LRU entries.
-    pub fn insert(&mut self, key: K, value: V) {
+    pub fn insert(&mut self, key: K, address: Address) {
         if self.capacity == 0 {
             return;
         }
         while self.len() + 1 > self.capacity {
             self.evict_one();
         }
-        self.key_to_value.insert(key.clone(), value);
+        self.key_to_address.insert(key.clone(), address);
         self.touch(key);
     }
 
@@ -93,7 +95,7 @@ where
         if self.capacity == 0 {
             return;
         }
-        self.key_to_value.remove(key);
+        self.key_to_address.remove(key);
         if let Some(counter) = self.usage.remove(key) {
             self.lru_order.remove(&counter);
         }
@@ -102,7 +104,7 @@ where
     /// Returns the number of entries in the cache.
     #[inline]
     pub fn len(&self) -> usize {
-        self.key_to_value.len()
+        self.key_to_address.len()
     }
 
     /// Returns the cache capacity (number of entries).
@@ -129,7 +131,7 @@ where
         // Find the least-recently used entry.
         if let Some((&old_counter, old_key)) = self.lru_order.iter().next() {
             let old_key = old_key.clone();
-            self.key_to_value.remove(&old_key);
+            self.key_to_address.remove(&old_key);
             self.lru_order.remove(&old_counter);
             self.usage.remove(&old_key);
             return Some(old_key);
@@ -189,10 +191,9 @@ impl CacheStats {
     }
 }
 
-impl<K, V> Drop for Cache<K, V>
+impl<K> Drop for KeyAddressCache<K>
 where
     K: Clone + Ord,
-    V: Clone,
 {
     fn drop(&mut self) {
         // crate::debug::print(&format!("ABC cache len       : {}", self.len()));
@@ -209,9 +210,6 @@ mod tests {
     use super::*;
     use crate::types::Address;
     use ic_principal::Principal;
-    use std::mem::size_of;
-
-    type KeyAddressCache = Cache<Principal, Address>;
 
     fn user(id: u8) -> Principal {
         Principal::from_slice(&[id])
@@ -227,7 +225,7 @@ mod tests {
         cache.insert(user(1), addr(100));
         cache.insert(user(2), addr(200));
 
-        // Test that values can be retrieved.
+        // Test that addresses can be retrieved.
         assert_eq!(cache.get(&user(1)), Some(addr(100)));
         assert_eq!(cache.get(&user(2)), Some(addr(200)));
 
