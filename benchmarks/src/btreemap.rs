@@ -608,6 +608,115 @@ pub fn btreemap_get_blob_8_u64_v2() -> BenchResult {
     get_helper::<Blob<8>, u64>(btree)
 }
 
+#[bench(raw)]
+pub fn btreemap_first_key_value_insert() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let num_operations = 10_000;
+
+    bench_fn(|| {
+        // Insert elements
+        for i in 0..num_operations {
+            btree.insert(i, vec![i as u8; 16]);
+        }
+
+        // Access first_key_value multiple times
+        for _ in 0..num_operations / 2 {
+            btree.first_key_value();
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_first_key_value_insert_and_pop_first() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let num_operations = 10_000;
+
+    bench_fn(|| {
+        // Insert elements
+        for i in 0..num_operations {
+            btree.insert(i, vec![i as u8; 16]);
+        }
+
+        // Access first_key_value multiple times and pop first, hence first key value changes in each interation.
+        for _ in 0..num_operations / 2 {
+            btree.first_key_value();
+            btree.pop_first();
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_first_key_value_insert_and_pop_last() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let num_operations = 10_000;
+
+    bench_fn(|| {
+        // Insert elements
+        for i in 0..num_operations {
+            btree.insert(i, vec![i as u8; 16]);
+        }
+
+        // Access first_key_value multiple times and pop last, hence first key value does not change.
+        for _ in 0..num_operations / 2 {
+            btree.first_key_value();
+            btree.pop_last();
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_last_key_value_insert() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let num_operations = 10_000;
+
+    bench_fn(|| {
+        // Insert elements
+        for i in 0..num_operations {
+            btree.insert(i, vec![i as u8; 16]);
+        }
+
+        // Access last_key_value multiple times
+        for _ in 0..num_operations {
+            btree.last_key_value();
+        }
+}
+
+#[bench(raw)]
+pub fn btreemap_last_key_value_insert_pop_first() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let num_operations = 10_000;
+
+    bench_fn(|| {
+        // Insert elements
+        for i in 0..num_operations {
+            btree.insert(i, vec![i as u8; 16]);
+        }
+
+        // Access last_key_value multiple times and pop first, hence last key value does not chnage.
+        for _ in 0..num_operations {
+            btree.last_key_value();
+            btree.pop_first();
+        }
+}
+
+#[bench(raw)]
+pub fn btreemap_last_key_value_insert_pop_last() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let num_operations = 10_000;
+
+    bench_fn(|| {
+        // Insert elements
+        for i in 0..num_operations {
+            btree.insert(i, vec![i as u8; 16]);
+        }
+
+        // Access first_key_value multiple times and pop last, hence last key value changes in each interation.
+        for _ in 0..num_operations {
+            btree.last_key_value();
+            btree.pop_last();
+        }
+}
+
 // Profiles inserting a large number of random blobs into a btreemap.
 fn insert_blob_helper<const K: usize, const V: usize>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
