@@ -47,8 +47,12 @@ else
 fi
 popd
 
+# Get the latest commit hash
+commit_hash=$(git rev-parse HEAD)
+time=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-echo "# \`canbench\` 🏋 (dir: $CANISTER_PATH)" > "$COMMENT_MESSAGE_PATH"
+# Print output with correct formatting
+echo "# \`canbench\` 🏋 (dir: $CANISTER_PATH) $commit_hash $time" > "$COMMENT_MESSAGE_PATH"
 
 # Detect if there are performance changes relative to the main branch.
 if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
