@@ -535,7 +535,7 @@ where
         let node = self.load_node(node_addr);
         // Look for the key in the current node.
         match node.search(key) {
-            Ok(idx) => Some(f(node, idx)), // Key found: apply f.
+            Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
                 NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
