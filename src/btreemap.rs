@@ -525,7 +525,12 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        self.traverse(self.root_addr, key, |node, idx| {
+        let node_addr = self
+            .key_address_cache
+            .borrow_mut()
+            .get(key)
+            .unwrap_or(self.root_addr);
+        self.traverse(node_addr, key, |node, idx| {
             node.into_entry(idx, self.memory()).1 // Extract value.
         })
         .map(Cow::Owned)
@@ -543,11 +548,6 @@ where
     where
         F: Fn(Node<K>, usize) -> R + Clone,
     {
-        let node_addr = self
-            .key_address_cache
-            .borrow_mut()
-            .get(key)
-            .unwrap_or(node_addr);
         let node = self.load_node(node_addr);
         // Look for the key in the current node.
         match node.search(key) {
