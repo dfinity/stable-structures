@@ -554,21 +554,21 @@ where
         let _p = crate::debug::InstructionCounter::new("traverse");
 
         let node = {
-            #[cfg(feature = "canbench-rs")]
-            let _p = crate::debug::InstructionCounter::new("load_node");
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("load_node");
             self.load_node(node_addr)
         };
 
         let search = {
-            #[cfg(feature = "canbench-rs")]
-            let _p = crate::debug::InstructionCounter::new("search");
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("search");
             node.search(key)
         };
         match search {
             Ok(idx) => {
                 // Key found: apply `f`.
-                #[cfg(feature = "canbench-rs")]
-                let _p = crate::debug::InstructionCounter::new("f");
+                // #[cfg(feature = "canbench-rs")]
+                // let _p = crate::debug::InstructionCounter::new("f");
 
                 Some(f(node, idx))
             }
@@ -578,6 +578,20 @@ where
             },
         }
     }
+
+    /*
+    $ canbench btreemap_get_blob_8_1024_v2 --show-canister-output
+
+    2021-05-06 19:17:10.000000003 UTC: [Canister lxzze-o7777-77777-aaaaa-cai] traverse: Stats:
+    total_instructions : 346544276,
+    call_count         : 48669
+
+    Benchmark: btreemap_get_blob_8_1024_v2
+    total:
+    instructions: 355.58 M (regressed by 18.64%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+    */
 
     /// Returns `true` if the map contains no elements.
     pub fn is_empty(&self) -> bool {
