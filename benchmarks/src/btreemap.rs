@@ -707,7 +707,7 @@ fn get_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
     })
 }
 
-/// Benchmarks contains_key of a BTreeMap.
+/// Benchmarks `contains_key` of a BTreeMap.
 #[bench(raw)]
 pub fn btreemap_contains_key_blob_4_1024() -> BenchResult {
     contains_key_blob_helper::<4, 1024>()
@@ -718,7 +718,7 @@ pub fn btreemap_contains_key_blob_4_1024_v2() -> BenchResult {
     contains_key_blob_helper_v2::<4, 1024>()
 }
 
-// Profiles contains_key on a large number of random blobs from a btreemap.
+// Profiles `contains_key` on a large number of random blobs from a btreemap.
 fn contains_key_blob_helper<const K: usize, const V: usize>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     contains_key_helper::<Blob<K>, Blob<V>>(btree)
