@@ -119,7 +119,7 @@ impl Drop for Destructor {
         for s in stats {
             let percent = (s.1.total_instructions as f64 / sum_instructions as f64) * 100.0;
             crate::debug::print(format!(
-                "{}: {:?} ({:>3.1} %), {}",
+                "{}: {:?} ({:>5.1} %), {}",
                 s.0, s.1.total_instructions, percent, s.1.call_count
             ));
         }
@@ -587,15 +587,9 @@ where
     /*
     $ canbench btreemap_get_blob_8_1024_v2 --show-canister-output
 
-    2021-05-06 19:17:10.000000003 UTC: [Canister lxzze-o7777-77777-aaaaa-cai] traverse: Stats:
-    total_instructions : 346544276,
-    call_count         : 48669
-
-    Benchmark: btreemap_get_blob_8_1024_v2
-    total:
-    instructions: 355.58 M (regressed by 18.64%)
-    heap_increase: 0 pages (no change)
-    stable_memory_increase: 0 pages (no change)
+    load_node : 262_628_480 ( 81.6 %), 48_669
+    search    :  38_580_885 ( 12.0 %), 48_669
+    f         :  20_445_909 (  6.4 %), 10_000
     */
 
     /// Returns `true` if the map contains no elements.
