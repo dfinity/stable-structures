@@ -371,7 +371,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .collect()
     }
 
-    #[cfg(test)]
     pub fn keys(&self) -> Vec<K> {
         self.keys_and_encoded_values
             .iter()
