@@ -31,6 +31,9 @@ pub use storable::Storable;
 use types::Address;
 pub use vec_mem::VectorMemory;
 
+#[cfg(feature = "canbench-rs")]
+mod debug; // TODO: remove debug code.
+
 #[cfg(target_arch = "wasm32")]
 pub type DefaultMemoryImpl = Ic0StableMemory;
 
