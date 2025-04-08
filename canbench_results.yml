@@ -13,19 +13,19 @@ benches:
     scopes: {}
   btreemap_first_key_value:
     total:
-      instructions: 117060439
+      instructions: 4978024
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_first_key_value_pop_first:
     total:
-      instructions: 518977111
+      instructions: 521197111
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_first_key_value_pop_last:
     total:
-      instructions: 483196272
+      instructions: 372452012
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -481,19 +481,19 @@ benches:
     scopes: {}
   btreemap_last_key_value:
     total:
-      instructions: 305020600
+      instructions: 9940110
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_last_key_value_pop_first:
     total:
-      instructions: 972625000
+      instructions: 705264570
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_last_key_value_pop_last:
     total:
-      instructions: 965157904
+      instructions: 969597964
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
