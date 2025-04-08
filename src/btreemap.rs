@@ -527,17 +527,18 @@ where
         self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
     }
 
-    /// Recursively traverses from `node_addr`, calling `f` when `key` is found; stops at a leaf if not.
+    /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
     fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
     where
         F: Fn(Node<K>, usize) -> R + Clone,
     {
         let node = self.load_node(node_addr);
+        // Look for the key in the current node.
         match node.search(key) {
-            Ok(idx) => Some(f(node, idx)), // Key found.
+            Ok(idx) => Some(f(node, idx)), // Key found: apply f.
             Err(idx) => match node.node_type() {
-                NodeType::Leaf => None, // At leaf: key missing.
-                NodeType::Internal => self.traverse(node.child(idx), key, f), // Search in child.
+                NodeType::Leaf => None, // At a leaf: key not present.
+                NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
             },
         }
     }
