@@ -1,12 +1,45 @@
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::LinkedList;
 
 thread_local! {
-    static STATS: RefCell<BTreeMap<&'static str, Stats>> = const { RefCell::new(BTreeMap::new()) };
+    static ENTRIES: RefCell<LinkedList<Measurement>> = const { RefCell::new(LinkedList::new()) };
+}
+
+struct Measurement {
+    name: &'static str,
+    time: u64,
+    is_start: bool,
 }
 
 pub struct InstructionCounter {
     name: &'static str,
+}
+
+impl InstructionCounter {
+    pub fn new(name: &'static str) -> Self {
+        let time = instruction_count();
+        ENTRIES.with(|c| {
+            c.borrow_mut().push_back(Measurement {
+                name,
+                time,
+                is_start: true,
+            });
+        });
+        Self { name }
+    }
+}
+
+impl Drop for InstructionCounter {
+    fn drop(&mut self) {
+        let time = instruction_count();
+        ENTRIES.with(|c| {
+            c.borrow_mut().push_back(Measurement {
+                name: self.name,
+                time,
+                is_start: false,
+            });
+        });
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -26,55 +59,47 @@ impl std::fmt::Debug for Stats {
     }
 }
 
-impl InstructionCounter {
-    pub fn new(name: &'static str) -> Self {
-        let now = instruction_count();
-        STATS.with(|c| {
-            let mut stats = c.borrow_mut();
-            let entry = stats.entry(name).or_insert(Stats {
-                start_instructions: Some(now),
+pub fn get_stats() -> Vec<(&'static str, Stats)> {
+    let start = instruction_count();
+    let mut stats = std::collections::HashMap::new();
+    ENTRIES.with(|c| {
+        for measurement in c.borrow().iter() {
+            let entry = stats.entry(measurement.name).or_insert(Stats {
+                start_instructions: None,
                 running_count: 0,
                 total_instructions: 0,
                 call_count: 0,
             });
-            if entry.running_count == 0 {
-                entry.start_instructions = Some(now);
+            if measurement.is_start {
+                entry.call_count += 1;
+                if entry.running_count == 0 {
+                    entry.start_instructions = Some(measurement.time);
+                }
+                entry.running_count += 1;
+            } else {
+                entry.running_count -= 1;
+                if entry.running_count == 0 {
+                    let instructions = measurement.time - entry.start_instructions.unwrap();
+                    entry.total_instructions += instructions;
+                }
             }
-            entry.running_count += 1;
-        });
-        Self { name }
-    }
-}
+        }
+    });
 
-impl Drop for InstructionCounter {
-    fn drop(&mut self) {
-        STATS.with(|c| {
-            let now = instruction_count();
-            let mut stats = c.borrow_mut();
-            let entry = stats.entry(self.name).or_insert_with(|| {
-                panic!("InstructionCounter not initialized");
-            });
-            entry.running_count -= 1;
-            if entry.running_count == 0 {
-                let elapsed = now
-                    - entry
-                        .start_instructions
-                        .expect("start_instructions is None");
-                entry.start_instructions = None;
-                entry.total_instructions += elapsed;
-            }
-            entry.call_count += 1;
-        });
-    }
-}
+    let mut stats_vec: Vec<_> = stats.iter().map(|(&k, &v)| (k, v)).collect();
+    stats_vec.sort_by(|a, b| b.1.total_instructions.cmp(&a.1.total_instructions));
 
-pub fn get_stats() -> Vec<(&'static str, Stats)> {
-    STATS.with(|c| {
-        let stats = c.borrow();
-        let mut stats_vec: Vec<_> = stats.iter().map(|(&k, &v)| (k, v)).collect();
-        stats_vec.sort_by(|a, b| b.1.total_instructions.cmp(&a.1.total_instructions));
-        stats_vec
-    })
+    stats_vec.push((
+        "get_stats",
+        Stats {
+            start_instructions: None,
+            running_count: 0,
+            total_instructions: instruction_count() - start,
+            call_count: 1,
+        },
+    ));
+
+    stats_vec
 }
 
 fn instruction_count() -> u64 {
