@@ -5,169 +5,56 @@ use ic_stable_structures::{storable::Blob, BTreeMap, DefaultMemoryImpl, Memory, 
 use std::ops::Bound;
 use tiny_rng::{Rand, Rng};
 
-#[bench(raw)]
-pub fn btreemap_insert_blob_4_1024() -> BenchResult {
-    insert_blob_helper::<4, 1024>()
+/// Helper macro to generate benchmarks.
+macro_rules! bench_tests {
+    ($( $fn_name:ident, $helper:ident, $k:expr, $v:expr );+ $(;)?) => {
+        $(
+            #[bench(raw)]
+            pub fn $fn_name() -> BenchResult {
+                $helper::<$k, $v>()
+            }
+        )+
+    };
 }
 
-#[bench(raw)]
-pub fn btreemap_insert_blob_4_1024_v2() -> BenchResult {
-    insert_blob_helper_v2::<4, 1024>()
-}
+// Benchmarks inserting blobs into a BTreeMap.
+bench_tests! {
+    // K x 1024
+    btreemap_insert_blob_4_1024,       insert_blob_helper,       4, 1024;
+    btreemap_insert_blob_4_1024_v2,    insert_blob_helper_v2,    4, 1024;
+    btreemap_insert_blob_8_1024,       insert_blob_helper,       8, 1024;
+    btreemap_insert_blob_8_1024_v2,    insert_blob_helper_v2,    8, 1024;
+    btreemap_insert_blob_16_1024,      insert_blob_helper,      16, 1024;
+    btreemap_insert_blob_16_1024_v2,   insert_blob_helper_v2,   16, 1024;
+    btreemap_insert_blob_32_1024,      insert_blob_helper,      32, 1024;
+    btreemap_insert_blob_32_1024_v2,   insert_blob_helper_v2,   32, 1024;
+    btreemap_insert_blob_64_1024,      insert_blob_helper,      64, 1024;
+    btreemap_insert_blob_64_1024_v2,   insert_blob_helper_v2,   64, 1024;
+    btreemap_insert_blob_128_1024,     insert_blob_helper,     128, 1024;
+    btreemap_insert_blob_128_1024_v2,  insert_blob_helper_v2,  128, 1024;
+    btreemap_insert_blob_256_1024,     insert_blob_helper,     256, 1024;
+    btreemap_insert_blob_256_1024_v2,  insert_blob_helper_v2,  256, 1024;
+    btreemap_insert_blob_512_1024,     insert_blob_helper,     512, 1024;
+    btreemap_insert_blob_512_1024_v2,  insert_blob_helper_v2,  512, 1024;
 
-#[bench(raw)]
-pub fn btreemap_insert_blob_8_1024() -> BenchResult {
-    insert_blob_helper::<8, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_8_1024_v2() -> BenchResult {
-    insert_blob_helper_v2::<8, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_16_1024() -> BenchResult {
-    insert_blob_helper::<16, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_16_1024_v2() -> BenchResult {
-    insert_blob_helper_v2::<16, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_32_1024() -> BenchResult {
-    insert_blob_helper::<32, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_32_1024_v2() -> BenchResult {
-    insert_blob_helper_v2::<32, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_64_1024() -> BenchResult {
-    insert_blob_helper::<64, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_64_1024_v2() -> BenchResult {
-    insert_blob_helper_v2::<64, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_128_1024() -> BenchResult {
-    insert_blob_helper::<128, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_128_1024_v2() -> BenchResult {
-    insert_blob_helper_v2::<128, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_256_1024() -> BenchResult {
-    insert_blob_helper::<256, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_256_1024_v2() -> BenchResult {
-    insert_blob_helper_v2::<256, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_512_1024() -> BenchResult {
-    insert_blob_helper::<512, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_512_1024_v2() -> BenchResult {
-    insert_blob_helper_v2::<512, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_4() -> BenchResult {
-    insert_blob_helper::<1024, 4>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_4_v2() -> BenchResult {
-    insert_blob_helper_v2::<1024, 4>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_8() -> BenchResult {
-    insert_blob_helper::<1024, 8>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_8_v2() -> BenchResult {
-    insert_blob_helper_v2::<1024, 8>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_16() -> BenchResult {
-    insert_blob_helper::<1024, 16>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_16_v2() -> BenchResult {
-    insert_blob_helper_v2::<1024, 16>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_32() -> BenchResult {
-    insert_blob_helper::<1024, 32>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_32_v2() -> BenchResult {
-    insert_blob_helper_v2::<1024, 32>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_64() -> BenchResult {
-    insert_blob_helper::<1024, 64>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_64_v2() -> BenchResult {
-    insert_blob_helper_v2::<1024, 64>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_128() -> BenchResult {
-    insert_blob_helper::<1024, 128>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_128_v2() -> BenchResult {
-    insert_blob_helper_v2::<1024, 128>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_256() -> BenchResult {
-    insert_blob_helper::<1024, 256>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_256_v2() -> BenchResult {
-    insert_blob_helper_v2::<1024, 256>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_512() -> BenchResult {
-    insert_blob_helper::<1024, 512>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_512_v2() -> BenchResult {
-    insert_blob_helper_v2::<1024, 512>()
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_1024_512_v2_mem_manager() -> BenchResult {
-    insert_blob_helper_v2_mem_manager::<1024, 512>()
+    // 1024 x V
+    btreemap_insert_blob_1024_4,       insert_blob_helper,    1024,    4;
+    btreemap_insert_blob_1024_4_v2,    insert_blob_helper_v2, 1024,    4;
+    btreemap_insert_blob_1024_8,       insert_blob_helper,    1024,    8;
+    btreemap_insert_blob_1024_8_v2,    insert_blob_helper_v2, 1024,    8;
+    btreemap_insert_blob_1024_16,      insert_blob_helper,    1024,   16;
+    btreemap_insert_blob_1024_16_v2,   insert_blob_helper_v2, 1024,   16;
+    btreemap_insert_blob_1024_32,      insert_blob_helper,    1024,   32;
+    btreemap_insert_blob_1024_32_v2,   insert_blob_helper_v2, 1024,   32;
+    btreemap_insert_blob_1024_64,      insert_blob_helper,    1024,   64;
+    btreemap_insert_blob_1024_64_v2,   insert_blob_helper_v2, 1024,   64;
+    btreemap_insert_blob_1024_128,     insert_blob_helper,    1024,  128;
+    btreemap_insert_blob_1024_128_v2,  insert_blob_helper_v2, 1024,  128;
+    btreemap_insert_blob_1024_256,     insert_blob_helper,    1024,  256;
+    btreemap_insert_blob_1024_256_v2,  insert_blob_helper_v2, 1024,  256;
+    btreemap_insert_blob_1024_512,     insert_blob_helper,    1024,  512;
+    btreemap_insert_blob_1024_512_v2,  insert_blob_helper_v2, 1024,  512;
+    btreemap_insert_blob_1024_512_v2_mem_manager, insert_blob_helper_v2_mem_manager, 1024, 512;
 }
 
 #[bench(raw)]
@@ -365,85 +252,25 @@ pub fn btreemap_iter_count_10mib_values() -> BenchResult {
     })
 }
 
-/// Benchmarks removing keys from a BTreeMap.
-#[bench(raw)]
-pub fn btreemap_remove_blob_4_1024() -> BenchResult {
-    remove_blob_helper::<4, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_4_1024_v2() -> BenchResult {
-    remove_blob_helper_v2::<4, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_8_1024() -> BenchResult {
-    remove_blob_helper::<8, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_8_1024_v2() -> BenchResult {
-    remove_blob_helper_v2::<8, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_16_1024() -> BenchResult {
-    remove_blob_helper::<16, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_16_1024_v2() -> BenchResult {
-    remove_blob_helper_v2::<16, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_32_1024() -> BenchResult {
-    remove_blob_helper::<32, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_32_1024_v2() -> BenchResult {
-    remove_blob_helper_v2::<32, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_64_1024() -> BenchResult {
-    remove_blob_helper::<64, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_64_1024_v2() -> BenchResult {
-    remove_blob_helper_v2::<64, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_128_1024() -> BenchResult {
-    remove_blob_helper::<128, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_128_1024_v2() -> BenchResult {
-    remove_blob_helper_v2::<128, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_256_1024() -> BenchResult {
-    remove_blob_helper::<256, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_256_1024_v2() -> BenchResult {
-    remove_blob_helper_v2::<256, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_512_1024() -> BenchResult {
-    remove_blob_helper::<512, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_remove_blob_512_1024_v2() -> BenchResult {
-    remove_blob_helper_v2::<512, 1024>()
+// Benchmarks removing keys from a BTreeMap.
+bench_tests! {
+    // K x 1024
+    btreemap_remove_blob_4_1024,        remove_blob_helper,        4, 1024;
+    btreemap_remove_blob_4_1024_v2,     remove_blob_helper_v2,     4, 1024;
+    btreemap_remove_blob_8_1024,        remove_blob_helper,        8, 1024;
+    btreemap_remove_blob_8_1024_v2,     remove_blob_helper_v2,     8, 1024;
+    btreemap_remove_blob_16_1024,       remove_blob_helper,       16, 1024;
+    btreemap_remove_blob_16_1024_v2,    remove_blob_helper_v2,    16, 1024;
+    btreemap_remove_blob_32_1024,       remove_blob_helper,       32, 1024;
+    btreemap_remove_blob_32_1024_v2,    remove_blob_helper_v2,    32, 1024;
+    btreemap_remove_blob_64_1024,       remove_blob_helper,       64, 1024;
+    btreemap_remove_blob_64_1024_v2,    remove_blob_helper_v2,    64, 1024;
+    btreemap_remove_blob_128_1024,      remove_blob_helper,      128, 1024;
+    btreemap_remove_blob_128_1024_v2,   remove_blob_helper_v2,   128, 1024;
+    btreemap_remove_blob_256_1024,      remove_blob_helper,      256, 1024;
+    btreemap_remove_blob_256_1024_v2,   remove_blob_helper_v2,   256, 1024;
+    btreemap_remove_blob_512_1024,      remove_blob_helper,      512, 1024;
+    btreemap_remove_blob_512_1024_v2,   remove_blob_helper_v2,   512, 1024;
 }
 
 #[bench(raw)]
@@ -479,90 +306,26 @@ pub fn btreemap_remove_blob_8_u64_v2() -> BenchResult {
     remove_helper::<Blob<8>, u64>(btree)
 }
 
-/// Benchmarks getting keys from a BTreeMap.
-#[bench(raw)]
-pub fn btreemap_get_blob_4_1024() -> BenchResult {
-    get_blob_helper::<4, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_4_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<4, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_8_1024() -> BenchResult {
-    get_blob_helper::<8, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_8_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<8, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_16_1024() -> BenchResult {
-    get_blob_helper::<16, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_16_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<16, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_32_1024() -> BenchResult {
-    get_blob_helper::<32, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_32_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<32, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_64_1024() -> BenchResult {
-    get_blob_helper::<64, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_64_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<64, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_128_1024() -> BenchResult {
-    get_blob_helper::<128, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_128_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<128, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_256_1024() -> BenchResult {
-    get_blob_helper::<256, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_256_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<256, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_512_1024() -> BenchResult {
-    get_blob_helper::<512, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_512_1024_v2() -> BenchResult {
-    get_blob_helper_v2::<512, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_get_blob_512_1024_v2_mem_manager() -> BenchResult {
-    get_blob_helper_v2_mem_manager::<512, 1024>()
+// Benchmarks getting keys from a BTreeMap.
+bench_tests! {
+    // K x 1024
+    btreemap_get_blob_4_1024,        get_blob_helper,        4, 1024;
+    btreemap_get_blob_4_1024_v2,     get_blob_helper_v2,     4, 1024;
+    btreemap_get_blob_8_1024,        get_blob_helper,        8, 1024;
+    btreemap_get_blob_8_1024_v2,     get_blob_helper_v2,     8, 1024;
+    btreemap_get_blob_16_1024,       get_blob_helper,       16, 1024;
+    btreemap_get_blob_16_1024_v2,    get_blob_helper_v2,    16, 1024;
+    btreemap_get_blob_32_1024,       get_blob_helper,       32, 1024;
+    btreemap_get_blob_32_1024_v2,    get_blob_helper_v2,    32, 1024;
+    btreemap_get_blob_64_1024,       get_blob_helper,       64, 1024;
+    btreemap_get_blob_64_1024_v2,    get_blob_helper_v2,    64, 1024;
+    btreemap_get_blob_128_1024,      get_blob_helper,      128, 1024;
+    btreemap_get_blob_128_1024_v2,   get_blob_helper_v2,   128, 1024;
+    btreemap_get_blob_256_1024,      get_blob_helper,      256, 1024;
+    btreemap_get_blob_256_1024_v2,   get_blob_helper_v2,   256, 1024;
+    btreemap_get_blob_512_1024,      get_blob_helper,      512, 1024;
+    btreemap_get_blob_512_1024_v2,   get_blob_helper_v2,   512, 1024;
+    btreemap_get_blob_512_1024_v2_mem_manager,  get_blob_helper_v2_mem_manager,  512, 1024;
 }
 
 #[bench(raw)]
@@ -707,15 +470,10 @@ fn get_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
     })
 }
 
-/// Benchmarks `contains_key` of a BTreeMap.
-#[bench(raw)]
-pub fn btreemap_contains_key_blob_4_1024() -> BenchResult {
-    contains_key_blob_helper::<4, 1024>()
-}
-
-#[bench(raw)]
-pub fn btreemap_contains_key_blob_4_1024_v2() -> BenchResult {
-    contains_key_blob_helper_v2::<4, 1024>()
+// Benchmarks `contains_key` of a BTreeMap.
+bench_tests! {
+    btreemap_contains_key_blob_4_1024,     contains_key_blob_helper,     4, 1024;
+    btreemap_contains_key_blob_4_1024_v2,  contains_key_blob_helper_v2,  4, 1024;
 }
 
 // Profiles `contains_key` on a large number of random blobs from a btreemap.
