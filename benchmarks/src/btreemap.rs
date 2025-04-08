@@ -17,87 +17,64 @@ macro_rules! bench_tests {
     };
 }
 
+type Blob4 = Blob<4>;
+type Blob8 = Blob<8>;
+type Blob16 = Blob<16>;
+type Blob32 = Blob<32>;
+type Blob64 = Blob<64>;
+type Blob128 = Blob<128>;
+type Blob256 = Blob<256>;
+type Blob512 = Blob<512>;
+type Blob1024 = Blob<1024>;
+
 // Benchmarks inserting blobs into a BTreeMap.
 bench_tests! {
     // K x 1024
-    btreemap_insert_blob_4_1024,       insert_blob_helper,       4, 1024;
-    btreemap_insert_blob_4_1024_v2,    insert_blob_helper_v2,    4, 1024;
-    btreemap_insert_blob_8_1024,       insert_blob_helper,       8, 1024;
-    btreemap_insert_blob_8_1024_v2,    insert_blob_helper_v2,    8, 1024;
-    btreemap_insert_blob_16_1024,      insert_blob_helper,      16, 1024;
-    btreemap_insert_blob_16_1024_v2,   insert_blob_helper_v2,   16, 1024;
-    btreemap_insert_blob_32_1024,      insert_blob_helper,      32, 1024;
-    btreemap_insert_blob_32_1024_v2,   insert_blob_helper_v2,   32, 1024;
-    btreemap_insert_blob_64_1024,      insert_blob_helper,      64, 1024;
-    btreemap_insert_blob_64_1024_v2,   insert_blob_helper_v2,   64, 1024;
-    btreemap_insert_blob_128_1024,     insert_blob_helper,     128, 1024;
-    btreemap_insert_blob_128_1024_v2,  insert_blob_helper_v2,  128, 1024;
-    btreemap_insert_blob_256_1024,     insert_blob_helper,     256, 1024;
-    btreemap_insert_blob_256_1024_v2,  insert_blob_helper_v2,  256, 1024;
-    btreemap_insert_blob_512_1024,     insert_blob_helper,     512, 1024;
-    btreemap_insert_blob_512_1024_v2,  insert_blob_helper_v2,  512, 1024;
+    btreemap_insert_blob_4_1024,       insert_helper_v1,    Blob4, Blob1024;
+    btreemap_insert_blob_4_1024_v2,    insert_helper_v2,    Blob4, Blob1024;
+    btreemap_insert_blob_8_1024,       insert_helper_v1,    Blob8, Blob1024;
+    btreemap_insert_blob_8_1024_v2,    insert_helper_v2,    Blob8, Blob1024;
+    btreemap_insert_blob_16_1024,      insert_helper_v1,   Blob16, Blob1024;
+    btreemap_insert_blob_16_1024_v2,   insert_helper_v2,   Blob16, Blob1024;
+    btreemap_insert_blob_32_1024,      insert_helper_v1,   Blob32, Blob1024;
+    btreemap_insert_blob_32_1024_v2,   insert_helper_v2,   Blob32, Blob1024;
+    btreemap_insert_blob_64_1024,      insert_helper_v1,   Blob64, Blob1024;
+    btreemap_insert_blob_64_1024_v2,   insert_helper_v2,   Blob64, Blob1024;
+    btreemap_insert_blob_128_1024,     insert_helper_v1,  Blob128, Blob1024;
+    btreemap_insert_blob_128_1024_v2,  insert_helper_v2,  Blob128, Blob1024;
+    btreemap_insert_blob_256_1024,     insert_helper_v1,  Blob256, Blob1024;
+    btreemap_insert_blob_256_1024_v2,  insert_helper_v2,  Blob256, Blob1024;
+    btreemap_insert_blob_512_1024,     insert_helper_v1,  Blob512, Blob1024;
+    btreemap_insert_blob_512_1024_v2,  insert_helper_v2,  Blob512, Blob1024;
 
     // 1024 x V
-    btreemap_insert_blob_1024_4,       insert_blob_helper,    1024,    4;
-    btreemap_insert_blob_1024_4_v2,    insert_blob_helper_v2, 1024,    4;
-    btreemap_insert_blob_1024_8,       insert_blob_helper,    1024,    8;
-    btreemap_insert_blob_1024_8_v2,    insert_blob_helper_v2, 1024,    8;
-    btreemap_insert_blob_1024_16,      insert_blob_helper,    1024,   16;
-    btreemap_insert_blob_1024_16_v2,   insert_blob_helper_v2, 1024,   16;
-    btreemap_insert_blob_1024_32,      insert_blob_helper,    1024,   32;
-    btreemap_insert_blob_1024_32_v2,   insert_blob_helper_v2, 1024,   32;
-    btreemap_insert_blob_1024_64,      insert_blob_helper,    1024,   64;
-    btreemap_insert_blob_1024_64_v2,   insert_blob_helper_v2, 1024,   64;
-    btreemap_insert_blob_1024_128,     insert_blob_helper,    1024,  128;
-    btreemap_insert_blob_1024_128_v2,  insert_blob_helper_v2, 1024,  128;
-    btreemap_insert_blob_1024_256,     insert_blob_helper,    1024,  256;
-    btreemap_insert_blob_1024_256_v2,  insert_blob_helper_v2, 1024,  256;
-    btreemap_insert_blob_1024_512,     insert_blob_helper,    1024,  512;
-    btreemap_insert_blob_1024_512_v2,  insert_blob_helper_v2, 1024,  512;
-    btreemap_insert_blob_1024_512_v2_mem_manager, insert_blob_helper_v2_mem_manager, 1024, 512;
-}
+    btreemap_insert_blob_1024_4,       insert_helper_v1, Blob1024,    Blob4;
+    btreemap_insert_blob_1024_4_v2,    insert_helper_v2, Blob1024,    Blob4;
+    btreemap_insert_blob_1024_8,       insert_helper_v1, Blob1024,    Blob8;
+    btreemap_insert_blob_1024_8_v2,    insert_helper_v2, Blob1024,    Blob8;
+    btreemap_insert_blob_1024_16,      insert_helper_v1, Blob1024,   Blob16;
+    btreemap_insert_blob_1024_16_v2,   insert_helper_v2, Blob1024,   Blob16;
+    btreemap_insert_blob_1024_32,      insert_helper_v1, Blob1024,   Blob32;
+    btreemap_insert_blob_1024_32_v2,   insert_helper_v2, Blob1024,   Blob32;
+    btreemap_insert_blob_1024_64,      insert_helper_v1, Blob1024,   Blob64;
+    btreemap_insert_blob_1024_64_v2,   insert_helper_v2, Blob1024,   Blob64;
+    btreemap_insert_blob_1024_128,     insert_helper_v1, Blob1024,  Blob128;
+    btreemap_insert_blob_1024_128_v2,  insert_helper_v2, Blob1024,  Blob128;
+    btreemap_insert_blob_1024_256,     insert_helper_v1, Blob1024,  Blob256;
+    btreemap_insert_blob_1024_256_v2,  insert_helper_v2, Blob1024,  Blob256;
+    btreemap_insert_blob_1024_512,     insert_helper_v1, Blob1024,  Blob512;
+    btreemap_insert_blob_1024_512_v2,  insert_helper_v2, Blob1024,  Blob512;
+    btreemap_insert_blob_1024_512_v2_mem_manager, insert_helper_v2_mem_manager, Blob1024, Blob512;
 
-#[bench(raw)]
-pub fn btreemap_insert_u64_u64() -> BenchResult {
-    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
-    insert_helper::<u64, u64>(btree)
-}
+    btreemap_insert_u64_u64,           insert_helper_v1, u64,     u64;
+    btreemap_insert_u64_u64_v2,        insert_helper_v2, u64,     u64;
+    btreemap_insert_u64_u64_v2_mem_manager, insert_helper_v2_mem_manager, u64, u64;
 
-#[bench(raw)]
-pub fn btreemap_insert_u64_u64_mem_manager() -> BenchResult {
-    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
-    let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
-    insert_helper::<u64, u64>(btree)
-}
+    btreemap_insert_u64_blob_8,        insert_helper_v1, u64,   Blob8;
+    btreemap_insert_u64_blob_8_v2,     insert_helper_v2, u64,   Blob8;
 
-#[bench(raw)]
-pub fn btreemap_insert_u64_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    insert_helper::<u64, u64>(btree)
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_u64_blob_8() -> BenchResult {
-    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
-    insert_helper::<u64, Blob<8>>(btree)
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_u64_blob_8_v2() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    insert_helper::<u64, Blob<8>>(btree)
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_8_u64() -> BenchResult {
-    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
-    insert_helper::<Blob<8>, u64>(btree)
-}
-
-#[bench(raw)]
-pub fn btreemap_insert_blob_8_u64_v2() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    insert_helper::<Blob<8>, u64>(btree)
+    btreemap_insert_blob_8_u64,        insert_helper_v1, Blob8,   u64;
+    btreemap_insert_blob_8_u64_v2,     insert_helper_v2, Blob8,   u64;
 }
 
 #[bench(raw)]
@@ -116,10 +93,8 @@ pub fn btreemap_insert_10mib_values() -> BenchResult {
     }
 
     bench_fn(|| {
-        let mut i = 0u64;
-        for value in values {
-            btree.insert(i, value);
-            i += 1;
+        for (i, value) in values.into_iter().enumerate() {
+            btree.insert(i as u32, value);
         }
     })
 }
@@ -372,20 +347,21 @@ pub fn btreemap_get_blob_8_u64_v2() -> BenchResult {
 }
 
 // Profiles inserting a large number of random blobs into a btreemap.
-fn insert_blob_helper<const K: usize, const V: usize>() -> BenchResult {
+fn insert_helper_v1<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
-    insert_helper::<Blob<K>, Blob<V>>(btree)
+    insert_helper::<K, V>(btree)
 }
 
-fn insert_blob_helper_v2<const K: usize, const V: usize>() -> BenchResult {
+fn insert_helper_v2<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    insert_helper::<Blob<K>, Blob<V>>(btree)
+    insert_helper::<K, V>(btree)
 }
 
-fn insert_blob_helper_v2_mem_manager<const K: usize, const V: usize>() -> BenchResult {
+fn insert_helper_v2_mem_manager<K: Clone + Ord + Storable + Random, V: Storable + Random>(
+) -> BenchResult {
     let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
     let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
-    insert_helper::<Blob<K>, Blob<V>>(btree)
+    insert_helper::<K, V>(btree)
 }
 
 // Profiles inserting a large number of random blobs into a btreemap.
