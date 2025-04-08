@@ -524,12 +524,7 @@ where
     /// Returns true if the key exists.
     pub fn contains_key(&self, key: &K) -> bool {
         // An empty closure returns Some(()) if the key is found.
-        self.root_addr != NULL
-            && self
-                .traverse(self.root_addr, key, |node, idx| {
-                    node.into_entry(idx, self.memory()).1 // TODO: remove debug code.
-                })
-                .is_some()
+        self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
     }
 
     /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
