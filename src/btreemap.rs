@@ -1096,9 +1096,9 @@ where
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
-        self.replace_cached_keys_for_address(source.address(), &[]);
+        //self.replace_cached_keys_for_address(source.address(), &[]);
         into.merge(source, median, &mut self.allocator);
-        self.replace_cached_keys_for_address(into.address(), &into.keys());
+        //self.replace_cached_keys_for_address(into.address(), &into.keys());
         into
     }
 
