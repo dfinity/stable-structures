@@ -293,16 +293,16 @@ pub fn btreemap_iter_count_10mib_values() -> BenchResult {
 }
 
 #[bench(raw)]
-pub fn btreemap_first_key_value_insert() -> BenchResult {
+pub fn btreemap_first_key_value() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let num_operations: u64 = 10_000;
 
-    bench_fn(|| {
-        // Insert elements
-        for i in 0..num_operations {
-            btree.insert(i, vec![i as u8; 16]);
-        }
+    // Insert elements
+    for i in 0..num_operations {
+        btree.insert(i, vec![i as u8; 16]);
+    }
 
+    bench_fn(|| {
         // Access first_key_value multiple times
         for _ in 0..num_operations / 2 {
             btree.first_key_value();
@@ -311,16 +311,16 @@ pub fn btreemap_first_key_value_insert() -> BenchResult {
 }
 
 #[bench(raw)]
-pub fn btreemap_first_key_value_insert_and_pop_first() -> BenchResult {
+pub fn btreemap_first_key_value_pop_first() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let num_operations: u64 = 10_000;
 
-    bench_fn(|| {
-        // Insert elements
-        for i in 0..num_operations {
-            btree.insert(i, vec![i as u8; 16]);
-        }
+    // Insert elements
+    for i in 0..num_operations {
+        btree.insert(i, vec![i as u8; 16]);
+    }
 
+    bench_fn(|| {
         // Access first_key_value multiple times and pop first, hence first key value changes in each interation.
         for _ in 0..num_operations / 2 {
             btree.first_key_value();
@@ -330,16 +330,16 @@ pub fn btreemap_first_key_value_insert_and_pop_first() -> BenchResult {
 }
 
 #[bench(raw)]
-pub fn btreemap_first_key_value_insert_and_pop_last() -> BenchResult {
+pub fn btreemap_first_key_value_pop_last() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let num_operations: u64 = 10_000;
 
-    bench_fn(|| {
-        // Insert elements
-        for i in 0..num_operations {
-            btree.insert(i, vec![i as u8; 16]);
-        }
+    // Insert elements
+    for i in 0..num_operations {
+        btree.insert(i, vec![i as u8; 16]);
+    }
 
+    bench_fn(|| {
         // Access first_key_value multiple times and pop last, hence first key value does not change.
         for _ in 0..num_operations / 2 {
             btree.first_key_value();
@@ -349,16 +349,16 @@ pub fn btreemap_first_key_value_insert_and_pop_last() -> BenchResult {
 }
 
 #[bench(raw)]
-pub fn btreemap_last_key_value_insert() -> BenchResult {
+pub fn btreemap_last_key_value() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let num_operations: u64 = 10_000;
 
-    bench_fn(|| {
-        // Insert elements
-        for i in 0..num_operations {
-            btree.insert(i, vec![i as u8; 16]);
-        }
+    // Insert elements
+    for i in 0..num_operations {
+        btree.insert(i, vec![i as u8; 16]);
+    }
 
+    bench_fn(|| {
         // Access last_key_value multiple times
         for _ in 0..num_operations {
             btree.last_key_value();
@@ -367,16 +367,16 @@ pub fn btreemap_last_key_value_insert() -> BenchResult {
 }
 
 #[bench(raw)]
-pub fn btreemap_last_key_value_insert_pop_first() -> BenchResult {
+pub fn btreemap_last_key_value_pop_first() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let num_operations: u64 = 10_000;
 
-    bench_fn(|| {
-        // Insert elements
-        for i in 0..num_operations {
-            btree.insert(i, vec![i as u8; 16]);
-        }
+    // Insert elements
+    for i in 0..num_operations {
+        btree.insert(i, vec![i as u8; 16]);
+    }
 
+    bench_fn(|| {
         // Access last_key_value multiple times and pop first, hence last key value does not chnage.
         for _ in 0..num_operations {
             btree.last_key_value();
@@ -386,16 +386,16 @@ pub fn btreemap_last_key_value_insert_pop_first() -> BenchResult {
 }
 
 #[bench(raw)]
-pub fn btreemap_last_key_value_insert_pop_last() -> BenchResult {
+pub fn btreemap_last_key_value_pop_last() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let num_operations: u64 = 10_000;
 
-    bench_fn(|| {
-        // Insert elements
-        for i in 0..num_operations {
-            btree.insert(i, vec![i as u8; 16]);
-        }
+    // Insert elements
+    for i in 0..num_operations {
+        btree.insert(i, vec![i as u8; 16]);
+    }
 
+    bench_fn(|| {
         // Access first_key_value multiple times and pop last, hence last key value changes in each interation.
         for _ in 0..num_operations {
             btree.last_key_value();
