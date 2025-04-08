@@ -555,7 +555,7 @@ where
                 // Key found: apply `f`.
                 self.key_address_cache
                     .borrow_mut()
-                    .insert(key.clone(), node.address());
+                    .insert(key.clone(), node_addr);
                 Some(f(node, idx))
             }
             Err(idx) => match node.node_type() {
