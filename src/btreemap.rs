@@ -103,6 +103,12 @@ where
     // The number of elements in the map.
     length: u64,
 
+    // Saved first (K, V) pair in tree.
+    first_key_value: Option<(K, Vec<u8>)>,
+
+    // Saved last (K, V) pair in tree.
+    last_key_value: Option<(K, Vec<u8>)>,
+
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
 }
@@ -214,6 +220,8 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
+            first_key_value: None,
+            last_key_value: None,
         };
 
         btree.save();
@@ -241,6 +249,8 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
+            first_key_value: None,
+            last_key_value: None,
         };
 
         btree.save();
@@ -290,6 +300,8 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
+            first_key_value: None,
+            last_key_value: None,
         }
     }
 
@@ -353,6 +365,18 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        if let Some((first_key, _)) = &self.first_key_value {
+            if key <= *first_key {
+                self.first_key_value = None;
+            }
+        }
+
+        if let Some((last_key, _)) = &self.last_key_value {
+            if key >= *last_key {
+                self.last_key_value = None;
+            }
+        }
+
         let value = value.to_bytes_checked().into_owned();
 
         let root = if self.root_addr == NULL {
@@ -573,23 +597,35 @@ where
 
     /// Returns the first key-value pair in the map. The key in this
     /// pair is the minimum key in the map.
-    pub fn first_key_value(&self) -> Option<(K, V)> {
+    pub fn first_key_value(&mut self) -> Option<(K, V)> {
         if self.root_addr == NULL {
             return None;
         }
+
+        if let Some((k, encoded_v)) = &self.first_key_value {
+            return Some((k.clone(), V::from_bytes(Cow::Owned(encoded_v.clone()))));
+        }
+
         let root = self.load_node(self.root_addr);
         let (k, encoded_v) = root.get_min(self.memory());
+        self.first_key_value = Some((k.clone(), encoded_v.clone()));
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
     /// Returns the last key-value pair in the map. The key in this
     /// pair is the maximum key in the map.
-    pub fn last_key_value(&self) -> Option<(K, V)> {
+    pub fn last_key_value(&mut self) -> Option<(K, V)> {
         if self.root_addr == NULL {
             return None;
         }
+
+        if let Some((k, encoded_v)) = &self.last_key_value {
+            return Some((k.clone(), V::from_bytes(Cow::Owned(encoded_v.clone()))));
+        }
+
         let root = self.load_node(self.root_addr);
         let (k, encoded_v) = root.get_max(self.memory());
+        self.last_key_value = Some((k.clone(), encoded_v.clone()));
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -607,6 +643,18 @@ where
             return None;
         }
 
+        if let Some((first_key, _)) = &self.first_key_value {
+            if first_key == key {
+                self.first_key_value = None;
+            }
+        }
+
+        if let Some((last_key, _)) = &self.last_key_value {
+            if last_key == key {
+                self.last_key_value = None;
+            }
+        }
+
         let root_node = self.load_node(self.root_addr);
         self.remove_helper(root_node, key)
             .map(Cow::Owned)
@@ -619,6 +667,12 @@ where
             return None;
         }
 
+        if self.length == 1 {
+            self.first_key_value = None;
+        }
+
+        self.last_key_value = None;
+
         let root = self.load_node(self.root_addr);
         let (max_key, _) = root.get_max(self.memory());
         self.remove_helper(root, &max_key)
@@ -630,6 +684,12 @@ where
         if self.root_addr == NULL {
             return None;
         }
+
+        if self.length == 1 {
+            self.last_key_value = None;
+        }
+
+        self.first_key_value = None;
 
         let root = self.load_node(self.root_addr);
         let (min_key, _) = root.get_min(self.memory());
@@ -1505,7 +1565,7 @@ mod test {
     #[test]
     fn last_key_value_empty_tree_simple() {
         btree_test(
-            |btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
+            |mut btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
                 assert_eq!(btree.last_key_value(), None);
             },
         );
@@ -1514,7 +1574,7 @@ mod test {
     #[test]
     fn first_key_value_empty_tree_simple() {
         btree_test(
-            |btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
+            |mut btree: BTreeMap<Blob<10>, Blob<10>, Rc<RefCell<Vec<u8>>>>| {
                 assert_eq!(btree.first_key_value(), None);
             },
         );
@@ -3068,5 +3128,138 @@ mod test {
         }
 
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn first_key_value_correctness() {
+        btree_test(|mut btree| {
+            // Initially, the tree is empty.
+            assert_eq!(btree.first_key_value(), None);
+
+            // Insert some elements.
+            assert_eq!(btree.insert(b(&[3]), b(&[30])), None);
+            assert_eq!(btree.insert(b(&[1]), b(&[10])), None);
+            assert_eq!(btree.insert(b(&[2]), b(&[20])), None);
+
+            // The first key-value pair should be the smallest key.
+            assert_eq!(btree.first_key_value(), Some((b(&[1]), b(&[10]))));
+
+            // Remove the first key.
+            assert_eq!(btree.remove(&b(&[1])), Some(b(&[10])));
+            assert_eq!(btree.first_key_value(), Some((b(&[2]), b(&[20]))));
+
+            // Remove all elements.
+            assert_eq!(btree.pop_first(), Some((b(&[2]), b(&[20]))));
+            assert_eq!(btree.first_key_value(), Some((b(&[3]), b(&[30]))));
+            assert_eq!(btree.pop_first(), Some((b(&[3]), b(&[30]))));
+
+            // Now the tree is empty again.
+            assert_eq!(btree.first_key_value(), None);
+        });
+    }
+
+    #[test]
+    fn last_key_value_correctness() {
+        btree_test(|mut btree| {
+            // Initially, the tree is empty.
+            assert_eq!(btree.last_key_value(), None);
+
+            // Insert some elements.
+            assert_eq!(btree.insert(b(&[3]), b(&[30])), None);
+            assert_eq!(btree.insert(b(&[1]), b(&[10])), None);
+            assert_eq!(btree.insert(b(&[2]), b(&[20])), None);
+
+            // The last key-value pair should be the largest key.
+            assert_eq!(btree.last_key_value(), Some((b(&[3]), b(&[30]))));
+
+            // Remove the last key.
+            assert_eq!(btree.remove(&b(&[3])), Some(b(&[30])));
+            assert_eq!(btree.last_key_value(), Some((b(&[2]), b(&[20]))));
+
+            // Remove all elements.
+            assert_eq!(btree.pop_last(), Some((b(&[2]), b(&[20]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[1]), b(&[10]))));
+            assert_eq!(btree.pop_last(), Some((b(&[1]), b(&[10]))));
+
+            // Now the tree is empty again.
+            assert_eq!(btree.last_key_value(), None);
+        });
+    }
+
+    #[test]
+    fn first_and_last_key_value_with_pop() {
+        btree_test(|mut btree| {
+            // Insert multiple elements.
+            assert_eq!(btree.insert(b(&[5]), b(&[50])), None);
+            assert_eq!(btree.insert(b(&[3]), b(&[30])), None);
+            assert_eq!(btree.insert(b(&[7]), b(&[70])), None);
+
+            // Check first and last key-value pairs.
+            assert_eq!(btree.first_key_value(), Some((b(&[3]), b(&[30]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[7]), b(&[70]))));
+
+            // Pop the first element and check again.
+            assert_eq!(btree.pop_first(), Some((b(&[3]), b(&[30]))));
+            assert_eq!(btree.first_key_value(), Some((b(&[5]), b(&[50]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[7]), b(&[70]))));
+
+            // Pop the last element and check again.
+            assert_eq!(btree.pop_last(), Some((b(&[7]), b(&[70]))));
+            assert_eq!(btree.first_key_value(), Some((b(&[5]), b(&[50]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[5]), b(&[50]))));
+
+            // Pop the remaining element.
+            assert_eq!(btree.pop_first(), Some((b(&[5]), b(&[50]))));
+            assert_eq!(btree.first_key_value(), None);
+            assert_eq!(btree.last_key_value(), None);
+
+            assert_eq!(btree.insert(b(&[1]), b(&[10])), None);
+            assert_eq!(btree.first_key_value(), Some((b(&[1]), b(&[10]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[1]), b(&[10]))));
+
+            // Pop the remaining element.
+            assert_eq!(btree.pop_last(), Some((b(&[1]), b(&[10]))));
+            assert_eq!(btree.first_key_value(), None);
+            assert_eq!(btree.last_key_value(), None);
+
+            assert_eq!(btree.insert(b(&[3]), b(&[30])), None);
+            assert_eq!(btree.first_key_value(), Some((b(&[3]), b(&[30]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[3]), b(&[30]))));
+        });
+    }
+
+    #[test]
+    fn first_and_last_key_value_with_insert_and_remove() {
+        btree_test(|mut btree| {
+            // Insert elements in random order.
+            assert_eq!(btree.insert(b(&[10]), b(&[100])), None);
+            assert_eq!(btree.insert(b(&[1]), b(&[10])), None);
+            assert_eq!(btree.insert(b(&[2]), b(&[20])), None);
+            assert_eq!(btree.insert(b(&[5]), b(&[50])), None);
+
+            // Check first and last key-value pairs.
+            assert_eq!(btree.first_key_value(), Some((b(&[1]), b(&[10]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[10]), b(&[100]))));
+
+            // Remove the element in the middle.
+            assert_eq!(btree.remove(&b(&[2])), Some(b(&[20])));
+            assert_eq!(btree.first_key_value(), Some((b(&[1]), b(&[10]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[10]), b(&[100]))));
+
+            // Remove the first element and check again.
+            assert_eq!(btree.remove(&b(&[1])), Some(b(&[10])));
+            assert_eq!(btree.first_key_value(), Some((b(&[5]), b(&[50]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[10]), b(&[100]))));
+
+            // Remove the last element and check again.
+            assert_eq!(btree.remove(&b(&[10])), Some(b(&[100])));
+            assert_eq!(btree.first_key_value(), Some((b(&[5]), b(&[50]))));
+            assert_eq!(btree.last_key_value(), Some((b(&[5]), b(&[50]))));
+
+            // Remove the remaining element.
+            assert_eq!(btree.remove(&b(&[5])), Some(b(&[50])));
+            assert_eq!(btree.first_key_value(), None);
+            assert_eq!(btree.last_key_value(), None);
+        });
     }
 }
