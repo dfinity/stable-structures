@@ -103,10 +103,10 @@ where
     // The number of elements in the map.
     length: u64,
 
-    // Saved first (K, V) pair in tree.
+    // Caches the first (K, V) pair in the tree for quick access.
     first_key_value: Option<(K, Vec<u8>)>,
 
-    // Saved last (K, V) pair in tree.
+    // Caches the last (K, V) pair in the tree for quick access.
     last_key_value: Option<(K, Vec<u8>)>,
 
     // A marker to communicate to the Rust compiler that we own these types.
@@ -219,9 +219,9 @@ where
             ),
             version: Version::V2(page_size),
             length: 0,
-            _phantom: PhantomData,
             first_key_value: None,
             last_key_value: None,
+            _phantom: PhantomData,
         };
 
         btree.save();
@@ -248,9 +248,9 @@ where
                 max_value_size,
             }),
             length: 0,
-            _phantom: PhantomData,
             first_key_value: None,
             last_key_value: None,
+            _phantom: PhantomData,
         };
 
         btree.save();
@@ -299,9 +299,9 @@ where
             allocator: Allocator::load(memory, allocator_addr),
             version,
             length: header.length,
-            _phantom: PhantomData,
             first_key_value: None,
             last_key_value: None,
+            _phantom: PhantomData,
         }
     }
 
