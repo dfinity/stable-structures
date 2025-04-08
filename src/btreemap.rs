@@ -509,36 +509,38 @@ where
         node.save(self.allocator_mut());
     }
 
-    /// Returns the value associated with the given key if it exists.
+    /// Returns the value for the given key, if it exists.
     pub fn get(&self, key: &K) -> Option<V> {
         if self.root_addr == NULL {
             return None;
         }
-
-        self.get_helper(self.root_addr, key)
-            .map(Cow::Owned)
-            .map(V::from_bytes)
+        self.traverse(self.root_addr, key, |node, idx| {
+            node.into_entry(idx, self.memory()).1 // Extract value.
+        })
+        .map(Cow::Owned)
+        .map(V::from_bytes)
     }
 
-    fn get_helper(&self, node_addr: Address, key: &K) -> Option<Vec<u8>> {
-        let node = self.load_node(node_addr);
-        match node.search(key) {
-            Ok(idx) => Some(node.into_entry(idx, self.memory()).1),
-            Err(idx) => {
-                match node.node_type() {
-                    NodeType::Leaf => None, // Key not found.
-                    NodeType::Internal => {
-                        // The key isn't in the node. Look for the key in the child.
-                        self.get_helper(node.child(idx), key)
-                    }
-                }
-            }
-        }
-    }
-
-    /// Returns `true` if the key exists in the map, `false` otherwise.
+    /// Returns true if the key exists.
     pub fn contains_key(&self, key: &K) -> bool {
-        self.get(key).is_some()
+        // An empty closure returns Some(()) if the key is found.
+        self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
+    }
+
+    /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
+    fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
+    where
+        F: Fn(Node<K>, usize) -> R + Clone,
+    {
+        let node = self.load_node(node_addr);
+        // Look for the key in the current node.
+        match node.search(key) {
+            Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
+            Err(idx) => match node.node_type() {
+                NodeType::Leaf => None, // At a leaf: key not present.
+                NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
+            },
+        }
     }
 
     /// Returns `true` if the map contains no elements.
