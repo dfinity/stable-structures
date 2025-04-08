@@ -110,8 +110,8 @@ where
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
 
-    // A cache for storing recently accessed nodes.
-    key_address_cache: RefCell<KeyAddressCache<K>>,
+    // A cache for storing the node addresses of keys.
+    cache: RefCell<KeyAddressCache<K>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -221,7 +221,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
-            key_address_cache: RefCell::new(KeyAddressCache::new()),
+            cache: RefCell::new(KeyAddressCache::new()),
         };
 
         btree.save_header();
@@ -249,7 +249,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
-            key_address_cache: RefCell::new(KeyAddressCache::new()),
+            cache: RefCell::new(KeyAddressCache::new()),
         };
 
         btree.save_header();
@@ -299,7 +299,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
-            key_address_cache: RefCell::new(KeyAddressCache::new()),
+            cache: RefCell::new(KeyAddressCache::new()),
         }
     }
 
@@ -525,11 +525,7 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        let node_addr = self
-            .key_address_cache
-            .borrow_mut()
-            .get(key)
-            .unwrap_or(self.root_addr);
+        let node_addr = self.cache.borrow_mut().get(key).unwrap_or(self.root_addr);
         self.traverse(node_addr, key, |node, idx| {
             node.into_entry(idx, self.memory()).1 // Extract value.
         })
@@ -553,9 +549,7 @@ where
         match node.search(key) {
             Ok(idx) => {
                 // Key found: apply `f`.
-                self.key_address_cache
-                    .borrow_mut()
-                    .insert(key.clone(), node_addr);
+                self.cache.borrow_mut().insert(key.clone(), node_addr);
                 Some(f(node, idx))
             }
             Err(idx) => match node.node_type() {
@@ -1138,7 +1132,7 @@ where
 
     /// Replaces the cached keys for the given address with the provided keys.
     fn replace_cached_keys_for_address(&mut self, address: Address, keys: &[K]) {
-        let mut cache = self.key_address_cache.borrow_mut();
+        let mut cache = self.cache.borrow_mut();
         if cache.capacity() > 0 {
             cache.remove_address(&address);
             keys.iter().for_each(|key| {
