@@ -60,9 +60,11 @@ use crate::{
     Memory, Storable,
 };
 use allocator::Allocator;
+use cache::Cache;
 pub use iter::Iter;
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -82,6 +84,8 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
+
+type KeyAddressCache<K> = Cache<K, Address>;
 
 /// A "stable" map based on a B-tree.
 ///
@@ -107,6 +111,9 @@ where
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
+
+    // A cache for storing recently accessed nodes.
+    key_address_cache: RefCell<KeyAddressCache<K>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -216,6 +223,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
+            key_address_cache: RefCell::new(KeyAddressCache::new()),
         };
 
         btree.save_header();
@@ -243,6 +251,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
+            key_address_cache: RefCell::new(KeyAddressCache::new()),
         };
 
         btree.save_header();
@@ -292,6 +301,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
+            key_address_cache: RefCell::new(KeyAddressCache::new()),
         }
     }
 
