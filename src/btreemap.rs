@@ -543,10 +543,21 @@ where
     where
         F: Fn(Node<K>, usize) -> R + Clone,
     {
+        let node_addr = self
+            .key_address_cache
+            .borrow_mut()
+            .get(key)
+            .unwrap_or(node_addr);
         let node = self.load_node(node_addr);
         // Look for the key in the current node.
         match node.search(key) {
-            Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
+            Ok(idx) => {
+                // Key found: apply `f`.
+                self.key_address_cache
+                    .borrow_mut()
+                    .insert(key.clone(), node.address());
+                Some(f(node, idx))
+            }
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
                 NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
@@ -1091,7 +1102,9 @@ where
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
+        self.replace_cached_keys_for_address(source.address(), &[]);
         into.merge(source, median, &mut self.allocator);
+        self.replace_cached_keys_for_address(into.address(), &into.keys());
         into
     }
 
@@ -1106,6 +1119,7 @@ where
     /// Deallocates a node.
     #[inline]
     fn deallocate_node(&mut self, node: Node<K>) {
+        self.replace_cached_keys_for_address(node.address(), &[]);
         node.deallocate(self.allocator_mut());
     }
 
@@ -1118,14 +1132,19 @@ where
     /// Saves the node to memory.
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
-        let address = node.address();
-        self.key_address_cache.borrow_mut().remove_address(&address);
-        node.keys().iter().for_each(|key| {
-            self.key_address_cache
-                .borrow_mut()
-                .insert(key.clone(), address);
-        });
+        self.replace_cached_keys_for_address(node.address(), &node.keys());
         node.save(self.allocator_mut());
+    }
+
+    /// Replaces the cached keys for the given address with the provided keys.
+    fn replace_cached_keys_for_address(&mut self, address: Address, keys: &[K]) {
+        let mut cache = self.key_address_cache.borrow_mut();
+        if cache.capacity() > 0 {
+            cache.remove_address(&address);
+            keys.iter().for_each(|key| {
+                cache.insert(key.clone(), address);
+            });
+        }
     }
 
     /// Saves the map to memory.
