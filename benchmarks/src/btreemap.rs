@@ -707,6 +707,54 @@ fn get_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
     })
 }
 
+/// Benchmarks `contains_key` of a BTreeMap.
+#[bench(raw)]
+pub fn btreemap_contains_key_blob_4_1024() -> BenchResult {
+    contains_key_blob_helper::<4, 1024>()
+}
+
+#[bench(raw)]
+pub fn btreemap_contains_key_blob_4_1024_v2() -> BenchResult {
+    contains_key_blob_helper_v2::<4, 1024>()
+}
+
+// Profiles `contains_key` on a large number of random blobs from a btreemap.
+fn contains_key_blob_helper<const K: usize, const V: usize>() -> BenchResult {
+    let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
+    contains_key_helper::<Blob<K>, Blob<V>>(btree)
+}
+
+fn contains_key_blob_helper_v2<const K: usize, const V: usize>() -> BenchResult {
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    contains_key_helper::<Blob<K>, Blob<V>>(btree)
+}
+
+fn contains_key_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+) -> BenchResult {
+    let num_keys = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let mut random_keys = Vec::with_capacity(num_keys);
+    let mut random_values = Vec::with_capacity(num_keys);
+
+    for _ in 0..num_keys {
+        random_keys.push(K::random(&mut rng));
+        random_values.push(V::random(&mut rng));
+    }
+
+    // Insert the keys into the btree.
+    for (k, v) in random_keys.iter().zip(random_values.into_iter()) {
+        btree.insert(k.clone(), v);
+    }
+
+    // Checks if the keys are in the map.
+    bench_fn(|| {
+        for k in random_keys.into_iter() {
+            btree.contains_key(&k);
+        }
+    })
+}
+
 // Inserts a large number of random blobs into a btreemap, then profiles removing them.
 fn remove_blob_helper<const K: usize, const V: usize>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
