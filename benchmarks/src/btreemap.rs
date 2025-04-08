@@ -611,7 +611,7 @@ pub fn btreemap_get_blob_8_u64_v2() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_first_key_value_insert() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let num_operations = 10_000;
+    let num_operations: u64 = 10_000;
 
     bench_fn(|| {
         // Insert elements
@@ -629,7 +629,7 @@ pub fn btreemap_first_key_value_insert() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_first_key_value_insert_and_pop_first() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let num_operations = 10_000;
+    let num_operations: u64 = 10_000;
 
     bench_fn(|| {
         // Insert elements
@@ -648,7 +648,7 @@ pub fn btreemap_first_key_value_insert_and_pop_first() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_first_key_value_insert_and_pop_last() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let num_operations = 10_000;
+    let num_operations: u64 = 10_000;
 
     bench_fn(|| {
         // Insert elements
@@ -667,7 +667,7 @@ pub fn btreemap_first_key_value_insert_and_pop_last() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_last_key_value_insert() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let num_operations = 10_000;
+    let num_operations: u64 = 10_000;
 
     bench_fn(|| {
         // Insert elements
@@ -679,12 +679,13 @@ pub fn btreemap_last_key_value_insert() -> BenchResult {
         for _ in 0..num_operations {
             btree.last_key_value();
         }
+    })
 }
 
 #[bench(raw)]
 pub fn btreemap_last_key_value_insert_pop_first() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let num_operations = 10_000;
+    let num_operations: u64 = 10_000;
 
     bench_fn(|| {
         // Insert elements
@@ -697,12 +698,13 @@ pub fn btreemap_last_key_value_insert_pop_first() -> BenchResult {
             btree.last_key_value();
             btree.pop_first();
         }
+    })
 }
 
 #[bench(raw)]
 pub fn btreemap_last_key_value_insert_pop_last() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let num_operations = 10_000;
+    let num_operations: u64 = 10_000;
 
     bench_fn(|| {
         // Insert elements
@@ -715,6 +717,7 @@ pub fn btreemap_last_key_value_insert_pop_last() -> BenchResult {
             btree.last_key_value();
             btree.pop_last();
         }
+    })
 }
 
 // Profiles inserting a large number of random blobs into a btreemap.
