@@ -84,7 +84,7 @@ fi
   echo "$UPDATED_MSG"
   echo ""
   echo "\`\`\`"
-  echo "$CANBENCH_OUTPUT"
+  cat "$CANBENCH_OUTPUT"
   echo "\`\`\`"
 } >> "$COMMENT_MESSAGE_PATH"
 
