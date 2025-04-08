@@ -559,21 +559,21 @@ where
         // let _p = crate::debug::InstructionCounter::new("traverse");
 
         let node = {
-            #[cfg(feature = "canbench-rs")]
-            let _p = crate::debug::InstructionCounter::new("load_node");
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("load_node");
             self.load_node(node_addr)
         };
 
         let search = {
-            #[cfg(feature = "canbench-rs")]
-            let _p = crate::debug::InstructionCounter::new("search");
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("search");
             node.search(key)
         };
         match search {
             Ok(idx) => {
                 // Key found: apply `f`.
-                #[cfg(feature = "canbench-rs")]
-                let _p = crate::debug::InstructionCounter::new("f");
+                // #[cfg(feature = "canbench-rs")]
+                // let _p = crate::debug::InstructionCounter::new("f");
 
                 Some(f(node, idx))
             }
