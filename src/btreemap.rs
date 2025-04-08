@@ -534,9 +534,11 @@ where
     {
         let node = self.load_node(node_addr);
         match node.search(key) {
-            Ok(idx) => Some(f(node, idx)),                           // Key found.
-            Err(_idx) if node.node_type() == NodeType::Leaf => None, // At leaf: key missing.
-            Err(idx) => self.traverse(node.child(idx), key, f),      // Search in child.
+            Ok(idx) => Some(f(node, idx)), // Key found.
+            Err(idx) => match node.node_type() {
+                NodeType::Leaf => None, // At leaf: key missing.
+                NodeType::Internal => self.traverse(node.child(idx), key, f), // Search in child.
+            },
         }
     }
 
