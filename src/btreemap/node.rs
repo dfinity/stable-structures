@@ -36,7 +36,7 @@ pub enum NodeType {
     Internal,
 }
 
-pub type Entry<K> = (K, Vec<u8>);
+pub type Entry<K> = (K, Blob);
 pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 
 /// A node of a B-Tree.
@@ -52,7 +52,7 @@ pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
     // INVARIANT: the list is sorted by key.
-    keys_and_encoded_values: Vec<(K, LazyBlob)>,
+    keys_and_encoded_values: Vec<(K, Value)>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
@@ -164,7 +164,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) -> Entry<K> {
         let (old_key, old_value) = core::mem::replace(
             &mut self.keys_and_encoded_values[idx],
-            (key, LazyBlob::by_value(value)),
+            (key, Value::by_value(value)),
         );
         (old_key, self.extract_value(old_value, memory))
     }
@@ -186,7 +186,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Extracts the contents of value (by loading it first if it's not loaded yet).
-    fn extract_value<M: Memory>(&self, value: LazyBlob, memory: &M) -> Vec<u8> {
+    fn extract_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
         value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
@@ -253,7 +253,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .insert(idx, (key, LazyBlob::by_value(encoded_value)));
+            .insert(idx, (key, Value::by_value(encoded_value)));
     }
 
     /// Returns the entry at the specified index while consuming this node.
@@ -272,7 +272,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Adds a new entry at the back of the node.
     pub fn push_entry(&mut self, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .push((key, LazyBlob::by_value(encoded_value)));
+            .push((key, Value::by_value(encoded_value)));
     }
 
     /// Removes an entry from the back of the node.
@@ -463,53 +463,53 @@ impl NodeHeader {
     }
 }
 
-/// A lazy-loaded blob of bytes.
-#[derive(Debug)]
-enum LazyBlob {
-    /// Blob stored as raw bytes.
-    ByVal(Vec<u8>),
+type Blob = Vec<u8>;
+type Value = LazyObject<Blob>;
 
+/// A lazy-loaded object.
+#[derive(Debug)]
+enum LazyObject<T> {
+    /// Object stored by value.
+    ByVal(T),
+
+    /// Object stored by reference, loaded on demand.
     ByRef {
-        /// Offset of the blob in memory.
+        /// Memory offset of the object.
         offset: Bytes,
-        /// Cache for the lazily loaded bytes.
-        loaded_bytes: OnceCell<Vec<u8>>,
+        /// Cache for the lazily loaded object.
+        loaded: OnceCell<T>,
     },
 }
 
-impl LazyBlob {
-    /// Create a lazy blob using a memory offset.
+impl<T> LazyObject<T> {
+    /// Create a lazy object with a memory offset.
     pub fn by_ref(offset: Bytes) -> Self {
         Self::ByRef {
             offset,
-            loaded_bytes: Default::default(),
+            loaded: Default::default(),
         }
     }
 
-    /// Create a blob from raw bytes.
-    pub fn by_value(bytes: Vec<u8>) -> Self {
-        Self::ByVal(bytes)
+    /// Create a lazy object from a value.
+    pub fn by_value(value: T) -> Self {
+        Self::ByVal(value)
     }
 
-    /// Return a reference to the blob bytes, loading them if needed.
-    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Vec<u8>) -> &[u8] {
+    /// Get a reference to the object, loading it if necessary.
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> T) -> &T {
         match self {
-            LazyBlob::ByVal(v) => &v[..],
-            LazyBlob::ByRef {
-                offset,
-                loaded_bytes: bytes,
-            } => bytes.get_or_init(|| load(*offset)),
+            LazyObject::ByVal(v) => v,
+            LazyObject::ByRef { offset, loaded } => loaded.get_or_init(|| load(*offset)),
         }
     }
 
-    /// Consume self and return the blob bytes, loading them if needed.
-    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Vec<u8>) -> Vec<u8> {
+    /// Consume self and return the object, loading it if necessary.
+    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> T) -> T {
         match self {
-            LazyBlob::ByVal(bytes) => bytes,
-            LazyBlob::ByRef {
-                offset,
-                loaded_bytes: bytes,
-            } => bytes.into_inner().unwrap_or_else(|| load(offset)),
+            LazyObject::ByVal(v) => v,
+            LazyObject::ByRef { offset, loaded } => {
+                loaded.into_inner().unwrap_or_else(|| load(offset))
+            }
         }
     }
 }
