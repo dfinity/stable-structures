@@ -11,6 +11,36 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
+  btreemap_first_key_value:
+    total:
+      instructions: 117060439
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_first_key_value_pop_first:
+    total:
+      instructions: 518977111
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_first_key_value_pop_first_blob1024:
+    total:
+      instructions: 647858734
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_first_key_value_pop_first_once_blob1024:
+    total:
+      instructions: 509829791
+      heap_increase: 0
+      stable_memory_increase: 10
+    scopes: {}
+  btreemap_first_key_value_pop_last:
+    total:
+      instructions: 483196272
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
   btreemap_get_blob_128_1024:
     total:
       instructions: 871377876
@@ -157,7 +187,7 @@ benches:
     scopes: {}
   btreemap_insert_10mib_values:
     total:
-      instructions: 5239421355
+      instructions: 5239412179
       heap_increase: 0
       stable_memory_increase: 3613
     scopes: {}
@@ -460,6 +490,36 @@ benches:
       instructions: 9526093
       heap_increase: 0
       stable_memory_increase: 0
+    scopes: {}
+  btreemap_last_key_value:
+    total:
+      instructions: 305020600
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_last_key_value_pop_first:
+    total:
+      instructions: 972625000
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_last_key_value_pop_last:
+    total:
+      instructions: 965157904
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_last_key_value_pop_last_blob1024:
+    total:
+      instructions: 656992168
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_last_key_value_pop_last_once_blob1024:
+    total:
+      instructions: 478668212
+      heap_increase: 0
+      stable_memory_increase: 10
     scopes: {}
   btreemap_read_every_third_value_from_range:
     total:
