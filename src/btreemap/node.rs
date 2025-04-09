@@ -36,7 +36,7 @@ pub enum NodeType {
     Internal,
 }
 
-pub type Entry<K> = (K, Blob);
+pub type Entry<K> = (K, Vec<u8>);
 pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 
 /// A node of a B-Tree.
@@ -52,7 +52,7 @@ pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
     // INVARIANT: the list is sorted by key.
-    keys_and_encoded_values: Vec<(K, Value)>,
+    keys_and_encoded_values: Vec<(LazyKey<K>, LazyValue)>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
@@ -108,11 +108,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             NodeType::Leaf => {
                 let last_idx = self.keys_and_encoded_values.len() - 1;
                 (
-                    self.keys_and_encoded_values
-                        .last()
-                        .expect("A node can never be empty")
-                        .0
-                        .clone(),
+                    self.key(last_idx, memory).clone(),
                     self.value(last_idx, memory).to_vec(),
                 )
             }
@@ -164,17 +160,25 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) -> Entry<K> {
         let (old_key, old_value) = core::mem::replace(
             &mut self.keys_and_encoded_values[idx],
-            (key, Value::by_value(value)),
+            (LazyKey::by_value(key), LazyValue::by_value(value)),
         );
-        (old_key, self.extract_value(old_value, memory))
+        (
+            self.extract_key(old_key, memory),
+            self.extract_value(old_value, memory),
+        )
     }
 
     /// Returns a reference to the entry at the specified index.
     pub fn entry<M: Memory>(&self, idx: usize, memory: &M) -> EntryRef<K> {
-        (
-            &self.keys_and_encoded_values[idx].0,
-            self.value(idx, memory),
-        )
+        (self.key(idx, memory), self.value(idx, memory))
+    }
+
+    /// Returns a reference to the key at the specified index.
+    pub fn key<M: Memory>(&self, idx: usize, memory: &M) -> &K {
+        // Load and cache the key from the underlying memory if needed.
+        self.keys_and_encoded_values[idx]
+            .0
+            .get_or_load(|offset| self.load_key_from_memory(offset, memory))
     }
 
     /// Returns a reference to the encoded value at the specified index.
@@ -185,9 +189,44 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .get_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
+    /// Extracts the contents of key (by loading it first if it's not loaded yet).
+    fn extract_key<M: Memory>(&self, key: LazyKey<K>, memory: &M) -> K {
+        key.take_or_load(|offset| self.load_key_from_memory(offset, memory))
+    }
+
     /// Extracts the contents of value (by loading it first if it's not loaded yet).
-    fn extract_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
+    fn extract_value<M: Memory>(&self, value: LazyValue, memory: &M) -> Vec<u8> {
         value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
+    }
+
+    /// Loads a key from stable memory at the given offset of this node.
+    fn load_key_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> K {
+        let reader = NodeReader {
+            address: self.address,
+            overflows: &self.overflows,
+            page_size: self.page_size(),
+            memory,
+        };
+
+        // Load the key's size.
+        let key_size = if K::BOUND.is_fixed_size() {
+            // Key is fixed in size. The size of the key is always its max size.
+            K::BOUND.max_size()
+        } else {
+            // Key is not fixed in size. Read the size from memory.
+            read_u32(&reader, Address::from(offset.get()))
+        };
+
+        let mut bytes = vec![];
+        read_to_vec(
+            &reader,
+            Address::from((offset + U32_SIZE).get()),
+            &mut bytes,
+            key_size as usize,
+        );
+        let key = K::from_bytes(Cow::Borrowed(&bytes));
+
+        key
     }
 
     /// Loads a value from stable memory at the given offset of this node.
@@ -213,11 +252,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     fn page_size(&self) -> PageSize {
         self.version.page_size()
-    }
-
-    /// Returns a reference to the key at the specified index.
-    pub fn key(&self, idx: usize) -> &K {
-        &self.keys_and_encoded_values[idx].0
     }
 
     /// Returns the child's address at the given index.
@@ -252,27 +286,35 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
-        self.keys_and_encoded_values
-            .insert(idx, (key, Value::by_value(encoded_value)));
+        self.keys_and_encoded_values.insert(
+            idx,
+            (LazyKey::by_value(key), LazyValue::by_value(encoded_value)),
+        );
     }
 
     /// Returns the entry at the specified index while consuming this node.
     pub fn into_entry<M: Memory>(mut self, idx: usize, memory: &M) -> Entry<K> {
         let keys_and_encoded_values = core::mem::take(&mut self.keys_and_encoded_values);
         let (key, value) = keys_and_encoded_values.into_iter().nth(idx).unwrap();
-        (key, self.extract_value(value, memory))
+        (
+            self.extract_key(key, memory),
+            self.extract_value(value, memory),
+        )
     }
 
     /// Removes the entry at the specified index.
     pub fn remove_entry<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
         let (key, value) = self.keys_and_encoded_values.remove(idx);
-        (key, self.extract_value(value, memory))
+        (
+            self.extract_key(key, memory),
+            self.extract_value(value, memory),
+        )
     }
 
     /// Adds a new entry at the back of the node.
     pub fn push_entry(&mut self, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .push((key, Value::by_value(encoded_value)));
+            .push((LazyKey::by_value(key), LazyValue::by_value(encoded_value)));
     }
 
     /// Removes an entry from the back of the node.
@@ -287,7 +329,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
             .pop()
             .expect("node must not be empty");
 
-        Some((key, self.extract_value(last_value, memory)))
+        Some((
+            self.extract_key(key, memory),
+            self.extract_value(last_value, memory),
+        ))
     }
 
     /// Merges the entries and children of the `source` node into self, along with the median entry.
@@ -312,14 +357,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
             source.value(i, allocator.memory());
         }
 
-        if source.key(0) > self.key(0) {
+        if source.key(0, allocator.memory()) > self.key(0, allocator.memory()) {
             // The source node has keys that are greater than self.
             // Append the source node into self.
-            Self::append(self, &mut source, median);
+            Self::append(self, &mut source, median, allocator.memory());
         } else {
             // self has keys that are greater than the source node.
             // Append self into the source node (which more efficient).
-            Self::append(&mut source, self, median);
+            Self::append(&mut source, self, median, allocator.memory());
 
             // Move the entries and children into self.
             self.keys_and_encoded_values = core::mem::take(&mut source.keys_and_encoded_values);
@@ -340,14 +385,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///
     /// POSTCONDITION:
     ///   * `b` is empty.
-    fn append(a: &mut Node<K>, b: &mut Node<K>, median: Entry<K>) {
+    fn append<M: Memory>(a: &mut Node<K>, b: &mut Node<K>, median: Entry<K>, memory: &M) {
         // Assert preconditions.
         let a_len = a.entries_len();
         assert_eq!(a.node_type(), b.node_type());
         assert!(b.entries_len() > 0);
         assert!(a_len > 0);
-        assert!(a.key(a_len - 1) < &median.0);
-        assert!(&median.0 < b.key(0));
+        assert!(a.key(a_len - 1, memory) < &median.0);
+        assert!(&median.0 < b.key(0, memory));
 
         a.push_entry(median);
 
@@ -364,18 +409,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     #[cfg(test)]
     pub fn entries<M: Memory>(&self, memory: &M) -> Vec<Entry<K>> {
-        self.keys_and_encoded_values
-            .iter()
-            .enumerate()
-            .map(|(idx, (key, _))| (key.clone(), self.value(idx, memory).to_vec()))
+        (0..self.keys_and_encoded_values.len())
+            .map(|idx| {
+                (
+                    self.key(idx, memory).clone(),
+                    self.value(idx, memory).to_vec(),
+                )
+            })
             .collect()
     }
 
     #[cfg(test)]
-    pub fn keys(&self) -> Vec<K> {
-        self.keys_and_encoded_values
-            .iter()
-            .map(|(key, _)| key.clone())
+    pub fn keys<M: Memory>(&self, memory: &M) -> Vec<K> {
+        (0..self.keys_and_encoded_values.len())
+            .map(|idx| self.key(idx, memory).clone())
             .collect()
     }
 
@@ -395,9 +442,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// of the matching key. If the value is not found then `Result::Err` is
     /// returned, containing the index where a matching key could be inserted
     /// while maintaining sorted order.
-    pub fn search(&self, key: &K) -> Result<usize, usize> {
+    pub fn search<M: Memory>(&self, key: &K, memory: &M) -> Result<usize, usize> {
         self.keys_and_encoded_values
-            .binary_search_by_key(&key, |entry| &entry.0)
+            .binary_search_by_key(&key, |entry| {
+                &entry
+                    .0
+                    .get_or_load(|offset| self.load_key_from_memory(offset, memory))
+            })
     }
 
     /// Returns the maximum size a node can be if it has bounded keys and values.
@@ -463,8 +514,65 @@ impl NodeHeader {
     }
 }
 
+#[derive(Debug)]
+struct LazyKey<K>(LazyObject<K>);
+
+impl<K> LazyKey<K> {
+    /// Create a lazy key with a memory offset.
+    #[inline]
+    pub fn by_ref(offset: Bytes) -> Self {
+        Self(LazyObject::by_ref(offset))
+    }
+
+    /// Create a lazy key from a key.
+    #[inline]
+    pub fn by_value(key: K) -> Self {
+        Self(LazyObject::by_value(key))
+    }
+
+    /// Returns a reference to the key, loading it if necessary.
+    #[inline]
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> K) -> &K {
+        self.0.get_or_load(load)
+    }
+
+    /// Consumes self and returns the key, loading it if necessary.
+    #[inline]
+    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> K) -> K {
+        self.0.take_or_load(load)
+    }
+}
+
 type Blob = Vec<u8>;
-type Value = LazyObject<Blob>;
+
+#[derive(Debug)]
+struct LazyValue(LazyObject<Blob>);
+
+impl LazyValue {
+    /// Create a lazy value with a memory offset.
+    #[inline]
+    pub fn by_ref(offset: Bytes) -> Self {
+        Self(LazyObject::by_ref(offset))
+    }
+
+    /// Create a lazy value from a value.
+    #[inline]
+    pub fn by_value(value: Blob) -> Self {
+        Self(LazyObject::by_value(value))
+    }
+
+    /// Returns a reference to the key, loading it if necessary.
+    #[inline]
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Blob) -> &Blob {
+        self.0.get_or_load(load)
+    }
+
+    /// Consumes self and returns the key, loading it if necessary.
+    #[inline]
+    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Blob) -> Blob {
+        self.0.take_or_load(load)
+    }
+}
 
 /// A lazy-loaded object.
 #[derive(Debug)]

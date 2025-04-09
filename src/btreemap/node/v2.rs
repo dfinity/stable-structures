@@ -151,7 +151,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the keys.
         let mut keys_encoded_values = Vec::with_capacity(num_entries);
-        let mut buf = vec![];
         for _ in 0..num_entries {
             // Load the key's size.
             let key_size = if K::BOUND.is_fixed_size() {
@@ -165,16 +164,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
             };
 
             // Load the key.
-            read_to_vec(&reader, offset, &mut buf, key_size as usize);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
+            keys_encoded_values.push((
+                LazyKey::by_ref(Bytes::from(offset.get())),
+                LazyValue::by_ref(Bytes::from(0usize)),
+            ));
             offset += Bytes::from(key_size);
-            keys_encoded_values.push((key, LazyObject::by_ref(Bytes::from(0usize))));
         }
 
         // Load the values
         for (_key, value) in keys_encoded_values.iter_mut() {
             // Load the values lazily.
-            *value = LazyObject::by_ref(Bytes::from(offset.get()));
+            *value = LazyValue::by_ref(Bytes::from(offset.get()));
             let value_size = read_u32(&reader, offset) as usize;
             offset += U32_SIZE + Bytes::from(value_size as u64);
         }

@@ -65,18 +65,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the entries.
         let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
-        let mut buf = vec![];
         for _ in 0..header.num_entries {
             // Read the key's size.
             let key_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
 
             // Read the key.
-            read_to_vec(memory, address + offset, &mut buf, key_size as usize);
+            let key_offset = offset;
             offset += Bytes::from(max_key_size);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
             // Values are loaded lazily. Store a reference and skip loading it.
-            keys_encoded_values.push((key, LazyObject::by_ref(offset)));
+            keys_encoded_values.push((LazyKey::by_ref(key_offset), LazyValue::by_ref(offset)));
 
             offset += U32_SIZE + Bytes::from(max_value_size);
         }
@@ -132,7 +130,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(self
             .keys_and_encoded_values
             .windows(2)
-            .all(|e| e[0].0 < e[1].0));
+            .all(|e| e[0].0 < e[1].0)); // TODO: here's a problem, we need to have all keys downloaded to check this.
 
         let (max_key_size, max_value_size) = match self.version {
             Version::V1(DerivedPageSize {
