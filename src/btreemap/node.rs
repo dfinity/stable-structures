@@ -473,7 +473,7 @@ enum Value {
         /// The value's offset in the node.
         offset: Bytes,
         /// The lazily loaded encoded bytes.
-        loaded_value: OnceCell<Vec<u8>>,
+        loaded_bytes: OnceCell<Vec<u8>>,
     },
 }
 
@@ -481,7 +481,7 @@ impl Value {
     pub fn by_ref(offset: Bytes) -> Self {
         Self::ByRef {
             offset,
-            loaded_value: Default::default(),
+            loaded_bytes: Default::default(),
         }
     }
 
@@ -496,7 +496,7 @@ impl Value {
             Value::ByVal(v) => &v[..],
             Value::ByRef {
                 offset,
-                loaded_value: value,
+                loaded_bytes: value,
             } => value.get_or_init(|| load(*offset)),
         }
     }
@@ -508,7 +508,7 @@ impl Value {
             Value::ByVal(v) => v,
             Value::ByRef {
                 offset,
-                loaded_value: value,
+                loaded_bytes: value,
             } => value.into_inner().unwrap_or_else(|| load(offset)),
         }
     }
