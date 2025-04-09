@@ -463,21 +463,22 @@ impl NodeHeader {
     }
 }
 
-/// The value in a K/V pair.
+/// A lazy-loaded blob of bytes.
 #[derive(Debug)]
 enum LazyBlob {
-    /// The value's encoded bytes.
+    /// Blob stored as raw bytes.
     ByVal(Vec<u8>),
 
     ByRef {
-        /// The value's offset in the node.
+        /// Offset of the blob in memory.
         offset: Bytes,
-        /// The lazily loaded encoded bytes.
+        /// Cache for the lazily loaded bytes.
         loaded_bytes: OnceCell<Vec<u8>>,
     },
 }
 
 impl LazyBlob {
+    /// Create a lazy blob using a memory offset.
     pub fn by_ref(offset: Bytes) -> Self {
         Self::ByRef {
             offset,
@@ -485,31 +486,30 @@ impl LazyBlob {
         }
     }
 
-    pub fn by_value(value: Vec<u8>) -> Self {
-        Self::ByVal(value)
+    /// Create a blob from raw bytes.
+    pub fn by_value(bytes: Vec<u8>) -> Self {
+        Self::ByVal(bytes)
     }
 
-    /// Returns a reference to the value if the value has been loaded or runs the given function to
-    /// load the value.
+    /// Return a reference to the blob bytes, loading them if needed.
     pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Vec<u8>) -> &[u8] {
         match self {
             LazyBlob::ByVal(v) => &v[..],
             LazyBlob::ByRef {
                 offset,
-                loaded_bytes: value,
-            } => value.get_or_init(|| load(*offset)),
+                loaded_bytes: bytes,
+            } => bytes.get_or_init(|| load(*offset)),
         }
     }
 
-    /// Extracts the value while consuming self if the value has been loaded or runs the given
-    /// function to load the value.
+    /// Consume self and return the blob bytes, loading them if needed.
     pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Vec<u8>) -> Vec<u8> {
         match self {
-            LazyBlob::ByVal(v) => v,
+            LazyBlob::ByVal(bytes) => bytes,
             LazyBlob::ByRef {
                 offset,
-                loaded_bytes: value,
-            } => value.into_inner().unwrap_or_else(|| load(offset)),
+                loaded_bytes: bytes,
+            } => bytes.into_inner().unwrap_or_else(|| load(offset)),
         }
     }
 }
