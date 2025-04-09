@@ -23,6 +23,12 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
+  btreemap_first_key_value_pop_first_blob1024:
+    total:
+      instructions: 647858734
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
   btreemap_first_key_value_pop_last:
     total:
       instructions: 483196272
@@ -494,6 +500,12 @@ benches:
   btreemap_last_key_value_pop_last:
     total:
       instructions: 965157904
+      heap_increase: 0
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_last_key_value_pop_last_blob1024:
+    total:
+      instructions: 656992168
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
