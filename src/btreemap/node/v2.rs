@@ -199,10 +199,33 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         /*
-        read_keys      : 293_619_121 ( 51.2 %), 91593
-        read_values    : 123_878_903 ( 21.6 %), 91593
-        read_children  : 107_642_317 ( 18.8 %), 71093
-        read_overflows :  48_610_398 (  8.5 %), 91593
+        $ canbench btreemap_get_u64_blob_8_v2 --show-canister-output
+
+        read_keys      :   221_987_821 ( 43.0 %), 94018
+        read_values    :   130_187_984 ( 25.2 %), 94018
+        read_children  :   113_994_776 ( 22.1 %), 72846
+        read_overflows :    50_249_184 (  9.7 %), 94018
+
+        $ canbench btreemap_get_blob_4_1024_v2 --show-canister-output
+
+        read_keys      :   247_653_437 ( 49.2 %), 78056
+        read_values    :   116_455_554 ( 23.1 %), 78056
+        read_children  :    98_024_327 ( 19.5 %), 58611
+        read_overflows :    41_560_306 (  8.3 %), 78056
+
+        $ canbench btreemap_get_blob_8_1024_v2 --show-canister-output
+
+        read_keys      :   293_619_121 ( 51.2 %), 91593
+        read_values    :   123_878_903 ( 21.6 %), 91593
+        read_children  :   107_642_317 ( 18.8 %), 71093
+        read_overflows :    48_610_398 (  8.5 %), 91593
+
+        $ canbench btreemap_get_blob_256_1024_v2 --show-canister-output
+
+        read_keys      : 2_590_429_735 ( 89.9 %), 94120
+        read_values    :   129_692_848 (  4.5 %), 94120
+        read_children  :   112_488_061 (  3.9 %), 72949
+        read_overflows :    50_042_554 (  1.7 %), 94120
         */
 
         Self {
