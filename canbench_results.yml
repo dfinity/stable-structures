@@ -25,7 +25,7 @@ benches:
     scopes: {}
   btreemap_first_key_value_pop_first_blob1024:
     total:
-      instructions: 647858734
+      instructions: 652265736
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -505,7 +505,7 @@ benches:
     scopes: {}
   btreemap_last_key_value_pop_last_blob1024:
     total:
-      instructions: 656992168
+      instructions: 661401864
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
