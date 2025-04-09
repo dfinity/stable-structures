@@ -168,13 +168,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
             read_to_vec(&reader, offset, &mut buf, key_size as usize);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             offset += Bytes::from(key_size);
-            keys_encoded_values.push((key, Value::by_ref(Bytes::from(0usize))));
+            keys_encoded_values.push((key, LazyBlob::by_ref(Bytes::from(0usize))));
         }
 
         // Load the values
         for (_key, value) in keys_encoded_values.iter_mut() {
             // Load the values lazily.
-            *value = Value::by_ref(Bytes::from(offset.get()));
+            *value = LazyBlob::by_ref(Bytes::from(offset.get()));
             let value_size = read_u32(&reader, offset) as usize;
             offset += U32_SIZE + Bytes::from(value_size as u64);
         }

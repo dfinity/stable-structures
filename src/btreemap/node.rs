@@ -52,7 +52,7 @@ pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
     // INVARIANT: the list is sorted by key.
-    keys_and_encoded_values: Vec<(K, Value)>,
+    keys_and_encoded_values: Vec<(K, LazyBlob)>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
@@ -164,7 +164,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) -> Entry<K> {
         let (old_key, old_value) = core::mem::replace(
             &mut self.keys_and_encoded_values[idx],
-            (key, Value::by_value(value)),
+            (key, LazyBlob::by_value(value)),
         );
         (old_key, self.extract_value(old_value, memory))
     }
@@ -186,7 +186,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Extracts the contents of value (by loading it first if it's not loaded yet).
-    fn extract_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
+    fn extract_value<M: Memory>(&self, value: LazyBlob, memory: &M) -> Vec<u8> {
         value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
@@ -253,7 +253,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .insert(idx, (key, Value::by_value(encoded_value)));
+            .insert(idx, (key, LazyBlob::by_value(encoded_value)));
     }
 
     /// Returns the entry at the specified index while consuming this node.
@@ -272,7 +272,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Adds a new entry at the back of the node.
     pub fn push_entry(&mut self, (key, encoded_value): Entry<K>) {
         self.keys_and_encoded_values
-            .push((key, Value::by_value(encoded_value)));
+            .push((key, LazyBlob::by_value(encoded_value)));
     }
 
     /// Removes an entry from the back of the node.
@@ -465,7 +465,7 @@ impl NodeHeader {
 
 /// The value in a K/V pair.
 #[derive(Debug)]
-enum Value {
+enum LazyBlob {
     /// The value's encoded bytes.
     ByVal(Vec<u8>),
 
@@ -477,7 +477,7 @@ enum Value {
     },
 }
 
-impl Value {
+impl LazyBlob {
     pub fn by_ref(offset: Bytes) -> Self {
         Self::ByRef {
             offset,
@@ -493,8 +493,8 @@ impl Value {
     /// load the value.
     pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Vec<u8>) -> &[u8] {
         match self {
-            Value::ByVal(v) => &v[..],
-            Value::ByRef {
+            LazyBlob::ByVal(v) => &v[..],
+            LazyBlob::ByRef {
                 offset,
                 loaded_bytes: value,
             } => value.get_or_init(|| load(*offset)),
@@ -505,8 +505,8 @@ impl Value {
     /// function to load the value.
     pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Vec<u8>) -> Vec<u8> {
         match self {
-            Value::ByVal(v) => v,
-            Value::ByRef {
+            LazyBlob::ByVal(v) => v,
+            LazyBlob::ByRef {
                 offset,
                 loaded_bytes: value,
             } => value.into_inner().unwrap_or_else(|| load(offset)),
