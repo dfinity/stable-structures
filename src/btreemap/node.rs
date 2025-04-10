@@ -208,7 +208,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a key from stable memory at the given offset of this node.
-    fn load_key_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> K {
+    fn load_key_from_memory<M: Memory>(&self, mut offset: Bytes, memory: &M) -> K {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -222,13 +222,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
             K::BOUND.max_size()
         } else {
             // Key is not fixed in size. Read the size from memory.
-            read_u32(&reader, Address::from(offset.get()))
+            let value = read_u32(&reader, Address::from(offset.get()));
+            offset += U32_SIZE;
+            value
         };
 
         let mut bytes = vec![];
         read_to_vec(
             &reader,
-            Address::from((offset + U32_SIZE).get()),
+            Address::from((offset).get()),
             &mut bytes,
             key_size as usize,
         );
@@ -362,6 +364,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) {
         // Load all the values from the source node first, as they will be moved out.
         for i in 0..source.entries_len() {
+            source.key(i, allocator.memory());
             source.value(i, allocator.memory());
         }
 
