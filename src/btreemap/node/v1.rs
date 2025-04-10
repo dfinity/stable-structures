@@ -63,11 +63,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
         for _ in 0..header.num_entries {
-            // Read the key.
             let key_offset = offset;
             offset += U32_SIZE + Bytes::from(max_key_size);
+
             let value_offset = offset;
             offset += U32_SIZE + Bytes::from(max_value_size);
+
             keys_encoded_values
                 .push((LazyKey::by_ref(key_offset), LazyValue::by_ref(value_offset)));
         }
