@@ -66,12 +66,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
         for _ in 0..header.num_entries {
-            // Read the key's size.
-            let key_size = read_u32(memory, address + offset);
-            offset += U32_SIZE;
-
             // Read the key.
             let key_offset = offset;
+            offset += U32_SIZE; // key_len size
             offset += Bytes::from(max_key_size);
             // Values are loaded lazily. Store a reference and skip loading it.
             keys_encoded_values.push((LazyKey::by_ref(key_offset), LazyValue::by_ref(offset)));
@@ -130,7 +127,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(self
             .keys_and_encoded_values
             .windows(2)
-            .all(|e| self.get_key(&e[0], memory) < self.get_key(&e[1], memory)));
+            .all(|arr| *self.get_key(&arr[0], memory) < *self.get_key(&arr[1], memory)));
 
         let (max_key_size, max_value_size) = match self.version {
             Version::V1(DerivedPageSize {

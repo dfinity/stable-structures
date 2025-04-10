@@ -208,7 +208,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a key from stable memory at the given offset of this node.
-    fn load_key_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> K {
+    fn load_key_from_memory<M: Memory>(&self, mut offset: Bytes, memory: &M) -> K {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -222,13 +222,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
             K::BOUND.max_size()
         } else {
             // Key is not fixed in size. Read the size from memory.
-            read_u32(&reader, Address::from(offset.get()))
+            let key_offset = offset;
+            read_u32(&reader, Address::from(key_offset.get()))
         };
+        offset += U32_SIZE; // key_size size
 
         let mut bytes = vec![];
         read_to_vec(
             &reader,
-            Address::from((offset + U32_SIZE).get()),
+            Address::from((offset).get()),
             &mut bytes,
             key_size as usize,
         );
@@ -238,7 +240,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a value from stable memory at the given offset of this node.
-    fn load_value_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> Vec<u8> {
+    fn load_value_from_memory<M: Memory>(&self, mut offset: Bytes, memory: &M) -> Vec<u8> {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -246,13 +248,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory,
         };
 
-        let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
+        let value_size = read_u32(&reader, Address::from(offset.get())) as usize;
+        offset += U32_SIZE; // value_size size
         let mut bytes = vec![];
         read_to_vec(
             &reader,
-            Address::from((offset + U32_SIZE).get()),
+            Address::from((offset).get()),
             &mut bytes,
-            value_len,
+            value_size,
         );
 
         bytes
