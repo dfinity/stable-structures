@@ -149,18 +149,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let mut offset = NodeHeader::size();
 
-        // Load all the values. This is necessary so that we don't overwrite referenced
-        // values when writing the entries to the node.
-        for i in 0..self.keys_and_encoded_values.len() {
-            self.key(i, memory);
-            self.value(i, memory);
-        }
+        // Load all the entries. This is necessary so that we don't overwrite referenced
+        // entries when writing the entries to the node.
+        let entries: Vec<_> = (0..self.keys_and_encoded_values.len())
+            .map(|i| {
+                (
+                    self.key(i, memory).to_bytes_checked(),
+                    self.value(i, memory),
+                )
+            })
+            .collect();
 
         // Write the entries.
-        for idx in 0..self.keys_and_encoded_values.len() {
+        for (key_bytes, value) in entries {
             // Write the size of the key.
-            let key = self.key(idx, memory);
-            let key_bytes = key.to_bytes_checked();
             write_u32(memory, self.address + offset, key_bytes.len() as u32);
             offset += U32_SIZE;
 
@@ -169,7 +171,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Bytes::from(max_key_size);
 
             // Write the size of the value.
-            let value = self.value(idx, memory);
             write_u32(memory, self.address + offset, value.len() as u32);
             offset += U32_SIZE;
 
