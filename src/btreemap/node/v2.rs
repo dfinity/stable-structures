@@ -149,6 +149,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the keys.
         let mut keys_encoded_values = Vec::with_capacity(num_entries);
         for _ in 0..num_entries {
+            let key_offset = offset;
             // Load the key's size.
             let key_size = if K::BOUND.is_fixed_size() {
                 // Key is fixed in size. The size of the key is always its max size.
@@ -162,7 +163,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
             // Load the key.
             keys_encoded_values.push((
-                LazyKey::by_ref(Bytes::from(offset.get())),
+                LazyKey::by_ref(Bytes::from(key_offset.get())),
                 LazyValue::by_ref(Bytes::from(0usize)),
             ));
             offset += Bytes::from(key_size);
