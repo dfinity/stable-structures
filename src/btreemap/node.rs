@@ -177,13 +177,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns a reference to the cached key and loads it from memory if needed.
     #[inline]
-    pub fn get_key<'a, M: Memory>(&'a self, (k, _): &'a LazyEntry<K>, memory: &M) -> &'a K {
+    fn get_key<'a, M: Memory>(&'a self, (k, _): &'a LazyEntry<K>, memory: &M) -> &'a K {
         k.get_or_load(|offset| self.load_key_from_memory(offset, memory))
     }
 
     /// Returns a reference to the cached value and loads it from memory if needed.
     #[inline]
-    pub fn get_value<'a, M: Memory>(&'a self, (_, v): &'a LazyEntry<K>, memory: &M) -> &'a [u8] {
+    fn get_value<'a, M: Memory>(&'a self, (_, v): &'a LazyEntry<K>, memory: &M) -> &'a [u8] {
         v.get_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 

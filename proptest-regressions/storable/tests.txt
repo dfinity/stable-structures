@@ -1,9 +1,0 @@
-# Seeds for failure cases proptest has generated in the past. It is
-# automatically read and these particular cases re-run before any
-# novel cases are generated.
-#
-# It is recommended to check this file in to source control so that
-# everyone who runs the test benefits from these saved cases.
-cc bba96dcb90414b34f8abdf74f80e9b15da65b9276309c25baf124b6268f22b80 # shrinks to v = Some(([], [0, 0], []))
-cc 5fff4549ed43e16909e38ae3ddb942e40822a3859b7f07c74b2f5da825c1f572 # shrinks to v = Some((0, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], []))
-cc b70e6693f80d4af46e8d66ffcabf319448163991202c2d33c604c8b0dd0bfd1b # shrinks to v = Some((0, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], []))
