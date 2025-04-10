@@ -175,6 +175,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
         (self.key(idx, memory), self.value(idx, memory))
     }
 
+    /// Extracts the contents of key (by loading it first if it's not loaded yet).
+    fn extract_key<M: Memory>(&self, key: LazyKey<K>, memory: &M) -> K {
+        key.take_or_load(|offset| self.load_key_from_memory(offset, memory))
+    }
+
+    /// Extracts the contents of value (by loading it first if it's not loaded yet).
+    fn extract_value<M: Memory>(&self, value: LazyValue, memory: &M) -> Vec<u8> {
+        value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
+    }
+
     /// Returns a reference to the cached key and loads it from memory if needed.
     #[inline]
     fn get_key<'a, M: Memory>(&'a self, (k, _): &'a LazyEntry<K>, memory: &M) -> &'a K {
@@ -195,16 +205,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Returns a reference to the encoded value at the specified index.
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> &[u8] {
         self.get_value(&self.keys_and_encoded_values[idx], memory)
-    }
-
-    /// Extracts the contents of key (by loading it first if it's not loaded yet).
-    fn extract_key<M: Memory>(&self, key: LazyKey<K>, memory: &M) -> K {
-        key.take_or_load(|offset| self.load_key_from_memory(offset, memory))
-    }
-
-    /// Extracts the contents of value (by loading it first if it's not loaded yet).
-    fn extract_value<M: Memory>(&self, value: LazyValue, memory: &M) -> Vec<u8> {
-        value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
     /// Loads a key from stable memory at the given offset of this node.
