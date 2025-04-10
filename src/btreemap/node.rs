@@ -490,6 +490,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Return the median entry.
+        let median_idx = self.keys_and_encoded_values.len() - 1;
+        self.key(median_idx, memory);
+        self.value(median_idx, memory);
         self.pop_entry(memory)
             .expect("An initially full node cannot be empty")
     }
