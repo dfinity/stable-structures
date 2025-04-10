@@ -175,16 +175,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         (self.key(idx, memory), self.value(idx, memory))
     }
 
-    /// Extracts the contents of key (by loading it first if it's not loaded yet).
-    fn extract_key<M: Memory>(&self, key: LazyKey<K>, memory: &M) -> K {
-        key.take_or_load(|offset| self.load_key_from_memory(offset, memory))
-    }
-
-    /// Extracts the contents of value (by loading it first if it's not loaded yet).
-    fn extract_value<M: Memory>(&self, value: LazyValue, memory: &M) -> Vec<u8> {
-        value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
-    }
-
     /// Returns a reference to the cached key and loads it from memory if needed.
     #[inline]
     fn get_key<'a, M: Memory>(&'a self, (k, _): &'a LazyEntry<K>, memory: &M) -> &'a K {
@@ -207,8 +197,18 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.get_value(&self.keys_and_encoded_values[idx], memory)
     }
 
+    /// Extracts the contents of key (by loading it first if it's not loaded yet).
+    fn extract_key<M: Memory>(&self, key: LazyKey<K>, memory: &M) -> K {
+        key.take_or_load(|offset| self.load_key_from_memory(offset, memory))
+    }
+
+    /// Extracts the contents of value (by loading it first if it's not loaded yet).
+    fn extract_value<M: Memory>(&self, value: LazyValue, memory: &M) -> Vec<u8> {
+        value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
+    }
+
     /// Loads a key from stable memory at the given offset of this node.
-    fn load_key_from_memory<M: Memory>(&self, mut offset: Bytes, memory: &M) -> K {
+    fn load_key_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> K {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -224,12 +224,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
             // Key is not fixed in size. Read the size from memory.
             read_u32(&reader, Address::from(offset.get()))
         };
-        offset += U32_SIZE; // key_size size
 
         let mut bytes = vec![];
         read_to_vec(
             &reader,
-            Address::from((offset).get()),
+            Address::from((offset + U32_SIZE).get()),
             &mut bytes,
             key_size as usize,
         );
@@ -239,7 +238,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a value from stable memory at the given offset of this node.
-    fn load_value_from_memory<M: Memory>(&self, mut offset: Bytes, memory: &M) -> Vec<u8> {
+    fn load_value_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> Vec<u8> {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -248,11 +247,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         let value_size = read_u32(&reader, Address::from(offset.get())) as usize;
-        offset += U32_SIZE; // value_size size
         let mut bytes = vec![];
         read_to_vec(
             &reader,
-            Address::from((offset).get()),
+            Address::from((offset + U32_SIZE).get()),
             &mut bytes,
             value_size,
         );
