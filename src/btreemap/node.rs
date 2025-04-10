@@ -337,7 +337,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Load the entry at the back of the node.
-        self.entry(len - 1, memory);
         let (key, value) = self
             .keys_and_encoded_values
             .pop()
