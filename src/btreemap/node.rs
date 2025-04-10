@@ -228,6 +228,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         let mut bytes = vec![];
+        assert_ne!(key_size, 0); // TODO: remove debug code;
         read_to_vec(
             &reader,
             Address::from((offset).get()),
@@ -334,6 +335,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
             return None;
         }
 
+        // Load the entry at the back of the node.
+        self.entry(len - 1, memory);
         let (key, value) = self
             .keys_and_encoded_values
             .pop()
@@ -362,10 +365,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         median: Entry<K>,
         allocator: &mut Allocator<M>,
     ) {
-        // Load all the values from the source node first, as they will be moved out.
+        // Load all the entries from the source node first, as they will be moved out.
         for i in 0..source.entries_len() {
-            source.key(i, allocator.memory());
-            source.value(i, allocator.memory());
+            source.entry(i, allocator.memory());
         }
 
         if source.key(0, allocator.memory()) > self.key(0, allocator.memory()) {
@@ -480,10 +482,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn split<M: Memory>(&mut self, sibling: &mut Node<K>, memory: &M) -> Entry<K> {
         debug_assert!(self.is_full());
 
-        // Load the keys and the values that will be moved out of the node and into the new sibling.
+        // Load the entries that will be moved out of the node and into the new sibling.
         for idx in B..self.entries_len() {
-            self.key(idx, memory);
-            self.value(idx, memory);
+            self.entry(idx, memory);
         }
 
         // Move the entries and children above the median into the new sibling.
@@ -492,10 +493,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             sibling.children = self.children.split_off(B);
         }
 
-        // Return the median entry.
-        let median_idx = self.keys_and_encoded_values.len() - 1;
-        self.key(median_idx, memory);
-        self.value(median_idx, memory);
+        // Load and return the median entry.
         self.pop_entry(memory)
             .expect("An initially full node cannot be empty")
     }
