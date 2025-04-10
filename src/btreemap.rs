@@ -469,7 +469,7 @@ where
         }
     }
 
-    /// Takes as input a nonfull internal `node` and index to its full child, then
+    /// Takes as input a non-full internal `node` and index to its full child, then
     /// splits this child into two, adding an additional child to `node`.
     ///
     /// Example:

@@ -332,14 +332,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
             return None;
         }
 
-        let (key, last_value) = self
+        let (key, value) = self
             .keys_and_encoded_values
             .pop()
             .expect("node must not be empty");
 
         Some((
             self.extract_key(key, memory),
-            self.extract_value(last_value, memory),
+            self.extract_value(value, memory),
         ))
     }
 
@@ -477,10 +477,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn split<M: Memory>(&mut self, sibling: &mut Node<K>, memory: &M) -> Entry<K> {
         debug_assert!(self.is_full());
 
-        // Load the values that will be moved out of the node and into the new sibling.
-        for idx in B..self.entries_len() {
-            self.value(idx, memory);
-        }
+        // // Load the values that will be moved out of the node and into the new sibling.
+        // for idx in B..self.entries_len() {
+        //     self.key(idx, memory);
+        //     self.value(idx, memory);
+        // }
 
         // Move the entries and children above the median into the new sibling.
         sibling.keys_and_encoded_values = self.keys_and_encoded_values.split_off(B);
