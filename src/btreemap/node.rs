@@ -336,7 +336,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             return None;
         }
 
-        // Load the entry at the back of the node.
         let (key, value) = self
             .keys_and_encoded_values
             .pop()
@@ -367,7 +366,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) {
         // Load all the entries from the source node first, as they will be moved out.
         for i in 0..source.entries_len() {
-            source.entry(i, allocator.memory());
+            let _e = source.entry(i, allocator.memory());
         }
 
         if source.key(0, allocator.memory()) > self.key(0, allocator.memory()) {
@@ -479,7 +478,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the entries that will be moved out of the node and into the new sibling.
         for idx in B..self.entries_len() {
-            self.entry(idx, memory);
+            let _e = self.entry(idx, memory);
         }
 
         // Move the entries and children above the median into the new sibling.
