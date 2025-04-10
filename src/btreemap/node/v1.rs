@@ -130,7 +130,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(self
             .keys_and_encoded_values
             .windows(2)
-            .all(|e| e[0].0 < e[1].0)); // TODO: here's a problem, we need to have all keys downloaded to check this.
+            .all(|e| self.get_key(&e[0], memory) < self.get_key(&e[1], memory)));
 
         let (max_key_size, max_value_size) = match self.version {
             Version::V1(DerivedPageSize {
@@ -161,8 +161,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the entries.
-        for (idx, (key, _)) in self.keys_and_encoded_values.iter().enumerate() {
+        for idx in 0..self.keys_and_encoded_values.len() {
             // Write the size of the key.
+            let key = self.key(idx, memory);
             let key_bytes = key.to_bytes_checked();
             write_u32(memory, self.address + offset, key_bytes.len() as u32);
             offset += U32_SIZE;

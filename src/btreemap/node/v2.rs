@@ -239,7 +239,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the keys.
-        for (key, _) in self.keys_and_encoded_values.iter() {
+        for idx in 0..self.keys_and_encoded_values.len() {
+            let key = self.key(idx, writer.memory());
             let key_bytes = key.to_bytes_checked();
 
             // Write the size of the key if it isn't fixed in size.

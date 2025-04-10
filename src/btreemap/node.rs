@@ -39,6 +39,8 @@ pub enum NodeType {
 pub type Entry<K> = (K, Vec<u8>);
 pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 
+type LazyEntry<K> = (LazyKey<K>, LazyValue);
+
 /// A node of a B-Tree.
 ///
 /// There are two versions of a `Node`:
@@ -52,7 +54,7 @@ pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
     // INVARIANT: the list is sorted by key.
-    keys_and_encoded_values: Vec<(LazyKey<K>, LazyValue)>,
+    keys_and_encoded_values: Vec<LazyEntry<K>>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
@@ -173,20 +175,26 @@ impl<K: Storable + Ord + Clone> Node<K> {
         (self.key(idx, memory), self.value(idx, memory))
     }
 
+    /// Returns a reference to the cached key and loads it from memory if needed.
+    #[inline]
+    pub fn get_key<'a, M: Memory>(&'a self, (k, _): &'a LazyEntry<K>, memory: &M) -> &'a K {
+        k.get_or_load(|offset| self.load_key_from_memory(offset, memory))
+    }
+
+    /// Returns a reference to the cached value and loads it from memory if needed.
+    #[inline]
+    pub fn get_value<'a, M: Memory>(&'a self, (_, v): &'a LazyEntry<K>, memory: &M) -> &'a [u8] {
+        v.get_or_load(|offset| self.load_value_from_memory(offset, memory))
+    }
+
     /// Returns a reference to the key at the specified index.
     pub fn key<M: Memory>(&self, idx: usize, memory: &M) -> &K {
-        // Load and cache the key from the underlying memory if needed.
-        self.keys_and_encoded_values[idx]
-            .0
-            .get_or_load(|offset| self.load_key_from_memory(offset, memory))
+        self.get_key(&self.keys_and_encoded_values[idx], memory)
     }
 
     /// Returns a reference to the encoded value at the specified index.
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> &[u8] {
-        // Load and cache the value from the underlying memory if needed.
-        self.keys_and_encoded_values[idx]
-            .1
-            .get_or_load(|offset| self.load_value_from_memory(offset, memory))
+        self.get_value(&self.keys_and_encoded_values[idx], memory)
     }
 
     /// Extracts the contents of key (by loading it first if it's not loaded yet).
