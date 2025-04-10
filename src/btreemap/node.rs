@@ -108,10 +108,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
         match self.node_type {
             NodeType::Leaf => {
-                let last_idx = self.keys_and_encoded_values.len() - 1;
+                let entry = self
+                    .keys_and_encoded_values
+                    .last()
+                    .expect("A node can never be empty");
                 (
-                    self.key(last_idx, memory).clone(),
-                    self.value(last_idx, memory).to_vec(),
+                    self.get_key(entry, memory).clone(),
+                    self.get_value(entry, memory).to_vec(),
                 )
             }
             NodeType::Internal => {
