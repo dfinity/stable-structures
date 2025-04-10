@@ -477,7 +477,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn split<M: Memory>(&mut self, sibling: &mut Node<K>, memory: &M) -> Entry<K> {
         debug_assert!(self.is_full());
 
-        // Load the values that will be moved out of the node and into the new sibling.
+        // Load the keys and the values that will be moved out of the node and into the new sibling.
         for idx in B..self.entries_len() {
             self.key(idx, memory);
             self.value(idx, memory);
