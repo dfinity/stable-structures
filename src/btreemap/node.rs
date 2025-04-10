@@ -299,11 +299,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Inserts a new entry at the specified index.
-    pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
-        self.keys_and_encoded_values.insert(
-            idx,
-            (LazyKey::by_value(key), LazyValue::by_value(encoded_value)),
-        );
+    pub fn insert_entry(&mut self, idx: usize, (key, value): Entry<K>) {
+        self.keys_and_encoded_values
+            .insert(idx, (LazyKey::by_value(key), LazyValue::by_value(value)));
     }
 
     /// Returns the entry at the specified index while consuming this node.
