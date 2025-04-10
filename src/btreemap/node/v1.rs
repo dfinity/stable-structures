@@ -15,9 +15,13 @@
 //! ----------------------------------------
 //! # Entries (k)           ↕ 2 bytes
 //! ---------------------------------------- <-- Entries (upto `CAPACITY` entries)
-//! Key(0)
+//! Key(0) size             ↕ 4 bytes
 //! ----------------------------------------
-//! Value(0)
+//! Key(0)                  ↕ `max_key_size` bytes
+//! ----------------------------------------
+//! Value(0) size           ↕ 4 bytes
+//! ----------------------------------------
+//! Value(0)                ↕ `max_value_size` bytes
 //! ----------------------------------------
 //! Key(1) size             ↕ 4 bytes
 //! ----------------------------------------
@@ -121,7 +125,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(self
             .keys_and_encoded_values
             .windows(2)
-            .all(|arr| *self.get_key(&arr[0], memory) < *self.get_key(&arr[1], memory)));
+            .all(|arr| self.get_key(&arr[0], memory) < self.get_key(&arr[1], memory)));
 
         let (max_key_size, max_value_size) = match self.version {
             Version::V1(DerivedPageSize {
