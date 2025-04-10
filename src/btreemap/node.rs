@@ -324,9 +324,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Adds a new entry at the back of the node.
-    pub fn push_entry(&mut self, (key, encoded_value): Entry<K>) {
+    pub fn push_entry(&mut self, (key, value): Entry<K>) {
         self.keys_and_encoded_values
-            .push((LazyKey::by_value(key), LazyValue::by_value(encoded_value)));
+            .push((LazyKey::by_value(key), LazyValue::by_value(value)));
     }
 
     /// Removes an entry from the back of the node.
