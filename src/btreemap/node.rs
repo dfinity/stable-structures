@@ -231,7 +231,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         };
 
         let mut bytes = vec![];
-        assert_ne!(key_size, 0); // TODO: remove debug code;
         read_to_vec(
             &reader,
             Address::from((offset).get()),
