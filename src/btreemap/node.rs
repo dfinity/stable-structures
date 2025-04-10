@@ -487,7 +487,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             sibling.children = self.children.split_off(B);
         }
 
-        // Load and return the median entry.
+        // Return the median entry.
         self.pop_entry(memory)
             .expect("An initially full node cannot be empty")
     }
