@@ -452,11 +452,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// while maintaining sorted order.
     pub fn search<M: Memory>(&self, key: &K, memory: &M) -> Result<usize, usize> {
         self.keys_and_encoded_values
-            .binary_search_by_key(&key, |entry| {
-                &entry
-                    .0
-                    .get_or_load(|offset| self.load_key_from_memory(offset, memory))
-            })
+            .binary_search_by_key(&key, |entry| self.get_key(entry, memory))
     }
 
     /// Returns the maximum size a node can be if it has bounded keys and values.
