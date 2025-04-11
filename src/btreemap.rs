@@ -66,14 +66,14 @@ use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
 /*
-- set value to false
-- canbench btreemap_first_entry  --persist
+Steps:
+1. set value to false
+2. canbench btreemap_first_entry  --persist
+3. set value to true
+4. canbench btreemap_first_entry
+5. compare the results
 
-- set value to true
-- canbench btreemap_first_entry
-
-- compare the results
-
+Blob1024 -> to_be_bytes
 ```
 ---------------------------------------------------
 
@@ -104,6 +104,43 @@ Benchmark: btreemap_first_entry_read
 Benchmark: btreemap_first_entry_pop
   total:
     instructions: 5.58 B (improved by 36.77%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+```
+
+Blob1024 -> to_le_bytes
+```
+---------------------------------------------------
+
+Benchmark: btreemap_first_entry_insert
+  total:
+    instructions: 4.63 B (improved by 12.55%)
+    heap_increase: 1 pages (no change)
+    stable_memory_increase: 469 pages (improved by 9.63%)
+
+---------------------------------------------------
+
+Benchmark: btreemap_first_entry_remove
+  total:
+    instructions: 5.36 B (regressed by 4.77%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_first_entry_read
+  total:
+    instructions: 197.93 M (improved by 94.28%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_first_entry_pop
+  total:
+    instructions: 5.48 B (improved by 37.80%)
     heap_increase: 0 pages (no change)
     stable_memory_increase: 0 pages (no change)
 
