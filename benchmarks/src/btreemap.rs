@@ -478,6 +478,7 @@ enum IterType {
     ValuesRev,
 }
 
+// canbench btreemap_first_entry
 fn blob(i: usize) -> Blob1024 {
     Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
 }

@@ -684,9 +684,15 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let (max_key, _) = self.last_key_value().unwrap();
-        self.remove_helper(root, &max_key)
-            .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
+        if FIRST_LAST_ENTRY_CACHE_ENABLED {
+            let (max_key, _) = self.last_key_value().unwrap();
+            self.remove_helper(root, &max_key)
+                .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
+        } else {
+            let (max_key, _) = root.get_max(self.memory());
+            self.remove_helper(root, &max_key)
+                .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
+        }
     }
 
     /// Removes and returns the first element in the map. The key of this element is the minimum key that was in the map
@@ -696,9 +702,15 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let (min_key, _) = self.first_key_value().unwrap();
-        self.remove_helper(root, &min_key)
-            .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
+        if FIRST_LAST_ENTRY_CACHE_ENABLED {
+            let (min_key, _) = self.first_key_value().unwrap();
+            self.remove_helper(root, &min_key)
+                .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
+        } else {
+            let (min_key, _) = root.get_min(self.memory());
+            self.remove_helper(root, &min_key)
+                .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
+        }
     }
 
     /// A helper method for recursively removing a key from the B-tree.
@@ -3171,6 +3183,7 @@ mod test {
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
     }
 
+    // cargo test test_btreemap_first_entry -- --nocapture
     type Blob1024 = Blob<1024>;
 
     fn blob(i: usize) -> Blob1024 {
