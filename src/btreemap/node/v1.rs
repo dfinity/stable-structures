@@ -122,6 +122,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(!self.keys_and_encoded_values.is_empty() || !self.children.is_empty());
 
         // Assert entries are sorted in strictly increasing order.
+
+        // TODO: remove debug code.
+        // let entries: Vec<_> = (0..self.entries_len())
+        //     .map(|i| (i, self.key(i, memory).to_bytes(), self.value(i, memory)))
+        //     .collect();
+        //println!("ABC: entries: {:?}", entries);
+
         assert!(self
             .keys_and_encoded_values
             .windows(2)

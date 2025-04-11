@@ -2102,16 +2102,37 @@ mod test {
 
     #[test]
     fn len() {
+        // RUST_BACKTRACE=1 cargo test btreemap::test::len -- --nocapture
+
+        // original OK
+        // let key = |i: u32| b(&i.to_be_bytes());
+        // let value = |_i: u32| b(&[]);
+
+        let key = |i: u32| i; // <- change FAIL
+        let value = |_i: u32| b(&[]);
+
+        // let key = |i: u32| b(&i.to_be_bytes());
+        // let value = |i: u32| i; // <- change OK
+
+        // let key = |i: u32| b(&i.to_le_bytes());// <- change OK
+        // let value = |_i: u32| b(&[]);
+
+        // let key = |i: u32| b(&i.to_ne_bytes());// <- change OK
+        // let value = |_i: u32| b(&[]);
+
+        // let key = |i: u32| b(&i.to_bytes());// <- change OK
+        // let value = |_i: u32| b(&[]);
+
         btree_test(|mut btree| {
             for i in 0..1000u32 {
-                assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
+                assert_eq!(btree.insert(key(i), value(i)), None);
             }
 
             assert_eq!(btree.len(), 1000);
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
-                assert_eq!(btree.remove(&b(&i.to_le_bytes())), Some(b(&[])));
+                assert_eq!(btree.remove(&key(i)), Some(value(i)));
             }
 
             assert_eq!(btree.len(), 0);
@@ -2121,16 +2142,38 @@ mod test {
 
     #[test]
     fn pop_first_len() {
+        // RUST_BACKTRACE=1 cargo test btreemap::test::pop_first_len -- --nocapture
+
+        // original FAIL
+        let key = |i: u32| i;
+        let value = |i: u32| b(&i.to_le_bytes());
+
+        // FAIL
+        let key = |i: u32| b(&i.to_le_bytes()); // <- change
+        let value = |i: u32| b(&i.to_le_bytes());
+
+        // FAIL
+        let key = |i: u32| i;
+        let value = |_i: u32| b(&[]); // <- change
+
+        // OK
+        let key = |i: u32| b(&i.to_le_bytes()); // <- change
+        let value = |_i: u32| b(&[]); // <- change
+
+        // FAIL
+        let key = |i: u32| b(&i.to_le_bytes()); // <- change
+        let value = |i: u32| i; // <- change
+
         btree_test(|mut btree| {
             for i in 0..1000u32 {
-                assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
+                assert_eq!(btree.insert(key(i), value(i)), None);
             }
 
             assert_eq!(btree.len(), 1000);
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
-                assert_eq!(btree.pop_first().unwrap().1, b(&i.to_le_bytes()));
+                assert_eq!(btree.pop_first().unwrap().1, value(i));
             }
 
             assert_eq!(btree.len(), 0);
