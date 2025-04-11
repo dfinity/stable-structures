@@ -67,84 +67,59 @@ use std::ops::{Bound, RangeBounds};
 
 /*
 Steps:
-1. set value to false
-2. canbench btreemap_first_entry  --persist
-3. set value to true
-4. canbench btreemap_first_entry
-5. compare the results
+1. choose a key/value type and big-/little- endian
+2. set value to false
+3. canbench btreemap_first_entry  --persist
+4. set value to true
+5. canbench btreemap_first_entry
+6. compare the results
 
 Blob1024 -> to_be_bytes
 ```
----------------------------------------------------
-
-Benchmark: btreemap_first_entry_insert
-  total:
+btreemap_first_entry_insert
     instructions: 5.31 B (0.30%) (change within noise threshold)
-    heap_increase: 1 pages (no change)
-    stable_memory_increase: 519 pages (no change)
-
----------------------------------------------------
-
-Benchmark: btreemap_first_entry_remove
-  total:
+btreemap_first_entry_remove
     instructions: 5.25 B (regressed by 2.63%)
-    heap_increase: 0 pages (no change)
-    stable_memory_increase: 0 pages (no change)
-
----------------------------------------------------
-
-Benchmark: btreemap_first_entry_read
-  total:
+btreemap_first_entry_read
     instructions: 197.88 M (improved by 94.28%)
-    heap_increase: 0 pages (no change)
-    stable_memory_increase: 0 pages (no change)
-
----------------------------------------------------
-
-Benchmark: btreemap_first_entry_pop
-  total:
+btreemap_first_entry_pop
     instructions: 5.58 B (improved by 36.77%)
-    heap_increase: 0 pages (no change)
-    stable_memory_increase: 0 pages (no change)
-
----------------------------------------------------
 ```
 
 Blob1024 -> to_le_bytes
 ```
----------------------------------------------------
+btreemap_first_entry_insert
+    instructions: 4.63 B (-0.65%) (change within noise threshold)
+btreemap_first_entry_remove
+    instructions: 5.36 B (-0.10%) (change within noise threshold)
+btreemap_first_entry_read
+    instructions: 197.93 M (improved by 95.12%)
+btreemap_first_entry_pop
+    instructions: 5.48 B (improved by 35.63%)
+```
 
-Benchmark: btreemap_first_entry_insert
-  total:
-    instructions: 4.63 B (improved by 12.55%)
-    heap_increase: 1 pages (no change)
-    stable_memory_increase: 469 pages (improved by 9.63%)
+Vec1024 -> to_be_bytes
+```
+btreemap_first_entry_insert
+    instructions: 3.78 B (regressed by 3.20%)
+btreemap_first_entry_remove
+    instructions: 4.18 B (regressed by 12.16%)
+btreemap_first_entry_read
+    instructions: 147.36 M (improved by 93.09%)
+btreemap_first_entry_pop
+    instructions: 4.24 B (improved by 29.76%)
+```
 
----------------------------------------------------
-
-Benchmark: btreemap_first_entry_remove
-  total:
-    instructions: 5.36 B (regressed by 4.77%)
-    heap_increase: 0 pages (no change)
-    stable_memory_increase: 0 pages (no change)
-
----------------------------------------------------
-
-Benchmark: btreemap_first_entry_read
-  total:
-    instructions: 197.93 M (improved by 94.28%)
-    heap_increase: 0 pages (no change)
-    stable_memory_increase: 0 pages (no change)
-
----------------------------------------------------
-
-Benchmark: btreemap_first_entry_pop
-  total:
-    instructions: 5.48 B (improved by 37.80%)
-    heap_increase: 0 pages (no change)
-    stable_memory_increase: 0 pages (no change)
-
----------------------------------------------------
+Vec1024 -> to_le_bytes
+```
+btreemap_first_entry_insert
+    instructions: 3.36 B (1.79%) (change within noise threshold)
+btreemap_first_entry_remove
+    instructions: 4.69 B (regressed by 2.13%)
+btreemap_first_entry_read
+    instructions: 147.17 M (improved by 94.12%)
+btreemap_first_entry_pop
+    instructions: 4.22 B (improved by 28.26%)
 ```
 */
 const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = true;
@@ -3268,12 +3243,22 @@ mod test {
 
     // cargo test test_btreemap_first_entry -- --nocapture
     type Blob1024 = Blob<1024>;
+    type Vec1024 = Vec<u8>;
 
-    fn blob(i: usize) -> Blob1024 {
-        Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
+    //type Entry = (Blob1024, Blob1024);
+    // fn blob(i: usize) -> Blob1024 {
+    //     Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
+    // }
+
+    type Entry = (Vec1024, Vec1024);
+    fn blob(i: usize) -> Vec1024 {
+        let mut buf = vec![0u8; 1024];
+        let bytes = i.to_be_bytes();
+        buf[..bytes.len()].copy_from_slice(&bytes);
+        buf
     }
 
-    fn generate_entries(count: usize) -> Vec<(Blob1024, Blob1024)> {
+    fn generate_entries(count: usize) -> Vec<Entry> {
         (0..count)
             .map(|i| (blob(i), blob(i * 1_000)))
             .collect::<Vec<_>>()

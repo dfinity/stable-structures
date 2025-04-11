@@ -479,11 +479,22 @@ enum IterType {
 }
 
 // canbench btreemap_first_entry
-fn blob(i: usize) -> Blob1024 {
-    Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
+
+// type Entry = (Blob1024, Blob1024);
+// fn blob(i: usize) -> Blob1024 {
+//     Blob1024::try_from(&i.to_le_bytes()[..]).unwrap()
+// }
+
+type Vec1024 = Vec<u8>;
+type Entry = (Vec1024, Vec1024);
+fn blob(i: usize) -> Vec1024 {
+    let mut buf = vec![0u8; 1024];
+    let bytes = i.to_le_bytes();
+    buf[..bytes.len()].copy_from_slice(&bytes);
+    buf
 }
 
-fn generate_entries(count: usize) -> Vec<(Blob1024, Blob1024)> {
+fn generate_entries(count: usize) -> Vec<Entry> {
     (0..count)
         .map(|i| (blob(i), blob(i * 1_000)))
         .collect::<Vec<_>>()
