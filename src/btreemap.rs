@@ -367,13 +367,13 @@ where
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         if let Some((first_key, _)) = &self.first_key_value {
             if key <= *first_key {
-                self.first_key_value = None;
+                self.first_key_value = Some((key.clone(), value.to_bytes_checked().into_owned()));
             }
         }
 
         if let Some((last_key, _)) = &self.last_key_value {
             if key >= *last_key {
-                self.last_key_value = None;
+                self.last_key_value = Some((key.clone(), value.to_bytes_checked().into_owned()));
             }
         }
 
@@ -608,7 +608,7 @@ where
             return Some((k.clone(), V::from_bytes(Cow::Owned(encoded_v.clone()))));
         }
 
-        let root = self.load_node(self.root_addr);
+        let root: Node<K> = self.load_node(self.root_addr);
         let (k, encoded_v) = root.get_min(self.memory());
         self.first_key_value = Some((k.clone(), encoded_v.clone()));
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
@@ -645,18 +645,6 @@ where
             return None;
         }
 
-        if let Some((first_key, _)) = &self.first_key_value {
-            if first_key == key {
-                self.first_key_value = None;
-            }
-        }
-
-        if let Some((last_key, _)) = &self.last_key_value {
-            if last_key == key {
-                self.last_key_value = None;
-            }
-        }
-
         let root_node = self.load_node(self.root_addr);
         self.remove_helper(root_node, key)
             .map(Cow::Owned)
@@ -669,14 +657,8 @@ where
             return None;
         }
 
-        if self.length == 1 {
-            self.first_key_value = None;
-        }
-
-        self.last_key_value = None;
-
         let root = self.load_node(self.root_addr);
-        let (max_key, _) = root.get_max(self.memory());
+        let (max_key, _) = self.last_key_value().unwrap();
         self.remove_helper(root, &max_key)
             .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -687,14 +669,8 @@ where
             return None;
         }
 
-        if self.length == 1 {
-            self.last_key_value = None;
-        }
-
-        self.first_key_value = None;
-
         let root = self.load_node(self.root_addr);
-        let (min_key, _) = root.get_min(self.memory());
+        let (min_key, _) = self.first_key_value().unwrap();
         self.remove_helper(root, &min_key)
             .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -727,8 +703,21 @@ where
                             // Deallocate the empty node.
                             node.deallocate(&mut self.allocator);
                             self.root_addr = NULL;
+                            self.first_key_value = None;
+                            self.last_key_value = None;
                         } else {
                             node.save(self.allocator_mut());
+                            if let Some((k, _)) = &self.first_key_value {
+                                if key == k {
+                                    self.first_key_value = Some(node.get_min(self.memory()));
+                                }
+                            }
+
+                            if let Some((k, _)) = &self.last_key_value {
+                                if key == k {
+                                    self.last_key_value = Some(node.get_max(self.memory()));
+                                }
+                            }
                         }
 
                         self.save();
