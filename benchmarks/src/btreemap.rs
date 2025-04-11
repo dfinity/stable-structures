@@ -477,3 +477,100 @@ enum IterType {
     Values,
     ValuesRev,
 }
+
+#[bench(raw)]
+pub fn btreemap_first_entry_insert() -> BenchResult {
+    let num_keys = 10_000;
+
+    let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
+    let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
+
+    let blob = |i: usize| Blob::try_from(&i.to_be_bytes()[..]).unwrap();
+    for i in 0..num_keys {
+        keys.push(blob(i));
+        values.push(blob(i));
+    }
+
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    bench_fn(|| {
+        for (k, v) in keys.into_iter().zip(values.into_iter()) {
+            btree.insert(k, v);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_first_entry_remove() -> BenchResult {
+    let num_keys = 10_000;
+
+    let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
+    let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
+
+    let blob = |i: usize| Blob::try_from(&i.to_be_bytes()[..]).unwrap();
+    for i in 0..num_keys {
+        keys.push(blob(i));
+        values.push(blob(i));
+    }
+
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+        btree.insert(k, v);
+    }
+
+    bench_fn(|| {
+        for k in keys.into_iter() {
+            btree.remove(&k);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_first_entry_read() -> BenchResult {
+    let num_keys = 10_000;
+
+    let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
+    let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
+
+    let blob = |i: usize| Blob::try_from(&i.to_be_bytes()[..]).unwrap();
+    for i in 0..num_keys {
+        keys.push(blob(i));
+        values.push(blob(i));
+    }
+
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+        btree.insert(k, v);
+    }
+
+    bench_fn(|| {
+        for _k in keys.into_iter() {
+            btree.first_key_value();
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_first_entry_read_pop() -> BenchResult {
+    let num_keys = 10_000;
+
+    let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
+    let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
+
+    let blob = |i: usize| Blob::try_from(&i.to_be_bytes()[..]).unwrap();
+    for i in 0..num_keys {
+        keys.push(blob(i));
+        values.push(blob(i));
+    }
+
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+        btree.insert(k, v);
+    }
+
+    bench_fn(|| {
+        for _k in keys.into_iter() {
+            btree.first_key_value();
+            btree.pop_first();
+        }
+    })
+}
