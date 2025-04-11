@@ -65,6 +65,8 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
+const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = false;
+
 #[cfg(test)]
 mod proptests;
 
@@ -362,10 +364,10 @@ where
         let value = value.to_bytes_checked().into_owned();
 
         // Populate first_last_entry_cache.
-        {
+        if FIRST_LAST_ENTRY_CACHE_ENABLED {
             let mut first_last_entry_cache = self.first_last_entry_cache.borrow_mut();
             if let Some((first_key, first_value)) = first_last_entry_cache.0.as_mut() {
-                if *first_key >= key {
+                if key <= *first_key {
                     *first_key = key.clone();
                     *first_value = value.clone();
                 }
@@ -604,18 +606,26 @@ where
             return None;
         }
 
-        // Check the cache first.
-        let first_entry_cache = &mut self.first_last_entry_cache.borrow_mut().0;
-        if let Some((first_key, first_value)) = first_entry_cache.as_ref() {
-            return Some((
-                first_key.clone(),
-                V::from_bytes(Cow::Owned(first_value.clone())),
-            ));
+        if FIRST_LAST_ENTRY_CACHE_ENABLED {
+            let first_entry_cache = &mut self.first_last_entry_cache.borrow_mut().0;
+            if let Some((first_key, first_value)) = first_entry_cache.as_ref() {
+                // Return a clone of the cached entry.
+                return Some((
+                    first_key.clone(),
+                    V::from_bytes(Cow::Owned(first_value.clone())),
+                ));
+            }
+
+            // Cache miss: load the node and get the minimal key-value pair.
+            let root = self.load_node(self.root_addr);
+            let (k, encoded_v) = root.get_min(self.memory());
+            *first_entry_cache = Some((k.clone(), encoded_v.clone()));
+            return Some((k, V::from_bytes(Cow::Owned(encoded_v))));
         }
 
+        // When cache is not enabled, directly load and return the first entry.
         let root = self.load_node(self.root_addr);
         let (k, encoded_v) = root.get_min(self.memory());
-        *first_entry_cache = Some((k.clone(), encoded_v.clone()));
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -626,18 +636,24 @@ where
             return None;
         }
 
-        // Check the cache first.
-        let last_entry_cache = &mut self.first_last_entry_cache.borrow_mut().1;
-        if let Some((last_key, last_value)) = last_entry_cache.as_ref() {
-            return Some((
-                last_key.clone(),
-                V::from_bytes(Cow::Owned(last_value.clone())),
-            ));
+        if FIRST_LAST_ENTRY_CACHE_ENABLED {
+            let last_entry_cache = &mut self.first_last_entry_cache.borrow_mut().1;
+            if let Some((last_key, last_value)) = last_entry_cache.as_ref() {
+                return Some((
+                    last_key.clone(),
+                    V::from_bytes(Cow::Owned(last_value.clone())),
+                ));
+            }
+
+            let root = self.load_node(self.root_addr);
+            let (k, encoded_v) = root.get_max(self.memory());
+            *last_entry_cache = Some((k.clone(), encoded_v.clone()));
+            return Some((k, V::from_bytes(Cow::Owned(encoded_v))));
         }
 
+        // When cache is not enabled, directly load and return the last entry.
         let root = self.load_node(self.root_addr);
         let (k, encoded_v) = root.get_max(self.memory());
-        *last_entry_cache = Some((k.clone(), encoded_v.clone()));
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -714,22 +730,29 @@ where
                             self.deallocate_node(node);
                             self.root_addr = NULL;
 
-                            // Clear cache.
-                            *self.first_last_entry_cache.borrow_mut() = (None, None);
+                            if FIRST_LAST_ENTRY_CACHE_ENABLED {
+                                *self.first_last_entry_cache.borrow_mut() = (None, None);
+                            }
                         } else {
                             self.save_node(&mut node);
 
-                            // Update the first/last entry cache.
-                            let mut first_last_entry_cache =
-                                self.first_last_entry_cache.borrow_mut();
-                            if let Some((first_key, _)) = first_last_entry_cache.0.as_mut() {
-                                if *first_key == *key {
-                                    first_last_entry_cache.0 = Some(node.get_min(self.memory()));
+                            if FIRST_LAST_ENTRY_CACHE_ENABLED {
+                                // Update the first/last entry cache.
+                                let mut first_last_entry_cache =
+                                    self.first_last_entry_cache.borrow_mut();
+                                if let Some((first_key, _)) = first_last_entry_cache.0.as_mut() {
+                                    if *first_key == *key {
+                                        //println!("ABC update first");
+                                        first_last_entry_cache.0 =
+                                            Some(node.get_min(self.memory()));
+                                    }
                                 }
-                            }
-                            if let Some((last_key, _)) = first_last_entry_cache.1.as_mut() {
-                                if *last_key == *key {
-                                    first_last_entry_cache.0 = Some(node.get_min(self.memory()));
+                                if let Some((last_key, _)) = first_last_entry_cache.1.as_mut() {
+                                    if *last_key == *key {
+                                        //println!("ABC update last");
+                                        first_last_entry_cache.1 =
+                                            Some(node.get_min(self.memory()));
+                                    }
                                 }
                             }
                         }
@@ -3146,5 +3169,122 @@ mod test {
         }
 
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    type Blob1024 = Blob<1024>;
+
+    fn blob(i: usize) -> Blob1024 {
+        Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
+    }
+
+    #[test]
+    pub fn test_btreemap_first_entry_insert() {
+        let num_keys = 10_000;
+
+        let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
+        let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
+
+        // Insert in reversed order to trigger cached key comparisons.
+        for i in (0..num_keys).rev() {
+            keys.push(blob(i));
+            values.push(blob(i));
+        }
+
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+        for (k, v) in keys.into_iter().zip(values.into_iter()) {
+            assert_eq!(btree.insert(k, v), None);
+            if btree.len() == 1 {
+                btree.first_key_value();
+                btree.last_key_value();
+            }
+        }
+    }
+
+    #[test]
+    pub fn test_btreemap_first_entry_remove() {
+        let num_keys = 10_000;
+
+        let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
+        let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
+
+        // Insert in reversed order to trigger cached key comparisons.
+        for i in 0..num_keys {
+            keys.push(blob(i));
+            values.push(blob(i));
+        }
+
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+            assert_eq!(btree.insert(k, v), None);
+        }
+
+        btree.first_key_value();
+        btree.last_key_value();
+
+        for k in keys.into_iter() {
+            assert!(btree.remove(&k).is_some());
+        }
+    }
+
+    #[test]
+    pub fn test_btreemap_first_entry_read() {
+        let num_keys = 10_000;
+
+        let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
+        let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
+
+        // Insert in reversed order to trigger cached key comparisons.
+        for i in 0..num_keys {
+            keys.push(blob(i));
+            values.push(blob(i));
+        }
+
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+            assert_eq!(btree.insert(k, v), None);
+        }
+
+        btree.first_key_value();
+        btree.last_key_value();
+
+        for _ in 0..keys.len() {
+            let entry = btree.first_key_value();
+            assert!(entry.is_some());
+        }
+    }
+
+    #[test]
+    pub fn test_btreemap_first_entry_pop() {
+        let num_keys = 10_000;
+
+        let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
+        let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
+
+        // Insert in reversed order to trigger cached key comparisons.
+        for i in 0..num_keys {
+            keys.push(blob(i));
+            values.push(blob(i));
+        }
+
+        let mem = make_memory();
+        let mut btree = BTreeMap::new(mem);
+
+        for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+            assert_eq!(btree.insert(k, v), None);
+        }
+
+        btree.first_key_value();
+        btree.last_key_value();
+
+        for _ in 0..keys.len() {
+            let entry = btree.first_key_value();
+            assert!(entry.is_some());
+            assert_eq!(btree.pop_first(), entry);
+        }
     }
 }

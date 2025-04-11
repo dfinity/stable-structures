@@ -489,7 +489,8 @@ pub fn btreemap_first_entry_insert() -> BenchResult {
     let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
     let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
 
-    for i in 0..num_keys {
+    // Insert in reversed order to trigger cached key comparisons.
+    for i in (0..num_keys).rev() {
         keys.push(blob(i));
         values.push(blob(i));
     }
@@ -498,6 +499,10 @@ pub fn btreemap_first_entry_insert() -> BenchResult {
     bench_fn(|| {
         for (k, v) in keys.into_iter().zip(values.into_iter()) {
             btree.insert(k, v);
+            if btree.len() == 1 {
+                btree.first_key_value();
+                btree.last_key_value();
+            }
         }
     })
 }
@@ -518,6 +523,9 @@ pub fn btreemap_first_entry_remove() -> BenchResult {
     for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
         btree.insert(k, v);
     }
+
+    btree.first_key_value();
+    btree.last_key_value();
 
     bench_fn(|| {
         for k in keys.into_iter() {
@@ -544,14 +552,14 @@ pub fn btreemap_first_entry_read() -> BenchResult {
     }
 
     bench_fn(|| {
-        for _k in keys.into_iter() {
+        for _ in 0..keys.len() {
             btree.first_key_value();
         }
     })
 }
 
 #[bench(raw)]
-pub fn btreemap_first_entry_read_pop() -> BenchResult {
+pub fn btreemap_first_entry_pop() -> BenchResult {
     let num_keys = 10_000;
 
     let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
@@ -568,8 +576,7 @@ pub fn btreemap_first_entry_read_pop() -> BenchResult {
     }
 
     bench_fn(|| {
-        for _k in keys.into_iter() {
-            btree.first_key_value();
+        for _ in 0..keys.len() {
             btree.pop_first();
         }
     })
