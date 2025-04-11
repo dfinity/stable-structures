@@ -61,6 +61,7 @@ use allocator::Allocator;
 pub use iter::Iter;
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -105,6 +106,8 @@ where
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
+
+    first_last_entry_cache: RefCell<(Option<(K, Vec<u8>)>, Option<(K, Vec<u8>)>)>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -214,6 +217,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
+            first_last_entry_cache: RefCell::new((None, None)),
         };
 
         btree.save_header();
@@ -241,6 +245,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
+            first_last_entry_cache: RefCell::new((None, None)),
         };
 
         btree.save_header();
@@ -290,6 +295,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
+            first_last_entry_cache: RefCell::new((None, None)),
         }
     }
 
@@ -354,6 +360,23 @@ where
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         let value = value.to_bytes_checked().into_owned();
+
+        // Populate first_last_entry_cache.
+        {
+            let mut first_last_entry_cache = self.first_last_entry_cache.borrow_mut();
+            if let Some((first_key, first_value)) = first_last_entry_cache.0.as_mut() {
+                if *first_key >= key {
+                    *first_key = key.clone();
+                    *first_value = value.clone();
+                }
+            }
+            if let Some((last_key, last_value)) = first_last_entry_cache.1.as_mut() {
+                if *last_key <= key {
+                    *last_key = key.clone();
+                    *last_value = value.clone();
+                }
+            }
+        }
 
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.
@@ -580,8 +603,19 @@ where
         if self.root_addr == NULL {
             return None;
         }
+
+        // Check the cache first.
+        let first_entry_cache = &mut self.first_last_entry_cache.borrow_mut().0;
+        if let Some((first_key, first_value)) = first_entry_cache.as_ref() {
+            return Some((
+                first_key.clone(),
+                V::from_bytes(Cow::Owned(first_value.clone())),
+            ));
+        }
+
         let root = self.load_node(self.root_addr);
         let (k, encoded_v) = root.get_min(self.memory());
+        *first_entry_cache = Some((k.clone(), encoded_v.clone()));
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -591,8 +625,19 @@ where
         if self.root_addr == NULL {
             return None;
         }
+
+        // Check the cache first.
+        let last_entry_cache = &mut self.first_last_entry_cache.borrow_mut().1;
+        if let Some((last_key, last_value)) = last_entry_cache.as_ref() {
+            return Some((
+                last_key.clone(),
+                V::from_bytes(Cow::Owned(last_value.clone())),
+            ));
+        }
+
         let root = self.load_node(self.root_addr);
         let (k, encoded_v) = root.get_max(self.memory());
+        *last_entry_cache = Some((k.clone(), encoded_v.clone()));
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -623,7 +668,7 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let (max_key, _) = root.get_max(self.memory());
+        let (max_key, _) = self.last_key_value().unwrap();
         self.remove_helper(root, &max_key)
             .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -635,7 +680,7 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let (min_key, _) = root.get_min(self.memory());
+        let (min_key, _) = self.first_key_value().unwrap();
         self.remove_helper(root, &min_key)
             .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -668,8 +713,25 @@ where
                             // Deallocate the empty node.
                             self.deallocate_node(node);
                             self.root_addr = NULL;
+
+                            // Clear cache.
+                            *self.first_last_entry_cache.borrow_mut() = (None, None);
                         } else {
                             self.save_node(&mut node);
+
+                            // Update the first/last entry cache.
+                            let mut first_last_entry_cache =
+                                self.first_last_entry_cache.borrow_mut();
+                            if let Some((first_key, _)) = first_last_entry_cache.0.as_mut() {
+                                if *first_key == *key {
+                                    first_last_entry_cache.0 = Some(node.get_min(self.memory()));
+                                }
+                            }
+                            if let Some((last_key, _)) = first_last_entry_cache.1.as_mut() {
+                                if *last_key == *key {
+                                    first_last_entry_cache.0 = Some(node.get_min(self.memory()));
+                                }
+                            }
                         }
 
                         self.save_header();
