@@ -74,8 +74,43 @@ use std::ops::{Bound, RangeBounds};
 
 - compare the results
 
+```
+---------------------------------------------------
+
+Benchmark: btreemap_first_entry_insert
+  total:
+    instructions: 5.31 B (0.30%) (change within noise threshold)
+    heap_increase: 1 pages (no change)
+    stable_memory_increase: 519 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_first_entry_remove
+  total:
+    instructions: 5.25 B (regressed by 2.63%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_first_entry_read
+  total:
+    instructions: 197.88 M (improved by 94.28%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_first_entry_pop
+  total:
+    instructions: 5.58 B (improved by 36.77%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+```
 */
-const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = false;
+const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = true;
 
 #[cfg(test)]
 mod proptests;
@@ -619,7 +654,7 @@ where
         if FIRST_LAST_ENTRY_CACHE_ENABLED {
             let first_entry_cache = &mut self.first_last_entry_cache.borrow_mut().0;
             if let Some((first_key, first_value)) = first_entry_cache.as_ref() {
-                // Return a clone of the cached entry.
+                //println!("ABC cache hit");
                 return Some((
                     first_key.clone(),
                     V::from_bytes(Cow::Owned(first_value.clone())),
@@ -630,6 +665,7 @@ where
             let root = self.load_node(self.root_addr);
             let (k, encoded_v) = root.get_min(self.memory());
             *first_entry_cache = Some((k.clone(), encoded_v.clone()));
+            //println!("ABC populated cache");
             return Some((k, V::from_bytes(Cow::Owned(encoded_v))));
         }
 
@@ -3200,22 +3236,21 @@ mod test {
         Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
     }
 
+    fn generate_entries(count: usize) -> Vec<(Blob1024, Blob1024)> {
+        (0..count)
+            .map(|i| (blob(i), blob(i * 1_000)))
+            .collect::<Vec<_>>()
+    }
+
     #[test]
     pub fn test_btreemap_first_entry_insert() {
         let num_keys = 10_000;
-
-        let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
-        let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
-
-        // Insert in reversed order to trigger cached key comparisons.
-        for i in (0..num_keys).rev() {
-            keys.push(blob(i));
-            values.push(blob(i));
-        }
+        let entries = generate_entries(num_keys);
 
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
-        for (k, v) in keys.into_iter().zip(values.into_iter()) {
+        // Iterate in reverse order to trigger cached key comparisons.
+        for (k, v) in entries.into_iter().rev() {
             assert_eq!(btree.insert(k, v), None);
             if btree.len() == 1 {
                 btree.first_key_value();
@@ -3227,27 +3262,19 @@ mod test {
     #[test]
     pub fn test_btreemap_first_entry_remove() {
         let num_keys = 10_000;
-
-        let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
-        let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
-
-        // Insert in reversed order to trigger cached key comparisons.
-        for i in 0..num_keys {
-            keys.push(blob(i));
-            values.push(blob(i));
-        }
+        let entries = generate_entries(num_keys);
 
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
-
-        for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+        for (k, v) in entries.clone().into_iter() {
             assert_eq!(btree.insert(k, v), None);
         }
 
+        // Populate the cache to trigger cached key comparisons.
         btree.first_key_value();
         btree.last_key_value();
-
-        for k in keys.into_iter() {
+        // Iterate in ascending order to trigger cached key comparisons.
+        for (k, _) in entries.into_iter() {
             assert!(btree.remove(&k).is_some());
         }
     }
@@ -3255,27 +3282,15 @@ mod test {
     #[test]
     pub fn test_btreemap_first_entry_read() {
         let num_keys = 10_000;
-
-        let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
-        let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
-
-        // Insert in reversed order to trigger cached key comparisons.
-        for i in 0..num_keys {
-            keys.push(blob(i));
-            values.push(blob(i));
-        }
+        let entries = generate_entries(num_keys);
 
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
-
-        for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+        for (k, v) in entries.clone().into_iter() {
             assert_eq!(btree.insert(k, v), None);
         }
 
-        btree.first_key_value();
-        btree.last_key_value();
-
-        for _ in 0..keys.len() {
+        for _ in 0..num_keys {
             let entry = btree.first_key_value();
             assert!(entry.is_some());
         }
@@ -3284,27 +3299,16 @@ mod test {
     #[test]
     pub fn test_btreemap_first_entry_pop() {
         let num_keys = 10_000;
-
-        let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
-        let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
-
-        // Insert in reversed order to trigger cached key comparisons.
-        for i in 0..num_keys {
-            keys.push(blob(i));
-            values.push(blob(i));
-        }
+        let entries = generate_entries(num_keys);
 
         let mem = make_memory();
         let mut btree = BTreeMap::new(mem);
-
-        for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
+        for (k, v) in entries.clone().into_iter() {
             assert_eq!(btree.insert(k, v), None);
         }
 
-        btree.first_key_value();
-        btree.last_key_value();
-
-        for _ in 0..keys.len() {
+        // Iterate in ascending order to trigger cached key comparisons.
+        for _ in 0..num_keys {
             let entry = btree.first_key_value();
             assert!(entry.is_some());
             assert_eq!(btree.pop_first(), entry);

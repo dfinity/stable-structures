@@ -483,22 +483,21 @@ fn blob(i: usize) -> Blob1024 {
     Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
 }
 
+fn generate_entries(count: usize) -> Vec<(Blob1024, Blob1024)> {
+    (0..count)
+        .map(|i| (blob(i), blob(i * 1_000)))
+        .collect::<Vec<_>>()
+}
+
 #[bench(raw)]
 pub fn btreemap_first_entry_insert() -> BenchResult {
     let num_keys = 10_000;
-
-    let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
-    let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
-
-    // Insert in reversed order to trigger cached key comparisons.
-    for i in (0..num_keys).rev() {
-        keys.push(blob(i));
-        values.push(blob(i));
-    }
+    let entries = generate_entries(num_keys);
 
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     bench_fn(|| {
-        for (k, v) in keys.into_iter().zip(values.into_iter()) {
+        // Iterate in reverse order to trigger cached key comparisons.
+        for (k, v) in entries.into_iter().rev() {
             btree.insert(k, v);
             if btree.len() == 1 {
                 btree.first_key_value();
@@ -511,25 +510,19 @@ pub fn btreemap_first_entry_insert() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_first_entry_remove() -> BenchResult {
     let num_keys = 10_000;
-
-    let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
-    let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
-
-    for i in 0..num_keys {
-        keys.push(blob(i));
-        values.push(blob(i));
-    }
+    let entries = generate_entries(num_keys);
 
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
-        btree.insert(k, v);
+    for (k, v) in entries.clone().into_iter() {
+        assert_eq!(btree.insert(k, v), None);
     }
 
+    // Populate the cache to trigger cached key comparisons.
     btree.first_key_value();
     btree.last_key_value();
-
     bench_fn(|| {
-        for k in keys.into_iter() {
+        // Iterate in ascending order to trigger cached key comparisons.
+        for (k, _) in entries.into_iter() {
             btree.remove(&k);
         }
     })
@@ -538,22 +531,15 @@ pub fn btreemap_first_entry_remove() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_first_entry_read() -> BenchResult {
     let num_keys = 10_000;
-
-    let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
-    let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
-
-    for i in 0..num_keys {
-        keys.push(blob(i));
-        values.push(blob(i));
-    }
+    let entries = generate_entries(num_keys);
 
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
-        btree.insert(k, v);
+    for (k, v) in entries.clone().into_iter() {
+        assert_eq!(btree.insert(k, v), None);
     }
 
     bench_fn(|| {
-        for _ in 0..keys.len() {
+        for _ in 0..num_keys {
             btree.first_key_value();
         }
     })
@@ -562,22 +548,16 @@ pub fn btreemap_first_entry_read() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_first_entry_pop() -> BenchResult {
     let num_keys = 10_000;
-
-    let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
-    let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
-
-    for i in 0..num_keys {
-        keys.push(blob(i));
-        values.push(blob(i));
-    }
+    let entries = generate_entries(num_keys);
 
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for (k, v) in keys.clone().into_iter().zip(values.into_iter()) {
-        btree.insert(k, v);
+    for (k, v) in entries.clone().into_iter() {
+        assert_eq!(btree.insert(k, v), None);
     }
 
     bench_fn(|| {
-        for _ in 0..keys.len() {
+        // Iterate in ascending order to trigger cached key comparisons.
+        for _ in 0..num_keys {
             btree.pop_first();
         }
     })
