@@ -1,25 +1,25 @@
 benches:
   btreemap_first_entry_insert:
     total:
-      instructions: 5079187123
+      instructions: 5460570265
       heap_increase: 1
       stable_memory_increase: 519
     scopes: {}
-  btreemap_first_entry_read:
+  btreemap_first_entry_pop:
     total:
-      instructions: 3458300688
+      instructions: 8816837103
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_first_entry_read_pop:
+  btreemap_first_entry_read:
     total:
-      instructions: 13115603156
+      instructions: 3458310557
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_first_entry_remove:
     total:
-      instructions: 5075397010
+      instructions: 5075425487
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}

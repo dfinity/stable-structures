@@ -65,6 +65,16 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
+/*
+- set value to false
+- canbench btreemap_first_entry  --persist
+
+- set value to true
+- canbench btreemap_first_entry
+
+- compare the results
+
+*/
 const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = false;
 
 #[cfg(test)]
