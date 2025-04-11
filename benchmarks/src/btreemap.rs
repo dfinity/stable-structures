@@ -478,6 +478,10 @@ enum IterType {
     ValuesRev,
 }
 
+fn blob(i: usize) -> Blob1024 {
+    Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
+}
+
 #[bench(raw)]
 pub fn btreemap_first_entry_insert() -> BenchResult {
     let num_keys = 10_000;
@@ -485,7 +489,6 @@ pub fn btreemap_first_entry_insert() -> BenchResult {
     let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
     let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
 
-    let blob = |i: usize| Blob::try_from(&i.to_be_bytes()[..]).unwrap();
     for i in 0..num_keys {
         keys.push(blob(i));
         values.push(blob(i));
@@ -506,7 +509,6 @@ pub fn btreemap_first_entry_remove() -> BenchResult {
     let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
     let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
 
-    let blob = |i: usize| Blob::try_from(&i.to_be_bytes()[..]).unwrap();
     for i in 0..num_keys {
         keys.push(blob(i));
         values.push(blob(i));
@@ -531,7 +533,6 @@ pub fn btreemap_first_entry_read() -> BenchResult {
     let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
     let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
 
-    let blob = |i: usize| Blob::try_from(&i.to_be_bytes()[..]).unwrap();
     for i in 0..num_keys {
         keys.push(blob(i));
         values.push(blob(i));
@@ -556,7 +557,6 @@ pub fn btreemap_first_entry_read_pop() -> BenchResult {
     let mut keys: Vec<Blob1024> = Vec::with_capacity(num_keys);
     let mut values: Vec<Blob1024> = Vec::with_capacity(num_keys);
 
-    let blob = |i: usize| Blob::try_from(&i.to_be_bytes()[..]).unwrap();
     for i in 0..num_keys {
         keys.push(blob(i));
         values.push(blob(i));
