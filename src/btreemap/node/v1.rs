@@ -15,9 +15,13 @@
 //! ----------------------------------------
 //! # Entries (k)           ↕ 2 bytes
 //! ---------------------------------------- <-- Entries (upto `CAPACITY` entries)
-//! Key(0)
+//! Key(0) size             ↕ 4 bytes
 //! ----------------------------------------
-//! Value(0)
+//! Key(0)                  ↕ `max_key_size` bytes
+//! ----------------------------------------
+//! Value(0) size           ↕ 4 bytes
+//! ----------------------------------------
+//! Value(0)                ↕ `max_value_size` bytes
 //! ----------------------------------------
 //! Key(1) size             ↕ 4 bytes
 //! ----------------------------------------
@@ -59,26 +63,18 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_value_size: u32,
         memory: &M,
     ) -> Self {
-        #[cfg(feature = "canbench")]
-        let _p = canbench::profile("node_load_v1");
-
         // Load the entries.
         let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
-        let mut buf = vec![];
         for _ in 0..header.num_entries {
-            // Read the key's size.
-            let key_size = read_u32(memory, address + offset);
-            offset += U32_SIZE;
+            let key_offset = offset;
+            offset += U32_SIZE + Bytes::from(max_key_size);
 
-            // Read the key.
-            read_to_vec(memory, address + offset, &mut buf, key_size as usize);
-            offset += Bytes::from(max_key_size);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
-            // Values are loaded lazily. Store a reference and skip loading it.
-            keys_encoded_values.push((key, Value::by_ref(offset)));
-
+            let value_offset = offset;
             offset += U32_SIZE + Bytes::from(max_value_size);
+
+            keys_encoded_values
+                .push((LazyKey::by_ref(key_offset), LazyValue::by_ref(value_offset)));
         }
 
         // Load children if this is an internal node.
@@ -113,9 +109,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     pub(super) fn save_v1<M: Memory>(&self, memory: &M) {
-        #[cfg(feature = "canbench")]
-        let _p = canbench::profile("node_save_v1");
-
         match self.node_type {
             NodeType::Leaf => {
                 assert!(self.children.is_empty());
@@ -129,10 +122,17 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(!self.keys_and_encoded_values.is_empty() || !self.children.is_empty());
 
         // Assert entries are sorted in strictly increasing order.
+
+        // TODO: remove debug code.
+        // let entries: Vec<_> = (0..self.entries_len())
+        //     .map(|i| (i, self.key(i, memory).to_bytes(), self.value(i, memory)))
+        //     .collect();
+        //println!("ABC: entries: {:?}", entries);
+
         assert!(self
             .keys_and_encoded_values
             .windows(2)
-            .all(|e| e[0].0 < e[1].0));
+            .all(|arr| self.get_key(&arr[0], memory) < self.get_key(&arr[1], memory)));
 
         let (max_key_size, max_value_size) = match self.version {
             Version::V1(DerivedPageSize {
@@ -156,16 +156,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let mut offset = NodeHeader::size();
 
-        // Load all the values. This is necessary so that we don't overwrite referenced
-        // values when writing the entries to the node.
-        for i in 0..self.keys_and_encoded_values.len() {
-            self.value(i, memory);
-        }
+        // Load all the entries. This is necessary so that we don't overwrite referenced
+        // entries when writing the entries to the node.
+        let entries: Vec<_> = (0..self.keys_and_encoded_values.len())
+            .map(|i| {
+                (
+                    self.key(i, memory).to_bytes_checked(),
+                    self.value(i, memory),
+                )
+            })
+            .collect();
 
         // Write the entries.
-        for (idx, (key, _)) in self.keys_and_encoded_values.iter().enumerate() {
+        for (key_bytes, value) in entries {
             // Write the size of the key.
-            let key_bytes = key.to_bytes_checked();
             write_u32(memory, self.address + offset, key_bytes.len() as u32);
             offset += U32_SIZE;
 
@@ -174,7 +178,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Bytes::from(max_key_size);
 
             // Write the size of the value.
-            let value = self.value(idx, memory);
             write_u32(memory, self.address + offset, value.len() as u32);
             offset += U32_SIZE;
 

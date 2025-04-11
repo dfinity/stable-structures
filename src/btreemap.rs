@@ -366,7 +366,7 @@ where
             let mut root = self.load_node(self.root_addr);
 
             // Check if the key already exists in the root.
-            if let Ok(idx) = root.search(&key) {
+            if let Ok(idx) = root.search(&key, self.memory()) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
                 self.save_node(&mut root);
@@ -409,7 +409,7 @@ where
         assert!(!node.is_full());
 
         // Look for the key in the node.
-        match node.search(&key) {
+        match node.search(&key, self.memory()) {
             Ok(idx) => {
                 // The key is already in the node.
                 // Overwrite it and return the previous value.
@@ -442,7 +442,7 @@ where
 
                         if child.is_full() {
                             // Check if the key already exists in the child.
-                            if let Ok(idx) = child.search(&key) {
+                            if let Ok(idx) = child.search(&key, self.memory()) {
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) =
                                     child.swap_entry(idx, (key, value), self.memory());
@@ -455,7 +455,7 @@ where
 
                             // The children have now changed. Search again for
                             // the child where we need to store the entry in.
-                            let idx = node.search(&key).unwrap_or_else(|idx| idx);
+                            let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
                             child = self.load_node(node.child(idx));
                         }
 
@@ -469,7 +469,7 @@ where
         }
     }
 
-    /// Takes as input a nonfull internal `node` and index to its full child, then
+    /// Takes as input a non-full internal `node` and index to its full child, then
     /// splits this child into two, adding an additional child to `node`.
     ///
     /// Example:
@@ -535,7 +535,7 @@ where
     {
         let node = self.load_node(node_addr);
         // Look for the key in the current node.
-        match node.search(key) {
+        match node.search(key, self.memory()) {
             Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
@@ -652,7 +652,7 @@ where
 
         match node.node_type() {
             NodeType::Leaf => {
-                match node.search(key) {
+                match node.search(key, self.memory()) {
                     Ok(idx) => {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
@@ -679,7 +679,7 @@ where
                 }
             }
             NodeType::Internal => {
-                match node.search(key) {
+                match node.search(key, self.memory()) {
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
@@ -1268,7 +1268,7 @@ mod test {
             let right_child = btree.load_node(root.child(1));
             assert!(right_child.is_full());
             let median_index = right_child.entries_len() / 2;
-            assert_eq!(right_child.key(median_index), &b(&[12]));
+            assert_eq!(right_child.key(median_index, btree.memory()), &b(&[12]));
 
             // Overwrite the value of the median key.
             assert_eq!(btree.insert(b(&[12]), b(&[1, 2, 3])), Some(b(&[])));
@@ -2102,16 +2102,37 @@ mod test {
 
     #[test]
     fn len() {
+        // RUST_BACKTRACE=1 cargo test btreemap::test::len -- --nocapture
+
+        // original OK
+        // let key = |i: u32| b(&i.to_be_bytes());
+        // let value = |_i: u32| b(&[]);
+
+        let key = |i: u32| i; // <- change FAIL
+        let value = |_i: u32| b(&[]);
+
+        // let key = |i: u32| b(&i.to_be_bytes());
+        // let value = |i: u32| i; // <- change OK
+
+        // let key = |i: u32| b(&i.to_le_bytes());// <- change OK
+        // let value = |_i: u32| b(&[]);
+
+        // let key = |i: u32| b(&i.to_ne_bytes());// <- change OK
+        // let value = |_i: u32| b(&[]);
+
+        // let key = |i: u32| b(&i.to_bytes());// <- change OK
+        // let value = |_i: u32| b(&[]);
+
         btree_test(|mut btree| {
             for i in 0..1000u32 {
-                assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
+                assert_eq!(btree.insert(key(i), value(i)), None);
             }
 
             assert_eq!(btree.len(), 1000);
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
-                assert_eq!(btree.remove(&b(&i.to_le_bytes())), Some(b(&[])));
+                assert_eq!(btree.remove(&key(i)), Some(value(i)));
             }
 
             assert_eq!(btree.len(), 0);
@@ -2121,16 +2142,38 @@ mod test {
 
     #[test]
     fn pop_first_len() {
+        // RUST_BACKTRACE=1 cargo test btreemap::test::pop_first_len -- --nocapture
+
+        // original FAIL
+        let key = |i: u32| i;
+        let value = |i: u32| b(&i.to_le_bytes());
+
+        // FAIL
+        let key = |i: u32| b(&i.to_le_bytes()); // <- change
+        let value = |i: u32| b(&i.to_le_bytes());
+
+        // FAIL
+        let key = |i: u32| i;
+        let value = |_i: u32| b(&[]); // <- change
+
+        // OK
+        let key = |i: u32| b(&i.to_le_bytes()); // <- change
+        let value = |_i: u32| b(&[]); // <- change
+
+        // FAIL
+        let key = |i: u32| b(&i.to_le_bytes()); // <- change
+        let value = |i: u32| i; // <- change
+
         btree_test(|mut btree| {
             for i in 0..1000u32 {
-                assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
+                assert_eq!(btree.insert(key(i), value(i)), None);
             }
 
             assert_eq!(btree.len(), 1000);
             assert!(!btree.is_empty());
 
             for i in 0..1000u32 {
-                assert_eq!(btree.pop_first().unwrap().1, b(&i.to_le_bytes()));
+                assert_eq!(btree.pop_first().unwrap().1, value(i));
             }
 
             assert_eq!(btree.len(), 0);
@@ -3039,7 +3082,7 @@ mod test {
         // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.keys(), vec![vec![6; 10_000]]);
+        assert_eq!(root.keys(btree.memory()), vec![vec![6; 10_000]]);
         assert_eq!(root.children_len(), 2);
 
         // Remove the element in the root.
@@ -3051,7 +3094,7 @@ mod test {
         // [0, 1, 2, 3, 4]     [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.keys(), vec![vec![5; 10_000]]);
+        assert_eq!(root.keys(btree.memory()), vec![vec![5; 10_000]]);
         assert_eq!(root.children_len(), 2);
 
         // Remove the element in the root. This triggers the case where the root
@@ -3063,7 +3106,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
-            root.keys(),
+            root.keys(btree.memory()),
             vec![
                 vec![0; 10_000],
                 vec![1; 10_000],
