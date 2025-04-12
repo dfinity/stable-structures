@@ -684,14 +684,15 @@ pub fn btreemap_first_entry_bulk_updates() -> BenchResult {
     // Precompute updates for every 100 iterations.
     let updates: Vec<_> = (0..5_000)
         .step_by(100)
-        .map(|i| (i, Key::make(i), Value::make(i)))
+        .map(|i| (Key::make(i), Value::make(i)))
         .collect();
     bench_fn(|| {
-        for i in 0..5000 {
+        let mut update_index = 0;
+        for i in 0..5_000 {
             btree.first_key_value();
             if i % 100 == 0 {
-                let index = i / 100;
-                let (_i_val, ref key, ref value) = updates[index];
+                let (ref key, ref value) = updates[update_index];
+                update_index = (update_index + 1) % updates.len();
                 btree.insert(key.clone(), value.clone());
             }
         }
