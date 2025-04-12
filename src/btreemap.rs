@@ -65,7 +65,7 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
-const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = false;
+const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = true;
 /*
 Steps:
 1. choose a key/value type
@@ -77,13 +77,52 @@ Steps:
 
 == v1 extra v1
 u32
+btreemap_first_entry_mixed_workload
+    instructions: 97.30 M (improved by 41.17%)
+btreemap_first_entry_priority_queue
+    instructions: 569.63 M (improved by 15.61%)
+
 u64
+btreemap_first_entry_mixed_workload
+    instructions: 100.07 M (improved by 41.35%)
+btreemap_first_entry_priority_queue
+    instructions: 584.70 M (improved by 15.77%)
+
 Blob4
+btreemap_first_entry_mixed_workload
+    instructions: 108.16 M (improved by 42.49%)
+btreemap_first_entry_priority_queue
+    instructions: 627.22 M (improved by 17.42%)
+
 Blob8
+btreemap_first_entry_mixed_workload
+    instructions: 113.41 M (improved by 41.68%)
+btreemap_first_entry_priority_queue
+    instructions: 657.18 M (improved by 16.61%)
+
 Blob32
+btreemap_first_entry_mixed_workload
+    instructions: 155.87 M (improved by 38.07%)
+btreemap_first_entry_priority_queue
+    instructions: 887.76 M (improved by 14.02%)
+
 Blob1024
+btreemap_first_entry_mixed_workload
+    instructions: 2.54 B (improved by 37.20%)
+btreemap_first_entry_priority_queue
+    instructions: 13.77 B (improved by 13.18%)
+
 Vec1024
+btreemap_first_entry_mixed_workload
+    instructions: 1.82 B (improved by 25.03%)
+btreemap_first_entry_priority_queue
+    instructions: 9.81 B (improved by 7.12%)
+
 String1024
+btreemap_first_entry_mixed_workload
+    instructions: 2.01 B (improved by 29.49%)
+btreemap_first_entry_priority_queue
+    instructions: 10.77 B (improved by 9.46%)
 
 == v1 extra v0
 u32
