@@ -532,92 +532,107 @@ impl Make<String1024> for String1024 {
     }
 }
 
+trait MakeRandom<T: Make<T>> {
+    fn make_random(rng: &mut Rng) -> T {
+        let i = Rand::rand_u32(rng);
+        T::make(i)
+    }
+}
+
+impl MakeRandom<u32> for u32 {}
+impl MakeRandom<u64> for u64 {}
+impl<const N: usize> MakeRandom<Blob<N>> for Blob<N> {}
+impl MakeRandom<Vec1024> for Vec1024 {}
+impl MakeRandom<String1024> for String1024 {}
+
 fn generate_entries(count: usize) -> Vec<Entry> {
     (0..count)
         .map(|i| (Key::make(i as u32), Value::make(1_000 * i as u32)))
         .collect::<Vec<_>>()
 }
 
-#[bench(raw)]
-pub fn btreemap_first_entry_insert() -> BenchResult {
-    let num_keys = 10_000;
-    let entries = generate_entries(num_keys);
+// #[bench(raw)]
+// pub fn btreemap_first_entry_insert() -> BenchResult {
+//     let num_keys = 10_000;
+//     let entries = generate_entries(num_keys);
 
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    bench_fn(|| {
-        // Iterate in reverse order to trigger cached key comparisons.
-        for (k, v) in entries.into_iter().rev() {
-            btree.insert(k, v);
-            if btree.len() == 1 {
-                btree.first_key_value();
-                btree.last_key_value();
-            }
-        }
-    })
-}
+//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+//     bench_fn(|| {
+//         // Iterate in reverse order to trigger cached key comparisons.
+//         for (k, v) in entries.into_iter().rev() {
+//             btree.insert(k, v);
+//             if btree.len() == 1 {
+//                 btree.first_key_value();
+//                 btree.last_key_value();
+//             }
+//         }
+//     })
+// }
 
-#[bench(raw)]
-pub fn btreemap_first_entry_remove() -> BenchResult {
-    let num_keys = 10_000;
-    let entries = generate_entries(num_keys);
+// #[bench(raw)]
+// pub fn btreemap_first_entry_remove() -> BenchResult {
+//     let num_keys = 10_000;
+//     let entries = generate_entries(num_keys);
 
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for (k, v) in entries.clone().into_iter() {
-        assert_eq!(btree.insert(k, v), None);
-    }
+//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+//     for (k, v) in entries.clone().into_iter() {
+//         assert_eq!(btree.insert(k, v), None);
+//     }
 
-    // Populate the cache to trigger cached key comparisons.
-    btree.first_key_value();
-    btree.last_key_value();
-    bench_fn(|| {
-        // Iterate in ascending order to trigger cached key comparisons.
-        for (k, _) in entries.into_iter() {
-            btree.remove(&k);
-        }
-    })
-}
+//     // Populate the cache to trigger cached key comparisons.
+//     btree.first_key_value();
+//     btree.last_key_value();
+//     bench_fn(|| {
+//         // Iterate in ascending order to trigger cached key comparisons.
+//         for (k, _) in entries.into_iter() {
+//             btree.remove(&k);
+//         }
+//     })
+// }
 
-#[bench(raw)]
-pub fn btreemap_first_entry_read() -> BenchResult {
-    let num_keys = 10_000;
-    let entries = generate_entries(num_keys);
+// #[bench(raw)]
+// pub fn btreemap_first_entry_read() -> BenchResult {
+//     let num_keys = 10_000;
+//     let entries = generate_entries(num_keys);
 
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for (k, v) in entries.clone().into_iter() {
-        assert_eq!(btree.insert(k, v), None);
-    }
+//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+//     for (k, v) in entries.clone().into_iter() {
+//         assert_eq!(btree.insert(k, v), None);
+//     }
 
-    bench_fn(|| {
-        for _ in 0..num_keys {
-            btree.first_key_value();
-        }
-    })
-}
+//     bench_fn(|| {
+//         for _ in 0..num_keys {
+//             btree.first_key_value();
+//         }
+//     })
+// }
 
-#[bench(raw)]
-pub fn btreemap_first_entry_pop() -> BenchResult {
-    let num_keys = 10_000;
-    let entries = generate_entries(num_keys);
+// #[bench(raw)]
+// pub fn btreemap_first_entry_pop() -> BenchResult {
+//     let num_keys = 10_000;
+//     let entries = generate_entries(num_keys);
 
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    for (k, v) in entries.clone().into_iter() {
-        assert_eq!(btree.insert(k, v), None);
-    }
+//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+//     for (k, v) in entries.clone().into_iter() {
+//         assert_eq!(btree.insert(k, v), None);
+//     }
 
-    bench_fn(|| {
-        // Iterate in ascending order to trigger cached key comparisons.
-        for _ in 0..num_keys {
-            btree.pop_first();
-        }
-    })
-}
+//     bench_fn(|| {
+//         // Iterate in ascending order to trigger cached key comparisons.
+//         for _ in 0..num_keys {
+//             btree.pop_first();
+//         }
+//     })
+// }
 
 #[bench(raw)]
 pub fn btreemap_first_entry_mixed_workload() -> BenchResult {
     let num_keys = 10_000;
-    let entries = generate_entries(num_keys);
+    let mut rng = Rng::from_seed(0);
+    let entries: Vec<_> = (0..num_keys)
+        .map(|_| (Key::make_random(&mut rng), Value::make_random(&mut rng)))
+        .collect();
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    // Preload the tree.
     for (k, v) in entries.clone() {
         btree.insert(k, v);
     }
@@ -628,9 +643,9 @@ pub fn btreemap_first_entry_mixed_workload() -> BenchResult {
         Read,
     }
     let ops: Vec<Op> = (0..5_000)
-        .map(|i| match i % 3 {
-            0 => Op::Insert(Key::make(i), Value::make(1_000 * i)),
-            1 => Op::Remove(Key::make(i)),
+        .map(|i| match i % 5 {
+            0 => Op::Insert(Key::make_random(&mut rng), Value::make_random(&mut rng)),
+            1 => Op::Remove(entries[i as usize % num_keys].0.clone()),
             _ => Op::Read,
         })
         .collect();
@@ -654,47 +669,22 @@ pub fn btreemap_first_entry_mixed_workload() -> BenchResult {
 #[bench(raw)]
 pub fn btreemap_first_entry_priority_queue() -> BenchResult {
     let num_keys = 10_000;
-    let entries = generate_entries(num_keys);
+    let mut rng = Rng::from_seed(0);
+    let entries: Vec<_> = (0..num_keys)
+        .map(|_| (Key::make_random(&mut rng), Value::make_random(&mut rng)))
+        .collect();
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    // Preload the tree.
     for (k, v) in entries.clone() {
         btree.insert(k, v);
     }
     // Precompute keys and values for insertions.
     let inserts: Vec<(Key, Value)> = (0..5_000)
-        .map(|i| (Key::make(i + num_keys as u32), Value::make(i)))
+        .map(|_| (Key::make_random(&mut rng), Value::make_random(&mut rng)))
         .collect();
     bench_fn(|| {
         for (key, value) in &inserts {
             btree.pop_first();
             btree.insert(key.clone(), value.clone());
-        }
-    })
-}
-
-#[bench(raw)]
-pub fn btreemap_first_entry_bulk_updates() -> BenchResult {
-    let num_keys = 10_000;
-    let entries = generate_entries(num_keys);
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    // Preload the tree.
-    for (k, v) in entries.clone() {
-        btree.insert(k, v);
-    }
-    // Precompute updates for every 100 iterations.
-    let updates: Vec<_> = (0..5_000)
-        .step_by(100)
-        .map(|i| (Key::make(i), Value::make(i)))
-        .collect();
-    bench_fn(|| {
-        let mut update_index = 0;
-        for i in 0..5_000 {
-            btree.first_key_value();
-            if i % 100 == 0 {
-                let (ref key, ref value) = updates[update_index];
-                update_index = (update_index + 1) % updates.len();
-                btree.insert(key.clone(), value.clone());
-            }
         }
     })
 }

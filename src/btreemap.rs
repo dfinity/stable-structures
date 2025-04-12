@@ -75,7 +75,17 @@ Steps:
 5. canbench btreemap_first_entry
 6. compare the results
 
-== v1 extra
+== v1 extra v1
+u32
+u64
+Blob4
+Blob8
+Blob32
+Blob1024
+Vec1024
+String1024
+
+== v1 extra v0
 u32
 btreemap_first_entry_mixed_workload
     instructions: 265.20 M (improved by 13.78%)

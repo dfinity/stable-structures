@@ -1,20 +1,14 @@
 benches:
-  btreemap_first_entry_bulk_updates:
-    total:
-      instructions: 111636338
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_first_entry_mixed_workload:
     total:
-      instructions: 307594982
+      instructions: 2856011566
       heap_increase: 0
-      stable_memory_increase: 0
+      stable_memory_increase: 2
     scopes: {}
   btreemap_first_entry_priority_queue:
     total:
-      instructions: 635221630
+      instructions: 11894031093
       heap_increase: 0
-      stable_memory_increase: 0
+      stable_memory_increase: 1
     scopes: {}
 version: 0.1.11
