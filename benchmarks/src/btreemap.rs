@@ -483,8 +483,8 @@ enum IterType {
 type Vec1024 = Vec<u8>;
 type String1024 = String;
 
-type Key = u32;
-type Value = u32;
+type Key = String1024;
+type Value = String1024;
 type Entry = (Key, Value);
 
 // Generates an array of N bytes, placing the u32's big-endian bytes at the end (slowest cmp).
