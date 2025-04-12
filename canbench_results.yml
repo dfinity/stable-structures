@@ -1,26 +1,20 @@
 benches:
-  btreemap_first_entry_insert:
+  btreemap_first_entry_bulk_updates:
     total:
-      instructions: 3297909657
-      heap_increase: 0
-      stable_memory_increase: 345
-    scopes: {}
-  btreemap_first_entry_pop:
-    total:
-      instructions: 5887210627
-      heap_increase: 0
-      stable_memory_increase: 1
-    scopes: {}
-  btreemap_first_entry_read:
-    total:
-      instructions: 2501091605
+      instructions: 111636338
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_first_entry_remove:
+  btreemap_first_entry_mixed_workload:
     total:
-      instructions: 4589007254
+      instructions: 307594982
       heap_increase: 0
-      stable_memory_increase: 1
+      stable_memory_increase: 0
+    scopes: {}
+  btreemap_first_entry_priority_queue:
+    total:
+      instructions: 635221630
+      heap_increase: 0
+      stable_memory_increase: 0
     scopes: {}
 version: 0.1.11

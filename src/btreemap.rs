@@ -65,15 +65,163 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
+const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = false;
 /*
 Steps:
-1. choose a key/value type and big-/little- endian
+1. choose a key/value type
 2. set value to false
 3. canbench btreemap_first_entry  --persist
 4. set value to true
 5. canbench btreemap_first_entry
 6. compare the results
 
+== v1 extra
+u32
+btreemap_first_entry_mixed_workload
+    instructions: 265.20 M (improved by 13.78%)
+btreemap_first_entry_priority_queue
+    instructions: 520.89 M (improved by 18.00%)
+btreemap_first_entry_bulk_updates
+    instructions: 4.47 M (improved by 96.00%)
+
+u64
+btreemap_first_entry_mixed_workload
+    instructions: 272.20 M (improved by 13.88%)
+btreemap_first_entry_priority_queue
+    instructions: 535.99 M (improved by 18.15%)
+btreemap_first_entry_bulk_updates
+    instructions: 4.61 M (improved by 96.01%)
+
+Blob4
+btreemap_first_entry_mixed_workload
+    instructions: 292.46 M (improved by 14.89%)
+btreemap_first_entry_priority_queue
+    instructions: 603.07 M (improved by 19.54%)
+btreemap_first_entry_bulk_updates
+    instructions: 3.05 M (improved by 97.62%)
+
+Blob8
+btreemap_first_entry_mixed_workload
+    instructions: 303.68 M (improved by 14.20%)
+btreemap_first_entry_priority_queue
+    instructions: 638.38 M (improved by 18.35%)
+btreemap_first_entry_bulk_updates
+    instructions: 3.39 M (improved by 97.40%)
+
+Blob32
+btreemap_first_entry_mixed_workload
+    instructions: 396.28 M (improved by 12.44%)
+btreemap_first_entry_priority_queue
+    instructions: 896.13 M (improved by 15.11%)
+btreemap_first_entry_bulk_updates
+    instructions: 7.00 M (improved by 95.56%)
+
+Blob1024
+btreemap_first_entry_mixed_workload
+    instructions: 5.59 B (improved by 12.92%)
+btreemap_first_entry_priority_queue
+    instructions: 15.18 B (improved by 13.38%)
+btreemap_first_entry_bulk_updates
+    instructions: 164.47 M (improved by 93.40%)
+
+Vec1024
+btreemap_first_entry_mixed_workload
+    instructions: 4.06 B (improved by 6.73%)
+btreemap_first_entry_priority_queue
+    instructions: 10.96 B (improved by 7.30%)
+btreemap_first_entry_bulk_updates
+    instructions: 119.76 M (improved by 89.22%)
+
+String1024
+btreemap_first_entry_mixed_workload
+    instructions: 4.46 B (improved by 8.94%)
+btreemap_first_entry_priority_queue
+    instructions: 12.06 B (improved by 9.46%)
+btreemap_first_entry_bulk_updates
+    instructions: 135.96 M (improved by 90.81%)
+
+== v1
+u32
+btreemap_first_entry_insert
+    instructions: 500.17 M (0.65%) (change within noise threshold)
+btreemap_first_entry_remove
+    instructions: 483.37 M (1.78%) (change within noise threshold)
+btreemap_first_entry_read
+    instructions: 5.26 M (improved by 97.61%)
+btreemap_first_entry_pop
+    instructions: 488.89 M (improved by 30.14%)
+
+u64
+btreemap_first_entry_insert
+    instructions: 513.93 M (0.63%) (change within noise threshold)
+btreemap_first_entry_remove
+    instructions: 497.19 M (1.75%) (change within noise threshold)
+btreemap_first_entry_read
+    instructions: 5.47 M (improved by 97.59%)
+btreemap_first_entry_pop
+    instructions: 502.92 M (improved by 30.34%)
+
+Blob4
+btreemap_first_entry_insert
+    instructions: 575.77 M (1.27%) (change within noise threshold)
+btreemap_first_entry_remove
+    instructions: 557.70 M (1.85%) (change within noise threshold)
+btreemap_first_entry_read
+    instructions: 2.14 M (improved by 99.15%)
+btreemap_first_entry_pop
+    instructions: 559.47 M (improved by 32.48%)
+
+Blob8
+btreemap_first_entry_insert
+    instructions: 614.51 M (1.56%) (change within noise threshold)
+btreemap_first_entry_remove
+    instructions: 588.50 M (regressed by 2.46%)
+btreemap_first_entry_read
+    instructions: 2.51 M (improved by 99.02%)
+btreemap_first_entry_pop
+    instructions: 588.79 M (improved by 31.01%)
+
+Blob32
+btreemap_first_entry_insert
+    instructions: 869.20 M (regressed by 2.71%)
+btreemap_first_entry_remove
+    instructions: 810.95 M (regressed by 3.78%)
+btreemap_first_entry_read
+    instructions: 7.66 M (improved by 97.52%)
+btreemap_first_entry_pop
+    instructions: 810.76 M (improved by 26.93%)
+
+Blob1024
+btreemap_first_entry_insert
+    instructions: 14.48 B (regressed by 4.34%)
+btreemap_first_entry_remove
+    instructions: 13.23 B (regressed by 5.96%)
+btreemap_first_entry_read
+    instructions: 210.17 M (improved by 95.68%)
+btreemap_first_entry_pop
+    instructions: 13.27 B (improved by 25.27%)
+
+Vec1024
+btreemap_first_entry_insert
+    instructions: 10.62 B (regressed by 6.49%)
+btreemap_first_entry_remove
+    instructions: 9.40 B (regressed by 8.28%)
+btreemap_first_entry_read
+    instructions: 147.36 M (improved by 93.09%)
+btreemap_first_entry_pop
+    instructions: 9.19 B (improved by 16.35%)
+
+String1024
+btreemap_first_entry_insert
+    instructions: 11.56 B (regressed by 5.79%)
+btreemap_first_entry_remove
+    instructions: 10.32 B (regressed by 7.42%)
+btreemap_first_entry_read
+    instructions: 174.13 M (improved by 93.92%)
+btreemap_first_entry_pop
+    instructions: 10.17 B (improved by 20.01%)
+
+== v0
 Blob1024 -> to_be_bytes
 ```
 btreemap_first_entry_insert
@@ -122,7 +270,6 @@ btreemap_first_entry_pop
     instructions: 4.22 B (improved by 28.26%)
 ```
 */
-const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = true;
 
 #[cfg(test)]
 mod proptests;
@@ -3242,26 +3389,112 @@ mod test {
     }
 
     // cargo test test_btreemap_first_entry -- --nocapture
+    type Blob4 = Blob<4>;
+    type Blob8 = Blob<8>;
+    type Blob32 = Blob<32>;
     type Blob1024 = Blob<1024>;
     type Vec1024 = Vec<u8>;
+    type String1024 = String;
 
-    //type Entry = (Blob1024, Blob1024);
-    // fn blob(i: usize) -> Blob1024 {
-    //     Blob1024::try_from(&i.to_be_bytes()[..]).unwrap()
-    // }
+    type Key = String1024;
+    type Value = String1024;
+    type Entry = (Key, Value);
 
-    type Entry = (Vec1024, Vec1024);
-    fn blob(i: usize) -> Vec1024 {
-        let mut buf = vec![0u8; 1024];
+    // Generates an array of N bytes, placing the u32's big-endian bytes at the end (slowest cmp).
+    fn make_buffer<const N: usize>(i: u32) -> [u8; N] {
+        let mut buf = [0u8; N];
         let bytes = i.to_be_bytes();
-        buf[..bytes.len()].copy_from_slice(&bytes);
+        buf[N - bytes.len()..].copy_from_slice(&bytes);
         buf
+    }
+
+    trait Make<T> {
+        fn make(_i: u32) -> T {
+            panic!("not implemented for {:?}", std::any::type_name::<T>())
+        }
+    }
+
+    impl Make<u32> for u32 {
+        fn make(i: u32) -> Self {
+            i
+        }
+    }
+
+    impl Make<u64> for u64 {
+        fn make(i: u32) -> Self {
+            i as u64
+        }
+    }
+
+    impl<const N: usize> Make<Blob<N>> for Blob<N> {
+        fn make(i: u32) -> Self {
+            Blob::try_from(&make_buffer::<N>(i)[..]).unwrap()
+        }
+    }
+
+    impl Make<Vec1024> for Vec1024 {
+        fn make(i: u32) -> Self {
+            make_buffer::<1024>(i).to_vec()
+        }
+    }
+
+    impl Make<String1024> for String1024 {
+        fn make(i: u32) -> Self {
+            // "000...{i}" forces comparisons to check all 1024 characters (slowest cmp).
+            format!("{:0>1024}", i)
+        }
     }
 
     fn generate_entries(count: usize) -> Vec<Entry> {
         (0..count)
-            .map(|i| (blob(i), blob(i * 1_000)))
+            .map(|i| (Key::make(i as u32), Value::make(1_000 * i as u32)))
             .collect::<Vec<_>>()
+    }
+
+    fn run_object_test<T>(name: &str, a: T, b: T, n: usize)
+    where
+        T: Clone + Ord + PartialOrd,
+    {
+        let start = std::time::Instant::now();
+        for _ in 0..n {
+            let _cmp = a < b;
+        }
+        let cmp = start.elapsed();
+
+        let start = std::time::Instant::now();
+        for _ in 0..n {
+            let _clone = a.clone();
+        }
+        let clone = start.elapsed();
+        println!(
+            "{name:>12}: cmp: {:.3}, clone: {:.3}",
+            cmp.as_secs_f64(),
+            clone.as_secs_f64()
+        );
+    }
+
+    // cargo test test_obj_perf -- --nocapture
+    /*
+           u32: cmp: 0.057, clone: 0.055
+           u64: cmp: 0.055, clone: 0.055
+         Blob4: cmp: 0.278, clone: 0.060
+         Blob8: cmp: 0.289, clone: 0.061
+        Blob32: cmp: 0.332, clone: 0.113
+      Blob1024: cmp: 0.599, clone: 0.197
+       Vec1024: cmp: 0.257, clone: 0.497
+    String1024: cmp: 0.530, clone: 0.402
+    */
+    #[test]
+    pub fn test_obj_perf() {
+        let n = 10_000_000;
+        run_object_test::<u32>("u32", 0, 1, n);
+        run_object_test::<u64>("u64", 0, 1, n);
+        run_object_test::<Blob4>("Blob4", <Blob4>::make(0), <Blob4>::make(1), n);
+        run_object_test::<Blob8>("Blob8", <Blob8>::make(0), <Blob8>::make(1), n);
+        run_object_test::<Blob32>("Blob32", <Blob32>::make(0), <Blob32>::make(1), n);
+        run_object_test::<Blob1024>("Blob1024", <Blob1024>::make(0), <Blob1024>::make(1), n);
+        run_object_test::<Vec1024>("Vec1024", vec![0], vec![1], n);
+        run_object_test::<String1024>("String1024", String1024::make(0), String1024::make(1), n);
     }
 
     #[test]
