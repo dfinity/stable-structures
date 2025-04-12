@@ -65,7 +65,7 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
-const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = true;
+const FIRST_LAST_ENTRY_CACHE_ENABLED: bool = false;
 /*
 Steps:
 1. choose a key/value type
