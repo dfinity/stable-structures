@@ -219,15 +219,24 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory,
         };
 
-        // Load the key's size.
-        let key_size = if K::BOUND.is_fixed_size() {
-            // Key is fixed in size. The size of the key is always its max size.
-            K::BOUND.max_size()
-        } else {
-            // Key is not fixed in size. Read the size from memory.
-            let key_size = read_u32(&reader, Address::from(offset.get()));
-            offset += U32_SIZE;
-            key_size
+        // Retrieve the key's size.
+        let key_offset = Address::from(offset.get());
+        let key_size = match self.version {
+            Version::V1(_) => {
+                // In V1, the key's size is always stored in memory.
+                offset += U32_SIZE;
+                read_u32(&reader, key_offset)
+            }
+            Version::V2(_) => {
+                // In V2, if the key is fixed-size, use the maximum bound;
+                // otherwise, read its size from memory.
+                if K::BOUND.is_fixed_size() {
+                    K::BOUND.max_size()
+                } else {
+                    offset += U32_SIZE;
+                    read_u32(&reader, key_offset)
+                }
+            }
         };
 
         let mut bytes = vec![];
