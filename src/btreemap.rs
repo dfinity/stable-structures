@@ -2157,13 +2157,13 @@ mod test {
         let key = |i: u32| b(&i.to_le_bytes()); // <- change
         let value = |_i: u32| b(&[]); // <- change
 
-        // FAIL
-        let key = |i: u32| b(&i.to_le_bytes()); // <- change
-        let value = |i: u32| b(&i.to_le_bytes());
-
         // // FAIL
         // let key = |i: u32| b(&i.to_le_bytes()); // <- change
-        // let value = |i: u32| i; // <- change
+        // let value = |i: u32| b(&i.to_le_bytes());
+
+        // FAIL
+        let key = |i: u32| b(&i.to_le_bytes()); // <- change
+        let value = |i: u32| i; // <- change
 
         btree_test(|mut btree| {
             let n = 257;
