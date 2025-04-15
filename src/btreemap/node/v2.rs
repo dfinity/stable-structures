@@ -192,16 +192,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
 
-        // Load all the values. This is necessary so that we don't overwrite referenced
-        // values when writing the entries to the node.
-        let entries: Vec<_> = (0..self.keys_and_encoded_values.len())
-            .map(|i| {
-                (
-                    self.key(i, allocator.memory()).to_bytes_checked(),
-                    self.value(i, allocator.memory()),
-                )
-            })
-            .collect();
+        // Load all the entry. This is necessary so that we don't overwrite referenced
+        // entry when writing the entries to the node.
+        let entries = (0..self.keys_and_encoded_values.len())
+            .map(|i| self.entry(i, allocator.memory()))
+            .collect::<Vec<_>>();
 
         // Initialize a NodeWriter. The NodeWriter takes care of allocating/deallocating
         // overflow pages as needed.
@@ -239,7 +234,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the keys.
-        for (key_bytes, _) in &entries {
+        for (key, _) in &entries {
+            let key_bytes = key.to_bytes_checked();
             // Write the size of the key if it isn't fixed in size.
             if !K::BOUND.is_fixed_size() {
                 writer.write_u32(offset, key_bytes.len() as u32);
@@ -252,7 +248,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the values.
-        for (_, value) in entries {
+        for (_, value) in &entries {
             // Write the size of the value.
             writer.write_u32(offset, value.len() as u32);
             offset += U32_SIZE;

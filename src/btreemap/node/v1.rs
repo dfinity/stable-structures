@@ -159,8 +159,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load all the entries. This is necessary so that we don't overwrite referenced
         // entries when writing the entries to the node.
         for i in 0..self.keys_and_encoded_values.len() {
-            self.key(i, memory);
-            self.value(i, memory);
+            self.entry(i, memory);
         }
 
         // Write the entries.
