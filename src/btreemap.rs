@@ -2105,7 +2105,10 @@ mod test {
         // RUST_BACKTRACE=1 cargo test btreemap::test::len -- --nocapture
 
         // original OK
-        // let key = |i: u32| b(&i.to_be_bytes());
+        let key = |i: u32| b(&i.to_be_bytes());
+        let value = |_i: u32| b(&[]);
+
+        // let key = |i: u32| i; // <- change OK
         // let value = |_i: u32| b(&[]);
 
         let key = |i: u32| i; // <- change FAIL
@@ -2114,24 +2117,25 @@ mod test {
         // let key = |i: u32| b(&i.to_be_bytes());
         // let value = |i: u32| i; // <- change OK
 
-        // let key = |i: u32| b(&i.to_le_bytes());// <- change OK
+        // let key = |i: u32| b(&i.to_le_bytes()); // <- change OK
         // let value = |_i: u32| b(&[]);
 
-        // let key = |i: u32| b(&i.to_ne_bytes());// <- change OK
+        // let key = |i: u32| b(&i.to_ne_bytes()); // <- change OK
         // let value = |_i: u32| b(&[]);
 
-        // let key = |i: u32| b(&i.to_bytes());// <- change OK
+        // let key = |i: u32| b(&i.to_bytes()); // <- change OK
         // let value = |_i: u32| b(&[]);
 
         btree_test(|mut btree| {
-            for i in 0..1000u32 {
+            let n = 1000;
+            for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
             }
 
-            assert_eq!(btree.len(), 1000);
+            assert_eq!(btree.len(), n as u64);
             assert!(!btree.is_empty());
 
-            for i in 0..1000u32 {
+            for i in 0..n {
                 assert_eq!(btree.remove(&key(i)), Some(value(i)));
             }
 
