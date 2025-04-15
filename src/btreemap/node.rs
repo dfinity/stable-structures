@@ -225,9 +225,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
             K::BOUND.max_size()
         } else {
             // Key is not fixed in size. Read the size from memory.
-            read_u32(&reader, Address::from(offset.get()))
+            let key_size = read_u32(&reader, Address::from(offset.get()));
+            offset += U32_SIZE;
+            key_size
         };
-        offset += U32_SIZE;
 
         let mut bytes = vec![];
         read_to_vec(

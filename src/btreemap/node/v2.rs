@@ -160,9 +160,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 K::BOUND.max_size()
             } else {
                 // Key is not fixed in size. Read the size from memory.
-                let value = read_u32(&reader, offset);
+                let key_size = read_u32(&reader, offset);
+                //println!("ABC read key_size: {:?}", key_size);
                 offset += U32_SIZE;
-                value
+                key_size
             };
 
             // Advance offset by the size of the key.
