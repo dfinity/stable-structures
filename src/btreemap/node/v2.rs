@@ -194,9 +194,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load all the entry. This is necessary so that we don't overwrite referenced
         // entry when writing the entries to the node.
-        let entries = (0..self.keys_and_encoded_values.len())
+        let entries: Vec<_> = (0..self.keys_and_encoded_values.len())
             .map(|i| self.entry(i, allocator.memory()))
-            .collect::<Vec<_>>();
+            .collect();
 
         // Initialize a NodeWriter. The NodeWriter takes care of allocating/deallocating
         // overflow pages as needed.
