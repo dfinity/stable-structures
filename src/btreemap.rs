@@ -2111,9 +2111,6 @@ mod test {
         // let key = |i: u32| i; // <- change OK
         // let value = |_i: u32| b(&[]);
 
-        let key = |i: u32| i; // <- change FAIL
-        let value = |_i: u32| b(&[]);
-
         // let key = |i: u32| b(&i.to_be_bytes());
         // let value = |i: u32| i; // <- change OK
 
@@ -2148,15 +2145,11 @@ mod test {
     fn pop_first_len() {
         // RUST_BACKTRACE=1 cargo test btreemap::test::pop_first_len -- --nocapture
 
-        // original FAIL
+        // original OK
         let key = |i: u32| i;
         let value = |i: u32| b(&i.to_le_bytes());
 
-        // FAIL
-        let key = |i: u32| b(&i.to_le_bytes()); // <- change
-        let value = |i: u32| b(&i.to_le_bytes());
-
-        // FAIL
+        // OK
         let key = |i: u32| i;
         let value = |_i: u32| b(&[]); // <- change
 
@@ -2166,17 +2159,23 @@ mod test {
 
         // FAIL
         let key = |i: u32| b(&i.to_le_bytes()); // <- change
-        let value = |i: u32| i; // <- change
+        let value = |i: u32| b(&i.to_le_bytes());
+
+        // // FAIL
+        // let key = |i: u32| b(&i.to_le_bytes()); // <- change
+        // let value = |i: u32| i; // <- change
 
         btree_test(|mut btree| {
-            for i in 0..1000u32 {
+            let n = 257;
+            for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
             }
 
-            assert_eq!(btree.len(), 1000);
+            assert_eq!(btree.len(), n as u64);
             assert!(!btree.is_empty());
 
-            for i in 0..1000u32 {
+            for i in 0..n {
+                println!("ABC i={i}");
                 assert_eq!(btree.pop_first().unwrap().1, value(i));
             }
 
