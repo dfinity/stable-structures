@@ -158,15 +158,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load all the entries. This is necessary so that we don't overwrite referenced
         // entries when writing the entries to the node.
-        for idx in 0..self.keys_and_encoded_values.len() {
-            self.key(idx, memory);
-            self.value(idx, memory);
+        for i in 0..self.keys_and_encoded_values.len() {
+            self.key(i, memory);
+            self.value(i, memory);
         }
 
         // Write the entries.
-        for idx in 0..self.keys_and_encoded_values.len() {
+        for i in 0..self.keys_and_encoded_values.len() {
             // Write the size of the key.
-            let key = self.key(idx, memory);
+            let key = self.key(i, memory);
             let key_bytes = key.to_bytes_checked();
             write_u32(memory, self.address + offset, key_bytes.len() as u32);
             offset += U32_SIZE;
@@ -176,7 +176,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Bytes::from(max_key_size);
 
             // Write the size of the value.
-            let value = self.value(idx, memory);
+            let value = self.value(i, memory);
             write_u32(memory, self.address + offset, value.len() as u32);
             offset += U32_SIZE;
 
