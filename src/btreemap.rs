@@ -1167,6 +1167,24 @@ mod test {
         Rc::new(RefCell::new(Vec::new()))
     }
 
+    fn make_buffer<const N: usize>(i: u32) -> [u8; N] {
+        let mut buf = [0u8; N];
+        let bytes = i.to_le_bytes();
+        let len = N.min(bytes.len());
+        buf[..len].copy_from_slice(&bytes[..len]);
+        buf
+    }
+
+    /// Creates a key from a u32.
+    fn k(i: u32) -> Blob<10> {
+        Blob::<10>::try_from(&make_buffer::<10>(i)[..]).unwrap()
+    }
+
+    /// Creates a value from a u32.
+    fn v(i: u32) -> Blob<10> {
+        Blob::<10>::try_from(&make_buffer::<10>(i)[..]).unwrap()
+    }
+
     /// A helper method to succinctly create an entry.
     fn e(x: u8) -> (Blob<10>, Vec<u8>) {
         (b(&[x]), vec![])
@@ -1204,46 +1222,43 @@ mod test {
     #[test]
     fn init_preserves_data() {
         btree_test(|mut btree| {
-            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.insert(k(123), v(456)), None);
+            assert_eq!(btree.get(&k(123)), Some(v(456)));
 
             // Reload the btree
             let btree = BTreeMap::init(btree.into_memory());
 
             // Data still exists.
-            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.get(&k(123)), Some(v(456)));
         });
     }
 
     #[test]
     fn insert_get() {
         btree_test(|mut btree| {
-            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+            assert_eq!(btree.insert(k(123), v(456)), None);
+            assert_eq!(btree.get(&k(123)), Some(v(456)));
         });
     }
 
     #[test]
     fn insert_overwrites_previous_value() {
         btree_test(|mut btree| {
-            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-            assert_eq!(
-                btree.insert(b(&[1, 2, 3]), b(&[7, 8, 9])),
-                Some(b(&[4, 5, 6]))
-            );
-            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[7, 8, 9])));
+            assert_eq!(btree.insert(k(123), v(456)), None);
+            assert_eq!(btree.insert(k(123), v(789)), Some(v(456)));
+            assert_eq!(btree.get(&k(123)), Some(v(789)));
         });
     }
 
     #[test]
     fn insert_get_multiple() {
         btree_test(|mut btree| {
-            assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-            assert_eq!(btree.insert(b(&[4, 5]), b(&[7, 8, 9, 10])), None);
-            assert_eq!(btree.insert(b(&[]), b(&[11])), None);
-            assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
-            assert_eq!(btree.get(&b(&[4, 5])), Some(b(&[7, 8, 9, 10])));
-            assert_eq!(btree.get(&b(&[])), Some(b(&[11])));
+            assert_eq!(btree.insert(k(123), v(456)), None);
+            assert_eq!(btree.insert(k(45), v(789)), None);
+            assert_eq!(btree.insert(b(&[]), v(111)), None);
+            assert_eq!(btree.get(&k(123)), Some(v(456)));
+            assert_eq!(btree.get(&k(45)), Some(v(789)));
+            assert_eq!(btree.get(&b(&[])), Some(v(111)));
         });
     }
 
