@@ -159,17 +159,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load all the entries. This is necessary so that we don't overwrite referenced
         // entries when writing the entries to the node.
         let entries: Vec<_> = (0..self.keys_and_encoded_values.len())
-            .map(|i| {
-                (
-                    self.key(i, memory).to_bytes_checked(),
-                    self.value(i, memory),
-                )
-            })
+            .map(|i| (self.key(i, memory), self.value(i, memory)))
             .collect();
 
         // Write the entries.
-        for (key_bytes, value) in entries {
+        for (key, value) in entries {
             // Write the size of the key.
+            let key_bytes = key.to_bytes_checked();
             write_u32(memory, self.address + offset, key_bytes.len() as u32);
             offset += U32_SIZE;
 
