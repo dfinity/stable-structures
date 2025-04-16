@@ -1222,29 +1222,29 @@ mod test {
     #[test]
     fn init_preserves_data() {
         run_btree_test(|mut btree| {
-            assert_eq!(btree.insert(k(1), v(2)), None);
-            assert_eq!(btree.get(&k(1)), Some(v(2)));
+            assert_eq!(btree.insert(k(1), v(20)), None);
+            assert_eq!(btree.get(&k(1)), Some(v(20)));
 
             // Reload the btree, verfiy data still exists.
             let btree = BTreeMap::init(btree.into_memory());
-            assert_eq!(btree.get(&k(1)), Some(v(2)));
+            assert_eq!(btree.get(&k(1)), Some(v(20)));
         });
     }
 
     #[test]
     fn insert_and_get() {
         run_btree_test(|mut btree| {
-            assert_eq!(btree.insert(k(1), v(2)), None);
-            assert_eq!(btree.get(&k(1)), Some(v(2)));
+            assert_eq!(btree.insert(k(1), v(20)), None);
+            assert_eq!(btree.get(&k(1)), Some(v(20)));
         });
     }
 
     #[test]
     fn insert_overwrites_previous_value() {
         run_btree_test(|mut btree| {
-            assert_eq!(btree.insert(k(1), v(2)), None);
-            assert_eq!(btree.insert(k(1), v(3)), Some(v(2)));
-            assert_eq!(btree.get(&k(1)), Some(v(3)));
+            assert_eq!(btree.insert(k(1), v(20)), None);
+            assert_eq!(btree.insert(k(1), v(30)), Some(v(20)));
+            assert_eq!(btree.get(&k(1)), Some(v(30)));
         });
     }
 
@@ -1287,8 +1287,8 @@ mod test {
             assert_eq!(right_child.key(median_index), &k(12));
 
             // Overwrite the value of the median key.
-            assert_eq!(btree.insert(k(12), v(123)), Some(v(0)));
-            assert_eq!(btree.get(&k(12)), Some(v(123)));
+            assert_eq!(btree.insert(k(12), v(100)), Some(v(0)));
+            assert_eq!(btree.get(&k(12)), Some(v(100)));
 
             // The child has not been split and is still full.
             let right_child = btree.load_node(root.child(1));
