@@ -1160,7 +1160,6 @@ mod test {
         storable::{Blob, Bound as StorableBound, Storable},
         VectorMemory,
     };
-    use std::borrow::Cow;
     use std::cell::RefCell;
     use std::convert::TryFrom;
     use std::rc::Rc;
