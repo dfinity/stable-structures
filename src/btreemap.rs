@@ -2060,77 +2060,40 @@ mod test {
         remove_case_3b_merge_into_left
     );
 
-    // #[test]
-    // fn many_insertions<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let mut btree = BTreeMap::new(mem.clone());
+    fn many_insertions<K: TestKey, V: TestValue>(ids: &[u32]) {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            for &i in ids {
+                assert_eq!(btree.insert(key(i), value(i)), None);
+            }
+            for &i in ids {
+                assert_eq!(btree.get(&key(i)), Some(value(i)));
+            }
 
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.insert(b(&[i, j]), b(&[i, j])), None);
-    //         }
-    //     }
+            let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
+            for &i in ids {
+                assert_eq!(btree.remove(&key(i)), Some(value(i)));
+            }
+            for &i in ids {
+                assert_eq!(btree.get(&key(i)), None);
+            }
 
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.get(&b(&[i, j])), Some(b(&[i, j])));
-    //         }
-    //     }
+            // We've deallocated everything.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
+    }
 
-    //     let mut btree = BTreeMap::load(mem);
+    fn many_insertions_ascending<K: TestKey, V: TestValue>() {
+        let n = 10_000;
+        many_insertions::<K, V>(&(0..n).collect::<Vec<_>>());
+    }
+    btree_test!(test_many_insertions_ascending, many_insertions_ascending);
 
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.remove(&b(&[i, j])), Some(b(&[i, j])));
-    //         }
-    //     }
-
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.get(&b(&[i, j])), None);
-    //         }
-    //     }
-
-    //     // We've deallocated everything.
-    //     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
-    // }
-    // btree_test!(test_, );
-
-    // #[test]
-    // fn many_insertions_2<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let mut btree = BTreeMap::new(mem.clone());
-
-    //     for j in (0..=10).rev() {
-    //         for i in (0..=255).rev() {
-    //             assert_eq!(btree.insert(b(&[i, j]), b(&[i, j])), None);
-    //         }
-    //     }
-
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.get(&b(&[i, j])), Some(b(&[i, j])));
-    //         }
-    //     }
-
-    //     let mut btree = BTreeMap::load(mem);
-
-    //     for j in (0..=10).rev() {
-    //         for i in (0..=255).rev() {
-    //             assert_eq!(btree.remove(&b(&[i, j])), Some(b(&[i, j])));
-    //         }
-    //     }
-
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.get(&b(&[i, j])), None);
-    //         }
-    //     }
-
-    //     // We've deallocated everything.
-    //     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
-    // }
-    // btree_test!(test_, );
+    fn many_insertions_descending<K: TestKey, V: TestValue>() {
+        let n = 10_000;
+        many_insertions::<K, V>(&(0..n).rev().collect::<Vec<_>>());
+    }
+    btree_test!(test_many_insertions_descending, many_insertions_descending);
 
     // #[test]
     // fn pop_first_many_entries<K: TestKey, V: TestValue>() {
