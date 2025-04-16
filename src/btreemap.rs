@@ -2427,54 +2427,61 @@ mod test {
     }
     btree_test!(test_range_large, range_large);
 
-    // fn range_various_prefixes_with_offset() {
-    //     run_btree_test(|mut btree| {
-    //         btree.insert(b(&[0, 1]), b(&[]));
-    //         btree.insert(b(&[0, 2]), b(&[]));
-    //         btree.insert(b(&[0, 3]), b(&[]));
-    //         btree.insert(b(&[0, 4]), b(&[]));
-    //         btree.insert(b(&[1, 1]), b(&[]));
-    //         btree.insert(b(&[1, 2]), b(&[]));
-    //         btree.insert(b(&[1, 3]), b(&[]));
-    //         btree.insert(b(&[1, 4]), b(&[]));
-    //         btree.insert(b(&[2, 1]), b(&[]));
-    //         btree.insert(b(&[2, 2]), b(&[]));
-    //         btree.insert(b(&[2, 3]), b(&[]));
-    //         btree.insert(b(&[2, 4]), b(&[]));
+    fn range_various_prefixes_with_offset<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            btree.insert(key(1), value(100));
+            btree.insert(key(2), value(200));
+            btree.insert(key(3), value(300));
+            btree.insert(key(4), value(400));
+            btree.insert(key(11), value(500));
+            btree.insert(key(12), value(600));
+            btree.insert(key(13), value(700));
+            btree.insert(key(14), value(800));
+            btree.insert(key(21), value(900));
+            btree.insert(key(22), value(1000));
+            btree.insert(key(23), value(1100));
+            btree.insert(key(24), value(1200));
 
-    //         // The result should look like this:
-    //         //                                         [(1, 2)]
-    //         //                                         /     \
-    //         // [(0, 1), (0, 2), (0, 3), (0, 4), (1, 1)]       [(1, 3), (1, 4), (2, 1), (2, 2), (2, 3), (2, 4)]
+            // The result should look like this:
+            //                  [12]
+            //                 /    \
+            // [1, 2, 3, 4, 11]      [13, 14, 21, 22, 23, 24]
 
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Internal);
-    //         assert_eq!(root.entries(btree.memory()), vec![(b(&[1, 2]), vec![])]);
-    //         assert_eq!(root.children_len(), 2);
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![(key(12), encode(value(600)))]
+            );
+            assert_eq!(root.children_len(), 2);
 
-    //         assert_eq!(
-    //             btree.range(b(&[0])..b(&[1])).collect::<Vec<_>>(),
-    //             vec![
-    //                 (b(&[0, 1]), b(&[])),
-    //                 (b(&[0, 2]), b(&[])),
-    //                 (b(&[0, 3]), b(&[])),
-    //                 (b(&[0, 4]), b(&[])),
-    //             ]
-    //         );
+            assert_eq!(
+                btree.range(key(0)..key(10)).collect::<Vec<_>>(),
+                vec![
+                    (key(1), value(100)),
+                    (key(2), value(200)),
+                    (key(3), value(300)),
+                    (key(4), value(400)),
+                ]
+            );
 
-    //         // Tests an offset that has a keys somewhere in the range of keys of an internal node.
-    //         assert_eq!(
-    //             btree.range(b(&[1, 3])..b(&[2])).collect::<Vec<_>>(),
-    //             vec![(b(&[1, 3]), b(&[])), (b(&[1, 4]), b(&[])),]
-    //         );
+            // Tests an offset that has a keys somewhere in the range of keys of an internal node.
+            assert_eq!(
+                btree.range(key(13)..key(20)).collect::<Vec<_>>(),
+                vec![(key(13), value(700)), (key(14), value(800))]
+            );
 
-    //         // Tests an offset that's larger than the key in the internal node.
-    //         assert_eq!(btree.range(b(&[2, 5])..).collect::<Vec<_>>(), vec![]);
-    //     });
-    // }
-    // btree_test!(test_, );
+            // Tests an offset that's larger than the key in the internal node.
+            assert_eq!(btree.range(key(25)..).collect::<Vec<_>>(), vec![]);
+        });
+    }
+    btree_test!(
+        test_range_various_prefixes_with_offset,
+        range_various_prefixes_with_offset
+    );
 
-    // fn range_various_prefixes_with_offset_2() {
+    // fn range_various_prefixes_with_offset_2<K: TestKey, V: TestValue>() {
     //     run_btree_test(|mut btree| {
     //         btree.insert(b(&[0, 1]), b(&[]));
     //         btree.insert(b(&[0, 2]), b(&[]));
@@ -2579,14 +2586,14 @@ mod test {
     // btree_test!(test_, );
 
     // #[should_panic(expected = "max_key_size must be <= 4")]
-    // fn v1_rejects_increases_in_max_key_size() {
+    // fn v1_rejects_increases_in_max_key_size<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init_v1(mem);
     //     let _btree: BTreeMap<Blob<5>, Blob<3>, _> = BTreeMap::init_v1(btree.into_memory());
     // }
     // btree_test!(test_, );
 
-    // fn v2_handles_increases_in_max_key_size_and_max_value_size() {
+    // fn v2_handles_increases_in_max_key_size_and_max_value_size<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init(mem);
     //     btree.insert(
@@ -2614,7 +2621,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn accepts_small_or_equal_key_sizes() {
+    // fn accepts_small_or_equal_key_sizes<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
     //     // Smaller key size
@@ -2625,14 +2632,14 @@ mod test {
     // btree_test!(test_, );
 
     // #[should_panic(expected = "max_value_size must be <= 3")]
-    // fn v1_rejects_larger_value_sizes() {
+    // fn v1_rejects_larger_value_sizes<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init_v1(mem);
     //     let _btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init_v1(btree.into_memory());
     // }
     // btree_test!(test_, );
 
-    // fn accepts_small_or_equal_value_sizes() {
+    // fn accepts_small_or_equal_value_sizes<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
     //     // Smaller key size
@@ -2642,7 +2649,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn bruteforce_range_search() {
+    // fn bruteforce_range_search<K: TestKey, V: TestValue>() {
     //     run_btree_test(|mut stable_map| {
     //         use std::collections::BTreeMap;
     //         const NKEYS: u64 = 60;
@@ -2703,7 +2710,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn test_iter_upper_bound() {
+    // fn test_iter_upper_bound<K: TestKey, V: TestValue>() {
     //     run_btree_test(|mut btree| {
     //         for k in 0..100u64 {
     //             btree.insert(k, ());
@@ -2745,28 +2752,28 @@ mod test {
     // btree_test!(test_, );
 
     // #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    // fn v1_panics_if_key_is_bigger_than_max_size() {
+    // fn v1_panics_if_key_is_bigger_than_max_size<K: TestKey, V: TestValue>() {
     //     let mut btree = BTreeMap::init_v1(make_memory());
     //     btree.insert(BuggyStruct, ());
     // }
     // btree_test!(test_, );
 
     // #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    // fn v2_panics_if_key_is_bigger_than_max_size() {
+    // fn v2_panics_if_key_is_bigger_than_max_size<K: TestKey, V: TestValue>() {
     //     let mut btree = BTreeMap::init(make_memory());
     //     btree.insert(BuggyStruct, ());
     // }
     // btree_test!(test_, );
 
     // #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    // fn v1_panics_if_value_is_bigger_than_max_size() {
+    // fn v1_panics_if_value_is_bigger_than_max_size<K: TestKey, V: TestValue>() {
     //     let mut btree = BTreeMap::init(make_memory());
     //     btree.insert((), BuggyStruct);
     // }
     // btree_test!(test_, );
 
     // #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    // fn v2_panics_if_value_is_bigger_than_max_size() {
+    // fn v2_panics_if_value_is_bigger_than_max_size<K: TestKey, V: TestValue>() {
     //     let mut btree = BTreeMap::init(make_memory());
     //     btree.insert((), BuggyStruct);
     // }
@@ -2775,7 +2782,7 @@ mod test {
     // // To generate the memory dump file for the current version:
     // //   cargo test create_btreemap_dump_file -- --include-ignored
     // #[ignore]
-    // fn create_btreemap_dump_file() {
+    // fn create_btreemap_dump_file<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let mut btree = BTreeMap::init_v1(mem.clone());
     //     assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
@@ -2788,7 +2795,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn produces_layout_identical_to_layout_version_1_with_packed_headers() {
+    // fn produces_layout_identical_to_layout_version_1_with_packed_headers<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let mut btree = BTreeMap::init_v1(mem.clone());
     //     assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
@@ -2799,7 +2806,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn read_write_header_is_identical_to_read_write_struct() {
+    // fn read_write_header_is_identical_to_read_write_struct<K: TestKey, V: TestValue>() {
     //     #[repr(C, packed)]
     //     struct BTreePackedHeader {
     //         magic: [u8; 3],
@@ -2857,7 +2864,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn migrate_from_bounded_to_unbounded_and_back() {
+    // fn migrate_from_bounded_to_unbounded_and_back<K: TestKey, V: TestValue>() {
     //     // A type that is bounded.
     //     #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
     //     struct T;
@@ -2912,7 +2919,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn test_clear_new_bounded_type() {
+    // fn test_clear_new_bounded_type<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::new(mem.clone());
 
@@ -2937,7 +2944,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn test_clear_new_unbounded_type() {
+    // fn test_clear_new_unbounded_type<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let mut btree: BTreeMap<String, String, _> = BTreeMap::new(mem.clone());
     //     btree.insert("asd".into(), "bce".into());
@@ -2958,7 +2965,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn deallocating_node_with_overflows() {
+    // fn deallocating_node_with_overflows<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let mut btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new(mem.clone());
 
@@ -2978,7 +2985,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn repeatedly_deallocating_nodes_with_overflows() {
+    // fn repeatedly_deallocating_nodes_with_overflows<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let mut btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new(mem.clone());
 
@@ -3000,7 +3007,7 @@ mod test {
     // }
     // btree_test!(test_, );
 
-    // fn deallocating_root_does_not_leak_memory() {
+    // fn deallocating_root_does_not_leak_memory<K: TestKey, V: TestValue>() {
     //     let mem = make_memory();
     //     let mut btree: BTreeMap<Vec<u8>, _, _> = BTreeMap::new(mem.clone());
 
