@@ -1286,8 +1286,8 @@ mod test {
     impl<T> TestKey for T where T: Storable + Ord + Clone + Make + std::fmt::Debug {}
 
     // Define a trait for values that need the full set of bounds.
-    trait TestValue: Storable + Make + std::fmt::Debug + PartialEq {}
-    impl<T> TestValue for T where T: Storable + Make + std::fmt::Debug + PartialEq {}
+    trait TestValue: Storable + Clone + Make + std::fmt::Debug + PartialEq {}
+    impl<T> TestValue for T where T: Storable + Clone + Make + std::fmt::Debug + PartialEq {}
 
     fn init_preserves_data<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
@@ -2095,91 +2095,67 @@ mod test {
     }
     btree_test!(test_many_insertions_descending, many_insertions_descending);
 
-    // #[test]
-    // fn pop_first_many_entries<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let mut std_btree = std::collections::BTreeMap::new();
-    //     let mut btree = BTreeMap::new(mem.clone());
+    fn pop_first_many_entries<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            let mut std_btree = std::collections::BTreeMap::<K, V>::new();
+            let n = 10_000;
+            for i in 0..n {
+                assert_eq!(btree.insert(key(i), value(i)), None);
+                assert_eq!(std_btree.insert(key(i), value(i)), None);
+            }
+            for i in 0..n {
+                assert_eq!(btree.get(&key(i)), Some(value(i)));
+                assert_eq!(std_btree.get(&key(i)), Some(&value(i)));
+            }
 
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(
-    //                 btree.insert(b(&[i, j]), b(&[i, j])),
-    //                 std_btree.insert(b(&[i, j]), b(&[i, j]))
-    //             );
-    //         }
-    //     }
+            let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
+            for _ in 0..n {
+                assert_eq!(btree.pop_first(), std_btree.pop_first());
+            }
+            for i in 0..n {
+                assert_eq!(btree.get(&key(i)), None);
+                assert_eq!(std_btree.get(&key(i)), None);
+            }
 
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.get(&b(&[i, j])), std_btree.get(&b(&[i, j])).cloned());
-    //         }
-    //     }
+            // We've deallocated everything.
+            assert!(btree.is_empty());
+            assert!(std_btree.is_empty());
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
+    }
+    btree_test!(test_pop_first_many_entries, pop_first_many_entries);
 
-    //     let mut btree = BTreeMap::load(mem);
+    fn pop_last_many_entries<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            let mut std_btree = std::collections::BTreeMap::<K, V>::new();
+            let n = 10_000;
+            for i in 0..n {
+                assert_eq!(btree.insert(key(i), value(i)), None);
+                assert_eq!(std_btree.insert(key(i), value(i)), None);
+            }
+            for i in 0..n {
+                assert_eq!(btree.get(&key(i)), Some(value(i)));
+                assert_eq!(std_btree.get(&key(i)), Some(&value(i)));
+            }
 
-    //     for _ in 0..=10 {
-    //         for _ in 0..=255 {
-    //             assert_eq!(btree.pop_first(), std_btree.pop_first());
-    //         }
-    //     }
+            let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
+            for _ in 0..n {
+                assert_eq!(btree.pop_last(), std_btree.pop_last());
+            }
+            for i in 0..n {
+                assert_eq!(btree.get(&key(i)), None);
+                assert_eq!(std_btree.get(&key(i)), None);
+            }
 
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.get(&b(&[i, j])), None);
-    //             assert_eq!(std_btree.get(&b(&[i, j])), None);
-    //         }
-    //     }
-
-    //     // We've deallocated everything.
-    //     assert!(std_btree.is_empty());
-    //     assert!(btree.is_empty());
-    //     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
-    // }
-    // btree_test!(test_, );
-
-    // #[test]
-    // fn pop_last_many_entries<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let mut std_btree = std::collections::BTreeMap::new();
-    //     let mut btree = BTreeMap::new(mem.clone());
-
-    //     for j in (0..=10).rev() {
-    //         for i in (0..=255).rev() {
-    //             assert_eq!(
-    //                 btree.insert(b(&[i, j]), b(&[i, j])),
-    //                 std_btree.insert(b(&[i, j]), b(&[i, j]))
-    //             );
-    //         }
-    //     }
-
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.get(&b(&[i, j])), std_btree.get(&b(&[i, j])).cloned());
-    //         }
-    //     }
-
-    //     let mut btree = BTreeMap::load(mem);
-
-    //     for _ in (0..=10).rev() {
-    //         for _ in (0..=255).rev() {
-    //             assert_eq!(btree.pop_last(), std_btree.pop_last());
-    //         }
-    //     }
-
-    //     for j in 0..=10 {
-    //         for i in 0..=255 {
-    //             assert_eq!(btree.get(&b(&[i, j])), None);
-    //             assert_eq!(std_btree.get(&b(&[i, j])), None);
-    //         }
-    //     }
-
-    //     // We've deallocated everything.
-    //     assert!(std_btree.is_empty());
-    //     assert!(btree.is_empty());
-    //     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
-    // }
-    // btree_test!(test_, );
+            // We've deallocated everything.
+            assert!(btree.is_empty());
+            assert!(std_btree.is_empty());
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
+    }
+    btree_test!(test_pop_last_many_entries, pop_last_many_entries);
 
     // #[test]
     // fn reloading<K: TestKey, V: TestValue>() {
