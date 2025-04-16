@@ -1185,6 +1185,22 @@ mod test {
         Blob::<10>::try_from(&make_buffer::<10>(i)[..]).unwrap()
     }
 
+    /// Encodes an object into a byte vector.
+    fn encode<T>(object: T) -> Vec<u8>
+    where
+        T: Storable,
+    {
+        object.to_bytes_checked().into_owned()
+    }
+
+    /// Decodes a byte vector into an object.
+    fn decode<T>(bytes: Vec<u8>) -> T
+    where
+        T: Storable,
+    {
+        T::from_bytes(Cow::Owned(bytes))
+    }
+
     /// A helper method to succinctly create an entry.
     fn e(x: u8) -> (Blob<10>, Vec<u8>) {
         (b(&[x]), vec![])
@@ -1274,10 +1290,7 @@ mod test {
 
             let root = btree.load_node(btree.root_addr);
             assert_eq!(root.node_type(), NodeType::Internal);
-            assert_eq!(
-                root.entries(btree.memory()),
-                vec![(k(6), v(0).as_slice().to_vec())]
-            );
+            assert_eq!(root.entries(btree.memory()), vec![(k(6), encode(v(0)))]);
             assert_eq!(root.children_len(), 2);
 
             // The right child should now be full, with the median key being "12"
