@@ -2220,9 +2220,9 @@ mod test {
             btree.insert(key(24), value(1_200));
 
             // The result should look like this:
-            //                [12]
-            //               /   \
-            // [1, 2, 3, 4, 11]   [13, 14, 21, 22, 23, 24]
+            //                 [12]
+            //                /    \
+            // [1, 2, 3, 4, 11]    [13, 14, 21, 22, 23, 24]
 
             let root = btree.load_node(btree.root_addr);
             assert_eq!(root.node_type(), NodeType::Internal);
@@ -2291,11 +2291,11 @@ mod test {
             btree.insert(key(29), value(1800));
 
             // The result should look like this:
-            //                  [14, 23]
-            //                 /    |   \
-            // [1, 2, 3, 4, 12]     |    [24, 25, 26, 27, 28, 29]
-            //                      |
-            //              [16, 18, 19, 21, 22]
+            //                 [14, 23]
+            //                /    |   \
+            // [1, 2, 3, 4, 12]    |   [24, 25, 26, 27, 28, 29]
+            //                     |
+            //           [16, 18, 19, 21, 22]
             let root = btree.load_node(btree.root_addr);
             assert_eq!(root.node_type(), NodeType::Internal);
             assert_eq!(
@@ -2444,9 +2444,9 @@ mod test {
             btree.insert(key(24), value(1200));
 
             // The result should look like this:
-            //                  [12]
-            //                 /    \
-            // [1, 2, 3, 4, 11]      [13, 14, 21, 22, 23, 24]
+            //                 [12]
+            //                /    \
+            // [1, 2, 3, 4, 11]    [13, 14, 21, 22, 23, 24]
 
             let root = btree.load_node(btree.root_addr);
             assert_eq!(root.node_type(), NodeType::Internal);
@@ -2504,11 +2504,11 @@ mod test {
             btree.insert(key(29), value(0));
 
             // The result should look like this:
-            //                  [14, 23]
-            //                 /    |   \
-            // [1, 2, 3, 4, 12]     |    [24, 25, 26, 27, 28, 29]
-            //                      |
-            //            [16, 18, 19, 21, 22]
+            //                 [14, 23]
+            //                /    |   \
+            // [1, 2, 3, 4, 12]    |   [24, 25, 26, 27, 28, 29]
+            //                     |
+            //           [16, 18, 19, 21, 22]
             let root = btree.load_node(btree.root_addr);
             assert_eq!(root.node_type(), NodeType::Internal);
             assert_eq!(
