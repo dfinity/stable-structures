@@ -1326,12 +1326,13 @@ mod test {
 
     fn insert_get_multiple_entries<K: TestKey, V: TestValue>() {
         run_btree_test(|mut btree| {
-            assert_eq!(btree.insert(K::make(1), V::make(10)), None);
-            assert_eq!(btree.insert(K::make(2), V::make(20)), None);
-            assert_eq!(btree.insert(K::default(), V::make(30)), None);
-            assert_eq!(btree.get(&K::make(1)), Some(V::make(10)));
-            assert_eq!(btree.get(&K::make(2)), Some(V::make(20)));
-            assert_eq!(btree.get(&K::default()), Some(V::make(30)));
+            let n = 10_000;
+            for i in 0..n {
+                assert_eq!(btree.insert(K::make(i), V::make(10 * i)), None);
+            }
+            for i in 0..n {
+                assert_eq!(btree.get(&K::make(i)), Some(V::make(10 * i)));
+            }
         });
     }
 
@@ -1412,42 +1413,44 @@ mod test {
         insert_overwrite_key_in_full_root_node
     );
 
-    // #[test]
-    // fn allocations() {
-    //     run_btree_test(|mut btree| {
-    //         // Insert entries until the root node is full.
-    //         let mut i = 0;
-    //         loop {
-    //             assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-    //             let root = btree.load_node(btree.root_addr);
-    //             if root.is_full() {
-    //                 break;
-    //             }
-    //             i += 1;
-    //         }
+    fn allocations<K: TestKey, V: TestValue>() {
+        run_btree_test(|mut btree| {
+            // Insert entries until the root node is full.
+            let mut i = 0;
+            loop {
+                assert_eq!(btree.insert(K::make(i), V::default()), None);
+                let root = btree.load_node(btree.root_addr);
+                if root.is_full() {
+                    break;
+                }
+                i += 1;
+            }
 
-    //         // Only need a single allocation to store up to `CAPACITY` elements.
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+            // Only need a single allocation to store up to `CAPACITY` elements.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
 
-    //         assert_eq!(btree.insert(b(&[255]), b(&[])), None);
+            assert_eq!(btree.insert(K::make(255), V::default()), None);
 
-    //         // The node had to be split into three nodes.
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
-    //     });
-    // }
+            // The node had to be split into three nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+        });
+    }
 
-    // #[test]
-    // fn allocations_2() {
-    //     run_btree_test(|mut btree| {
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    btree_test!(test_allocations, allocations);
 
-    //         assert_eq!(btree.insert(b(&[]), b(&[])), None);
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+    fn allocations_2<K: TestKey, V: TestValue>() {
+        run_btree_test(|mut btree| {
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
-    //         assert_eq!(btree.remove(&b(&[])), Some(b(&[])));
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
-    //     });
-    // }
+            assert_eq!(btree.insert(K::make(1), V::make(20)), None);
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+
+            assert_eq!(btree.remove(&K::make(1)), Some(V::make(20)));
+            assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        });
+    }
+
+    btree_test!(test_allocations_2, allocations_2);
 
     // #[test]
     // fn pop_last_single_entry() {
