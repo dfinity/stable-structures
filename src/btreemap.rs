@@ -2589,130 +2589,127 @@ mod test {
         range_various_prefixes_with_offset_2
     );
 
-    // #[should_panic(expected = "max_key_size must be <= 4")]
-    // fn v1_rejects_increases_in_max_key_size<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init_v1(mem);
-    //     let _btree: BTreeMap<Blob<5>, Blob<3>, _> = BTreeMap::init_v1(btree.into_memory());
-    // }
-    // btree_test!(test_, );
+    #[test]
+    #[should_panic(expected = "max_key_size must be <= 4")]
+    fn v1_rejects_increases_in_max_key_size() {
+        let mem = make_memory();
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init_v1(mem);
+        let _btree: BTreeMap<Blob<5>, Blob<3>, _> = BTreeMap::init_v1(btree.into_memory());
+    }
 
-    // fn v2_handles_increases_in_max_key_size_and_max_value_size<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init(mem);
-    //     btree.insert(
-    //         [1u8; 4].as_slice().try_into().unwrap(),
-    //         [1u8; 4].as_slice().try_into().unwrap(),
-    //     );
+    #[test]
+    fn v2_handles_increases_in_max_key_size_and_max_value_size() {
+        let mem = make_memory();
+        let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init(mem);
+        btree.insert(
+            [1u8; 4].as_slice().try_into().unwrap(),
+            [1u8; 4].as_slice().try_into().unwrap(),
+        );
 
-    //     // Reinitialize the BTree with larger keys and value sizes.
-    //     let mut btree: BTreeMap<Blob<5>, Blob<5>, _> = BTreeMap::init(btree.into_memory());
-    //     btree.insert(
-    //         [2u8; 5].as_slice().try_into().unwrap(),
-    //         [2u8; 5].as_slice().try_into().unwrap(),
-    //     );
+        // Reinitialize the BTree with larger keys and value sizes.
+        let mut btree: BTreeMap<Blob<5>, Blob<5>, _> = BTreeMap::init(btree.into_memory());
+        btree.insert(
+            [2u8; 5].as_slice().try_into().unwrap(),
+            [2u8; 5].as_slice().try_into().unwrap(),
+        );
 
-    //     // Still able to retrieve all the entries inserted.
-    //     assert_eq!(
-    //         btree.get(&([1u8; 4].as_slice().try_into().unwrap())),
-    //         Some([1u8; 4].as_slice().try_into().unwrap())
-    //     );
+        // Still able to retrieve all the entries inserted.
+        assert_eq!(
+            btree.get(&([1u8; 4].as_slice().try_into().unwrap())),
+            Some([1u8; 4].as_slice().try_into().unwrap())
+        );
 
-    //     assert_eq!(
-    //         btree.get(&([2u8; 5].as_slice().try_into().unwrap())),
-    //         Some([2u8; 5].as_slice().try_into().unwrap())
-    //     );
-    // }
-    // btree_test!(test_, );
+        assert_eq!(
+            btree.get(&([2u8; 5].as_slice().try_into().unwrap())),
+            Some([2u8; 5].as_slice().try_into().unwrap())
+        );
+    }
 
-    // fn accepts_small_or_equal_key_sizes<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
-    //     // Smaller key size
-    //     let btree: BTreeMap<Blob<3>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
-    //     // Equal key size
-    //     let _btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
-    // }
-    // btree_test!(test_, );
+    #[test]
+    fn accepts_small_or_equal_key_sizes() {
+        let mem = make_memory();
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
+        // Smaller key size
+        let btree: BTreeMap<Blob<3>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
+        // Equal key size
+        let _btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
+    }
 
-    // #[should_panic(expected = "max_value_size must be <= 3")]
-    // fn v1_rejects_larger_value_sizes<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init_v1(mem);
-    //     let _btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init_v1(btree.into_memory());
-    // }
-    // btree_test!(test_, );
+    #[test]
+    #[should_panic(expected = "max_value_size must be <= 3")]
+    fn v1_rejects_larger_value_sizes() {
+        let mem = make_memory();
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init_v1(mem);
+        let _btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::init_v1(btree.into_memory());
+    }
 
-    // fn accepts_small_or_equal_value_sizes<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
-    //     // Smaller key size
-    //     let btree: BTreeMap<Blob<4>, Blob<2>, _> = BTreeMap::init(btree.into_memory());
-    //     // Equal key size
-    //     let _btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
-    // }
-    // btree_test!(test_, );
+    #[test]
+    fn accepts_small_or_equal_value_sizes() {
+        let mem = make_memory();
+        let btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(mem);
+        // Smaller key size
+        let btree: BTreeMap<Blob<4>, Blob<2>, _> = BTreeMap::init(btree.into_memory());
+        // Equal key size
+        let _btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
+    }
 
-    // fn bruteforce_range_search<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut stable_map| {
-    //         use std::collections::BTreeMap;
-    //         const NKEYS: u64 = 60;
-    //         let mut std_map = BTreeMap::new();
+    fn bruteforce_range_search<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
 
-    //         for k in 0..NKEYS {
-    //             std_map.insert(k, k);
-    //             stable_map.insert(k, k);
-    //         }
+        fn collect_kv<'a, K: Clone + 'a, V: Clone + 'a>(
+            iter: impl Iterator<Item = (&'a K, &'a V)>,
+        ) -> Vec<(K, V)> {
+            iter.map(|(k, v)| (k.clone(), v.clone())).collect()
+        }
 
-    //         assert_eq!(
-    //             std_map.range(..).map(|(k, v)| (*k, *v)).collect::<Vec<_>>(),
-    //             stable_map.range(..).collect::<Vec<_>>()
-    //         );
+        fn collect<K: Clone, V: Clone>(it: impl Iterator<Item = (K, V)>) -> Vec<(K, V)> {
+            it.collect()
+        }
 
-    //         for l in 0..=NKEYS {
-    //             assert_eq!(
-    //                 std_map
-    //                     .range(l..)
-    //                     .map(|(k, v)| (*k, *v))
-    //                     .collect::<Vec<_>>(),
-    //                 stable_map.range(l..).collect::<Vec<_>>()
-    //             );
+        run_btree_test(|mut stable_map| {
+            use std::collections::BTreeMap;
+            const NKEYS: u32 = 60;
+            let mut std_map = BTreeMap::new();
 
-    //             assert_eq!(
-    //                 std_map
-    //                     .range(..l)
-    //                     .map(|(k, v)| (*k, *v))
-    //                     .collect::<Vec<_>>(),
-    //                 stable_map.range(..l).collect::<Vec<_>>()
-    //             );
+            for i in 0..NKEYS {
+                std_map.insert(key(i), value(i));
+                stable_map.insert(key(i), value(i));
+            }
 
-    //             assert_eq!(
-    //                 std_map
-    //                     .range(..=l)
-    //                     .map(|(k, v)| (*k, *v))
-    //                     .collect::<Vec<_>>(),
-    //                 stable_map.range(..=l).collect::<Vec<_>>()
-    //             );
+            assert_eq!(collect_kv(std_map.range(..)), collect(stable_map.range(..)));
 
-    //             for r in l + 1..=NKEYS {
-    //                 for lbound in [Bound::Included(l), Bound::Excluded(l)] {
-    //                     for rbound in [Bound::Included(r), Bound::Excluded(r)] {
-    //                         let range = (lbound, rbound);
-    //                         assert_eq!(
-    //                             std_map
-    //                                 .range(range)
-    //                                 .map(|(k, v)| (*k, *v))
-    //                                 .collect::<Vec<_>>(),
-    //                             stable_map.range(range).collect::<Vec<_>>(),
-    //                             "range: {range:?}"
-    //                         );
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     });
-    // }
-    // btree_test!(test_, );
+            for l in 0..=NKEYS {
+                assert_eq!(
+                    collect_kv(std_map.range(key(l)..)),
+                    collect(stable_map.range(key(l)..))
+                );
+
+                assert_eq!(
+                    collect_kv(std_map.range(..key(l))),
+                    collect(stable_map.range(..key(l)))
+                );
+
+                assert_eq!(
+                    collect_kv(std_map.range(..=key(l))),
+                    collect(stable_map.range(..=key(l)))
+                );
+
+                for r in l + 1..=NKEYS {
+                    for lbound in [Bound::Included(key(l)), Bound::Excluded(key(l))] {
+                        for rbound in [Bound::Included(key(r)), Bound::Excluded(key(r))] {
+                            let range = (lbound.clone(), rbound);
+                            assert_eq!(
+                                collect_kv(std_map.range(range.clone())),
+                                collect(stable_map.range(range.clone())),
+                                "range: {range:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        });
+    }
+    btree_test!(test_bruteforce_range_search, bruteforce_range_search);
 
     // fn test_iter_upper_bound<K: TestKey, V: TestValue>() {
     //     run_btree_test(|mut btree| {
