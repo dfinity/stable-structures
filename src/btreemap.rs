@@ -1248,7 +1248,7 @@ mod test {
     }
 
     #[test]
-    fn insert_and_get() {
+    fn insert_get() {
         run_btree_test(|mut btree| {
             assert_eq!(btree.insert(k(1), v(20)), None);
             assert_eq!(btree.get(&k(1)), Some(v(20)));
