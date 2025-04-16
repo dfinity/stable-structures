@@ -2043,6 +2043,7 @@ mod test {
             for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
             }
+            assert_eq!(btree.len(), n as u64);
 
             let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
             for i in 0..n {
@@ -2068,6 +2069,7 @@ mod test {
             for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
             }
+            assert_eq!(btree.len(), n as u64);
 
             let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
             for i in (0..n).rev() {
@@ -2082,99 +2084,56 @@ mod test {
     }
     btree_test!(test_pop_last_many, pop_last_many);
 
-    // #[test]
-    // fn reloading<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         // The btree is initially empty.
-    //         assert_eq!(btree.len(), 0);
-    //         assert!(btree.is_empty());
+    fn reloading<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            let n = 1_000;
+            for i in 0..n {
+                assert_eq!(btree.insert(key(i), value(i)), None);
+                assert_eq!(btree.get(&key(i)), Some(value(i)));
+            }
+            assert_eq!(btree.len(), n as u64);
 
-    //         // Add an entry into the btree.
-    //         assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-    //         assert_eq!(btree.len(), 1);
-    //         assert!(!btree.is_empty());
+            // Reload the BTreeMap and verify the entry.
+            let mut btree = BTreeMap::<K, V, VectorMemory>::load(btree.into_memory());
+            assert_eq!(btree.len(), n as u64);
+            for i in 0..n {
+                assert_eq!(btree.get(&key(i)), Some(value(i)));
+            }
 
-    //         // Reload the btree. The element should still be there, and `len()`
-    //         // should still be `1`.
-    //         let btree = BTreeMap::load(btree.into_memory());
-    //         assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
-    //         assert_eq!(btree.len(), 1);
-    //         assert!(!btree.is_empty());
+            // Remove all entries and verify the entry.
+            for i in 0..n {
+                assert_eq!(btree.remove(&key(i)), Some(value(i)));
+            }
+            assert_eq!(btree.len(), 0);
 
-    //         // Remove an element. Length should be zero.
-    //         let mut btree = BTreeMap::load(btree.into_memory());
-    //         assert_eq!(btree.remove(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
-    //         assert_eq!(btree.len(), 0);
-    //         assert!(btree.is_empty());
+            // Reload the BTreeMap and verify the entry.
+            let btree = BTreeMap::<K, V, VectorMemory>::load(btree.into_memory());
+            assert_eq!(btree.len(), 0);
+        });
+    }
+    btree_test!(test_reloading, reloading);
 
-    //         // Reload. Btree should still be empty.
-    //         let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(btree.into_memory());
-    //         assert_eq!(btree.get(&b(&[1, 2, 3])), None);
-    //         assert_eq!(btree.len(), 0);
-    //         assert!(btree.is_empty());
-    //     });
-    // }
-    // btree_test!(test_, );
+    fn len<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            let n = 1_000;
+            for i in 0..n {
+                assert_eq!(btree.insert(key(i), value(i)), None);
+            }
 
-    // #[test]
-    // fn len<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 0..1000u32 {
-    //             assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
-    //         }
+            assert_eq!(btree.len(), n as u64);
+            assert!(!btree.is_empty());
 
-    //         assert_eq!(btree.len(), 1000);
-    //         assert!(!btree.is_empty());
+            for i in 0..n {
+                assert_eq!(btree.remove(&key(i)), Some(value(i)));
+            }
 
-    //         for i in 0..1000u32 {
-    //             assert_eq!(btree.remove(&b(&i.to_le_bytes())), Some(b(&[])));
-    //         }
-
-    //         assert_eq!(btree.len(), 0);
-    //         assert!(btree.is_empty());
-    //     });
-    // }
-    // btree_test!(test_, );
-
-    // #[test]
-    // fn pop_first_len<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 0..1000u32 {
-    //             assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
-    //         }
-
-    //         assert_eq!(btree.len(), 1000);
-    //         assert!(!btree.is_empty());
-
-    //         for i in 0..1000u32 {
-    //             assert_eq!(btree.pop_first().unwrap().1, b(&i.to_le_bytes()));
-    //         }
-
-    //         assert_eq!(btree.len(), 0);
-    //         assert!(btree.is_empty());
-    //     });
-    // }
-    // btree_test!(test_, );
-
-    // #[test]
-    // fn pop_last_len<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 0..1000u32 {
-    //             assert_eq!(btree.insert(i, b(&i.to_le_bytes())), None);
-    //         }
-
-    //         assert_eq!(btree.len(), 1000);
-    //         assert!(!btree.is_empty());
-
-    //         for i in (0..1000u32).rev() {
-    //             assert_eq!(btree.pop_last().unwrap().1, b(&i.to_le_bytes()));
-    //         }
-
-    //         assert_eq!(btree.len(), 0);
-    //         assert!(btree.is_empty());
-    //     });
-    // }
-    // btree_test!(test_, );
+            assert_eq!(btree.len(), 0);
+            assert!(btree.is_empty());
+        });
+    }
+    btree_test!(test_len, len);
 
     // #[test]
     // fn contains_key<K: TestKey, V: TestValue>() {
