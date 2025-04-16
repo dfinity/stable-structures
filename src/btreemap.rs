@@ -1383,28 +1383,32 @@ mod test {
         insert_overwrite_median_key_in_full_child_node
     );
 
-    // #[test]
-    // fn insert_overwrite_key_in_full_root_node() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 1..=11 {
-    //             assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-    //         }
+    fn insert_overwrite_key_in_full_root_node<K: TestKey, V: TestValue>() {
+        run_btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(K::make(i), V::default()), None);
+            }
 
-    //         // We now have a root that is full and looks like this:
-    //         //
-    //         // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert!(root.is_full());
+            // We now have a root that is full and looks like this:
+            //
+            // [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+            let root = btree.load_node(btree.root_addr);
+            assert!(root.is_full());
 
-    //         // Overwrite an element in the root. It should NOT cause the node to be split.
-    //         assert_eq!(btree.insert(b(&[6]), b(&[4, 5, 6])), Some(b(&[])));
+            // Overwrite an element in the root. It should NOT cause the node to be split.
+            assert_eq!(btree.insert(K::make(6), V::make(456)), Some(V::default()));
 
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Leaf);
-    //         assert_eq!(btree.get(&b(&[6])), Some(b(&[4, 5, 6])));
-    //         assert_eq!(root.entries_len(), 11);
-    //     });
-    // }
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Leaf);
+            assert_eq!(btree.get(&K::make(6)), Some(V::make(456)));
+            assert_eq!(root.entries_len(), 11);
+        });
+    }
+
+    btree_test!(
+        test_insert_overwrite_key_in_full_root_node,
+        insert_overwrite_key_in_full_root_node
+    );
 
     // #[test]
     // fn allocations() {
