@@ -1165,7 +1165,7 @@ mod test {
     use std::rc::Rc;
 
     /// Returns a fixed‑size buffer for the given u32.
-    fn make_buffer<const N: usize>(i: u32) -> [u8; N] {
+    fn make_monotonic_buffer<const N: usize>(i: u32) -> [u8; N] {
         let mut buf = [0u8; N];
         let bytes = i.to_be_bytes();
         buf[N - bytes.len()..].copy_from_slice(&bytes);
@@ -1189,7 +1189,7 @@ mod test {
 
     impl<const N: usize> Make for Blob<N> {
         fn make(i: u32) -> Self {
-            Blob::try_from(&make_buffer::<N>(i)[..]).unwrap()
+            Blob::try_from(&make_monotonic_buffer::<N>(i)[..]).unwrap()
         }
         fn empty() -> Self {
             let x: &[u8] = &[];
