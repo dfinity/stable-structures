@@ -1298,7 +1298,7 @@ mod test {
 
     fn insert_get<K, V>()
     where
-        K: Storable + Ord + Clone + Make,
+        K: Storable + Ord + Clone + Make + std::fmt::Debug,
         V: Storable + Make + std::fmt::Debug + PartialEq,
     {
         run_btree_test(|mut btree| {
@@ -1311,7 +1311,7 @@ mod test {
 
     fn insert_overwrites_previous_value<K, V>()
     where
-        K: Storable + Ord + Clone + Make,
+        K: Storable + Ord + Clone + Make + std::fmt::Debug,
         V: Storable + Make + std::fmt::Debug + PartialEq,
     {
         run_btree_test(|mut btree| {
@@ -1328,7 +1328,7 @@ mod test {
 
     fn insert_get_multiple_entries<K, V>()
     where
-        K: Storable + Ord + Clone + Make,
+        K: Storable + Ord + Clone + Make + std::fmt::Debug,
         V: Storable + Make + std::fmt::Debug + PartialEq,
     {
         run_btree_test(|mut btree| {
@@ -1346,40 +1346,54 @@ mod test {
         insert_get_multiple_entries
     );
 
-    // #[test]
-    // fn insert_overwrite_median_key_in_full_child_node() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 1..=17 {
-    //             assert_eq!(btree.insert(K::make(i), V::make(0)), None);
-    //         }
+    fn insert_overwrite_median_key_in_full_child_node<K, V>()
+    where
+        K: Storable + Ord + Clone + Make + std::fmt::Debug,
+        V: Storable + Make + std::fmt::Debug + PartialEq,
+    {
+        run_btree_test(|mut btree| {
+            for i in 1..=17 {
+                assert_eq!(btree.insert(K::make(i), V::default()), None);
+            }
 
-    //         // The result should look like this:
-    //         //                [6]
-    //         //               /   \
-    //         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, (12), 13, 14, 15, 16, 17]
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, (12), 13, 14, 15, 16, 17]
 
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Internal);
-    //         assert_eq!(root.entries(btree.memory()), vec![(K::make(6), encode(V::make(0)))]);
-    //         assert_eq!(root.children_len(), 2);
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![(K::make(6), encode(V::default()))]
+            );
+            assert_eq!(root.children_len(), 2);
 
-    //         // The right child should now be full, with the median key being "12"
-    //         let right_child = btree.load_node(root.child(1));
-    //         assert!(right_child.is_full());
-    //         let median_index = right_child.entries_len() / 2;
-    //         let expected_median_key = K::make(12);
-    //         assert_eq!(right_child.key(median_index), &expected_median_key);
+            // The right child should now be full, with the median key being "12"
+            let right_child = btree.load_node(root.child(1));
+            assert!(right_child.is_full());
+            let median_index = right_child.entries_len() / 2;
+            let expected_median_key = K::make(12);
+            assert_eq!(right_child.key(median_index), &expected_median_key);
 
-    //         // Overwrite the value of the median key.
-    //         assert_eq!(btree.insert(expected_median_key, V::make(100)), Some(V::make(0)));
-    //         assert_eq!(btree.get(&expected_median_key), Some(V::make(100)));
+            // Overwrite the value of the median key.
+            assert_eq!(
+                btree.insert(expected_median_key.clone(), V::make(123)),
+                Some(V::default())
+            );
+            assert_eq!(btree.get(&expected_median_key), Some(V::make(123)));
 
-    //         // The child has not been split and is still full.
-    //         let right_child = btree.load_node(root.child(1));
-    //         assert_eq!(right_child.node_type(), NodeType::Leaf);
-    //         assert!(right_child.is_full());
-    //     });
-    // }
+            // The child has not been split and is still full.
+            let right_child = btree.load_node(root.child(1));
+            assert_eq!(right_child.node_type(), NodeType::Leaf);
+            assert!(right_child.is_full());
+        });
+    }
+
+    btree_test!(
+        test_insert_overwrite_median_key_in_full_child_node,
+        insert_overwrite_median_key_in_full_child_node
+    );
 
     // #[test]
     // fn insert_overwrite_key_in_full_root_node() {
