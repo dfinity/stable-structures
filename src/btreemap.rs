@@ -1166,11 +1166,6 @@ mod test {
     use std::convert::TryFrom;
     use std::rc::Rc;
 
-    /// Creates a new shared memory instance.
-    pub(crate) fn make_memory() -> Rc<RefCell<Vec<u8>>> {
-        Rc::new(RefCell::new(Vec::new()))
-    }
-
     /// Returns a fixed‑size buffer for the given u32.
     fn make_buffer<const N: usize>(i: u32) -> [u8; N] {
         let mut buf = [0u8; N];
@@ -1234,6 +1229,11 @@ mod test {
         for i in 0..10 {
             assert!(T::make(i) < T::make(i + 1));
         }
+    }
+
+    /// Creates a new shared memory instance.
+    pub(crate) fn make_memory() -> Rc<RefCell<Vec<u8>>> {
+        Rc::new(RefCell::new(Vec::new()))
     }
 
     /// A test runner that runs the test using V1, migrated V2, and direct V2.
@@ -1522,15 +1522,14 @@ mod test {
     btree_test!(test_insert_split_node, insert_split_node);
 
     fn insert_split_multiple_nodes<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
-        let e = |i: u32| (key(i), encode(value(0)));
-
+        let key = |i| K::make(i);
+        let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
-                assert_eq!(btree.insert(key(i), value(0)), None);
+                assert_eq!(btree.insert(key(i), V::empty()), None);
             }
             // Should now split a node.
-            assert_eq!(btree.insert(key(12), value(0)), None);
+            assert_eq!(btree.insert(key(12), V::empty()), None);
 
             // The result should look like this:
             //                [6]
@@ -1557,20 +1556,20 @@ mod test {
             );
 
             for i in 1..=12 {
-                assert_eq!(btree.get(&key(i)), Some(value(0)));
+                assert_eq!(btree.get(&key(i)), Some(V::empty()));
             }
 
             // Insert more to cause more splitting.
-            assert_eq!(btree.insert(key(13), value(0)), None);
-            assert_eq!(btree.insert(key(14), value(0)), None);
-            assert_eq!(btree.insert(key(15), value(0)), None);
-            assert_eq!(btree.insert(key(16), value(0)), None);
-            assert_eq!(btree.insert(key(17), value(0)), None);
+            assert_eq!(btree.insert(key(13), V::empty()), None);
+            assert_eq!(btree.insert(key(14), V::empty()), None);
+            assert_eq!(btree.insert(key(15), V::empty()), None);
+            assert_eq!(btree.insert(key(16), V::empty()), None);
+            assert_eq!(btree.insert(key(17), V::empty()), None);
             // Should cause another split
-            assert_eq!(btree.insert(key(18), value(0)), None);
+            assert_eq!(btree.insert(key(18), V::empty()), None);
 
             for i in 1..=18 {
-                assert_eq!(btree.get(&key(i)), Some(value(0)));
+                assert_eq!(btree.get(&key(i)), Some(V::empty()));
             }
 
             let root = btree.load_node(btree.root_addr);
@@ -1598,6 +1597,8 @@ mod test {
                 child_2.entries(btree.memory()),
                 vec![e(13), e(14), e(15), e(16), e(17), e(18)]
             );
+
+            assert_eq!(btree.allocator.num_allocated_chunks(), 4);
         });
     }
     btree_test!(
@@ -1667,9 +1668,8 @@ mod test {
     );
 
     fn remove_case_2a_and_2c<K: TestKey, V: TestValue>() {
-        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let key = |i| K::make(i);
         let e = |i: u32| (key(i), encode(V::empty()));
-
         run_btree_test(|mut btree| {
             for i in 1..=11 {
                 assert_eq!(btree.insert(key(i), V::empty()), None);
@@ -1736,7 +1736,7 @@ mod test {
     btree_test!(test_remove_case_2a_and_2c, remove_case_2a_and_2c);
 
     fn remove_case_2b<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let key = |i| K::make(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1809,7 +1809,7 @@ mod test {
     btree_test!(test_remove_case_2b, remove_case_2b);
 
     fn remove_case_3a_right<K: TestKey, V: TestValue>() {
-        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let key = |i| K::make(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1857,7 +1857,7 @@ mod test {
     btree_test!(test_remove_case_3a_right, remove_case_3a_right);
 
     fn remove_case_3a_left<K: TestKey, V: TestValue>() {
-        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let key = |i| K::make(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1904,7 +1904,7 @@ mod test {
     btree_test!(test_remove_case_3a_left, remove_case_3a_left);
 
     fn remove_case_3b_merge_into_right<K: TestKey, V: TestValue>() {
-        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let key = |i| K::make(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1987,9 +1987,8 @@ mod test {
     );
 
     fn remove_case_3b_merge_into_left<K: TestKey, V: TestValue>() {
-        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let key = |i| K::make(i);
         let e = |i: u32| (key(i), encode(V::empty()));
-
         run_btree_test(|mut btree| {
             for i in 1..=11 {
                 assert_eq!(btree.insert(key(i), V::empty()), None);
