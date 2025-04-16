@@ -1197,10 +1197,6 @@ mod test {
         }
     }
 
-    fn make<T: Make>(i: u32) -> T {
-        T::make(i)
-    }
-
     /// Encodes an object into a byte vector.
     fn encode<T: Storable>(object: T) -> Vec<u8> {
         object.to_bytes_checked().into_owned()
@@ -1266,14 +1262,15 @@ mod test {
 
     /// Macro to apply a test function to a predefined grid of key/value types.
     macro_rules! btree_test {
-        ($runner_fn:ident) => {{
-            //             (Key, Value, Test function).
-            verify_and_run!(u32, Blob<20>, $runner_fn);
-            verify_and_run!(Blob<10>, Blob<20>, $runner_fn);
-        }};
+        ($name:ident, $runner_fn:ident) => {
+            #[test]
+            fn $name() {
+                verify_and_run!(u32, Blob<20>, $runner_fn);
+                verify_and_run!(Blob<10>, Blob<20>, $runner_fn);
+            }
+        };
     }
 
-    /// Test that data is preserved after reloading the BTreeMap.
     fn init_preserves_data<K, V>()
     where
         K: Storable + Ord + Clone + Make,
@@ -1289,65 +1286,47 @@ mod test {
         });
     }
 
-    #[test]
-    fn test_init_preserves_data() {
-        btree_test!(init_preserves_data);
+    btree_test!(test_init_preserves_data, init_preserves_data);
+
+    fn insert_get<K, V>()
+    where
+        K: Storable + Ord + Clone + Make,
+        V: Storable + Make + std::fmt::Debug + PartialEq,
+    {
+        run_btree_test(|mut btree| {
+            assert_eq!(btree.insert(K::make(1), V::make(20)), None);
+            assert_eq!(btree.get(&K::make(1)), Some(V::make(20)));
+        });
     }
 
-    // /// Test that data is preserved after reloading the BTreeMap.
-    // fn init_preserves_data<K, V>()
-    // where
-    //     K: Storable + Ord + Clone + Make,
-    //     V: Storable + Make + std::fmt::Debug + PartialEq,
-    // {
-    //     run_btree_test(|mut btree| {
-    //         assert_eq!(btree.insert(make::<K>(1), make::<V>(20)), None);
-    //         assert_eq!(btree.get(&make::<K>(1)), Some(make::<V>(20)));
+    btree_test!(test_insert_get, insert_get);
 
-    //         // Reload the btree, verify the entry remains.
-    //         let btree = BTreeMap::<K, V, VectorMemory>::init(btree.into_memory());
-    //         assert_eq!(btree.get(&make::<K>(1)), Some(make::<V>(20)));
-    //     });
-    // }
+    fn insert_overwrites_previous_value<K, V>()
+    where
+        K: Storable + Ord + Clone + Make,
+        V: Storable + Make + std::fmt::Debug + PartialEq,
+    {
+        run_btree_test(|mut btree| {
+            assert_eq!(btree.insert(K::make(1), V::make(20)), None);
+            assert_eq!(btree.insert(K::make(1), V::make(30)), Some(V::make(20)));
+            assert_eq!(btree.get(&K::make(1)), Some(V::make(30)));
+        });
+    }
 
-    // #[test]
-    // fn test_init_preserves_data() {
-    //     run_btree_test(|mut btree| {
-    //         assert_eq!(btree.insert(k(1), v(20)), None);
-    //         assert_eq!(btree.get(&k(1)), Some(v(20)));
-
-    //         // Reload the btree, verify data still exists.
-    //         let btree = BTreeMap::init(btree.into_memory());
-    //         assert_eq!(btree.get(&k(1)), Some(v(20)));
-    //     });
-    // }
-
-    // #[test]
-    // fn insert_get() {
-    //     run_btree_test(|mut btree| {
-    //         assert_eq!(btree.insert(k(1), v(20)), None);
-    //         assert_eq!(btree.get(&k(1)), Some(v(20)));
-    //     });
-    // }
-
-    // #[test]
-    // fn insert_overwrites_previous_value() {
-    //     run_btree_test(|mut btree| {
-    //         assert_eq!(btree.insert(k(1), v(20)), None);
-    //         assert_eq!(btree.insert(k(1), v(30)), Some(v(20)));
-    //         assert_eq!(btree.get(&k(1)), Some(v(30)));
-    //     });
-    // }
+    btree_test!(
+        test_insert_overwrites_previous_value,
+        insert_overwrites_previous_value
+    );
 
     // #[test]
     // fn insert_get_multiple_entries() {
     //     run_btree_test(|mut btree| {
-    //         assert_eq!(btree.insert(k(1), v(10)), None);
-    //         assert_eq!(btree.insert(k(2), v(20)), None);
-    //         assert_eq!(btree.insert(b(&[]), v(30)), None);
-    //         assert_eq!(btree.get(&k(1)), Some(v(10)));
-    //         assert_eq!(btree.get(&k(2)), Some(v(20)));
-    //         assert_eq!(btree.get(&b(&[])), Some(v(30)));
+    //         assert_eq!(btree.insert(K::make(1), V::make(10)), None);
+    //         assert_eq!(btree.insert(K::make(2), V::make(20)), None);
+    //         assert_eq!(btree.insert(b(&[]), V::make(30)), None);
+    //         assert_eq!(btree.get(&K::make(1)), Some(V::make(10)));
+    //         assert_eq!(btree.get(&K::make(2)), Some(V::make(20)));
+    //         assert_eq!(btree.get(&b(&[])), Some(V::make(30)));
     //     });
     // }
 
@@ -1355,7 +1334,7 @@ mod test {
     // fn insert_overwrite_median_key_in_full_child_node() {
     //     run_btree_test(|mut btree| {
     //         for i in 1..=17 {
-    //             assert_eq!(btree.insert(k(i), v(0)), None);
+    //             assert_eq!(btree.insert(K::make(i), V::make(0)), None);
     //         }
 
     //         // The result should look like this:
@@ -1365,19 +1344,19 @@ mod test {
 
     //         let root = btree.load_node(btree.root_addr);
     //         assert_eq!(root.node_type(), NodeType::Internal);
-    //         assert_eq!(root.entries(btree.memory()), vec![(k(6), encode(v(0)))]);
+    //         assert_eq!(root.entries(btree.memory()), vec![(K::make(6), encode(V::make(0)))]);
     //         assert_eq!(root.children_len(), 2);
 
     //         // The right child should now be full, with the median key being "12"
     //         let right_child = btree.load_node(root.child(1));
     //         assert!(right_child.is_full());
     //         let median_index = right_child.entries_len() / 2;
-    //         let expected_median_key = k(12);
+    //         let expected_median_key = K::make(12);
     //         assert_eq!(right_child.key(median_index), &expected_median_key);
 
     //         // Overwrite the value of the median key.
-    //         assert_eq!(btree.insert(expected_median_key, v(100)), Some(v(0)));
-    //         assert_eq!(btree.get(&expected_median_key), Some(v(100)));
+    //         assert_eq!(btree.insert(expected_median_key, V::make(100)), Some(V::make(0)));
+    //         assert_eq!(btree.get(&expected_median_key), Some(V::make(100)));
 
     //         // The child has not been split and is still full.
     //         let right_child = btree.load_node(root.child(1));
