@@ -1285,7 +1285,7 @@ mod test {
             // The result should look like this:
             //                [6]
             //               /   \
-            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, (12), 13, 14, 15, 16, 17]
 
             let root = btree.load_node(btree.root_addr);
             assert_eq!(root.node_type(), NodeType::Internal);
@@ -1296,11 +1296,12 @@ mod test {
             let right_child = btree.load_node(root.child(1));
             assert!(right_child.is_full());
             let median_index = right_child.entries_len() / 2;
-            assert_eq!(right_child.key(median_index), &k(12));
+            let expected_median_key = k(12);
+            assert_eq!(right_child.key(median_index), &expected_median_key);
 
             // Overwrite the value of the median key.
-            assert_eq!(btree.insert(k(12), v(100)), Some(v(0)));
-            assert_eq!(btree.get(&k(12)), Some(v(100)));
+            assert_eq!(btree.insert(expected_median_key, v(100)), Some(v(0)));
+            assert_eq!(btree.get(&expected_median_key), Some(v(100)));
 
             // The child has not been split and is still full.
             let right_child = btree.load_node(root.child(1));
