@@ -1260,21 +1260,23 @@ mod test {
         f(tree_v2);
     }
 
-    /// Macro that verifies the monotonicity for a given key type and then runs the test function.
-    macro_rules! verify_and_run {
-        ($Key:ty, $Value:ty, $runner_fn:ident) => {{
-            verify_monotonic_keys::<$Key>();
-            $runner_fn::<$Key, $Value>();
-        }};
-    }
-
     /// Macro to apply a test function to a predefined grid of key/value types.
     macro_rules! btree_test {
         ($name:ident, $runner_fn:ident) => {
             #[test]
             fn $name() {
-                verify_and_run!(u32, Blob<20>, $runner_fn);
-                verify_and_run!(Blob<10>, Blob<20>, $runner_fn);
+                {
+                    type K = u32;
+                    type V = Blob<20>;
+                    verify_monotonic_keys::<K>();
+                    $runner_fn::<K, V>();
+                }
+                {
+                    type K = Blob<10>;
+                    type V = Blob<20>;
+                    verify_monotonic_keys::<K>();
+                    $runner_fn::<K, V>();
+                }
             }
         };
     }
