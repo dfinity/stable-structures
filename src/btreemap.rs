@@ -1180,12 +1180,12 @@ mod test {
 
     /// Creates a key from a u32.
     fn k(i: u32) -> Key {
-        Blob::<10>::try_from(&make_buffer::<10>(i)[..]).unwrap()
+        Key::try_from(&make_buffer::<10>(i)[..]).unwrap()
     }
 
     /// Creates a value from a u32.
     fn v(i: u32) -> Value {
-        Blob::<20>::try_from(&make_buffer::<20>(i)[..]).unwrap()
+        Value::try_from(&make_buffer::<20>(i)[..]).unwrap()
     }
 
     /// Encodes an object into a byte vector.
