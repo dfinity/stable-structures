@@ -1175,14 +1175,17 @@ mod test {
         buf
     }
 
+    type Key = Blob<10>;
+    type Value = Blob<20>;
+
     /// Creates a key from a u32.
-    fn k(i: u32) -> Blob<10> {
+    fn k(i: u32) -> Key {
         Blob::<10>::try_from(&make_buffer::<10>(i)[..]).unwrap()
     }
 
     /// Creates a value from a u32.
-    fn v(i: u32) -> Blob<10> {
-        Blob::<10>::try_from(&make_buffer::<10>(i)[..]).unwrap()
+    fn v(i: u32) -> Value {
+        Blob::<20>::try_from(&make_buffer::<20>(i)[..]).unwrap()
     }
 
     /// Encodes an object into a byte vector.
@@ -1201,11 +1204,13 @@ mod test {
         T::from_bytes(Cow::Owned(bytes))
     }
 
+    // TODO: remove obsolete code.
     /// A helper method to succinctly create an entry.
     fn e(x: u8) -> (Blob<10>, Vec<u8>) {
         (b(&[x]), vec![])
     }
 
+    // TODO: remove obsolete code.
     /// A helper method to succinctly create a blob.
     pub(crate) fn b(x: &[u8]) -> Blob<10> {
         Blob::<10>::try_from(x).unwrap()
@@ -1241,7 +1246,7 @@ mod test {
             assert_eq!(btree.insert(k(1), v(20)), None);
             assert_eq!(btree.get(&k(1)), Some(v(20)));
 
-            // Reload the btree, verfiy data still exists.
+            // Reload the btree, verify data still exists.
             let btree = BTreeMap::init(btree.into_memory());
             assert_eq!(btree.get(&k(1)), Some(v(20)));
         });
