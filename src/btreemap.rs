@@ -2734,52 +2734,51 @@ mod test {
     }
     btree_test!(test_test_iter_upper_bound, test_iter_upper_bound);
 
-    // // A buggy implementation of storable where the max_size is smaller than the serialized size.
-    // #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
-    // struct BuggyStruct;
-    // impl crate::Storable for BuggyStruct {
-    //     fn to_bytes(&self) -> Cow<[u8]> {
-    //         Cow::Borrowed(&[1, 2, 3, 4])
-    //     }
+    // A buggy implementation of storable where the max_size is smaller than the serialized size.
+    #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+    struct BuggyStruct;
+    impl crate::Storable for BuggyStruct {
+        fn to_bytes(&self) -> Cow<[u8]> {
+            Cow::Borrowed(&[1, 2, 3, 4])
+        }
 
-    //     fn from_bytes(_: Cow<[u8]>) -> Self {
-    //         unimplemented!();
-    //     }
+        fn from_bytes(_: Cow<[u8]>) -> Self {
+            unimplemented!();
+        }
 
-    //     const BOUND: StorableBound = StorableBound::Bounded {
-    //         max_size: 1,
-    //         is_fixed_size: false,
-    //     };
-    // }
-    // btree_test!(test_, );
+        const BOUND: StorableBound = StorableBound::Bounded {
+            max_size: 1,
+            is_fixed_size: false,
+        };
+    }
 
-    // #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    // fn v1_panics_if_key_is_bigger_than_max_size<K: TestKey, V: TestValue>() {
-    //     let mut btree = BTreeMap::init_v1(make_memory());
-    //     btree.insert(BuggyStruct, ());
-    // }
-    // btree_test!(test_, );
+    #[test]
+    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+    fn v1_panics_if_key_is_bigger_than_max_size() {
+        let mut btree = BTreeMap::init_v1(make_memory());
+        btree.insert(BuggyStruct, ());
+    }
 
-    // #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    // fn v2_panics_if_key_is_bigger_than_max_size<K: TestKey, V: TestValue>() {
-    //     let mut btree = BTreeMap::init(make_memory());
-    //     btree.insert(BuggyStruct, ());
-    // }
-    // btree_test!(test_, );
+    #[test]
+    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+    fn v2_panics_if_key_is_bigger_than_max_size() {
+        let mut btree = BTreeMap::init(make_memory());
+        btree.insert(BuggyStruct, ());
+    }
 
-    // #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    // fn v1_panics_if_value_is_bigger_than_max_size<K: TestKey, V: TestValue>() {
-    //     let mut btree = BTreeMap::init(make_memory());
-    //     btree.insert((), BuggyStruct);
-    // }
-    // btree_test!(test_, );
+    #[test]
+    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+    fn v1_panics_if_value_is_bigger_than_max_size() {
+        let mut btree = BTreeMap::init(make_memory());
+        btree.insert((), BuggyStruct);
+    }
 
-    // #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
-    // fn v2_panics_if_value_is_bigger_than_max_size<K: TestKey, V: TestValue>() {
-    //     let mut btree = BTreeMap::init(make_memory());
-    //     btree.insert((), BuggyStruct);
-    // }
-    // btree_test!(test_, );
+    #[test]
+    #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
+    fn v2_panics_if_value_is_bigger_than_max_size() {
+        let mut btree = BTreeMap::init(make_memory());
+        btree.insert((), BuggyStruct);
+    }
 
     // // To generate the memory dump file for the current version:
     // //   cargo test create_btreemap_dump_file -- --include-ignored
