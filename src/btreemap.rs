@@ -1735,318 +1735,331 @@ mod test {
     }
     btree_test!(test_remove_case_2a_and_2c, remove_case_2a_and_2c);
 
-    // #[test]
-    // fn remove_case_2b<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 1..=11 {
-    //             assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-    //         }
-    //         // Should now split a node.
-    //         assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+    fn remove_case_2b<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let e = |i: u32| (key(i), encode(V::empty()));
+        run_btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(key(i), V::empty()), None);
+            }
+            // Should now split a node.
+            assert_eq!(btree.insert(key(12), V::empty()), None);
 
-    //         // The result should look like this:
-    //         //                [6]
-    //         //               /   \
-    //         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-    //         for i in 1..=12 {
-    //             assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-    //         }
+            for i in 1..=12 {
+                assert_eq!(btree.get(&key(i)), Some(V::empty()));
+            }
 
-    //         // Remove node 6. Triggers case 2.b
-    //         assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
+            // Remove node 6. Triggers case 2.b
+            assert_eq!(btree.remove(&key(6)), Some(V::empty()));
 
-    //         // The result should look like this:
-    //         //                [7]
-    //         //               /   \
-    //         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Internal);
-    //         assert_eq!(root.entries(btree.memory()), vec![e(7)]);
-    //         assert_eq!(root.children_len(), 2);
+            // The result should look like this:
+            //                [7]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(7)]);
+            assert_eq!(root.children_len(), 2);
 
-    //         let child_0 = btree.load_node(root.child(0));
-    //         assert_eq!(child_0.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             child_0.entries(btree.memory()),
-    //             vec![e(1), e(2), e(3), e(4), e(5)]
-    //         );
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(3), e(4), e(5)]
+            );
 
-    //         let child_1 = btree.load_node(root.child(1));
-    //         assert_eq!(child_1.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             child_1.entries(btree.memory()),
-    //             vec![e(8), e(9), e(10), e(11), e(12)]
-    //         );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(8), e(9), e(10), e(11), e(12)]
+            );
 
-    //         // Remove node 7. Triggers case 2.c
-    //         assert_eq!(btree.remove(&b(&[7])), Some(b(&[])));
-    //         // The result should look like this:
-    //         //
-    //         // [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             root.entries(btree.memory()),
-    //             vec![
-    //                 e(1),
-    //                 e(2),
-    //                 e(3),
-    //                 e(4),
-    //                 e(5),
-    //                 e(8),
-    //                 e(9),
-    //                 e(10),
-    //                 e(11),
-    //                 e(12)
-    //             ]
-    //         );
-    //     });
-    // }
-    // btree_test!(test_, );
+            // Remove node 7. Triggers case 2.c
+            assert_eq!(btree.remove(&key(7)), Some(V::empty()));
+            // The result should look like this:
+            //
+            // [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Leaf);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![
+                    e(1),
+                    e(2),
+                    e(3),
+                    e(4),
+                    e(5),
+                    e(8),
+                    e(9),
+                    e(10),
+                    e(11),
+                    e(12)
+                ]
+            );
 
-    // #[test]
-    // fn remove_case_3a_right<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 1..=11 {
-    //             assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-    //         }
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+        });
+    }
+    btree_test!(test_remove_case_2b, remove_case_2b);
 
-    //         // Should now split a node.
-    //         assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+    fn remove_case_3a_right<K: TestKey, V: TestValue>() {
+        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let e = |i: u32| (key(i), encode(V::empty()));
+        run_btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(key(i), V::empty()), None);
+            }
 
-    //         // The result should look like this:
-    //         //                [6]
-    //         //               /   \
-    //         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+            // Should now split a node.
+            assert_eq!(btree.insert(key(12), V::empty()), None);
 
-    //         // Remove node 3. Triggers case 3.a
-    //         assert_eq!(btree.remove(&b(&[3])), Some(b(&[])));
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-    //         // The result should look like this:
-    //         //                [7]
-    //         //               /   \
-    //         // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Internal);
-    //         assert_eq!(root.entries(btree.memory()), vec![e(7)]);
-    //         assert_eq!(root.children_len(), 2);
+            // Remove node 3. Triggers case 3.a
+            assert_eq!(btree.remove(&key(3)), Some(V::empty()));
 
-    //         let child_0 = btree.load_node(root.child(0));
-    //         assert_eq!(child_0.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             child_0.entries(btree.memory()),
-    //             vec![e(1), e(2), e(4), e(5), e(6)]
-    //         );
+            // The result should look like this:
+            //                [7]
+            //               /   \
+            // [1, 2, 4, 5, 6]   [8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(7)]);
+            assert_eq!(root.children_len(), 2);
 
-    //         let child_1 = btree.load_node(root.child(1));
-    //         assert_eq!(child_1.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             child_1.entries(btree.memory()),
-    //             vec![e(8), e(9), e(10), e(11), e(12)]
-    //         );
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(4), e(5), e(6)]
+            );
 
-    //         // There are three allocated nodes.
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
-    //     });
-    // }
-    // btree_test!(test_, );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(8), e(9), e(10), e(11), e(12)]
+            );
 
-    // #[test]
-    // fn remove_case_3a_left<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 1..=11 {
-    //             assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-    //         }
-    //         // Should now split a node.
-    //         assert_eq!(btree.insert(b(&[0]), b(&[])), None);
+            // There are three allocated nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+        });
+    }
+    btree_test!(test_remove_case_3a_right, remove_case_3a_right);
 
-    //         // The result should look like this:
-    //         //                   [6]
-    //         //                  /   \
-    //         // [0, 1, 2, 3, 4, 5]   [7, 8, 9, 10, 11]
+    fn remove_case_3a_left<K: TestKey, V: TestValue>() {
+        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let e = |i: u32| (key(i), encode(V::empty()));
+        run_btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(key(i), V::empty()), None);
+            }
+            // Should now split a node.
+            assert_eq!(btree.insert(key(0), V::empty()), None);
 
-    //         // Remove node 8. Triggers case 3.a left
-    //         assert_eq!(btree.remove(&b(&[8])), Some(b(&[])));
+            // The result should look like this:
+            //                   [6]
+            //                  /   \
+            // [0, 1, 2, 3, 4, 5]   [7, 8, 9, 10, 11]
 
-    //         // The result should look like this:
-    //         //                [5]
-    //         //               /   \
-    //         // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Internal);
-    //         assert_eq!(root.entries(btree.memory()), vec![e(5)]);
-    //         assert_eq!(root.children_len(), 2);
+            // Remove node 8. Triggers case 3.a left
+            assert_eq!(btree.remove(&key(8)), Some(V::empty()));
 
-    //         let child_0 = btree.load_node(root.child(0));
-    //         assert_eq!(child_0.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             child_0.entries(btree.memory()),
-    //             vec![e(0), e(1), e(2), e(3), e(4)]
-    //         );
+            // The result should look like this:
+            //                [5]
+            //               /   \
+            // [0, 1, 2, 3, 4]   [6, 7, 9, 10, 11]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(5)]);
+            assert_eq!(root.children_len(), 2);
 
-    //         let child_1 = btree.load_node(root.child(1));
-    //         assert_eq!(child_1.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             child_1.entries(btree.memory()),
-    //             vec![e(6), e(7), e(9), e(10), e(11)]
-    //         );
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(0), e(1), e(2), e(3), e(4)]
+            );
 
-    //         // There are three allocated nodes.
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
-    //     });
-    // }
-    // btree_test!(test_, );
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(6), e(7), e(9), e(10), e(11)]
+            );
 
-    // #[test]
-    // fn remove_case_3b_merge_into_right<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         for i in 1..=11 {
-    //             assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-    //         }
-    //         // Should now split a node.
-    //         assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+            // There are three allocated nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+        });
+    }
+    btree_test!(test_remove_case_3a_left, remove_case_3a_left);
 
-    //         // The result should look like this:
-    //         //                [6]
-    //         //               /   \
-    //         // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+    fn remove_case_3b_merge_into_right<K: TestKey, V: TestValue>() {
+        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let e = |i: u32| (key(i), encode(V::empty()));
+        run_btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(key(i), V::empty()), None);
+            }
+            // Should now split a node.
+            assert_eq!(btree.insert(key(12), V::empty()), None);
 
-    //         for i in 1..=12 {
-    //             assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-    //         }
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-    //         // Remove node 6. Triggers case 2.b
-    //         assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
-    //         // The result should look like this:
-    //         //                [7]
-    //         //               /   \
-    //         // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Internal);
-    //         assert_eq!(root.entries(btree.memory()), vec![e(7)]);
-    //         assert_eq!(root.children_len(), 2);
+            for i in 1..=12 {
+                assert_eq!(btree.get(&key(i)), Some(V::empty()));
+            }
 
-    //         let child_0 = btree.load_node(root.child(0));
-    //         assert_eq!(child_0.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             child_0.entries(btree.memory()),
-    //             vec![e(1), e(2), e(3), e(4), e(5)]
-    //         );
+            // Remove node 6. Triggers case 2.b
+            assert_eq!(btree.remove(&key(6)), Some(V::empty()));
+            // The result should look like this:
+            //                [7]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(7)]);
+            assert_eq!(root.children_len(), 2);
 
-    //         let child_1 = btree.load_node(root.child(1));
-    //         assert_eq!(child_1.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             child_1.entries(btree.memory()),
-    //             vec![e(8), e(9), e(10), e(11), e(12)]
-    //         );
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(3), e(4), e(5)]
+            );
 
-    //         // There are three allocated nodes.
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(8), e(9), e(10), e(11), e(12)]
+            );
 
-    //         // Remove node 3. Triggers case 3.b
-    //         assert_eq!(btree.remove(&b(&[3])), Some(b(&[])));
+            // There are three allocated nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
 
-    //         // Reload the btree to verify that we saved it correctly.
-    //         let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(btree.into_memory());
+            // Remove node 3. Triggers case 3.b
+            assert_eq!(btree.remove(&key(3)), Some(V::empty()));
 
-    //         // The result should look like this:
-    //         //
-    //         // [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
-    //         let root = btree.load_node(btree.root_addr);
-    //         assert_eq!(root.node_type(), NodeType::Leaf);
-    //         assert_eq!(
-    //             root.entries(btree.memory()),
-    //             vec![
-    //                 e(1),
-    //                 e(2),
-    //                 e(4),
-    //                 e(5),
-    //                 e(7),
-    //                 e(8),
-    //                 e(9),
-    //                 e(10),
-    //                 e(11),
-    //                 e(12)
-    //             ]
-    //         );
+            // Reload the btree to verify that we saved it correctly.
+            let btree = BTreeMap::<K, V, _>::load(btree.into_memory());
 
-    //         // There is only one allocated node remaining.
-    //         assert_eq!(btree.allocator.num_allocated_chunks(), 1);
-    //     });
-    // }
-    // btree_test!(test_, );
+            // The result should look like this:
+            //
+            // [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Leaf);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![
+                    e(1),
+                    e(2),
+                    e(4),
+                    e(5),
+                    e(7),
+                    e(8),
+                    e(9),
+                    e(10),
+                    e(11),
+                    e(12)
+                ]
+            );
 
-    // #[test]
-    // fn remove_case_3b_merge_into_left<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let mut btree = BTreeMap::new(mem.clone());
+            // There is only one allocated node remaining.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+        });
+    }
+    btree_test!(
+        test_remove_case_3b_merge_into_right,
+        remove_case_3b_merge_into_right
+    );
 
-    //     for i in 1..=11 {
-    //         assert_eq!(btree.insert(b(&[i]), b(&[])), None);
-    //     }
+    fn remove_case_3b_merge_into_left<K: TestKey, V: TestValue>() {
+        let (key, _value) = (|i| K::make(i), |i| V::make(i));
+        let e = |i: u32| (key(i), encode(V::empty()));
 
-    //     // Should now split a node.
-    //     assert_eq!(btree.insert(b(&[12]), b(&[])), None);
+        run_btree_test(|mut btree| {
+            for i in 1..=11 {
+                assert_eq!(btree.insert(key(i), V::empty()), None);
+            }
 
-    //     // The result should look like this:
-    //     //                [6]
-    //     //               /   \
-    //     // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
+            // Should now split a node.
+            assert_eq!(btree.insert(key(12), V::empty()), None);
 
-    //     for i in 1..=12 {
-    //         assert_eq!(btree.get(&b(&[i])), Some(b(&[])));
-    //     }
+            // The result should look like this:
+            //                [6]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
-    //     // Remove node 6. Triggers case 2.b
-    //     assert_eq!(btree.remove(&b(&[6])), Some(b(&[])));
+            for i in 1..=12 {
+                assert_eq!(btree.get(&key(i)), Some(V::empty()));
+            }
 
-    //     // The result should look like this:
-    //     //                [7]
-    //     //               /   \
-    //     // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
-    //     let root = btree.load_node(btree.root_addr);
-    //     assert_eq!(root.node_type(), NodeType::Internal);
-    //     assert_eq!(root.entries(btree.memory()), vec![e(7)]);
-    //     assert_eq!(root.children_len(), 2);
+            // Remove node 6. Triggers case 2.b
+            assert_eq!(btree.remove(&key(6)), Some(V::empty()));
 
-    //     let child_0 = btree.load_node(root.child(0));
-    //     assert_eq!(child_0.node_type(), NodeType::Leaf);
-    //     assert_eq!(
-    //         child_0.entries(btree.memory()),
-    //         vec![e(1), e(2), e(3), e(4), e(5)]
-    //     );
+            // The result should look like this:
+            //                [7]
+            //               /   \
+            // [1, 2, 3, 4, 5]   [8, 9, 10, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Internal);
+            assert_eq!(root.entries(btree.memory()), vec![e(7)]);
+            assert_eq!(root.children_len(), 2);
 
-    //     let child_1 = btree.load_node(root.child(1));
-    //     assert_eq!(child_1.node_type(), NodeType::Leaf);
-    //     assert_eq!(
-    //         child_1.entries(btree.memory()),
-    //         vec![e(8), e(9), e(10), e(11), e(12)]
-    //     );
+            let child_0 = btree.load_node(root.child(0));
+            assert_eq!(child_0.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_0.entries(btree.memory()),
+                vec![e(1), e(2), e(3), e(4), e(5)]
+            );
 
-    //     // There are three allocated nodes.
-    //     assert_eq!(btree.allocator.num_allocated_chunks(), 3);
+            let child_1 = btree.load_node(root.child(1));
+            assert_eq!(child_1.node_type(), NodeType::Leaf);
+            assert_eq!(
+                child_1.entries(btree.memory()),
+                vec![e(8), e(9), e(10), e(11), e(12)]
+            );
 
-    //     // Remove node 10. Triggers case 3.b where we merge the right into the left.
-    //     assert_eq!(btree.remove(&b(&[10])), Some(b(&[])));
+            // There are three allocated nodes.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 3);
 
-    //     // Reload the btree to verify that we saved it correctly.
-    //     let btree = BTreeMap::<Blob<10>, Blob<10>, _>::load(mem);
+            // Remove node 10. Triggers case 3.b where we merge the right into the left.
+            assert_eq!(btree.remove(&key(10)), Some(V::empty()));
 
-    //     // The result should look like this:
-    //     //
-    //     // [1, 2, 3, 4, 5, 7, 8, 9, 11, 12]
-    //     let root = btree.load_node(btree.root_addr);
-    //     assert_eq!(root.node_type(), NodeType::Leaf);
-    //     assert_eq!(
-    //         root.entries(btree.memory()),
-    //         vec![e(1), e(2), e(3), e(4), e(5), e(7), e(8), e(9), e(11), e(12)]
-    //     );
+            // Reload the btree to verify that we saved it correctly.
+            let btree = BTreeMap::<K, V, _>::load(btree.into_memory());
 
-    //     // There is only one allocated node remaining.
-    //     assert_eq!(btree.allocator.num_allocated_chunks(), 1);
-    // }
-    // btree_test!(test_, );
+            // The result should look like this:
+            //
+            // [1, 2, 3, 4, 5, 7, 8, 9, 11, 12]
+            let root = btree.load_node(btree.root_addr);
+            assert_eq!(root.node_type(), NodeType::Leaf);
+            assert_eq!(
+                root.entries(btree.memory()),
+                vec![e(1), e(2), e(3), e(4), e(5), e(7), e(8), e(9), e(11), e(12)]
+            );
+
+            // There is only one allocated node remaining.
+            assert_eq!(btree.allocator.num_allocated_chunks(), 1);
+        });
+    }
+    btree_test!(
+        test_remove_case_3b_merge_into_left,
+        remove_case_3b_merge_into_left
+    );
 
     // #[test]
     // fn many_insertions<K: TestKey, V: TestValue>() {
