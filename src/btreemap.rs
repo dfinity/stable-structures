@@ -2503,10 +2503,10 @@ mod test {
     fn range_various_prefixes_with_offset_2<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
         run_btree_test(|mut btree| {
-            btree.insert(key(01), value(0));
-            btree.insert(key(02), value(0));
-            btree.insert(key(03), value(0));
-            btree.insert(key(04), value(0));
+            btree.insert(key(1), value(0));
+            btree.insert(key(2), value(0));
+            btree.insert(key(3), value(0));
+            btree.insert(key(4), value(0));
             btree.insert(key(12), value(0));
             btree.insert(key(14), value(0));
             btree.insert(key(16), value(0));
