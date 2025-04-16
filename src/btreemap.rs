@@ -2711,27 +2711,28 @@ mod test {
     }
     btree_test!(test_bruteforce_range_search, bruteforce_range_search);
 
-    // fn test_iter_upper_bound<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         for k in 0..100u64 {
-    //             btree.insert(k, ());
-    //             for i in 0..=k {
-    //                 assert_eq!(
-    //                     Some((i, ())),
-    //                     btree.iter_upper_bound(&(i + 1)).next(),
-    //                     "failed to get an upper bound for key {}",
-    //                     i + 1
-    //                 );
-    //             }
-    //             assert_eq!(
-    //                 None,
-    //                 btree.iter_upper_bound(&0).next(),
-    //                 "key 0 must not have an upper bound"
-    //             );
-    //         }
-    //     });
-    // }
-    // btree_test!(test_, );
+    fn test_iter_upper_bound<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            for j in 0..100 {
+                btree.insert(key(j), value(j));
+                for i in 0..=j {
+                    assert_eq!(
+                        btree.iter_upper_bound(&key(i + 1)).next(),
+                        Some((key(i), value(i))),
+                        "failed to get an upper bound for key({})",
+                        i + 1
+                    );
+                }
+                assert_eq!(
+                    btree.iter_upper_bound(&key(0)).next(),
+                    None,
+                    "key(0) must not have an upper bound"
+                );
+            }
+        });
+    }
+    btree_test!(test_test_iter_upper_bound, test_iter_upper_bound);
 
     // // A buggy implementation of storable where the max_size is smaller than the serialized size.
     // #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
