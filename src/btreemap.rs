@@ -2135,22 +2135,21 @@ mod test {
     }
     btree_test!(test_len, len);
 
-    // #[test]
-    // fn contains_key<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         // Insert even numbers from 0 to 1000.
-    //         for i in (0..1000u32).step_by(2) {
-    //             assert_eq!(btree.insert(b(&i.to_le_bytes()), b(&[])), None);
-    //         }
+    fn contains_key<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            let n = 1_000;
+            for i in (0..n).step_by(2) {
+                assert_eq!(btree.insert(key(i), value(i)), None);
+            }
 
-    //         // Contains key should return true on all the even numbers and false on all the odd
-    //         // numbers.
-    //         for i in 0..1000u32 {
-    //             assert_eq!(btree.contains_key(&b(&i.to_le_bytes())), i % 2 == 0);
-    //         }
-    //     });
-    // }
-    // btree_test!(test_, );
+            // Only even keys should be present.
+            for i in 0..n {
+                assert_eq!(btree.contains_key(&key(i)), i % 2 == 0);
+            }
+        });
+    }
+    btree_test!(test_contains_key, contains_key);
 
     // #[test]
     // fn range_empty<K: TestKey, V: TestValue>() {
