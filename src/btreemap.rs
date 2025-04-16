@@ -1197,6 +1197,16 @@ mod test {
         }
     }
 
+    type MonotonicString32 = String;
+    impl Make for MonotonicString32 {
+        fn make(i: u32) -> Self {
+            format!("{i:0>32}")
+        }
+        fn empty() -> Self {
+            String::new()
+        }
+    }
+
     /// Encodes an object into a byte vector.
     fn encode<T: Storable>(object: T) -> Vec<u8> {
         object.to_bytes_checked().into_owned()
@@ -1219,16 +1229,18 @@ mod test {
         V: Storable,
         F: Fn(BTreeMap<K, V, VectorMemory>) -> R,
     {
-        // Test with V1.
-        let mem = make_memory();
-        let tree_v1 = BTreeMap::new_v1(mem);
-        f(tree_v1);
+        if K::BOUND != StorableBound::Unbounded {
+            // Test with V1.
+            let mem = make_memory();
+            let tree_v1 = BTreeMap::new_v1(mem);
+            f(tree_v1);
 
-        // Test with V2 migrated from V1.
-        let mem = make_memory();
-        let tree_v1: BTreeMap<K, V, _> = BTreeMap::new_v1(mem);
-        let tree_v2_migrated = BTreeMap::load_helper(tree_v1.into_memory(), true);
-        f(tree_v2_migrated);
+            // Test with V2 migrated from V1.
+            let mem = make_memory();
+            let tree_v1: BTreeMap<K, V, _> = BTreeMap::new_v1(mem);
+            let tree_v2_migrated = BTreeMap::load_helper(tree_v1.into_memory(), true);
+            f(tree_v2_migrated);
+        }
 
         // Test with direct V2.
         let mem = make_memory();
@@ -1259,6 +1271,12 @@ mod test {
                 {
                     type K = Blob<10>;
                     type V = Blob<20>;
+                    verify_monotonic::<K>();
+                    $runner_fn::<K, V>();
+                }
+                {
+                    type K = MonotonicString32;
+                    type V = String;
                     verify_monotonic::<K>();
                     $runner_fn::<K, V>();
                 }
@@ -1593,11 +1611,11 @@ mod test {
         run_btree_test(|mut btree| {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
-            assert_eq!(btree.insert(key(1), value(1)), None);
+            assert_eq!(btree.insert(key(1), V::empty()), None);
             assert!(!btree.is_empty());
             assert_eq!(btree.allocator.num_allocated_chunks(), 1);
 
-            assert_eq!(btree.pop_first(), Some((key(1), value(1))));
+            assert_eq!(btree.pop_first(), Some((key(1), V::empty())));
             assert!(btree.is_empty());
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
         });
