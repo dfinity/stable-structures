@@ -1783,18 +1783,10 @@ mod test {
             assert_eq!(root.node_type(), NodeType::Leaf);
             assert_eq!(
                 root.entries(btree.memory()),
-                vec![
-                    e(1),
-                    e(2),
-                    e(3),
-                    e(4),
-                    e(5),
-                    e(8),
-                    e(9),
-                    e(10),
-                    e(11),
-                    e(12)
-                ]
+                [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
+                    .into_iter()
+                    .map(e)
+                    .collect::<Vec<_>>()
             );
 
             assert_eq!(btree.allocator.num_allocated_chunks(), 1);
@@ -1957,18 +1949,10 @@ mod test {
             assert_eq!(root.node_type(), NodeType::Leaf);
             assert_eq!(
                 root.entries(btree.memory()),
-                vec![
-                    e(1),
-                    e(2),
-                    e(4),
-                    e(5),
-                    e(7),
-                    e(8),
-                    e(9),
-                    e(10),
-                    e(11),
-                    e(12)
-                ]
+                [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
+                    .into_iter()
+                    .map(e)
+                    .collect::<Vec<_>>()
             );
 
             // There is only one allocated node remaining.
@@ -2037,7 +2021,7 @@ mod test {
 
             // The result should look like this:
             //
-            // [1, 2, 3, 4, 5, 7, 8, 9, 11, 12]
+            // [1, 2, 3, 4, 5, 7, 8, 9, 11, 12], 10 is gone
             let root = btree.load_node(btree.root_addr);
             assert_eq!(root.node_type(), NodeType::Leaf);
             assert_eq!(
@@ -2054,21 +2038,22 @@ mod test {
         remove_case_3b_merge_into_left
     );
 
-    fn many_insertions<K: TestKey, V: TestValue>(ids: &[u32]) {
+    fn insert_remove_many<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
         run_btree_test(|mut btree| {
-            for &i in ids {
+            let n = 10_000;
+            for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
             }
-            for &i in ids {
+            for i in 0..n {
                 assert_eq!(btree.get(&key(i)), Some(value(i)));
             }
 
             let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
-            for &i in ids {
+            for i in 0..n {
                 assert_eq!(btree.remove(&key(i)), Some(value(i)));
             }
-            for &i in ids {
+            for i in 0..n {
                 assert_eq!(btree.get(&key(i)), None);
             }
 
@@ -2076,18 +2061,7 @@ mod test {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
         });
     }
-
-    fn many_insertions_ascending<K: TestKey, V: TestValue>() {
-        let n = 10_000;
-        many_insertions::<K, V>(&(0..n).collect::<Vec<_>>());
-    }
-    btree_test!(test_many_insertions_ascending, many_insertions_ascending);
-
-    fn many_insertions_descending<K: TestKey, V: TestValue>() {
-        let n = 10_000;
-        many_insertions::<K, V>(&(0..n).rev().collect::<Vec<_>>());
-    }
-    btree_test!(test_many_insertions_descending, many_insertions_descending);
+    btree_test!(test_insert_remove_many, insert_remove_many);
 
     fn pop_first_many_entries<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
