@@ -2399,25 +2399,29 @@ mod test {
     fn range_large<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
         run_btree_test(|mut btree| {
-            let n = 2_000;
-            let m = n / 2;
+            const TOTAL: u32 = 2_000;
+            const MID: u32 = TOTAL / 2;
 
-            for i in 0..n {
+            for i in 0..TOTAL {
                 assert_eq!(btree.insert(key(i), value(i)), None);
             }
 
-            // Inspect the first half.
-            let keys: Vec<_> = btree.range(key(0)..key(m)).collect();
-            assert_eq!(keys.len(), m as usize);
-            for (i, (k, _)) in keys.into_iter().enumerate() {
-                assert_eq!(k, key(i as u32));
+            // Check range [0, MID): should yield exactly the first MID entries.
+            let keys: Vec<_> = btree.range(key(0)..key(MID)).collect();
+            assert_eq!(keys.len(), MID as usize);
+            for (i, (k, v)) in keys.into_iter().enumerate() {
+                let j = i as u32;
+                assert_eq!(k, key(j));
+                assert_eq!(v, value(j));
             }
 
-            // Inspect the second half.
-            let keys: Vec<_> = btree.range(key(m)..).collect();
-            assert_eq!(keys.len(), (n - m) as usize);
-            for (i, (k, _)) in keys.into_iter().enumerate() {
-                assert_eq!(k, key(m + i as u32));
+            // Check range [MID, TOTAL): should yield the remaining entries.
+            let keys: Vec<_> = btree.range(key(MID)..).collect();
+            assert_eq!(keys.len(), (TOTAL - MID) as usize);
+            for (i, (k, v)) in keys.into_iter().enumerate() {
+                let j = MID + i as u32;
+                assert_eq!(k, key(j));
+                assert_eq!(v, value(j));
             }
         });
     }
