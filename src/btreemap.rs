@@ -1279,11 +1279,15 @@ mod test {
         };
     }
 
-    fn init_preserves_data<K, V>()
-    where
-        K: Storable + Ord + Clone + Make,
-        V: Storable + Make + std::fmt::Debug + PartialEq,
-    {
+    // Define a trait for keys that need the full set of bounds.
+    trait TestKey: Storable + Ord + Clone + Make + std::fmt::Debug {}
+    impl<T> TestKey for T where T: Storable + Ord + Clone + Make + std::fmt::Debug {}
+
+    // Define a trait for values that need the full set of bounds.
+    trait TestValue: Storable + Make + std::fmt::Debug + PartialEq {}
+    impl<T> TestValue for T where T: Storable + Make + std::fmt::Debug + PartialEq {}
+
+    fn init_preserves_data<K: TestKey, V: TestValue>() {
         run_btree_test(|mut btree| {
             assert_eq!(btree.insert(K::make(1), V::make(20)), None);
             assert_eq!(btree.get(&K::make(1)), Some(V::make(20)));
@@ -1296,11 +1300,7 @@ mod test {
 
     btree_test!(test_init_preserves_data, init_preserves_data);
 
-    fn insert_get<K, V>()
-    where
-        K: Storable + Ord + Clone + Make + std::fmt::Debug,
-        V: Storable + Make + std::fmt::Debug + PartialEq,
-    {
+    fn insert_get<K: TestKey, V: TestValue>() {
         run_btree_test(|mut btree| {
             assert_eq!(btree.insert(K::make(1), V::make(20)), None);
             assert_eq!(btree.get(&K::make(1)), Some(V::make(20)));
@@ -1309,11 +1309,7 @@ mod test {
 
     btree_test!(test_insert_get, insert_get);
 
-    fn insert_overwrites_previous_value<K, V>()
-    where
-        K: Storable + Ord + Clone + Make + std::fmt::Debug,
-        V: Storable + Make + std::fmt::Debug + PartialEq,
-    {
+    fn insert_overwrites_previous_value<K: TestKey, V: TestValue>() {
         run_btree_test(|mut btree| {
             assert_eq!(btree.insert(K::make(1), V::make(20)), None);
             assert_eq!(btree.insert(K::make(1), V::make(30)), Some(V::make(20)));
@@ -1326,11 +1322,7 @@ mod test {
         insert_overwrites_previous_value
     );
 
-    fn insert_get_multiple_entries<K, V>()
-    where
-        K: Storable + Ord + Clone + Make + std::fmt::Debug,
-        V: Storable + Make + std::fmt::Debug + PartialEq,
-    {
+    fn insert_get_multiple_entries<K: TestKey, V: TestValue>() {
         run_btree_test(|mut btree| {
             assert_eq!(btree.insert(K::make(1), V::make(10)), None);
             assert_eq!(btree.insert(K::make(2), V::make(20)), None);
@@ -1346,11 +1338,7 @@ mod test {
         insert_get_multiple_entries
     );
 
-    fn insert_overwrite_median_key_in_full_child_node<K, V>()
-    where
-        K: Storable + Ord + Clone + Make + std::fmt::Debug,
-        V: Storable + Make + std::fmt::Debug + PartialEq,
-    {
+    fn insert_overwrite_median_key_in_full_child_node<K: TestKey, V: TestValue>() {
         run_btree_test(|mut btree| {
             for i in 1..=17 {
                 assert_eq!(btree.insert(K::make(i), V::default()), None);
