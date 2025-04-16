@@ -2801,35 +2801,36 @@ mod test {
 
     // To generate the memory dump file for the current version:
     //   cargo test create_btreemap_dump_file -- --include-ignored
-    fn create_btreemap_dump_file<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
-
+    #[test]
+    #[ignore]
+    fn create_btreemap_dump_file() {
         let mem = make_memory();
         let mut btree = BTreeMap::init_v1(mem.clone());
-        assert_eq!(btree.insert(key(1), value(1)), None);
-        assert_eq!(btree.get(&key(1)), Some(value(1)));
 
-        let key_type = std::any::type_name::<K>();
-        let value_type = std::any::type_name::<V>();
+        let key = b(&[1, 2, 3]);
+        let value = b(&[4, 5, 6]);
+        assert_eq!(btree.insert(key, value), None);
+        assert_eq!(btree.get(&key), Some(value));
+
         use std::io::prelude::*;
-        let mut file = std::fs::File::create(format!(
-            "dumps/btreemap_v{LAYOUT_VERSION}_{key_type}_{value_type}.dump"
-        ))
-        .unwrap();
+        let mut file =
+            std::fs::File::create(format!("dumps/btreemap_v{LAYOUT_VERSION}.dump")).unwrap();
         file.write_all(&mem.borrow()).unwrap();
     }
-    btree_test_ignored!(test_create_btreemap_dump_file, create_btreemap_dump_file);
 
-    // fn produces_layout_identical_to_layout_version_1_with_packed_headers<K: TestKey, V: TestValue>() {
-    //     let mem = make_memory();
-    //     let mut btree = BTreeMap::init_v1(mem.clone());
-    //     assert_eq!(btree.insert(b(&[1, 2, 3]), b(&[4, 5, 6])), None);
-    //     assert_eq!(btree.get(&b(&[1, 2, 3])), Some(b(&[4, 5, 6])));
+    #[test]
+    fn produces_layout_identical_to_layout_version_1_with_packed_headers() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::init_v1(mem.clone());
 
-    //     let btreemap_v1 = include_bytes!("../dumps/btreemap_v1_packed_headers.dump");
-    //     assert_eq!(*mem.borrow(), btreemap_v1);
-    // }
-    // btree_test!(test_, );
+        let key = b(&[1, 2, 3]);
+        let value = b(&[4, 5, 6]);
+        assert_eq!(btree.insert(key, value), None);
+        assert_eq!(btree.get(&key), Some(value));
+
+        let btreemap_v1 = include_bytes!("../dumps/btreemap_v1_packed_headers.dump");
+        assert_eq!(*mem.borrow(), btreemap_v1);
+    }
 
     // fn read_write_header_is_identical_to_read_write_struct<K: TestKey, V: TestValue>() {
     //     #[repr(C, packed)]
