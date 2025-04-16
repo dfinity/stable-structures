@@ -1160,6 +1160,7 @@ mod test {
         storable::{Blob, Bound as StorableBound, Storable},
         VectorMemory,
     };
+    use core::panic;
     use std::borrow::Cow;
     use std::cell::RefCell;
     use std::convert::TryFrom;
@@ -1196,13 +1197,7 @@ mod test {
         }
     }
 
-    /// Creates a key from a u32.
-    fn k<T: Make>(i: u32) -> T {
-        T::make(i)
-    }
-
-    /// Creates a value from a u32.
-    fn v<T: Make>(i: u32) -> T {
+    fn make<T: Make>(i: u32) -> T {
         T::make(i)
     }
 
@@ -1226,6 +1221,31 @@ mod test {
     /// A helper method to succinctly create a blob.
     pub(crate) fn b(x: &[u8]) -> Blob<10> {
         Blob::<10>::try_from(x).unwrap()
+    }
+
+    /// Asserts that keys from consecutive IDs are strictly increasing.
+    ///
+    /// This is important for the B-tree structure to maintain its properties.
+    fn verify_monotonic_keys<T: Make + PartialOrd>() {
+        for i in 0..10 {
+            assert!(T::make(i) < T::make(i + 1));
+        }
+    }
+
+    /// Macro that verifies the monotonicity for a given key type and then runs the test function.
+    macro_rules! verify_and_run {
+        ($Key:ty, $Value:ty, $f:ident) => {{
+            verify_monotonic_keys::<$Key>();
+            $f::<$Key, $Value>();
+        }};
+    }
+
+    /// Macro to apply a test function to a predefined grid of key/value types.
+    macro_rules! apply_type_grid {
+        ($f:ident) => {{
+            verify_and_run!(u32, Blob<20>, $f);
+            verify_and_run!(Blob<10>, Blob<20>, $f);
+        }};
     }
 
     /// A test runner that runs the test using V1, migrated V2, and direct V2.
@@ -1259,19 +1279,18 @@ mod test {
         V: Storable + Make + std::fmt::Debug + PartialEq,
     {
         run_btree_test(|mut btree| {
-            assert_eq!(btree.insert(K::make(1), V::make(20)), None);
-            assert_eq!(btree.get(&K::make(1)), Some(V::make(20)));
+            assert_eq!(btree.insert(make::<K>(1), make::<V>(20)), None);
+            assert_eq!(btree.get(&make::<K>(1)), Some(make::<V>(20)));
 
             // Reload the btree, verify the entry remains.
             let btree = BTreeMap::<K, V, VectorMemory>::init(btree.into_memory());
-            assert_eq!(btree.get(&K::make(1)), Some(V::make(20)));
+            assert_eq!(btree.get(&make::<K>(1)), Some(make::<V>(20)));
         });
     }
 
     #[test]
     fn test_init_preserves_data() {
-        init_preserves_data::<u32, Blob<20>>();
-        init_preserves_data::<Blob<10>, Blob<20>>();
+        apply_type_grid!(init_preserves_data);
     }
 
     // #[test]
