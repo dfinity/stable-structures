@@ -1220,14 +1220,6 @@ mod test {
     }
 
     #[test]
-    fn test_insert_and_get() {
-        run_btree_test(|mut btree| {
-            assert_eq!(btree.insert(k(1), v(2)), None);
-            assert_eq!(btree.get(&k(1)), Some(v(2)));
-        });
-    }
-
-    #[test]
     fn test_init_preserves_data() {
         run_btree_test(|mut btree| {
             assert_eq!(btree.insert(k(1), v(2)), None);
@@ -1235,6 +1227,14 @@ mod test {
 
             // Reload the btree, verfiy data still exists.
             let btree = BTreeMap::init(btree.into_memory());
+            assert_eq!(btree.get(&k(1)), Some(v(2)));
+        });
+    }
+
+    #[test]
+    fn test_insert_and_get() {
+        run_btree_test(|mut btree| {
+            assert_eq!(btree.insert(k(1), v(2)), None);
             assert_eq!(btree.get(&k(1)), Some(v(2)));
         });
     }
