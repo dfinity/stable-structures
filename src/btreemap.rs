@@ -1157,7 +1157,7 @@ where
 mod test {
     use super::*;
     use crate::{
-        storable::{Blob, Bound as StorableBound, Storable},
+        storable::{Blob, Bound as StorableBound},
         VectorMemory,
     };
     use std::cell::RefCell;
