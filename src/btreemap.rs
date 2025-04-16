@@ -1294,8 +1294,6 @@ mod test {
             let n = 1_000;
             for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
-            }
-            for i in 0..n {
                 assert_eq!(btree.get(&key(i)), Some(value(i)));
             }
 
@@ -1327,7 +1325,7 @@ mod test {
         insert_overwrites_previous_value
     );
 
-    fn insert_same_key_multiple<K: TestKey, V: TestValue>() {
+    fn insert_same_key_many<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
         run_btree_test(|mut btree| {
             let n = 1_000;
@@ -1338,7 +1336,7 @@ mod test {
             assert_eq!(btree.get(&key(1)), Some(value(n)));
         });
     }
-    btree_test!(test_insert_same_key_multiple, insert_same_key_multiple);
+    btree_test!(test_insert_same_key_many, insert_same_key_many);
 
     fn insert_overwrite_median_key_in_full_child_node<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
@@ -1560,22 +1558,6 @@ mod test {
         insert_split_multiple_nodes
     );
 
-    fn remove_multiple<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
-        run_btree_test(|mut btree| {
-            let n = 1_000;
-            for i in 0..n {
-                assert_eq!(btree.insert(key(i), value(i)), None);
-                assert_eq!(btree.get(&key(i)), Some(value(i)));
-            }
-            for i in 0..n {
-                assert_eq!(btree.remove(&key(i)), Some(value(i)));
-                assert_eq!(btree.get(&key(i)), None);
-            }
-        });
-    }
-    btree_test!(test_remove_multiple, remove_multiple);
-
     fn first_key_value<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
         run_btree_test(|mut btree: BTreeMap<K, V, _>| {
@@ -1619,15 +1601,6 @@ mod test {
         });
     }
     btree_test!(test_last_key_value, last_key_value);
-
-    fn pop_on_empty_tree<K: TestKey, V: TestValue>() {
-        run_btree_test(|mut btree: BTreeMap<K, V, _>| {
-            assert!(btree.is_empty());
-            assert_eq!(btree.pop_first(), None);
-            assert_eq!(btree.pop_last(), None);
-        });
-    }
-    btree_test!(test_pop_on_empty_tree, pop_on_empty_tree);
 
     fn pop_first_single_entry<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
@@ -2044,16 +2017,12 @@ mod test {
             let n = 10_000;
             for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
-            }
-            for i in 0..n {
                 assert_eq!(btree.get(&key(i)), Some(value(i)));
             }
 
             let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
             for i in 0..n {
                 assert_eq!(btree.remove(&key(i)), Some(value(i)));
-            }
-            for i in 0..n {
                 assert_eq!(btree.get(&key(i)), None);
             }
 
@@ -2063,22 +2032,21 @@ mod test {
     }
     btree_test!(test_insert_remove_many, insert_remove_many);
 
-    fn pop_first_many_entries<K: TestKey, V: TestValue>() {
+    fn pop_first_many<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
         run_btree_test(|mut btree| {
             let n = 10_000;
+
+            assert!(btree.is_empty());
+            assert_eq!(btree.pop_first(), None);
+
             for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
-            }
-            for i in 0..n {
-                assert_eq!(btree.get(&key(i)), Some(value(i)));
             }
 
             let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
             for i in 0..n {
                 assert_eq!(btree.pop_first(), Some((key(i), value(i))));
-            }
-            for i in 0..n {
                 assert_eq!(btree.get(&key(i)), None);
             }
 
@@ -2087,38 +2055,32 @@ mod test {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
         });
     }
-    btree_test!(test_pop_first_many_entries, pop_first_many_entries);
+    btree_test!(test_pop_first_many, pop_first_many);
 
-    fn pop_last_many_entries<K: TestKey, V: TestValue>() {
+    fn pop_last_many<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
         run_btree_test(|mut btree| {
-            let mut std_btree = std::collections::BTreeMap::<K, V>::new();
             let n = 10_000;
+
+            assert!(btree.is_empty());
+            assert_eq!(btree.pop_last(), None);
+
             for i in 0..n {
                 assert_eq!(btree.insert(key(i), value(i)), None);
-                assert_eq!(std_btree.insert(key(i), value(i)), None);
-            }
-            for i in 0..n {
-                assert_eq!(btree.get(&key(i)), Some(value(i)));
-                assert_eq!(std_btree.get(&key(i)), Some(&value(i)));
             }
 
             let mut btree = BTreeMap::<K, V, _>::load(btree.into_memory());
-            for _ in 0..n {
-                assert_eq!(btree.pop_last(), std_btree.pop_last());
-            }
-            for i in 0..n {
+            for i in (0..n).rev() {
+                assert_eq!(btree.pop_last(), Some((key(i), value(i))));
                 assert_eq!(btree.get(&key(i)), None);
-                assert_eq!(std_btree.get(&key(i)), None);
             }
 
             // We've deallocated everything.
             assert!(btree.is_empty());
-            assert!(std_btree.is_empty());
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
         });
     }
-    btree_test!(test_pop_last_many_entries, pop_last_many_entries);
+    btree_test!(test_pop_last_many, pop_last_many);
 
     // #[test]
     // fn reloading<K: TestKey, V: TestValue>() {
