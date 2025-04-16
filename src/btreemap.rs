@@ -2396,46 +2396,32 @@ mod test {
     }
     btree_test!(test_range_various_prefixes_2, range_various_prefixes_2);
 
-    // fn range_large<K: TestKey, V: TestValue>() {
-    //     run_btree_test(|mut btree| {
-    //         // Insert 1000 elements with prefix 0 and another 1000 elements with prefix 1.
-    //         for prefix in 0..=1 {
-    //             for i in 0..1000u32 {
-    //                 assert_eq!(
-    //                     btree.insert(
-    //                         // The key is the prefix followed by the integer's encoding.
-    //                         // The encoding is big-endian so that the byte representation of the
-    //                         // integers are sorted.
-    //                         b([vec![prefix], i.to_be_bytes().to_vec()]
-    //                             .into_iter()
-    //                             .flatten()
-    //                             .collect::<Vec<_>>()
-    //                             .as_slice()),
-    //                         b(&[])
-    //                     ),
-    //                     None
-    //                 );
-    //             }
-    //         }
+    fn range_large<K: TestKey, V: TestValue>() {
+        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        run_btree_test(|mut btree| {
+            let n = 2_000;
+            let m = n / 2;
 
-    //         // Getting the range with a prefix should return all 1000 elements with that prefix.
-    //         for prefix in 0..=1 {
-    //             let mut i: u32 = 0;
-    //             for (key, _) in btree.range(b(&[prefix])..b(&[prefix + 1])) {
-    //                 assert_eq!(
-    //                     key,
-    //                     b(&[vec![prefix], i.to_be_bytes().to_vec()]
-    //                         .into_iter()
-    //                         .flatten()
-    //                         .collect::<Vec<_>>())
-    //                 );
-    //                 i += 1;
-    //             }
-    //             assert_eq!(i, 1000);
-    //         }
-    //     });
-    // }
-    // btree_test!(test_, );
+            for i in 0..n {
+                assert_eq!(btree.insert(key(i), value(i)), None);
+            }
+
+            // Inspect the first half.
+            let keys: Vec<_> = btree.range(key(0)..key(m)).collect();
+            assert_eq!(keys.len(), m as usize);
+            for (i, (k, _)) in keys.into_iter().enumerate() {
+                assert_eq!(k, key(i as u32));
+            }
+
+            // Inspect the second half.
+            let keys: Vec<_> = btree.range(key(m)..).collect();
+            assert_eq!(keys.len(), (n - m) as usize);
+            for (i, (k, _)) in keys.into_iter().enumerate() {
+                assert_eq!(k, key(m + i as u32));
+            }
+        });
+    }
+    btree_test!(test_range_large, range_large);
 
     // fn range_various_prefixes_with_offset() {
     //     run_btree_test(|mut btree| {
