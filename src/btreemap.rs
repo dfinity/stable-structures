@@ -1160,7 +1160,6 @@ mod test {
         storable::{Blob, Bound as StorableBound, Storable},
         VectorMemory,
     };
-    use core::panic;
     use std::borrow::Cow;
     use std::cell::RefCell;
     use std::convert::TryFrom;
@@ -1204,19 +1203,6 @@ mod test {
         object.to_bytes_checked().into_owned()
     }
 
-    /// Decodes a byte vector into an object.
-    fn decode<T: Storable>(bytes: Vec<u8>) -> T {
-        T::from_bytes(Cow::Owned(bytes))
-    }
-
-    // // TODO: remove obsolete code.
-    // /// A helper method to succinctly create an entry.
-    // fn e(x: u8) -> (Blob<10>, Vec<u8>) {
-    //     (b(&[x]), vec![])
-    // }
-    // btree_test!(test_, );
-
-    // TODO: remove obsolete code.
     /// A helper method to succinctly create a blob.
     pub(crate) fn b(x: &[u8]) -> Blob<10> {
         Blob::<10>::try_from(x).unwrap()
@@ -1260,42 +1246,23 @@ mod test {
         }
     }
 
-    macro_rules! btree_test_body {
-        ($runner_fn:ident) => {{
-            // first key/value combo
-            {
-                type K = u32;
-                type V = Blob<20>;
-                verify_monotonic::<K>();
-                $runner_fn::<K, V>();
-            }
-            // second key/value combo
-            {
-                type K = Blob<10>;
-                type V = Blob<20>;
-                verify_monotonic::<K>();
-                $runner_fn::<K, V>();
-            }
-        }};
-    }
-
     /// Macro to apply a test function to a predefined grid of key/value types.
     macro_rules! btree_test {
         ($name:ident, $runner_fn:ident) => {
             #[test]
             fn $name() {
-                btree_test_body!($runner_fn);
-            }
-        };
-    }
-
-    /// Macro to apply a test function to a predefined grid of key/value types.
-    macro_rules! btree_test_ignored {
-        ($name:ident, $runner_fn:ident) => {
-            #[test]
-            #[ignore]
-            fn $name() {
-                btree_test_body!($runner_fn);
+                {
+                    type K = u32;
+                    type V = Blob<20>;
+                    verify_monotonic::<K>();
+                    $runner_fn::<K, V>();
+                }
+                {
+                    type K = Blob<10>;
+                    type V = Blob<20>;
+                    verify_monotonic::<K>();
+                    $runner_fn::<K, V>();
+                }
             }
         };
     }
