@@ -1189,18 +1189,12 @@ mod test {
     }
 
     /// Encodes an object into a byte vector.
-    fn encode<T>(object: T) -> Vec<u8>
-    where
-        T: Storable,
-    {
+    fn encode<T: Storable>(object: T) -> Vec<u8> {
         object.to_bytes_checked().into_owned()
     }
 
     /// Decodes a byte vector into an object.
-    fn decode<T>(bytes: Vec<u8>) -> T
-    where
-        T: Storable,
-    {
+    fn decode<T: Storable>(bytes: Vec<u8>) -> T {
         T::from_bytes(Cow::Owned(bytes))
     }
 
