@@ -1183,17 +1183,25 @@ mod test {
     /// A trait to construct a value from a u32.
     trait Make {
         fn make(i: u32) -> Self;
+        fn default() -> Self;
     }
 
     impl Make for u32 {
         fn make(i: u32) -> Self {
             i
         }
+        fn default() -> Self {
+            0
+        }
     }
 
     impl<const N: usize> Make for Blob<N> {
         fn make(i: u32) -> Self {
             Blob::try_from(&make_buffer::<N>(i)[..]).unwrap()
+        }
+        fn default() -> Self {
+            let x: &[u8] = &[];
+            Blob::try_from(x).unwrap()
         }
     }
 
@@ -1318,17 +1326,25 @@ mod test {
         insert_overwrites_previous_value
     );
 
-    // #[test]
-    // fn insert_get_multiple_entries() {
-    //     run_btree_test(|mut btree| {
-    //         assert_eq!(btree.insert(K::make(1), V::make(10)), None);
-    //         assert_eq!(btree.insert(K::make(2), V::make(20)), None);
-    //         assert_eq!(btree.insert(b(&[]), V::make(30)), None);
-    //         assert_eq!(btree.get(&K::make(1)), Some(V::make(10)));
-    //         assert_eq!(btree.get(&K::make(2)), Some(V::make(20)));
-    //         assert_eq!(btree.get(&b(&[])), Some(V::make(30)));
-    //     });
-    // }
+    fn insert_get_multiple_entries<K, V>()
+    where
+        K: Storable + Ord + Clone + Make,
+        V: Storable + Make + std::fmt::Debug + PartialEq,
+    {
+        run_btree_test(|mut btree| {
+            assert_eq!(btree.insert(K::make(1), V::make(10)), None);
+            assert_eq!(btree.insert(K::make(2), V::make(20)), None);
+            assert_eq!(btree.insert(K::default(), V::make(30)), None);
+            assert_eq!(btree.get(&K::make(1)), Some(V::make(10)));
+            assert_eq!(btree.get(&K::make(2)), Some(V::make(20)));
+            assert_eq!(btree.get(&K::default()), Some(V::make(30)));
+        });
+    }
+
+    btree_test!(
+        test_insert_get_multiple_entries,
+        insert_get_multiple_entries
+    );
 
     // #[test]
     // fn insert_overwrite_median_key_in_full_child_node() {
