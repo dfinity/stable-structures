@@ -1278,7 +1278,8 @@ mod test {
         V: Storable,
         F: Fn(BTreeMap<K, V, VectorMemory>) -> R,
     {
-        if K::BOUND != StorableBound::Unbounded {
+        // V1 does not support unbounded types.
+        if K::BOUND != StorableBound::Unbounded && V::BOUND != StorableBound::Unbounded {
             // Test with V1.
             let mem = make_memory();
             let tree_v1 = BTreeMap::new_v1(mem);
@@ -1321,17 +1322,23 @@ mod test {
         ($name:ident, $runner:ident) => {
             #[test]
             fn $name() {
-                // Set.
+                // Set, empty value.
                 verify_and_run!($runner, u32, ());
                 verify_and_run!($runner, Blob<10>, ());
                 verify_and_run!($runner, MonotonicVec32, ());
                 verify_and_run!($runner, MonotonicString32, ());
 
-                // Map.
+                // Map, bounded value.
                 verify_and_run!($runner, u32, Blob<20>);
                 verify_and_run!($runner, Blob<10>, Blob<20>);
                 verify_and_run!($runner, MonotonicVec32, Blob<20>);
                 verify_and_run!($runner, MonotonicString32, Blob<20>);
+
+                // Map, unbounded value.
+                verify_and_run!($runner, u32, MonotonicVec32);
+                verify_and_run!($runner, Blob<10>, MonotonicVec32);
+                verify_and_run!($runner, MonotonicVec32, MonotonicVec32);
+                verify_and_run!($runner, MonotonicString32, MonotonicVec32);
             }
         };
     }
