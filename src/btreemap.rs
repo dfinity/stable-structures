@@ -1173,18 +1173,18 @@ mod test {
     }
 
     /// A trait to construct a value from a u32.
-    trait FromId {
-        fn make(i: u32) -> Self;
+    trait Builder {
+        fn build(i: u32) -> Self;
         fn empty() -> Self;
     }
 
-    impl FromId for () {
-        fn make(_i: u32) -> Self {}
+    impl Builder for () {
+        fn build(_i: u32) -> Self {}
         fn empty() -> Self {}
     }
 
-    impl FromId for u32 {
-        fn make(i: u32) -> Self {
+    impl Builder for u32 {
+        fn build(i: u32) -> Self {
             i
         }
         fn empty() -> Self {
@@ -1192,8 +1192,8 @@ mod test {
         }
     }
 
-    impl<const N: usize> FromId for Blob<N> {
-        fn make(i: u32) -> Self {
+    impl<const N: usize> Builder for Blob<N> {
+        fn build(i: u32) -> Self {
             Blob::try_from(&make_monotonic_buffer::<N>(i)[..]).unwrap()
         }
         fn empty() -> Self {
@@ -1203,8 +1203,8 @@ mod test {
     }
 
     type MonotonicString32 = String;
-    impl FromId for MonotonicString32 {
-        fn make(i: u32) -> Self {
+    impl Builder for MonotonicString32 {
+        fn build(i: u32) -> Self {
             format!("{i:0>32}")
         }
         fn empty() -> Self {
@@ -1213,8 +1213,8 @@ mod test {
     }
 
     type MonotonicVec32 = Vec<u8>;
-    impl FromId for MonotonicVec32 {
-        fn make(i: u32) -> Self {
+    impl Builder for MonotonicVec32 {
+        fn build(i: u32) -> Self {
             make_monotonic_buffer::<32>(i).to_vec()
         }
         fn empty() -> Self {
@@ -1265,10 +1265,13 @@ mod test {
 
     /// Checks that objects from boundary u32 values are strictly increasing.
     /// This ensures multi-byte conversions preserve order.
-    fn verify_monotonic<T: FromId + PartialOrd>() {
+    fn verify_monotonic<T: Builder + PartialOrd>() {
         for shift_bits in [8, 16, 24] {
             let i = (1 << shift_bits) - 1;
-            assert!(T::make(i) < T::make(i + 1), "Monotonicity failed at i: {i}",);
+            assert!(
+                T::build(i) < T::build(i + 1),
+                "Monotonicity failed at i: {i}",
+            );
         }
     }
 
@@ -1300,15 +1303,15 @@ mod test {
     }
 
     // Define a trait for keys that need the full set of bounds.
-    trait TestKey: Storable + Ord + Clone + FromId + std::fmt::Debug {}
-    impl<T> TestKey for T where T: Storable + Ord + Clone + FromId + std::fmt::Debug {}
+    trait TestKey: Storable + Ord + Clone + Builder + std::fmt::Debug {}
+    impl<T> TestKey for T where T: Storable + Ord + Clone + Builder + std::fmt::Debug {}
 
     // Define a trait for values that need the full set of bounds.
-    trait TestValue: Storable + Clone + FromId + std::fmt::Debug + PartialEq {}
-    impl<T> TestValue for T where T: Storable + Clone + FromId + std::fmt::Debug + PartialEq {}
+    trait TestValue: Storable + Clone + Builder + std::fmt::Debug + PartialEq {}
+    impl<T> TestValue for T where T: Storable + Clone + Builder + std::fmt::Debug + PartialEq {}
 
     fn insert_get_init_preserves_data<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 1_000;
             for i in 0..n {
@@ -1329,7 +1332,7 @@ mod test {
     );
 
     fn insert_overwrites_previous_value<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 1_000;
             for i in 0..n {
@@ -1345,7 +1348,7 @@ mod test {
     );
 
     fn insert_same_key_many<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 1_000;
             assert_eq!(btree.insert(key(1), value(2)), None);
@@ -1358,7 +1361,7 @@ mod test {
     btree_test!(test_insert_same_key_many, insert_same_key_many);
 
     fn insert_overwrite_median_key_in_full_child_node<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             for i in 1..=17 {
                 assert_eq!(btree.insert(key(i), value(0)), None);
@@ -1400,7 +1403,7 @@ mod test {
     );
 
     fn insert_overwrite_key_in_full_root_node<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
                 assert_eq!(btree.insert(key(i), value(0)), None);
@@ -1427,7 +1430,7 @@ mod test {
     );
 
     fn allocations_without_split<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         run_btree_test(|mut btree| {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
@@ -1441,7 +1444,7 @@ mod test {
     btree_test!(test_allocations_without_split, allocations_without_split);
 
     fn allocations_with_split<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         run_btree_test(|mut btree| {
             // Insert entries until the root node is full.
             let mut i = 0;
@@ -1466,7 +1469,7 @@ mod test {
     btree_test!(test_allocations_with_split, allocations_with_split);
 
     fn insert_split_node<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
                 assert_eq!(btree.insert(key(i), value(10)), None);
@@ -1490,7 +1493,7 @@ mod test {
     btree_test!(test_insert_split_node, insert_split_node);
 
     fn insert_split_multiple_nodes<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1575,7 +1578,7 @@ mod test {
     );
 
     fn first_key_value<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree: BTreeMap<K, V, _>| {
             assert_eq!(btree.first_key_value(), None);
 
@@ -1597,7 +1600,7 @@ mod test {
     btree_test!(test_first_key_value, first_key_value);
 
     fn last_key_value<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree: BTreeMap<K, V, _>| {
             assert_eq!(btree.last_key_value(), None);
 
@@ -1619,7 +1622,7 @@ mod test {
     btree_test!(test_last_key_value, last_key_value);
 
     fn pop_first_single_entry<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
@@ -1635,7 +1638,7 @@ mod test {
     btree_test!(test_pop_first_single_entry, pop_first_single_entry);
 
     fn pop_last_single_entry<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
@@ -1651,7 +1654,7 @@ mod test {
     btree_test!(test_pop_last_single_entry, pop_last_single_entry);
 
     fn remove_case_2a_and_2c<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1719,7 +1722,7 @@ mod test {
     btree_test!(test_remove_case_2a_and_2c, remove_case_2a_and_2c);
 
     fn remove_case_2b<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1784,7 +1787,7 @@ mod test {
     btree_test!(test_remove_case_2b, remove_case_2b);
 
     fn remove_case_3a_right<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1832,7 +1835,7 @@ mod test {
     btree_test!(test_remove_case_3a_right, remove_case_3a_right);
 
     fn remove_case_3a_left<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1879,7 +1882,7 @@ mod test {
     btree_test!(test_remove_case_3a_left, remove_case_3a_left);
 
     fn remove_case_3b_merge_into_right<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -1954,7 +1957,7 @@ mod test {
     );
 
     fn remove_case_3b_merge_into_left<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         let e = |i: u32| (key(i), encode(V::empty()));
         run_btree_test(|mut btree| {
             for i in 1..=11 {
@@ -2028,7 +2031,7 @@ mod test {
     );
 
     fn insert_remove_many<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 10_000;
             for i in 0..n {
@@ -2049,7 +2052,7 @@ mod test {
     btree_test!(test_insert_remove_many, insert_remove_many);
 
     fn pop_first_many<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 10_000;
 
@@ -2075,7 +2078,7 @@ mod test {
     btree_test!(test_pop_first_many, pop_first_many);
 
     fn pop_last_many<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 10_000;
 
@@ -2101,7 +2104,7 @@ mod test {
     btree_test!(test_pop_last_many, pop_last_many);
 
     fn reloading<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 1_000;
             for i in 0..n {
@@ -2131,7 +2134,7 @@ mod test {
     btree_test!(test_reloading, reloading);
 
     fn len<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 1_000;
             for i in 0..n {
@@ -2152,7 +2155,7 @@ mod test {
     btree_test!(test_len, len);
 
     fn contains_key<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             let n = 1_000;
             for i in (0..n).step_by(2) {
@@ -2168,7 +2171,7 @@ mod test {
     btree_test!(test_contains_key, contains_key);
 
     fn range_empty<K: TestKey, V: TestValue>() {
-        let key = |i| K::make(i);
+        let key = |i| K::build(i);
         run_btree_test(|btree| {
             // Test prefixes that don't exist in the map.
             assert_eq!(btree.range(key(0)..).collect::<Vec<(K, V)>>(), vec![]);
@@ -2180,7 +2183,7 @@ mod test {
 
     // Tests the case where the prefix is larger than all the entries in a leaf node.
     fn range_leaf_prefix_greater_than_all_entries<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             btree.insert(key(0), value(0));
 
@@ -2195,7 +2198,7 @@ mod test {
 
     // Tests the case where the prefix is larger than all the entries in an internal node.
     fn range_internal_prefix_greater_than_all_entries<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             for i in 1..=12 {
                 assert_eq!(btree.insert(key(i), value(i)), None);
@@ -2219,7 +2222,7 @@ mod test {
     );
 
     fn range_various_prefixes<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             btree.insert(key(1), value(100));
             btree.insert(key(2), value(200));
@@ -2284,7 +2287,7 @@ mod test {
     btree_test!(test_range_various_prefixes, range_various_prefixes);
 
     fn range_various_prefixes_2<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             btree.insert(key(1), value(100));
             btree.insert(key(2), value(200));
@@ -2412,7 +2415,7 @@ mod test {
     btree_test!(test_range_various_prefixes_2, range_various_prefixes_2);
 
     fn range_large<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             const TOTAL: u32 = 2_000;
             const MID: u32 = TOTAL / 2;
@@ -2443,7 +2446,7 @@ mod test {
     btree_test!(test_range_large, range_large);
 
     fn range_various_prefixes_with_offset<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             btree.insert(key(1), value(100));
             btree.insert(key(2), value(200));
@@ -2497,7 +2500,7 @@ mod test {
     );
 
     fn range_various_prefixes_with_offset_2<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             btree.insert(key(1), value(0));
             btree.insert(key(2), value(0));
@@ -2669,7 +2672,7 @@ mod test {
     }
 
     fn bruteforce_range_search<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
 
         fn collect_kv<'a, K: Clone + 'a, V: Clone + 'a>(
             iter: impl Iterator<Item = (&'a K, &'a V)>,
@@ -2727,7 +2730,7 @@ mod test {
     btree_test!(test_bruteforce_range_search, bruteforce_range_search);
 
     fn test_iter_upper_bound<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::make(i), |i| V::make(i));
+        let (key, value) = (|i| K::build(i), |i| V::build(i));
         run_btree_test(|mut btree| {
             for j in 0..100 {
                 btree.insert(key(j), value(j));
