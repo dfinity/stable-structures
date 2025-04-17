@@ -1322,23 +1322,37 @@ mod test {
         ($name:ident, $runner:ident) => {
             #[test]
             fn $name() {
-                // Set, empty value.
-                verify_and_run!($runner, u32, ());
-                verify_and_run!($runner, Blob<10>, ());
-                verify_and_run!($runner, MonotonicVec32, ());
-                verify_and_run!($runner, MonotonicString32, ());
+                use StorableBound::Unbounded;
+
+                // Set, empty value, bounded.
+                {
+                    type Value = ();
+                    assert_ne!(<Value>::BOUND, Unbounded, "Must be Bounded");
+                    verify_and_run!($runner, u32, Value);
+                    verify_and_run!($runner, Blob<10>, Value);
+                    verify_and_run!($runner, MonotonicVec32, Value);
+                    verify_and_run!($runner, MonotonicString32, Value);
+                }
 
                 // Map, bounded value.
-                verify_and_run!($runner, u32, u32);
-                verify_and_run!($runner, Blob<10>, u32);
-                verify_and_run!($runner, MonotonicVec32, u32);
-                verify_and_run!($runner, MonotonicString32, u32);
+                {
+                    type Value = u32;
+                    assert_ne!(Value::BOUND, Unbounded, "Must be Bounded");
+                    verify_and_run!($runner, u32, Value);
+                    verify_and_run!($runner, Blob<10>, Value);
+                    verify_and_run!($runner, MonotonicVec32, Value);
+                    verify_and_run!($runner, MonotonicString32, Value);
+                }
 
                 // Map, unbounded value.
-                verify_and_run!($runner, u32, MonotonicVec32);
-                verify_and_run!($runner, Blob<10>, MonotonicVec32);
-                verify_and_run!($runner, MonotonicVec32, MonotonicVec32);
-                verify_and_run!($runner, MonotonicString32, MonotonicVec32);
+                {
+                    type Value = MonotonicVec32;
+                    assert_eq!(Value::BOUND, Unbounded, "Must be Unbounded");
+                    verify_and_run!($runner, u32, Value);
+                    verify_and_run!($runner, Blob<10>, Value);
+                    verify_and_run!($runner, MonotonicVec32, Value);
+                    verify_and_run!($runner, MonotonicString32, Value);
+                }
             }
         };
     }
