@@ -1197,8 +1197,7 @@ mod test {
             Blob::try_from(&make_monotonic_buffer::<N>(i)[..]).unwrap()
         }
         fn empty() -> Self {
-            let x: &[u8] = &[];
-            Blob::try_from(x).unwrap()
+            Blob::try_from(&[][..]).unwrap()
         }
     }
 
@@ -1622,7 +1621,7 @@ mod test {
     btree_test!(test_last_key_value, last_key_value);
 
     fn pop_first_single_entry<K: TestKey, V: TestValue>() {
-        let (key, value) = (|i| K::build(i), |i| V::build(i));
+        let key = |i| K::build(i);
         run_btree_test(|mut btree| {
             assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 
