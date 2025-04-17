@@ -1165,11 +1165,34 @@ mod test {
     use std::rc::Rc;
 
     /// Returns a fixed‑size buffer for the given u32.
-    fn make_monotonic_buffer<const N: usize>(i: u32) -> [u8; N] {
+    fn monotonic_buffer<const N: usize>(i: u32) -> [u8; N] {
         let mut buf = [0u8; N];
         let bytes = i.to_be_bytes();
         buf[N - bytes.len()..].copy_from_slice(&bytes);
         buf
+    }
+
+    #[test]
+    fn test_monotonic_buffer() {
+        let cases: &[(u32, [u8; 4])] = &[
+            (1, [0, 0, 0, 1]),
+            (2, [0, 0, 0, 2]),
+            ((1 << 8) - 1, [0, 0, 0, 255]),
+            ((1 << 8), [0, 0, 1, 0]),
+            ((1 << 16) - 1, [0, 0, 255, 255]),
+            (1 << 16, [0, 1, 0, 0]),
+            ((1 << 24) - 1, [0, 255, 255, 255]),
+            (1 << 24, [1, 0, 0, 0]),
+        ];
+
+        for &(input, expected) in cases {
+            let output = monotonic_buffer::<4>(input);
+            assert_eq!(
+                output, expected,
+                "monotonic_buffer::<4>({}) returned {:?}, expected {:?}",
+                input, output, expected
+            );
+        }
     }
 
     /// A trait to construct a value from a u32.
@@ -1194,7 +1217,7 @@ mod test {
 
     impl<const N: usize> Builder for Blob<N> {
         fn build(i: u32) -> Self {
-            Blob::try_from(&make_monotonic_buffer::<N>(i)[..]).unwrap()
+            Blob::try_from(&monotonic_buffer::<N>(i)[..]).unwrap()
         }
         fn empty() -> Self {
             Blob::try_from(&[][..]).unwrap()
@@ -1214,7 +1237,7 @@ mod test {
     type MonotonicVec32 = Vec<u8>;
     impl Builder for MonotonicVec32 {
         fn build(i: u32) -> Self {
-            make_monotonic_buffer::<32>(i).to_vec()
+            monotonic_buffer::<32>(i).to_vec()
         }
         fn empty() -> Self {
             Vec::new()
