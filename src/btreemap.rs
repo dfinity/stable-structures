@@ -1381,15 +1381,12 @@ mod test {
             let right_child = btree.load_node(root.child(1));
             assert!(right_child.is_full());
             let median_index = right_child.entries_len() / 2;
-            let expected_median_key = key(12);
-            assert_eq!(right_child.key(median_index), &expected_median_key);
+            let median_key = key(12);
+            assert_eq!(right_child.key(median_index), &median_key);
 
             // Overwrite the value of the median key.
-            assert_eq!(
-                btree.insert(expected_median_key.clone(), value(123)),
-                Some(value(0))
-            );
-            assert_eq!(btree.get(&expected_median_key), Some(value(123)));
+            assert_eq!(btree.insert(median_key.clone(), value(123)), Some(value(0)));
+            assert_eq!(btree.get(&median_key), Some(value(123)));
 
             // The child has not been split and is still full.
             let right_child = btree.load_node(root.child(1));
