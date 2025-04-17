@@ -1178,6 +1178,11 @@ mod test {
         fn empty() -> Self;
     }
 
+    impl Make for () {
+        fn make(_i: u32) -> Self {}
+        fn empty() -> Self {}
+    }
+
     impl Make for u32 {
         fn make(i: u32) -> Self {
             i
@@ -1204,6 +1209,16 @@ mod test {
         }
         fn empty() -> Self {
             String::new()
+        }
+    }
+
+    type MonotonicVec32 = Vec<u8>;
+    impl Make for MonotonicVec32 {
+        fn make(i: u32) -> Self {
+            make_monotonic_buffer::<32>(i).to_vec()
+        }
+        fn empty() -> Self {
+            Vec::new()
         }
     }
 
@@ -1257,29 +1272,29 @@ mod test {
         }
     }
 
+    macro_rules! verify_and_run {
+        ($runner:ident, $K:ty, $V:ty) => {{
+            verify_monotonic::<$K>();
+            $runner::<$K, $V>();
+        }};
+    }
+
     /// Macro to apply a test function to a predefined grid of key/value types.
     macro_rules! btree_test {
-        ($name:ident, $runner_fn:ident) => {
+        ($name:ident, $runner:ident) => {
             #[test]
             fn $name() {
-                {
-                    type K = u32;
-                    type V = Blob<20>;
-                    verify_monotonic::<K>();
-                    $runner_fn::<K, V>();
-                }
-                {
-                    type K = Blob<10>;
-                    type V = Blob<20>;
-                    verify_monotonic::<K>();
-                    $runner_fn::<K, V>();
-                }
-                {
-                    type K = MonotonicString32;
-                    type V = String;
-                    verify_monotonic::<K>();
-                    $runner_fn::<K, V>();
-                }
+                // Set.
+                verify_and_run!($runner, u32, ());
+                verify_and_run!($runner, Blob<10>, ());
+                verify_and_run!($runner, MonotonicString32, ());
+                verify_and_run!($runner, MonotonicVec32, ());
+
+                // Map.
+                verify_and_run!($runner, u32, Blob<20>);
+                verify_and_run!($runner, Blob<10>, Blob<20>);
+                verify_and_run!($runner, MonotonicString32, Blob<20>);
+                verify_and_run!($runner, MonotonicVec32, Blob<20>);
             }
         };
     }
