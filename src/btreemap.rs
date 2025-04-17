@@ -1506,13 +1506,13 @@ mod test {
         let (key, value) = (K::build, V::build);
         run_btree_test(|mut btree| {
             for i in 1..=11 {
-                assert_eq!(btree.insert(key(i), value(10)), None);
+                assert_eq!(btree.insert(key(i), value(i)), None);
             }
 
             // Should now split a node.
             let root = btree.load_node(btree.root_addr);
             assert!(root.is_full());
-            assert_eq!(btree.insert(key(12), value(10)), None);
+            assert_eq!(btree.insert(key(12), value(12)), None);
 
             // The result should look like this:
             //                [6]
@@ -1520,7 +1520,7 @@ mod test {
             // [1, 2, 3, 4, 5]   [7, 8, 9, 10, 11, 12]
 
             for i in 1..=12 {
-                assert_eq!(btree.get(&key(i)), Some(value(10)));
+                assert_eq!(btree.get(&key(i)), Some(value(i)));
             }
         });
     }
