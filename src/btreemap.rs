@@ -1164,6 +1164,16 @@ mod test {
     use std::convert::TryFrom;
     use std::rc::Rc;
 
+    fn collect_kv<'a, K: Clone + 'a, V: Clone + 'a>(
+        iter: impl Iterator<Item = (&'a K, &'a V)>,
+    ) -> Vec<(K, V)> {
+        iter.map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+
+    fn collect<K: Clone, V: Clone>(it: impl Iterator<Item = (K, V)>) -> Vec<(K, V)> {
+        it.collect()
+    }
+
     /// Returns a fixed‑size buffer for the given u32.
     fn monotonic_buffer<const N: usize>(i: u32) -> [u8; N] {
         let mut buf = [0u8; N];
@@ -1797,10 +1807,7 @@ mod test {
             assert_eq!(root.node_type(), NodeType::Leaf);
             assert_eq!(
                 root.entries(btree.memory()),
-                [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
-                    .into_iter()
-                    .map(e)
-                    .collect::<Vec<_>>()
+                collect([1, 2, 3, 4, 5, 8, 9, 10, 11, 12].into_iter().map(e))
             );
 
             assert_eq!(btree.allocator.num_allocated_chunks(), 1);
@@ -1963,10 +1970,7 @@ mod test {
             assert_eq!(root.node_type(), NodeType::Leaf);
             assert_eq!(
                 root.entries(btree.memory()),
-                [1, 2, 4, 5, 7, 8, 9, 10, 11, 12]
-                    .into_iter()
-                    .map(e)
-                    .collect::<Vec<_>>()
+                collect([1, 2, 4, 5, 7, 8, 9, 10, 11, 12].into_iter().map(e))
             );
 
             // There is only one allocated node remaining.
@@ -2194,11 +2198,11 @@ mod test {
 
     fn range_empty<K: TestKey, V: TestValue>() {
         let key = |i| K::build(i);
-        run_btree_test(|btree| {
+        run_btree_test(|btree: BTreeMap<K, V, _>| {
             // Test prefixes that don't exist in the map.
-            assert_eq!(btree.range(key(0)..).collect::<Vec<(K, V)>>(), vec![]);
-            assert_eq!(btree.range(key(10)..).collect::<Vec<(K, V)>>(), vec![]);
-            assert_eq!(btree.range(key(100)..).collect::<Vec<(K, V)>>(), vec![]);
+            assert_eq!(collect(btree.range(key(0)..)), vec![]);
+            assert_eq!(collect(btree.range(key(10)..)), vec![]);
+            assert_eq!(collect(btree.range(key(100)..)), vec![]);
         });
     }
     btree_test!(test_range_empty, range_empty);
@@ -2233,7 +2237,7 @@ mod test {
 
             // Test a prefix that's larger than the key in the internal node.
             assert_eq!(
-                btree.range(key(7)..key(8)).collect::<Vec<_>>(),
+                collect(btree.range(key(7)..key(8))),
                 vec![(key(7), value(7))]
             );
         });
@@ -2274,7 +2278,7 @@ mod test {
 
             // Tests a prefix that's smaller than the key in the internal node.
             assert_eq!(
-                btree.range(key(0)..key(11)).collect::<Vec<_>>(),
+                collect(btree.range(key(0)..key(11))),
                 vec![
                     (key(1), value(100)),
                     (key(2), value(200)),
@@ -2285,7 +2289,7 @@ mod test {
 
             // Tests a prefix that crosses several nodes.
             assert_eq!(
-                btree.range(key(10)..key(20)).collect::<Vec<_>>(),
+                collect(btree.range(key(10)..key(20))),
                 vec![
                     (key(11), value(500)),
                     (key(12), value(600)),
@@ -2296,7 +2300,7 @@ mod test {
 
             // Tests a prefix that's larger than the key in the internal node.
             assert_eq!(
-                btree.range(key(20)..key(30)).collect::<Vec<_>>(),
+                collect(btree.range(key(20)..key(30))),
                 vec![
                     (key(21), value(900)),
                     (key(22), value(1_000)),
@@ -2386,11 +2390,11 @@ mod test {
             );
 
             // Tests a prefix that doesn't exist, but is in the middle of the root node.
-            assert_eq!(btree.range(key(15)..key(16)).collect::<Vec<_>>(), vec![]);
+            assert_eq!(collect(btree.range(key(15)..key(16))), vec![]);
 
             // Tests a prefix beginning in the middle of the tree and crossing several nodes.
             assert_eq!(
-                btree.range(key(15)..=key(26)).collect::<Vec<_>>(),
+                collect(btree.range(key(15)..=key(26))),
                 vec![
                     (key(16), value(700)),
                     (key(18), value(800)),
@@ -2406,7 +2410,7 @@ mod test {
 
             // Tests a prefix that crosses several nodes.
             assert_eq!(
-                btree.range(key(10)..key(20)).collect::<Vec<_>>(),
+                collect(btree.range(key(10)..key(20))),
                 vec![
                     (key(12), value(500)),
                     (key(14), value(600)),
@@ -2419,7 +2423,7 @@ mod test {
             // Tests a prefix that starts from a leaf node, then iterates through the root and right
             // sibling.
             assert_eq!(
-                btree.range(key(20)..key(30)).collect::<Vec<_>>(),
+                collect(btree.range(key(20)..key(30))),
                 vec![
                     (key(21), value(1000)),
                     (key(22), value(1100)),
@@ -2497,7 +2501,7 @@ mod test {
             assert_eq!(root.children_len(), 2);
 
             assert_eq!(
-                btree.range(key(0)..key(10)).collect::<Vec<_>>(),
+                collect(btree.range(key(0)..key(10))),
                 vec![
                     (key(1), value(100)),
                     (key(2), value(200)),
@@ -2508,12 +2512,12 @@ mod test {
 
             // Tests an offset that has a keys somewhere in the range of keys of an internal node.
             assert_eq!(
-                btree.range(key(13)..key(20)).collect::<Vec<_>>(),
+                collect(btree.range(key(13)..key(20))),
                 vec![(key(13), value(700)), (key(14), value(800))]
             );
 
             // Tests an offset that's larger than the key in the internal node.
-            assert_eq!(btree.range(key(25)..).collect::<Vec<_>>(), vec![]);
+            assert_eq!(collect(btree.range(key(25)..)), vec![]);
         });
     }
     btree_test!(
@@ -2598,7 +2602,7 @@ mod test {
 
             // Tests a offset that crosses several nodes.
             assert_eq!(
-                btree.range(key(14)..key(20)).collect::<Vec<_>>(),
+                collect(btree.range(key(14)..key(20))),
                 vec![
                     (key(14), value(0)),
                     (key(16), value(0)),
@@ -2610,7 +2614,7 @@ mod test {
             // Tests a offset that starts from a leaf node, then iterates through the root and right
             // sibling.
             assert_eq!(
-                btree.range(key(22)..key(30)).collect::<Vec<_>>(),
+                collect(btree.range(key(22)..key(30))),
                 vec![
                     (key(22), value(0)),
                     (key(23), value(0)),
@@ -2695,17 +2699,6 @@ mod test {
 
     fn bruteforce_range_search<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::build(i), |i| V::build(i));
-
-        fn collect_kv<'a, K: Clone + 'a, V: Clone + 'a>(
-            iter: impl Iterator<Item = (&'a K, &'a V)>,
-        ) -> Vec<(K, V)> {
-            iter.map(|(k, v)| (k.clone(), v.clone())).collect()
-        }
-
-        fn collect<K: Clone, V: Clone>(it: impl Iterator<Item = (K, V)>) -> Vec<(K, V)> {
-            it.collect()
-        }
-
         run_btree_test(|mut stable_map| {
             use std::collections::BTreeMap;
             const NKEYS: u32 = 60;
