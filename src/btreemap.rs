@@ -1173,17 +1173,17 @@ mod test {
     }
 
     /// A trait to construct a value from a u32.
-    trait Make {
+    trait FromId {
         fn make(i: u32) -> Self;
         fn empty() -> Self;
     }
 
-    impl Make for () {
+    impl FromId for () {
         fn make(_i: u32) -> Self {}
         fn empty() -> Self {}
     }
 
-    impl Make for u32 {
+    impl FromId for u32 {
         fn make(i: u32) -> Self {
             i
         }
@@ -1192,7 +1192,7 @@ mod test {
         }
     }
 
-    impl<const N: usize> Make for Blob<N> {
+    impl<const N: usize> FromId for Blob<N> {
         fn make(i: u32) -> Self {
             Blob::try_from(&make_monotonic_buffer::<N>(i)[..]).unwrap()
         }
@@ -1203,7 +1203,7 @@ mod test {
     }
 
     type MonotonicString32 = String;
-    impl Make for MonotonicString32 {
+    impl FromId for MonotonicString32 {
         fn make(i: u32) -> Self {
             format!("{i:0>32}")
         }
@@ -1213,7 +1213,7 @@ mod test {
     }
 
     type MonotonicVec32 = Vec<u8>;
-    impl Make for MonotonicVec32 {
+    impl FromId for MonotonicVec32 {
         fn make(i: u32) -> Self {
             make_monotonic_buffer::<32>(i).to_vec()
         }
@@ -1265,7 +1265,7 @@ mod test {
 
     /// Checks that objects from boundary u32 values are strictly increasing.
     /// This ensures multi-byte conversions preserve order.
-    fn verify_monotonic<T: Make + PartialOrd>() {
+    fn verify_monotonic<T: FromId + PartialOrd>() {
         for shift_bits in [8, 16, 24] {
             let i = (1 << shift_bits) - 1;
             assert!(T::make(i) < T::make(i + 1), "Monotonicity failed at i: {i}",);
@@ -1300,12 +1300,12 @@ mod test {
     }
 
     // Define a trait for keys that need the full set of bounds.
-    trait TestKey: Storable + Ord + Clone + Make + std::fmt::Debug {}
-    impl<T> TestKey for T where T: Storable + Ord + Clone + Make + std::fmt::Debug {}
+    trait TestKey: Storable + Ord + Clone + FromId + std::fmt::Debug {}
+    impl<T> TestKey for T where T: Storable + Ord + Clone + FromId + std::fmt::Debug {}
 
     // Define a trait for values that need the full set of bounds.
-    trait TestValue: Storable + Clone + Make + std::fmt::Debug + PartialEq {}
-    impl<T> TestValue for T where T: Storable + Clone + Make + std::fmt::Debug + PartialEq {}
+    trait TestValue: Storable + Clone + FromId + std::fmt::Debug + PartialEq {}
+    impl<T> TestValue for T where T: Storable + Clone + FromId + std::fmt::Debug + PartialEq {}
 
     fn insert_get_init_preserves_data<K: TestKey, V: TestValue>() {
         let (key, value) = (|i| K::make(i), |i| V::make(i));
