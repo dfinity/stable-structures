@@ -1236,16 +1236,6 @@ mod test {
         }
     }
 
-    type MonotonicString32 = String;
-    impl Builder for MonotonicString32 {
-        fn build(i: u32) -> Self {
-            format!("{i:0>32}")
-        }
-        fn empty() -> Self {
-            String::new()
-        }
-    }
-
     type MonotonicVec32 = Vec<u8>;
     impl Builder for MonotonicVec32 {
         fn build(i: u32) -> Self {
@@ -1253,6 +1243,16 @@ mod test {
         }
         fn empty() -> Self {
             Vec::new()
+        }
+    }
+
+    type MonotonicString32 = String;
+    impl Builder for MonotonicString32 {
+        fn build(i: u32) -> Self {
+            format!("{i:0>32}")
+        }
+        fn empty() -> Self {
+            String::new()
         }
     }
 
@@ -1324,14 +1324,14 @@ mod test {
                 // Set.
                 verify_and_run!($runner, u32, ());
                 verify_and_run!($runner, Blob<10>, ());
-                verify_and_run!($runner, MonotonicString32, ());
                 verify_and_run!($runner, MonotonicVec32, ());
+                verify_and_run!($runner, MonotonicString32, ());
 
                 // Map.
                 verify_and_run!($runner, u32, Blob<20>);
                 verify_and_run!($runner, Blob<10>, Blob<20>);
-                verify_and_run!($runner, MonotonicString32, Blob<20>);
                 verify_and_run!($runner, MonotonicVec32, Blob<20>);
+                verify_and_run!($runner, MonotonicString32, Blob<20>);
             }
         };
     }
