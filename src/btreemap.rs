@@ -1329,10 +1329,10 @@ mod test {
                 verify_and_run!($runner, MonotonicString32, ());
 
                 // Map, bounded value.
-                verify_and_run!($runner, u32, Blob<20>);
-                verify_and_run!($runner, Blob<10>, Blob<20>);
-                verify_and_run!($runner, MonotonicVec32, Blob<20>);
-                verify_and_run!($runner, MonotonicString32, Blob<20>);
+                verify_and_run!($runner, u32, u32);
+                verify_and_run!($runner, Blob<10>, u32);
+                verify_and_run!($runner, MonotonicVec32, u32);
+                verify_and_run!($runner, MonotonicString32, u32);
 
                 // Map, unbounded value.
                 verify_and_run!($runner, u32, MonotonicVec32);
