@@ -2216,7 +2216,7 @@ mod test {
             btree.insert(key(0), value(0));
 
             // Test a prefix that's larger than the value in the leaf node. Should be empty.
-            assert_eq!(btree.range(key(1)..).collect::<Vec<_>>(), vec![]);
+            assert_eq!(collect(btree.range(key(1)..)), vec![]);
         });
     }
     btree_test!(
