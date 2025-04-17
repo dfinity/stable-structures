@@ -1164,12 +1164,14 @@ mod test {
     use std::convert::TryFrom;
     use std::rc::Rc;
 
+    /// A helper function to clone and collect borrowed key/value pairs into a `Vec`.
     fn collect_kv<'a, K: Clone + 'a, V: Clone + 'a>(
         iter: impl Iterator<Item = (&'a K, &'a V)>,
     ) -> Vec<(K, V)> {
         iter.map(|(k, v)| (k.clone(), v.clone())).collect()
     }
 
+    /// A helper function to collect owned key/value pairs into a `Vec`.
     fn collect<K: Clone, V: Clone>(it: impl Iterator<Item = (K, V)>) -> Vec<(K, V)> {
         it.collect()
     }
