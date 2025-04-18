@@ -81,10 +81,149 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-/// A "stable" map based on a B-tree.
+/// A B-Tree map implementation that stores its data into a designated memory.
 ///
-/// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
-/// by Cormen et al.
+/// # Memory Implementations
+///
+/// `BTreeMap` works with any memory implementation that satisfies the [`Memory`] trait:
+///
+/// - [`Ic0StableMemory`](crate::Ic0StableMemory): Stores data in the Internet Computer's stable memory
+/// - [`VectorMemory`](crate::VectorMemory): In-memory implementation backed by a Rust `Vec<u8>`
+/// - [`FileMemory`](crate::FileMemory): Persists data to disk using a file
+/// - [`DefaultMemoryImpl`](crate::DefaultMemoryImpl): Default implementation that automatically selects the 
+///   appropriate memory backend based on the environment:
+///   - Uses `Ic0StableMemory` when running in an Internet Computer canister (wasm32 target)
+///   - Falls back to `VectorMemory` in other environments (like tests or non-IC contexts)
+///
+/// For almost all use cases, [`DefaultMemoryImpl`](crate::DefaultMemoryImpl) is recommended as it provides
+/// the right implementation based on the runtime context.
+///
+/// # Examples
+///
+/// ## Basic Usage with a Single BTreeMap
+///
+/// ```rust
+/// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+/// let mut map: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
+///
+/// map.insert(1, "hello".to_string());
+/// # assert_eq!(map.get(&1), Some("hello".to_string()));
+/// ```
+///
+/// ## Multiple BTreeMaps and Memory Management
+///
+/// **Important**: Each stable structure requires its own designated memory region. Attempting to
+/// initialize multiple structures with the same memory will lead to data corruption.
+///
+/// ### What NOT to do:
+///
+/// ```rust,no_run
+/// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+/// 
+/// // ERROR: Using the same memory for multiple BTreeMaps will corrupt data
+/// let mut map_1: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
+/// let mut map_2: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
+///
+/// map_1.insert(1, "two".to_string());
+/// map_2.insert(1, "three".to_string());
+/// // This assertion would fail: changes to map_2 corrupt map_1's data
+/// assert_eq!(map_1.get(&1), Some("two".to_string())); 
+/// ```
+///
+/// ### Correct approach using MemoryManager:
+///
+/// ```rust
+/// use ic_stable_structures::{
+///    memory_manager::{MemoryId, MemoryManager},
+///    BTreeMap, DefaultMemoryImpl,
+/// };
+/// 
+/// // Initialize the memory manager with a single memory
+/// let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+/// 
+/// // Get separate virtual memories for each BTreeMap
+/// let mut map_1: BTreeMap<u64, String, _> = BTreeMap::init(memory_manager.get(MemoryId::new(0)));
+/// let mut map_2: BTreeMap<u64, String, _> = BTreeMap::init(memory_manager.get(MemoryId::new(1)));
+///
+/// map_1.insert(1, "two".to_string());
+/// map_2.insert(1, "three".to_string());
+/// // Now this works as expected
+/// assert_eq!(map_1.get(&1), Some("two".to_string()));
+/// ```
+///
+/// The [`MemoryManager`](crate::memory_manager::MemoryManager) creates up to 255 virtual memories
+/// from a single contiguous memory, allowing multiple stable structures to safely coexist.
+/// 
+/// For complete examples of using multiple stable structures in a production environment, see the 
+/// [Quick Start example](https://github.com/dfinity/stable-structures/tree/main/examples/src/quick_start).
+///
+/// ## Custom Types
+///
+/// You can store custom structs in a `BTreeMap` by implementing the `Storable` trait:
+///
+/// ```rust
+/// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl, Storable, storable::Bound};
+/// use std::borrow::Cow;
+///
+/// #[derive(Debug, PartialEq)]
+/// struct User {
+///     id: u64,
+///     name: String,
+/// }
+///
+/// impl Storable for User {
+///     fn to_bytes(&self) -> Cow<[u8]> {
+///         let mut bytes = Vec::new();
+///         // TODO: Convert your struct to bytes...
+///         Cow::Owned(bytes)
+///     }
+///
+///     fn from_bytes(bytes: Cow<[u8]>) -> Self {
+///         // TODO: Convert bytes back to your struct
+///         let (id, name) = (0, "".to_string()); 
+///         User { id, name }
+///     }
+///
+///     // Types can be bounded or unbounded:
+///     // - Use Bound::Unbounded if the size can vary or isn't known in advance (recommended for most cases)
+///     // - Use Bound::Bounded if you know the maximum size and want memory optimization
+///     const BOUND: Bound = Bound::Unbounded;
+/// }
+///
+/// // Now you can use your custom type in a BTreeMap
+/// let mut map: BTreeMap<u64, User, _> = BTreeMap::init(DefaultMemoryImpl::default());
+/// 
+/// let user = User { id: 1, name: "Alice".to_string() };
+/// map.insert(1, user);
+///
+/// // Retrieving the custom type
+/// if let Some(user) = map.get(&1) {
+///     println!("Found user: {}", user.name);
+/// }
+/// ```
+///
+/// ### Bounded vs Unbounded Types
+///
+/// When implementing `Storable`, you must specify whether your type is bounded or unbounded:
+///
+/// - **Unbounded (`Bound::Unbounded`)**: 
+///   - Use when your type's serialized size can vary or has no fixed maximum
+///   - Recommended for most custom types, especially those containing Strings or Vecs
+///   - Example: `const BOUND: Bound = Bound::Unbounded;`
+///
+/// - **Bounded (`Bound::Bounded{ max_size, is_fixed_size }`)**: 
+///   - Use when you know the maximum serialized size of your type
+///   - Enables memory optimizations in the BTreeMap
+///   - Example: `const BOUND: Bound = Bound::Bounded { max_size: 100, is_fixed_size: false };`
+///   - For types with truly fixed size (like primitive types), set `is_fixed_size: true`
+///
+/// If unsure, use `Bound::Unbounded` as it's the safer choice.
+///
+/// # Warning
+///
+/// Once you've deployed with a bounded type, you cannot increase its `max_size` in 
+/// future versions without risking data corruption. You can, however, migrate from a bounded type 
+/// to an unbounded type if needed. For evolving data structures, prefer `Bound::Unbounded`.
 pub struct BTreeMap<K, V, M>
 where
     K: Storable + Ord + Clone,
@@ -1009,12 +1148,43 @@ where
     }
 
     /// Returns an iterator over the entries of the map, sorted by key.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    /// let mut map: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
+    /// 
+    /// map.insert(1, "one".to_string());
+    /// map.insert(2, "two".to_string());
+    /// 
+    /// for (key, value) in map.iter() {
+    ///     println!("{}: {}", key, value);
+    /// }
+    /// ```
     pub fn iter(&self) -> Iter<K, V, M> {
         self.iter_internal().into()
     }
 
     /// Returns an iterator over the entries in the map where keys
     /// belong to the specified range.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    /// use std::ops::Bound;
+    /// 
+    /// let mut map: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
+    /// map.insert(1, "one".to_string());
+    /// map.insert(2, "two".to_string());
+    /// map.insert(3, "three".to_string());
+    /// 
+    /// // Get entries with keys between 1 and 3 (inclusive)
+    /// for (key, value) in map.range((Bound::Included(1), Bound::Included(3))) {
+    ///     println!("{}: {}", key, value);
+    /// }
+    /// ```
     pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, V, M> {
         self.range_internal(key_range).into()
     }
