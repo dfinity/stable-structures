@@ -1,6 +1,6 @@
 use crate::{
     btreemap::{
-        test::{b, btree_test, make_memory},
+        test::{b, make_memory, run_btree_test},
         BTreeMap,
     },
     storable::Blob,
@@ -105,7 +105,7 @@ fn comprehensive_fuzz() {
 
 #[proptest(cases = 10)]
 fn insert(#[strategy(pset(arb_blob(), 1000..10_000))] keys: BTreeSet<Blob<10>>) {
-    btree_test(|mut btree| {
+    run_btree_test(|mut btree| {
         let keys = keys.clone();
         for key in keys.iter() {
             assert_eq!(btree.insert(*key, *key), None);
@@ -122,7 +122,7 @@ fn insert(#[strategy(pset(arb_blob(), 1000..10_000))] keys: BTreeSet<Blob<10>>) 
 
 #[proptest]
 fn map_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
-    btree_test(|mut map| {
+    run_btree_test(|mut map| {
         prop_assert_eq!(map.first_key_value(), None);
         prop_assert_eq!(map.last_key_value(), None);
 
@@ -142,7 +142,7 @@ fn map_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
 
 #[proptest]
 fn map_upper_bound_iter(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: Vec<u64>) {
-    btree_test(|mut map| {
+    run_btree_test(|mut map| {
         for k in keys.iter() {
             map.insert(*k, ());
 
@@ -155,7 +155,7 @@ fn map_upper_bound_iter(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: Vec
 
 #[proptest(cases = 10)]
 fn iter_count_test(#[strategy(0..250u8)] start: u8, #[strategy(#start..255u8)] end: u8) {
-    btree_test(|mut btree| {
+    run_btree_test(|mut btree| {
         for i in start..end {
             assert_eq!(btree.insert(b(&[i]), b(&[])), None);
         }
