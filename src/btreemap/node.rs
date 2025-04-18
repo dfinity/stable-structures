@@ -333,7 +333,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Removes the entry at the specified index.
     pub fn remove_entry<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
         let (key, value) = self.keys_and_encoded_values.remove(idx);
-        println!("ABC remove_entry: {:?}", key);
+        //println!("ABC remove_entry: {:?}", key);
         (
             self.extract_key(key, memory),
             self.extract_value(value, memory),
