@@ -63,32 +63,34 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_value_size: u32,
         memory: &M,
     ) -> Self {
-        const LOAD_SIZE_THRESHOLD: u32 = 8;
         // Load the entries.
         let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
-        let mut buf = vec![];
+        //const LOAD_SIZE_THRESHOLD: u32 = 8;
+        //let mut buf = vec![];
         for _ in 0..header.num_entries {
             let key_offset = offset;
-            let key_size = read_u32(memory, address + offset);
+            //let key_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
-            let key = if key_size <= LOAD_SIZE_THRESHOLD {
-                read_to_vec(memory, address + offset, &mut buf, key_size as usize);
-                LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
-            } else {
-                LazyKey::by_ref(key_offset)
-            };
+            // let key = if key_size <= LOAD_SIZE_THRESHOLD {
+            //     read_to_vec(memory, address + offset, &mut buf, key_size as usize);
+            //     LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
+            // } else {
+            //     LazyKey::by_ref(key_offset)
+            // };
+            let key = LazyKey::by_ref(key_offset);
             offset += Bytes::from(max_key_size);
 
             let value_offset = offset;
-            let value_size = read_u32(memory, address + offset);
+            // let value_size = read_u32(memory, address + offset);
             offset += U32_SIZE;
-            let value = if value_size <= LOAD_SIZE_THRESHOLD {
-                read_to_vec(memory, address + offset, &mut buf, value_size as usize);
-                LazyValue::by_value(buf.to_vec())
-            } else {
-                LazyValue::by_ref(value_offset)
-            };
+            // let value = if value_size <= LOAD_SIZE_THRESHOLD {
+            //     read_to_vec(memory, address + offset, &mut buf, value_size as usize);
+            //     LazyValue::by_value(buf.to_vec())
+            // } else {
+            //     LazyValue::by_ref(value_offset)
+            // };
+            let value = LazyValue::by_ref(value_offset);
             offset += Bytes::from(max_value_size);
 
             keys_encoded_values.push((key, value));
