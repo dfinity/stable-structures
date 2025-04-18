@@ -146,13 +146,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
             }
         }
 
+        const LOAD_SIZE_THRESHOLD: u32 = 8;
         // Load the keys.
         let mut keys_encoded_values = Vec::with_capacity(num_entries);
+        let mut buf = vec![];
         for _ in 0..num_entries {
-            keys_encoded_values.push((
-                LazyKey::by_ref(Bytes::from(offset.get())),
-                LazyValue::by_ref(Bytes::from(0usize)),
-            ));
+            let key_offset = Bytes::from(offset.get());
 
             // Advance offset by the key_size type size if applicable.
             let key_size = if K::BOUND.is_fixed_size() {
@@ -165,17 +164,31 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 offset += U32_SIZE;
                 key_size
             };
+            let key = if key_size <= LOAD_SIZE_THRESHOLD {
+                read_to_vec(&reader, offset, &mut buf, key_size as usize);
+                LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
+            } else {
+                LazyKey::by_ref(key_offset)
+            };
 
             // Advance offset by the size of the key.
             offset += Bytes::from(key_size);
+
+            keys_encoded_values.push((key, LazyValue::by_ref(Bytes::from(0usize))));
         }
 
         // Load the values
         for (_key, value) in keys_encoded_values.iter_mut() {
-            // Load the values lazily.
-            *value = LazyValue::by_ref(Bytes::from(offset.get()));
-            let value_size = read_u32(&reader, offset) as usize;
-            offset += U32_SIZE + Bytes::from(value_size as u64);
+            let value_offset = Bytes::from(offset.get());
+            let value_size = read_u32(&reader, offset);
+            offset += U32_SIZE;
+            *value = if value_size <= LOAD_SIZE_THRESHOLD {
+                read_to_vec(&reader, offset, &mut buf, value_size as usize);
+                LazyValue::by_value(buf.to_vec())
+            } else {
+                LazyValue::by_ref(value_offset)
+            };
+            offset += Bytes::from(value_size as u64);
         }
 
         Self {
