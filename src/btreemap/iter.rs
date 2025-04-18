@@ -94,7 +94,7 @@ where
             Bound::Included(key) | Bound::Excluded(key) => {
                 let mut node = self.map.load_node(self.map.root_addr);
                 loop {
-                    match node.search(key) {
+                    match node.search(key, self.map.memory()) {
                         Ok(idx) => {
                             if let Bound::Included(_) = self.range.start_bound() {
                                 // We found the key exactly matching the left bound.
@@ -115,7 +115,7 @@ where
                                 };
 
                                 if idx + 1 < node.entries_len()
-                                    && self.range.contains(node.key(idx + 1))
+                                    && self.range.contains(node.key(idx + 1, self.map.memory()))
                                 {
                                     self.forward_cursors.push(Cursor::Node {
                                         node,
@@ -152,7 +152,9 @@ where
                                 NodeType::Leaf => None,
                             };
 
-                            if idx < node.entries_len() && self.range.contains(node.key(idx)) {
+                            if idx < node.entries_len()
+                                && self.range.contains(node.key(idx, self.map.memory()))
+                            {
                                 self.forward_cursors.push(Cursor::Node {
                                     node,
                                     next: Index::Entry(idx),
@@ -188,7 +190,7 @@ where
             Bound::Included(key) | Bound::Excluded(key) => {
                 let mut node = self.map.load_node(self.map.root_addr);
                 loop {
-                    match node.search(key) {
+                    match node.search(key, self.map.memory()) {
                         Ok(idx) => {
                             if let Bound::Included(_) = self.range.end_bound() {
                                 // We found the key exactly matching the right bound.
@@ -208,7 +210,9 @@ where
                                     NodeType::Leaf => None,
                                 };
 
-                                if idx > 0 && self.range.contains(node.key(idx - 1)) {
+                                if idx > 0
+                                    && self.range.contains(node.key(idx - 1, self.map.memory()))
+                                {
                                     self.backward_cursors.push(Cursor::Node {
                                         node,
                                         next: Index::Entry(idx - 1),
@@ -243,7 +247,8 @@ where
                                 NodeType::Leaf => None,
                             };
 
-                            if idx > 0 && self.range.contains(node.key(idx - 1)) {
+                            if idx > 0 && self.range.contains(node.key(idx - 1, self.map.memory()))
+                            {
                                 self.backward_cursors.push(Cursor::Node {
                                     node,
                                     next: Index::Entry(idx - 1),
@@ -320,7 +325,7 @@ where
                 next: Index::Entry(entry_idx),
             } => {
                 // If the key does not belong to the range, iteration stops.
-                if !self.range.contains(node.key(entry_idx)) {
+                if !self.range.contains(node.key(entry_idx, self.map.memory())) {
                     // Clear all cursors to avoid needless work in subsequent calls.
                     self.forward_cursors = vec![];
                     self.backward_cursors = vec![];
@@ -328,7 +333,7 @@ where
                 }
 
                 let res = map(&node, entry_idx);
-                self.range.0 = Bound::Excluded(node.key(entry_idx).clone());
+                self.range.0 = Bound::Excluded(node.key(entry_idx, self.map.memory()).clone());
 
                 let next = match node.node_type() {
                     // If this is an internal node, add the next child to the cursors.
@@ -403,7 +408,7 @@ where
                 next: Index::Entry(entry_idx),
             } => {
                 // If the key does not belong to the range, iteration stops.
-                if !self.range.contains(node.key(entry_idx)) {
+                if !self.range.contains(node.key(entry_idx, self.map.memory())) {
                     // Clear all cursors to avoid needless work in subsequent calls.
                     self.forward_cursors = vec![];
                     self.backward_cursors = vec![];
@@ -411,7 +416,7 @@ where
                 }
 
                 let res = map(&node, entry_idx);
-                self.range.1 = Bound::Excluded(node.key(entry_idx).clone());
+                self.range.1 = Bound::Excluded(node.key(entry_idx, self.map.memory()).clone());
 
                 if let Some(next) = match node.node_type() {
                     // If this is an internal node, add the previous child to the cursors.
@@ -497,7 +502,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0
-            .next_map(|node, entry_idx| node.key(entry_idx).clone())
+            .next_map(|node, entry_idx| node.key(entry_idx, self.0.map.memory()).clone())
     }
 
     fn count(mut self) -> usize
@@ -516,7 +521,7 @@ where
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0
-            .next_back_map(|node, entry_idx| node.key(entry_idx).clone())
+            .next_back_map(|node, entry_idx| node.key(entry_idx, self.0.map.memory()).clone())
     }
 }
 
