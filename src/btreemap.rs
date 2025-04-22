@@ -366,7 +366,7 @@ where
             let mut root = self.load_node(self.root_addr);
 
             // Check if the key already exists in the root.
-            if let Ok(idx) = root.search(&key) {
+            if let Ok(idx) = root.search(&key, self.memory()) {
                 // The key exists. Overwrite it and return the previous value.
                 let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
                 self.save_node(&mut root);
@@ -409,7 +409,7 @@ where
         assert!(!node.is_full());
 
         // Look for the key in the node.
-        match node.search(&key) {
+        match node.search(&key, self.memory()) {
             Ok(idx) => {
                 // The key is already in the node.
                 // Overwrite it and return the previous value.
@@ -442,7 +442,7 @@ where
 
                         if child.is_full() {
                             // Check if the key already exists in the child.
-                            if let Ok(idx) = child.search(&key) {
+                            if let Ok(idx) = child.search(&key, self.memory()) {
                                 // The key exists. Overwrite it and return the previous value.
                                 let (_, previous_value) =
                                     child.swap_entry(idx, (key, value), self.memory());
@@ -455,7 +455,7 @@ where
 
                             // The children have now changed. Search again for
                             // the child where we need to store the entry in.
-                            let idx = node.search(&key).unwrap_or_else(|idx| idx);
+                            let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
                             child = self.load_node(node.child(idx));
                         }
 
@@ -469,7 +469,7 @@ where
         }
     }
 
-    /// Takes as input a nonfull internal `node` and index to its full child, then
+    /// Takes as input a non-full internal `node` and index to its full child, then
     /// splits this child into two, adding an additional child to `node`.
     ///
     /// Example:
@@ -535,7 +535,7 @@ where
     {
         let node = self.load_node(node_addr);
         // Look for the key in the current node.
-        match node.search(key) {
+        match node.search(key, self.memory()) {
             Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
@@ -652,7 +652,7 @@ where
 
         match node.node_type() {
             NodeType::Leaf => {
-                match node.search(key) {
+                match node.search(key, self.memory()) {
                     Ok(idx) => {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
@@ -679,7 +679,7 @@ where
                 }
             }
             NodeType::Internal => {
-                match node.search(key) {
+                match node.search(key, self.memory()) {
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
@@ -1310,10 +1310,40 @@ mod test {
         }
     }
 
-    macro_rules! verify_and_run {
-        ($runner:ident, $K:ty, $V:ty) => {{
+    /// Asserts that the associated `BOUND` for `$ty` is _not_ `Unbounded`.
+    macro_rules! assert_bounded {
+        ($ty:ty) => {
+            assert_ne!(<$ty>::BOUND, StorableBound::Unbounded, "Must be Bounded");
+        };
+    }
+
+    /// Asserts that the associated `BOUND` for `$ty` _is_ `Unbounded`.
+    macro_rules! assert_unbounded {
+        ($ty:ty) => {
+            assert_eq!(<$ty>::BOUND, StorableBound::Unbounded, "Must be Unbounded");
+        };
+    }
+
+    macro_rules! run_with_key {
+        ($runner:ident, $K:ty) => {{
             verify_monotonic::<$K>();
-            $runner::<$K, $V>();
+
+            // Empty value.
+            $runner::<$K, ()>();
+
+            // Bounded values.
+            assert_bounded!(u32);
+            $runner::<$K, u32>();
+
+            assert_bounded!(Blob<20>);
+            $runner::<$K, Blob<20>>();
+
+            // Unbounded values.
+            assert_unbounded!(MonotonicVec32);
+            $runner::<$K, MonotonicVec32>();
+
+            assert_unbounded!(MonotonicString32);
+            $runner::<$K, MonotonicString32>();
         }};
     }
 
@@ -1322,37 +1352,19 @@ mod test {
         ($name:ident, $runner:ident) => {
             #[test]
             fn $name() {
-                use StorableBound::Unbounded;
+                // Bounded keys.
+                assert_bounded!(u32);
+                run_with_key!($runner, u32);
 
-                // Set, empty value, bounded.
-                {
-                    type Value = ();
-                    assert_ne!(<Value>::BOUND, Unbounded, "Must be Bounded");
-                    verify_and_run!($runner, u32, Value);
-                    verify_and_run!($runner, Blob<10>, Value);
-                    verify_and_run!($runner, MonotonicVec32, Value);
-                    verify_and_run!($runner, MonotonicString32, Value);
-                }
+                assert_bounded!(Blob<10>);
+                run_with_key!($runner, Blob<10>);
 
-                // Map, bounded value.
-                {
-                    type Value = u32;
-                    assert_ne!(Value::BOUND, Unbounded, "Must be Bounded");
-                    verify_and_run!($runner, u32, Value);
-                    verify_and_run!($runner, Blob<10>, Value);
-                    verify_and_run!($runner, MonotonicVec32, Value);
-                    verify_and_run!($runner, MonotonicString32, Value);
-                }
+                // Unbounded keys.
+                assert_unbounded!(MonotonicVec32);
+                run_with_key!($runner, MonotonicVec32);
 
-                // Map, unbounded value.
-                {
-                    type Value = MonotonicVec32;
-                    assert_eq!(Value::BOUND, Unbounded, "Must be Unbounded");
-                    verify_and_run!($runner, u32, Value);
-                    verify_and_run!($runner, Blob<10>, Value);
-                    verify_and_run!($runner, MonotonicVec32, Value);
-                    verify_and_run!($runner, MonotonicString32, Value);
-                }
+                assert_unbounded!(MonotonicString32);
+                run_with_key!($runner, MonotonicString32);
             }
         };
     }
@@ -1440,7 +1452,7 @@ mod test {
             assert!(right_child.is_full());
             let median_index = right_child.entries_len() / 2;
             let median_key = key(12);
-            assert_eq!(right_child.key(median_index), &median_key);
+            assert_eq!(right_child.key(median_index, btree.memory()), &median_key);
 
             // Overwrite the value of the median key.
             assert_eq!(btree.insert(median_key.clone(), value(123)), Some(value(0)));
@@ -3089,7 +3101,7 @@ mod test {
         // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.keys(), vec![vec![6; 10_000]]);
+        assert_eq!(root.keys(btree.memory()), vec![vec![6; 10_000]]);
         assert_eq!(root.children_len(), 2);
 
         // Remove the element in the root.
@@ -3101,7 +3113,7 @@ mod test {
         // [0, 1, 2, 3, 4]     [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.keys(), vec![vec![5; 10_000]]);
+        assert_eq!(root.keys(btree.memory()), vec![vec![5; 10_000]]);
         assert_eq!(root.children_len(), 2);
 
         // Remove the element in the root. This triggers the case where the root
@@ -3113,7 +3125,7 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
-            root.keys(),
+            root.keys(btree.memory()),
             vec![
                 vec![0; 10_000],
                 vec![1; 10_000],
