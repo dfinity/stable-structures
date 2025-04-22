@@ -311,8 +311,8 @@ fn remove_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory
     let keys: Vec<K> = items.into_iter().map(|(k, _)| k).collect();
     bench_fn(|| {
         // Remove the keys from the btree.
-        for k in keys {
-            btree.remove(&k);
+        for random_key in keys {
+            btree.remove(&random_key);
         }
     })
 }
@@ -448,8 +448,8 @@ fn get_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory>) 
     let keys: Vec<K> = items.into_iter().map(|(k, _)| k).collect();
     bench_fn(|| {
         // Get all the keys from the map.
-        for k in keys {
-            btree.get(&k).unwrap();
+        for random_key in keys {
+            btree.get(&random_key);
         }
     })
 }
@@ -587,8 +587,8 @@ fn contains_helper<K: TestKey, V: TestValue>(
     let keys: Vec<K> = items.into_iter().map(|(k, _)| k).collect();
     bench_fn(|| {
         // Checks if the keys are in the map.
-        for k in keys {
-            btree.contains_key(&k);
+        for random_key in keys {
+            btree.contains_key(&random_key);
         }
     })
 }
