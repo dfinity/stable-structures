@@ -47,150 +47,6 @@ bench_tests! {
     btreemap_insert_blob_512_1024,     insert_helper_v1,  Blob512, Blob1024;
     btreemap_insert_blob_512_1024_v2,  insert_helper_v2,  Blob512, Blob1024;
 
-    // 4 x V
-    btreemap_insert_blob_4_4,       insert_helper_v1, Blob4,    Blob4;
-    btreemap_insert_blob_4_4_v2,    insert_helper_v2, Blob4,    Blob4;
-    btreemap_insert_blob_4_8,       insert_helper_v1, Blob4,    Blob8;
-    btreemap_insert_blob_4_8_v2,    insert_helper_v2, Blob4,    Blob8;
-    btreemap_insert_blob_4_16,      insert_helper_v1, Blob4,   Blob16;
-    btreemap_insert_blob_4_16_v2,   insert_helper_v2, Blob4,   Blob16;
-    btreemap_insert_blob_4_32,      insert_helper_v1, Blob4,   Blob32;
-    btreemap_insert_blob_4_32_v2,   insert_helper_v2, Blob4,   Blob32;
-    btreemap_insert_blob_4_64,      insert_helper_v1, Blob4,   Blob64;
-    btreemap_insert_blob_4_64_v2,   insert_helper_v2, Blob4,   Blob64;
-    btreemap_insert_blob_4_128,     insert_helper_v1, Blob4,  Blob128;
-    btreemap_insert_blob_4_128_v2,  insert_helper_v2, Blob4,  Blob128;
-    btreemap_insert_blob_4_256,     insert_helper_v1, Blob4,  Blob256;
-    btreemap_insert_blob_4_256_v2,  insert_helper_v2, Blob4,  Blob256;
-    btreemap_insert_blob_4_512,     insert_helper_v1, Blob4,  Blob512;
-    btreemap_insert_blob_4_512_v2,  insert_helper_v2, Blob4,  Blob512;
-
-    // 8 x V
-    btreemap_insert_blob_8_4,       insert_helper_v1, Blob8,    Blob4;
-    btreemap_insert_blob_8_4_v2,    insert_helper_v2, Blob8,    Blob4;
-    btreemap_insert_blob_8_8,       insert_helper_v1, Blob8,    Blob8;
-    btreemap_insert_blob_8_8_v2,    insert_helper_v2, Blob8,    Blob8;
-    btreemap_insert_blob_8_16,      insert_helper_v1, Blob8,   Blob16;
-    btreemap_insert_blob_8_16_v2,   insert_helper_v2, Blob8,   Blob16;
-    btreemap_insert_blob_8_32,      insert_helper_v1, Blob8,   Blob32;
-    btreemap_insert_blob_8_32_v2,   insert_helper_v2, Blob8,   Blob32;
-    btreemap_insert_blob_8_64,      insert_helper_v1, Blob8,   Blob64;
-    btreemap_insert_blob_8_64_v2,   insert_helper_v2, Blob8,   Blob64;
-    btreemap_insert_blob_8_128,     insert_helper_v1, Blob8,  Blob128;
-    btreemap_insert_blob_8_128_v2,  insert_helper_v2, Blob8,  Blob128;
-    btreemap_insert_blob_8_256,     insert_helper_v1, Blob8,  Blob256;
-    btreemap_insert_blob_8_256_v2,  insert_helper_v2, Blob8,  Blob256;
-    btreemap_insert_blob_8_512,     insert_helper_v1, Blob8,  Blob512;
-    btreemap_insert_blob_8_512_v2,  insert_helper_v2, Blob8,  Blob512;
-
-    // 16 x V
-    btreemap_insert_blob_16_4,       insert_helper_v1, Blob16,    Blob4;
-    btreemap_insert_blob_16_4_v2,    insert_helper_v2, Blob16,    Blob4;
-    btreemap_insert_blob_16_8,       insert_helper_v1, Blob16,    Blob8;
-    btreemap_insert_blob_16_8_v2,    insert_helper_v2, Blob16,    Blob8;
-    btreemap_insert_blob_16_16,      insert_helper_v1, Blob16,   Blob16;
-    btreemap_insert_blob_16_16_v2,   insert_helper_v2, Blob16,   Blob16;
-    btreemap_insert_blob_16_32,      insert_helper_v1, Blob16,   Blob32;
-    btreemap_insert_blob_16_32_v2,   insert_helper_v2, Blob16,   Blob32;
-    btreemap_insert_blob_16_64,      insert_helper_v1, Blob16,   Blob64;
-    btreemap_insert_blob_16_64_v2,   insert_helper_v2, Blob16,   Blob64;
-    btreemap_insert_blob_16_128,     insert_helper_v1, Blob16,  Blob128;
-    btreemap_insert_blob_16_128_v2,  insert_helper_v2, Blob16,  Blob128;
-    btreemap_insert_blob_16_256,     insert_helper_v1, Blob16,  Blob256;
-    btreemap_insert_blob_16_256_v2,  insert_helper_v2, Blob16,  Blob256;
-    btreemap_insert_blob_16_512,     insert_helper_v1, Blob16,  Blob512;
-    btreemap_insert_blob_16_512_v2,  insert_helper_v2, Blob16,  Blob512;
-
-    // 32 x V
-    btreemap_insert_blob_32_4,       insert_helper_v1, Blob32,    Blob4;
-    btreemap_insert_blob_32_4_v2,    insert_helper_v2, Blob32,    Blob4;
-    btreemap_insert_blob_32_8,       insert_helper_v1, Blob32,    Blob8;
-    btreemap_insert_blob_32_8_v2,    insert_helper_v2, Blob32,    Blob8;
-    btreemap_insert_blob_32_16,      insert_helper_v1, Blob32,   Blob16;
-    btreemap_insert_blob_32_16_v2,   insert_helper_v2, Blob32,   Blob16;
-    btreemap_insert_blob_32_32,      insert_helper_v1, Blob32,   Blob32;
-    btreemap_insert_blob_32_32_v2,   insert_helper_v2, Blob32,   Blob32;
-    btreemap_insert_blob_32_64,      insert_helper_v1, Blob32,   Blob64;
-    btreemap_insert_blob_32_64_v2,   insert_helper_v2, Blob32,   Blob64;
-    btreemap_insert_blob_32_128,     insert_helper_v1, Blob32,  Blob128;
-    btreemap_insert_blob_32_128_v2,  insert_helper_v2, Blob32,  Blob128;
-    btreemap_insert_blob_32_256,     insert_helper_v1, Blob32,  Blob256;
-    btreemap_insert_blob_32_256_v2,  insert_helper_v2, Blob32,  Blob256;
-    btreemap_insert_blob_32_512,     insert_helper_v1, Blob32,  Blob512;
-    btreemap_insert_blob_32_512_v2,  insert_helper_v2, Blob32,  Blob512;
-
-    // 64 x V
-    btreemap_insert_blob_64_4,       insert_helper_v1, Blob64,    Blob4;
-    btreemap_insert_blob_64_4_v2,    insert_helper_v2, Blob64,    Blob4;
-    btreemap_insert_blob_64_8,       insert_helper_v1, Blob64,    Blob8;
-    btreemap_insert_blob_64_8_v2,    insert_helper_v2, Blob64,    Blob8;
-    btreemap_insert_blob_64_16,      insert_helper_v1, Blob64,   Blob16;
-    btreemap_insert_blob_64_16_v2,   insert_helper_v2, Blob64,   Blob16;
-    btreemap_insert_blob_64_32,      insert_helper_v1, Blob64,   Blob32;
-    btreemap_insert_blob_64_32_v2,   insert_helper_v2, Blob64,   Blob32;
-    btreemap_insert_blob_64_64,      insert_helper_v1, Blob64,   Blob64;
-    btreemap_insert_blob_64_64_v2,   insert_helper_v2, Blob64,   Blob64;
-    btreemap_insert_blob_64_128,     insert_helper_v1, Blob64,  Blob128;
-    btreemap_insert_blob_64_128_v2,  insert_helper_v2, Blob64,  Blob128;
-    btreemap_insert_blob_64_256,     insert_helper_v1, Blob64,  Blob256;
-    btreemap_insert_blob_64_256_v2,  insert_helper_v2, Blob64,  Blob256;
-    btreemap_insert_blob_64_512,     insert_helper_v1, Blob64,  Blob512;
-    btreemap_insert_blob_64_512_v2,  insert_helper_v2, Blob64,  Blob512;
-
-    // 128 x V
-    btreemap_insert_blob_128_4,       insert_helper_v1, Blob128,    Blob4;
-    btreemap_insert_blob_128_4_v2,    insert_helper_v2, Blob128,    Blob4;
-    btreemap_insert_blob_128_8,       insert_helper_v1, Blob128,    Blob8;
-    btreemap_insert_blob_128_8_v2,    insert_helper_v2, Blob128,    Blob8;
-    btreemap_insert_blob_128_16,      insert_helper_v1, Blob128,   Blob16;
-    btreemap_insert_blob_128_16_v2,   insert_helper_v2, Blob128,   Blob16;
-    btreemap_insert_blob_128_32,      insert_helper_v1, Blob128,   Blob32;
-    btreemap_insert_blob_128_32_v2,   insert_helper_v2, Blob128,   Blob32;
-    btreemap_insert_blob_128_64,      insert_helper_v1, Blob128,   Blob64;
-    btreemap_insert_blob_128_64_v2,   insert_helper_v2, Blob128,   Blob64;
-    btreemap_insert_blob_128_128,     insert_helper_v1, Blob128,  Blob128;
-    btreemap_insert_blob_128_128_v2,  insert_helper_v2, Blob128,  Blob128;
-    btreemap_insert_blob_128_256,     insert_helper_v1, Blob128,  Blob256;
-    btreemap_insert_blob_128_256_v2,  insert_helper_v2, Blob128,  Blob256;
-    btreemap_insert_blob_128_512,     insert_helper_v1, Blob128,  Blob512;
-    btreemap_insert_blob_128_512_v2,  insert_helper_v2, Blob128,  Blob512;
-
-    // 256 x V
-    btreemap_insert_blob_256_4,       insert_helper_v1, Blob256,    Blob4;
-    btreemap_insert_blob_256_4_v2,    insert_helper_v2, Blob256,    Blob4;
-    btreemap_insert_blob_256_8,       insert_helper_v1, Blob256,    Blob8;
-    btreemap_insert_blob_256_8_v2,    insert_helper_v2, Blob256,    Blob8;
-    btreemap_insert_blob_256_16,      insert_helper_v1, Blob256,   Blob16;
-    btreemap_insert_blob_256_16_v2,   insert_helper_v2, Blob256,   Blob16;
-    btreemap_insert_blob_256_32,      insert_helper_v1, Blob256,   Blob32;
-    btreemap_insert_blob_256_32_v2,   insert_helper_v2, Blob256,   Blob32;
-    btreemap_insert_blob_256_64,      insert_helper_v1, Blob256,   Blob64;
-    btreemap_insert_blob_256_64_v2,   insert_helper_v2, Blob256,   Blob64;
-    btreemap_insert_blob_256_128,     insert_helper_v1, Blob256,  Blob128;
-    btreemap_insert_blob_256_128_v2,  insert_helper_v2, Blob256,  Blob128;
-    btreemap_insert_blob_256_256,     insert_helper_v1, Blob256,  Blob256;
-    btreemap_insert_blob_256_256_v2,  insert_helper_v2, Blob256,  Blob256;
-    btreemap_insert_blob_256_512,     insert_helper_v1, Blob256,  Blob512;
-    btreemap_insert_blob_256_512_v2,  insert_helper_v2, Blob256,  Blob512;
-
-    // 512 x V
-    btreemap_insert_blob_512_4,       insert_helper_v1, Blob512,    Blob4;
-    btreemap_insert_blob_512_4_v2,    insert_helper_v2, Blob512,    Blob4;
-    btreemap_insert_blob_512_8,       insert_helper_v1, Blob512,    Blob8;
-    btreemap_insert_blob_512_8_v2,    insert_helper_v2, Blob512,    Blob8;
-    btreemap_insert_blob_512_16,      insert_helper_v1, Blob512,   Blob16;
-    btreemap_insert_blob_512_16_v2,   insert_helper_v2, Blob512,   Blob16;
-    btreemap_insert_blob_512_32,      insert_helper_v1, Blob512,   Blob32;
-    btreemap_insert_blob_512_32_v2,   insert_helper_v2, Blob512,   Blob32;
-    btreemap_insert_blob_512_64,      insert_helper_v1, Blob512,   Blob64;
-    btreemap_insert_blob_512_64_v2,   insert_helper_v2, Blob512,   Blob64;
-    btreemap_insert_blob_512_128,     insert_helper_v1, Blob512,  Blob128;
-    btreemap_insert_blob_512_128_v2,  insert_helper_v2, Blob512,  Blob128;
-    btreemap_insert_blob_512_256,     insert_helper_v1, Blob512,  Blob256;
-    btreemap_insert_blob_512_256_v2,  insert_helper_v2, Blob512,  Blob256;
-    btreemap_insert_blob_512_512,     insert_helper_v1, Blob512,  Blob512;
-    btreemap_insert_blob_512_512_v2,  insert_helper_v2, Blob512,  Blob512;
-
     // 1024 x V
     btreemap_insert_blob_1024_4,       insert_helper_v1, Blob1024,    Blob4;
     btreemap_insert_blob_1024_4_v2,    insert_helper_v2, Blob1024,    Blob4;
@@ -208,19 +64,19 @@ bench_tests! {
     btreemap_insert_blob_1024_256_v2,  insert_helper_v2, Blob1024,  Blob256;
     btreemap_insert_blob_1024_512,     insert_helper_v1, Blob1024,  Blob512;
     btreemap_insert_blob_1024_512_v2,  insert_helper_v2, Blob1024,  Blob512;
-    //btreemap_insert_blob_1024_512_v2_mem_manager, insert_helper_v2_mem_manager, Blob1024, Blob512;
+    btreemap_insert_blob_1024_512_v2_mem_manager, insert_helper_v2_mem_manager, Blob1024, Blob512;
 
     btreemap_insert_blob_1024_1024,     insert_helper_v1,  Blob1024, Blob1024;
     btreemap_insert_blob_1024_1024_v2,  insert_helper_v2,  Blob1024, Blob1024;
 
-    // btreemap_insert_u64_u64,           insert_helper_v1, u64,     u64;
-    // btreemap_insert_u64_u64_v2,        insert_helper_v2, u64,     u64;
-    // btreemap_insert_u64_u64_v2_mem_manager, insert_helper_v2_mem_manager, u64, u64;
+    btreemap_insert_u64_u64,           insert_helper_v1, u64,     u64;
+    btreemap_insert_u64_u64_v2,        insert_helper_v2, u64,     u64;
+    btreemap_insert_u64_u64_v2_mem_manager, insert_helper_v2_mem_manager, u64, u64;
 
-    // btreemap_insert_u64_blob_8,        insert_helper_v1, u64,   Blob8;
-    // btreemap_insert_u64_blob_8_v2,     insert_helper_v2, u64,   Blob8;
-    // btreemap_insert_blob_8_u64,        insert_helper_v1, Blob8,   u64;
-    // btreemap_insert_blob_8_u64_v2,     insert_helper_v2, Blob8,   u64;
+    btreemap_insert_u64_blob_8,        insert_helper_v1, u64,   Blob8;
+    btreemap_insert_u64_blob_8_v2,     insert_helper_v2, u64,   Blob8;
+    btreemap_insert_blob_8_u64,        insert_helper_v1, Blob8,   u64;
+    btreemap_insert_blob_8_u64_v2,     insert_helper_v2, Blob8,   u64;
 }
 
 // Benchmarks removing keys from a BTreeMap.
@@ -243,178 +99,34 @@ bench_tests! {
     btreemap_remove_blob_512_1024,      remove_helper_v1,   Blob512, Blob1024;
     btreemap_remove_blob_512_1024_v2,   remove_helper_v2,   Blob512, Blob1024;
 
-    // // 4 x V
-    // btreemap_remove_blob_4_4,       remove_helper_v1, Blob4,    Blob4;
-    // btreemap_remove_blob_4_4_v2,    remove_helper_v2, Blob4,    Blob4;
-    // btreemap_remove_blob_4_8,       remove_helper_v1, Blob4,    Blob8;
-    // btreemap_remove_blob_4_8_v2,    remove_helper_v2, Blob4,    Blob8;
-    // btreemap_remove_blob_4_16,      remove_helper_v1, Blob4,   Blob16;
-    // btreemap_remove_blob_4_16_v2,   remove_helper_v2, Blob4,   Blob16;
-    // btreemap_remove_blob_4_32,      remove_helper_v1, Blob4,   Blob32;
-    // btreemap_remove_blob_4_32_v2,   remove_helper_v2, Blob4,   Blob32;
-    // btreemap_remove_blob_4_64,      remove_helper_v1, Blob4,   Blob64;
-    // btreemap_remove_blob_4_64_v2,   remove_helper_v2, Blob4,   Blob64;
-    // btreemap_remove_blob_4_128,     remove_helper_v1, Blob4,  Blob128;
-    // btreemap_remove_blob_4_128_v2,  remove_helper_v2, Blob4,  Blob128;
-    // btreemap_remove_blob_4_256,     remove_helper_v1, Blob4,  Blob256;
-    // btreemap_remove_blob_4_256_v2,  remove_helper_v2, Blob4,  Blob256;
-    // btreemap_remove_blob_4_512,     remove_helper_v1, Blob4,  Blob512;
-    // btreemap_remove_blob_4_512_v2,  remove_helper_v2, Blob4,  Blob512;
+    // 1024 x V
+    btreemap_remove_blob_1024_4,       remove_helper_v1, Blob1024,    Blob4;
+    btreemap_remove_blob_1024_4_v2,    remove_helper_v2, Blob1024,    Blob4;
+    btreemap_remove_blob_1024_8,       remove_helper_v1, Blob1024,    Blob8;
+    btreemap_remove_blob_1024_8_v2,    remove_helper_v2, Blob1024,    Blob8;
+    btreemap_remove_blob_1024_16,      remove_helper_v1, Blob1024,   Blob16;
+    btreemap_remove_blob_1024_16_v2,   remove_helper_v2, Blob1024,   Blob16;
+    btreemap_remove_blob_1024_32,      remove_helper_v1, Blob1024,   Blob32;
+    btreemap_remove_blob_1024_32_v2,   remove_helper_v2, Blob1024,   Blob32;
+    btreemap_remove_blob_1024_64,      remove_helper_v1, Blob1024,   Blob64;
+    btreemap_remove_blob_1024_64_v2,   remove_helper_v2, Blob1024,   Blob64;
+    btreemap_remove_blob_1024_128,     remove_helper_v1, Blob1024,  Blob128;
+    btreemap_remove_blob_1024_128_v2,  remove_helper_v2, Blob1024,  Blob128;
+    btreemap_remove_blob_1024_256,     remove_helper_v1, Blob1024,  Blob256;
+    btreemap_remove_blob_1024_256_v2,  remove_helper_v2, Blob1024,  Blob256;
+    btreemap_remove_blob_1024_512,     remove_helper_v1, Blob1024,  Blob512;
+    btreemap_remove_blob_1024_512_v2,  remove_helper_v2, Blob1024,  Blob512;
 
-    // // 8 x V
-    // btreemap_remove_blob_8_4,       remove_helper_v1, Blob8,    Blob4;
-    // btreemap_remove_blob_8_4_v2,    remove_helper_v2, Blob8,    Blob4;
-    // btreemap_remove_blob_8_8,       remove_helper_v1, Blob8,    Blob8;
-    // btreemap_remove_blob_8_8_v2,    remove_helper_v2, Blob8,    Blob8;
-    // btreemap_remove_blob_8_16,      remove_helper_v1, Blob8,   Blob16;
-    // btreemap_remove_blob_8_16_v2,   remove_helper_v2, Blob8,   Blob16;
-    // btreemap_remove_blob_8_32,      remove_helper_v1, Blob8,   Blob32;
-    // btreemap_remove_blob_8_32_v2,   remove_helper_v2, Blob8,   Blob32;
-    // btreemap_remove_blob_8_64,      remove_helper_v1, Blob8,   Blob64;
-    // btreemap_remove_blob_8_64_v2,   remove_helper_v2, Blob8,   Blob64;
-    // btreemap_remove_blob_8_128,     remove_helper_v1, Blob8,  Blob128;
-    // btreemap_remove_blob_8_128_v2,  remove_helper_v2, Blob8,  Blob128;
-    // btreemap_remove_blob_8_256,     remove_helper_v1, Blob8,  Blob256;
-    // btreemap_remove_blob_8_256_v2,  remove_helper_v2, Blob8,  Blob256;
-    // btreemap_remove_blob_8_512,     remove_helper_v1, Blob8,  Blob512;
-    // btreemap_remove_blob_8_512_v2,  remove_helper_v2, Blob8,  Blob512;
+    btreemap_remove_blob_1024_1024,     remove_helper_v1,  Blob1024, Blob1024;
+    btreemap_remove_blob_1024_1024_v2,  remove_helper_v2,  Blob1024, Blob1024;
 
-    // // 16 x V
-    // btreemap_remove_blob_16_4,       remove_helper_v1, Blob16,    Blob4;
-    // btreemap_remove_blob_16_4_v2,    remove_helper_v2, Blob16,    Blob4;
-    // btreemap_remove_blob_16_8,       remove_helper_v1, Blob16,    Blob8;
-    // btreemap_remove_blob_16_8_v2,    remove_helper_v2, Blob16,    Blob8;
-    // btreemap_remove_blob_16_16,      remove_helper_v1, Blob16,   Blob16;
-    // btreemap_remove_blob_16_16_v2,   remove_helper_v2, Blob16,   Blob16;
-    // btreemap_remove_blob_16_32,      remove_helper_v1, Blob16,   Blob32;
-    // btreemap_remove_blob_16_32_v2,   remove_helper_v2, Blob16,   Blob32;
-    // btreemap_remove_blob_16_64,      remove_helper_v1, Blob16,   Blob64;
-    // btreemap_remove_blob_16_64_v2,   remove_helper_v2, Blob16,   Blob64;
-    // btreemap_remove_blob_16_128,     remove_helper_v1, Blob16,  Blob128;
-    // btreemap_remove_blob_16_128_v2,  remove_helper_v2, Blob16,  Blob128;
-    // btreemap_remove_blob_16_256,     remove_helper_v1, Blob16,  Blob256;
-    // btreemap_remove_blob_16_256_v2,  remove_helper_v2, Blob16,  Blob256;
-    // btreemap_remove_blob_16_512,     remove_helper_v1, Blob16,  Blob512;
-    // btreemap_remove_blob_16_512_v2,  remove_helper_v2, Blob16,  Blob512;
+    btreemap_remove_u64_u64,            remove_helper_v1,   u64,     u64;
+    btreemap_remove_u64_u64_v2,         remove_helper_v2,   u64,     u64;
 
-    // // 32 x V
-    // btreemap_remove_blob_32_4,       remove_helper_v1, Blob32,    Blob4;
-    // btreemap_remove_blob_32_4_v2,    remove_helper_v2, Blob32,    Blob4;
-    // btreemap_remove_blob_32_8,       remove_helper_v1, Blob32,    Blob8;
-    // btreemap_remove_blob_32_8_v2,    remove_helper_v2, Blob32,    Blob8;
-    // btreemap_remove_blob_32_16,      remove_helper_v1, Blob32,   Blob16;
-    // btreemap_remove_blob_32_16_v2,   remove_helper_v2, Blob32,   Blob16;
-    // btreemap_remove_blob_32_32,      remove_helper_v1, Blob32,   Blob32;
-    // btreemap_remove_blob_32_32_v2,   remove_helper_v2, Blob32,   Blob32;
-    // btreemap_remove_blob_32_64,      remove_helper_v1, Blob32,   Blob64;
-    // btreemap_remove_blob_32_64_v2,   remove_helper_v2, Blob32,   Blob64;
-    // btreemap_remove_blob_32_128,     remove_helper_v1, Blob32,  Blob128;
-    // btreemap_remove_blob_32_128_v2,  remove_helper_v2, Blob32,  Blob128;
-    // btreemap_remove_blob_32_256,     remove_helper_v1, Blob32,  Blob256;
-    // btreemap_remove_blob_32_256_v2,  remove_helper_v2, Blob32,  Blob256;
-    // btreemap_remove_blob_32_512,     remove_helper_v1, Blob32,  Blob512;
-    // btreemap_remove_blob_32_512_v2,  remove_helper_v2, Blob32,  Blob512;
-
-    // // 64 x V
-    // btreemap_remove_blob_64_4,       remove_helper_v1, Blob64,    Blob4;
-    // btreemap_remove_blob_64_4_v2,    remove_helper_v2, Blob64,    Blob4;
-    // btreemap_remove_blob_64_8,       remove_helper_v1, Blob64,    Blob8;
-    // btreemap_remove_blob_64_8_v2,    remove_helper_v2, Blob64,    Blob8;
-    // btreemap_remove_blob_64_16,      remove_helper_v1, Blob64,   Blob16;
-    // btreemap_remove_blob_64_16_v2,   remove_helper_v2, Blob64,   Blob16;
-    // btreemap_remove_blob_64_32,      remove_helper_v1, Blob64,   Blob32;
-    // btreemap_remove_blob_64_32_v2,   remove_helper_v2, Blob64,   Blob32;
-    // btreemap_remove_blob_64_64,      remove_helper_v1, Blob64,   Blob64;
-    // btreemap_remove_blob_64_64_v2,   remove_helper_v2, Blob64,   Blob64;
-    // btreemap_remove_blob_64_128,     remove_helper_v1, Blob64,  Blob128;
-    // btreemap_remove_blob_64_128_v2,  remove_helper_v2, Blob64,  Blob128;
-    // btreemap_remove_blob_64_256,     remove_helper_v1, Blob64,  Blob256;
-    // btreemap_remove_blob_64_256_v2,  remove_helper_v2, Blob64,  Blob256;
-    // btreemap_remove_blob_64_512,     remove_helper_v1, Blob64,  Blob512;
-    // btreemap_remove_blob_64_512_v2,  remove_helper_v2, Blob64,  Blob512;
-
-    // // 128 x V
-    // btreemap_remove_blob_128_4,       remove_helper_v1, Blob128,    Blob4;
-    // btreemap_remove_blob_128_4_v2,    remove_helper_v2, Blob128,    Blob4;
-    // btreemap_remove_blob_128_8,       remove_helper_v1, Blob128,    Blob8;
-    // btreemap_remove_blob_128_8_v2,    remove_helper_v2, Blob128,    Blob8;
-    // btreemap_remove_blob_128_16,      remove_helper_v1, Blob128,   Blob16;
-    // btreemap_remove_blob_128_16_v2,   remove_helper_v2, Blob128,   Blob16;
-    // btreemap_remove_blob_128_32,      remove_helper_v1, Blob128,   Blob32;
-    // btreemap_remove_blob_128_32_v2,   remove_helper_v2, Blob128,   Blob32;
-    // btreemap_remove_blob_128_64,      remove_helper_v1, Blob128,   Blob64;
-    // btreemap_remove_blob_128_64_v2,   remove_helper_v2, Blob128,   Blob64;
-    // btreemap_remove_blob_128_128,     remove_helper_v1, Blob128,  Blob128;
-    // btreemap_remove_blob_128_128_v2,  remove_helper_v2, Blob128,  Blob128;
-    // btreemap_remove_blob_128_256,     remove_helper_v1, Blob128,  Blob256;
-    // btreemap_remove_blob_128_256_v2,  remove_helper_v2, Blob128,  Blob256;
-    // btreemap_remove_blob_128_512,     remove_helper_v1, Blob128,  Blob512;
-    // btreemap_remove_blob_128_512_v2,  remove_helper_v2, Blob128,  Blob512;
-
-    // // 256 x V
-    // btreemap_remove_blob_256_4,       remove_helper_v1, Blob256,    Blob4;
-    // btreemap_remove_blob_256_4_v2,    remove_helper_v2, Blob256,    Blob4;
-    // btreemap_remove_blob_256_8,       remove_helper_v1, Blob256,    Blob8;
-    // btreemap_remove_blob_256_8_v2,    remove_helper_v2, Blob256,    Blob8;
-    // btreemap_remove_blob_256_16,      remove_helper_v1, Blob256,   Blob16;
-    // btreemap_remove_blob_256_16_v2,   remove_helper_v2, Blob256,   Blob16;
-    // btreemap_remove_blob_256_32,      remove_helper_v1, Blob256,   Blob32;
-    // btreemap_remove_blob_256_32_v2,   remove_helper_v2, Blob256,   Blob32;
-    // btreemap_remove_blob_256_64,      remove_helper_v1, Blob256,   Blob64;
-    // btreemap_remove_blob_256_64_v2,   remove_helper_v2, Blob256,   Blob64;
-    // btreemap_remove_blob_256_128,     remove_helper_v1, Blob256,  Blob128;
-    // btreemap_remove_blob_256_128_v2,  remove_helper_v2, Blob256,  Blob128;
-    // btreemap_remove_blob_256_256,     remove_helper_v1, Blob256,  Blob256;
-    // btreemap_remove_blob_256_256_v2,  remove_helper_v2, Blob256,  Blob256;
-    // btreemap_remove_blob_256_512,     remove_helper_v1, Blob256,  Blob512;
-    // btreemap_remove_blob_256_512_v2,  remove_helper_v2, Blob256,  Blob512;
-
-    // // 512 x V
-    // btreemap_remove_blob_512_4,       remove_helper_v1, Blob512,    Blob4;
-    // btreemap_remove_blob_512_4_v2,    remove_helper_v2, Blob512,    Blob4;
-    // btreemap_remove_blob_512_8,       remove_helper_v1, Blob512,    Blob8;
-    // btreemap_remove_blob_512_8_v2,    remove_helper_v2, Blob512,    Blob8;
-    // btreemap_remove_blob_512_16,      remove_helper_v1, Blob512,   Blob16;
-    // btreemap_remove_blob_512_16_v2,   remove_helper_v2, Blob512,   Blob16;
-    // btreemap_remove_blob_512_32,      remove_helper_v1, Blob512,   Blob32;
-    // btreemap_remove_blob_512_32_v2,   remove_helper_v2, Blob512,   Blob32;
-    // btreemap_remove_blob_512_64,      remove_helper_v1, Blob512,   Blob64;
-    // btreemap_remove_blob_512_64_v2,   remove_helper_v2, Blob512,   Blob64;
-    // btreemap_remove_blob_512_128,     remove_helper_v1, Blob512,  Blob128;
-    // btreemap_remove_blob_512_128_v2,  remove_helper_v2, Blob512,  Blob128;
-    // btreemap_remove_blob_512_256,     remove_helper_v1, Blob512,  Blob256;
-    // btreemap_remove_blob_512_256_v2,  remove_helper_v2, Blob512,  Blob256;
-    // btreemap_remove_blob_512_512,     remove_helper_v1, Blob512,  Blob512;
-    // btreemap_remove_blob_512_512_v2,  remove_helper_v2, Blob512,  Blob512;
-
-    // // 1024 x V
-    // btreemap_remove_blob_1024_4,       remove_helper_v1, Blob1024,    Blob4;
-    // btreemap_remove_blob_1024_4_v2,    remove_helper_v2, Blob1024,    Blob4;
-    // btreemap_remove_blob_1024_8,       remove_helper_v1, Blob1024,    Blob8;
-    // btreemap_remove_blob_1024_8_v2,    remove_helper_v2, Blob1024,    Blob8;
-    // btreemap_remove_blob_1024_16,      remove_helper_v1, Blob1024,   Blob16;
-    // btreemap_remove_blob_1024_16_v2,   remove_helper_v2, Blob1024,   Blob16;
-    // btreemap_remove_blob_1024_32,      remove_helper_v1, Blob1024,   Blob32;
-    // btreemap_remove_blob_1024_32_v2,   remove_helper_v2, Blob1024,   Blob32;
-    // btreemap_remove_blob_1024_64,      remove_helper_v1, Blob1024,   Blob64;
-    // btreemap_remove_blob_1024_64_v2,   remove_helper_v2, Blob1024,   Blob64;
-    // btreemap_remove_blob_1024_128,     remove_helper_v1, Blob1024,  Blob128;
-    // btreemap_remove_blob_1024_128_v2,  remove_helper_v2, Blob1024,  Blob128;
-    // btreemap_remove_blob_1024_256,     remove_helper_v1, Blob1024,  Blob256;
-    // btreemap_remove_blob_1024_256_v2,  remove_helper_v2, Blob1024,  Blob256;
-    // btreemap_remove_blob_1024_512,     remove_helper_v1, Blob1024,  Blob512;
-    // btreemap_remove_blob_1024_512_v2,  remove_helper_v2, Blob1024,  Blob512;
-
-    // btreemap_remove_blob_1024_1024,     remove_helper_v1,  Blob1024, Blob1024;
-    // btreemap_remove_blob_1024_1024_v2,  remove_helper_v2,  Blob1024, Blob1024;
-
-    // btreemap_remove_u64_u64,            remove_helper_v1,   u64,     u64;
-    // btreemap_remove_u64_u64_v2,         remove_helper_v2,   u64,     u64;
-
-    // btreemap_remove_u64_blob_8,         remove_helper_v1,   u64,   Blob8;
-    // btreemap_remove_u64_blob_8_v2,      remove_helper_v2,   u64,   Blob8;
-    // btreemap_remove_blob_8_u64,         remove_helper_v1,   Blob8,   u64;
-    // btreemap_remove_blob_8_u64_v2,      remove_helper_v2,   Blob8,   u64;
+    btreemap_remove_u64_blob_8,         remove_helper_v1,   u64,   Blob8;
+    btreemap_remove_u64_blob_8_v2,      remove_helper_v2,   u64,   Blob8;
+    btreemap_remove_blob_8_u64,         remove_helper_v1,   Blob8,   u64;
+    btreemap_remove_blob_8_u64_v2,      remove_helper_v2,   Blob8,   u64;
 }
 
 // Benchmarks getting keys from a BTreeMap.
@@ -436,151 +148,7 @@ bench_tests! {
     btreemap_get_blob_256_1024_v2,   get_helper_v2,   Blob256, Blob1024;
     btreemap_get_blob_512_1024,      get_helper_v1,   Blob512, Blob1024;
     btreemap_get_blob_512_1024_v2,   get_helper_v2,   Blob512, Blob1024;
-    //btreemap_get_blob_512_1024_v2_mem_manager,  get_helper_v2_mem_manager,  Blob512, Blob1024;
-
-    // 4 x V
-    btreemap_get_blob_4_4,       get_helper_v1, Blob4,    Blob4;
-    btreemap_get_blob_4_4_v2,    get_helper_v2, Blob4,    Blob4;
-    btreemap_get_blob_4_8,       get_helper_v1, Blob4,    Blob8;
-    btreemap_get_blob_4_8_v2,    get_helper_v2, Blob4,    Blob8;
-    btreemap_get_blob_4_16,      get_helper_v1, Blob4,   Blob16;
-    btreemap_get_blob_4_16_v2,   get_helper_v2, Blob4,   Blob16;
-    btreemap_get_blob_4_32,      get_helper_v1, Blob4,   Blob32;
-    btreemap_get_blob_4_32_v2,   get_helper_v2, Blob4,   Blob32;
-    btreemap_get_blob_4_64,      get_helper_v1, Blob4,   Blob64;
-    btreemap_get_blob_4_64_v2,   get_helper_v2, Blob4,   Blob64;
-    btreemap_get_blob_4_128,     get_helper_v1, Blob4,  Blob128;
-    btreemap_get_blob_4_128_v2,  get_helper_v2, Blob4,  Blob128;
-    btreemap_get_blob_4_256,     get_helper_v1, Blob4,  Blob256;
-    btreemap_get_blob_4_256_v2,  get_helper_v2, Blob4,  Blob256;
-    btreemap_get_blob_4_512,     get_helper_v1, Blob4,  Blob512;
-    btreemap_get_blob_4_512_v2,  get_helper_v2, Blob4,  Blob512;
-
-    // 8 x V
-    btreemap_get_blob_8_4,       get_helper_v1, Blob8,    Blob4;
-    btreemap_get_blob_8_4_v2,    get_helper_v2, Blob8,    Blob4;
-    btreemap_get_blob_8_8,       get_helper_v1, Blob8,    Blob8;
-    btreemap_get_blob_8_8_v2,    get_helper_v2, Blob8,    Blob8;
-    btreemap_get_blob_8_16,      get_helper_v1, Blob8,   Blob16;
-    btreemap_get_blob_8_16_v2,   get_helper_v2, Blob8,   Blob16;
-    btreemap_get_blob_8_32,      get_helper_v1, Blob8,   Blob32;
-    btreemap_get_blob_8_32_v2,   get_helper_v2, Blob8,   Blob32;
-    btreemap_get_blob_8_64,      get_helper_v1, Blob8,   Blob64;
-    btreemap_get_blob_8_64_v2,   get_helper_v2, Blob8,   Blob64;
-    btreemap_get_blob_8_128,     get_helper_v1, Blob8,  Blob128;
-    btreemap_get_blob_8_128_v2,  get_helper_v2, Blob8,  Blob128;
-    btreemap_get_blob_8_256,     get_helper_v1, Blob8,  Blob256;
-    btreemap_get_blob_8_256_v2,  get_helper_v2, Blob8,  Blob256;
-    btreemap_get_blob_8_512,     get_helper_v1, Blob8,  Blob512;
-    btreemap_get_blob_8_512_v2,  get_helper_v2, Blob8,  Blob512;
-
-    // 16 x V
-    btreemap_get_blob_16_4,       get_helper_v1, Blob16,    Blob4;
-    btreemap_get_blob_16_4_v2,    get_helper_v2, Blob16,    Blob4;
-    btreemap_get_blob_16_8,       get_helper_v1, Blob16,    Blob8;
-    btreemap_get_blob_16_8_v2,    get_helper_v2, Blob16,    Blob8;
-    btreemap_get_blob_16_16,      get_helper_v1, Blob16,   Blob16;
-    btreemap_get_blob_16_16_v2,   get_helper_v2, Blob16,   Blob16;
-    btreemap_get_blob_16_32,      get_helper_v1, Blob16,   Blob32;
-    btreemap_get_blob_16_32_v2,   get_helper_v2, Blob16,   Blob32;
-    btreemap_get_blob_16_64,      get_helper_v1, Blob16,   Blob64;
-    btreemap_get_blob_16_64_v2,   get_helper_v2, Blob16,   Blob64;
-    btreemap_get_blob_16_128,     get_helper_v1, Blob16,  Blob128;
-    btreemap_get_blob_16_128_v2,  get_helper_v2, Blob16,  Blob128;
-    btreemap_get_blob_16_256,     get_helper_v1, Blob16,  Blob256;
-    btreemap_get_blob_16_256_v2,  get_helper_v2, Blob16,  Blob256;
-    btreemap_get_blob_16_512,     get_helper_v1, Blob16,  Blob512;
-    btreemap_get_blob_16_512_v2,  get_helper_v2, Blob16,  Blob512;
-
-    // 32 x V
-    btreemap_get_blob_32_4,       get_helper_v1, Blob32,    Blob4;
-    btreemap_get_blob_32_4_v2,    get_helper_v2, Blob32,    Blob4;
-    btreemap_get_blob_32_8,       get_helper_v1, Blob32,    Blob8;
-    btreemap_get_blob_32_8_v2,    get_helper_v2, Blob32,    Blob8;
-    btreemap_get_blob_32_16,      get_helper_v1, Blob32,   Blob16;
-    btreemap_get_blob_32_16_v2,   get_helper_v2, Blob32,   Blob16;
-    btreemap_get_blob_32_32,      get_helper_v1, Blob32,   Blob32;
-    btreemap_get_blob_32_32_v2,   get_helper_v2, Blob32,   Blob32;
-    btreemap_get_blob_32_64,      get_helper_v1, Blob32,   Blob64;
-    btreemap_get_blob_32_64_v2,   get_helper_v2, Blob32,   Blob64;
-    btreemap_get_blob_32_128,     get_helper_v1, Blob32,  Blob128;
-    btreemap_get_blob_32_128_v2,  get_helper_v2, Blob32,  Blob128;
-    btreemap_get_blob_32_256,     get_helper_v1, Blob32,  Blob256;
-    btreemap_get_blob_32_256_v2,  get_helper_v2, Blob32,  Blob256;
-    btreemap_get_blob_32_512,     get_helper_v1, Blob32,  Blob512;
-    btreemap_get_blob_32_512_v2,  get_helper_v2, Blob32,  Blob512;
-
-    // 64 x V
-    btreemap_get_blob_64_4,       get_helper_v1, Blob64,    Blob4;
-    btreemap_get_blob_64_4_v2,    get_helper_v2, Blob64,    Blob4;
-    btreemap_get_blob_64_8,       get_helper_v1, Blob64,    Blob8;
-    btreemap_get_blob_64_8_v2,    get_helper_v2, Blob64,    Blob8;
-    btreemap_get_blob_64_16,      get_helper_v1, Blob64,   Blob16;
-    btreemap_get_blob_64_16_v2,   get_helper_v2, Blob64,   Blob16;
-    btreemap_get_blob_64_32,      get_helper_v1, Blob64,   Blob32;
-    btreemap_get_blob_64_32_v2,   get_helper_v2, Blob64,   Blob32;
-    btreemap_get_blob_64_64,      get_helper_v1, Blob64,   Blob64;
-    btreemap_get_blob_64_64_v2,   get_helper_v2, Blob64,   Blob64;
-    btreemap_get_blob_64_128,     get_helper_v1, Blob64,  Blob128;
-    btreemap_get_blob_64_128_v2,  get_helper_v2, Blob64,  Blob128;
-    btreemap_get_blob_64_256,     get_helper_v1, Blob64,  Blob256;
-    btreemap_get_blob_64_256_v2,  get_helper_v2, Blob64,  Blob256;
-    btreemap_get_blob_64_512,     get_helper_v1, Blob64,  Blob512;
-    btreemap_get_blob_64_512_v2,  get_helper_v2, Blob64,  Blob512;
-
-    // 128 x V
-    btreemap_get_blob_128_4,       get_helper_v1, Blob128,    Blob4;
-    btreemap_get_blob_128_4_v2,    get_helper_v2, Blob128,    Blob4;
-    btreemap_get_blob_128_8,       get_helper_v1, Blob128,    Blob8;
-    btreemap_get_blob_128_8_v2,    get_helper_v2, Blob128,    Blob8;
-    btreemap_get_blob_128_16,      get_helper_v1, Blob128,   Blob16;
-    btreemap_get_blob_128_16_v2,   get_helper_v2, Blob128,   Blob16;
-    btreemap_get_blob_128_32,      get_helper_v1, Blob128,   Blob32;
-    btreemap_get_blob_128_32_v2,   get_helper_v2, Blob128,   Blob32;
-    btreemap_get_blob_128_64,      get_helper_v1, Blob128,   Blob64;
-    btreemap_get_blob_128_64_v2,   get_helper_v2, Blob128,   Blob64;
-    btreemap_get_blob_128_128,     get_helper_v1, Blob128,  Blob128;
-    btreemap_get_blob_128_128_v2,  get_helper_v2, Blob128,  Blob128;
-    btreemap_get_blob_128_256,     get_helper_v1, Blob128,  Blob256;
-    btreemap_get_blob_128_256_v2,  get_helper_v2, Blob128,  Blob256;
-    btreemap_get_blob_128_512,     get_helper_v1, Blob128,  Blob512;
-    btreemap_get_blob_128_512_v2,  get_helper_v2, Blob128,  Blob512;
-
-    // 256 x V
-    btreemap_get_blob_256_4,       get_helper_v1, Blob256,    Blob4;
-    btreemap_get_blob_256_4_v2,    get_helper_v2, Blob256,    Blob4;
-    btreemap_get_blob_256_8,       get_helper_v1, Blob256,    Blob8;
-    btreemap_get_blob_256_8_v2,    get_helper_v2, Blob256,    Blob8;
-    btreemap_get_blob_256_16,      get_helper_v1, Blob256,   Blob16;
-    btreemap_get_blob_256_16_v2,   get_helper_v2, Blob256,   Blob16;
-    btreemap_get_blob_256_32,      get_helper_v1, Blob256,   Blob32;
-    btreemap_get_blob_256_32_v2,   get_helper_v2, Blob256,   Blob32;
-    btreemap_get_blob_256_64,      get_helper_v1, Blob256,   Blob64;
-    btreemap_get_blob_256_64_v2,   get_helper_v2, Blob256,   Blob64;
-    btreemap_get_blob_256_128,     get_helper_v1, Blob256,  Blob128;
-    btreemap_get_blob_256_128_v2,  get_helper_v2, Blob256,  Blob128;
-    btreemap_get_blob_256_256,     get_helper_v1, Blob256,  Blob256;
-    btreemap_get_blob_256_256_v2,  get_helper_v2, Blob256,  Blob256;
-    btreemap_get_blob_256_512,     get_helper_v1, Blob256,  Blob512;
-    btreemap_get_blob_256_512_v2,  get_helper_v2, Blob256,  Blob512;
-
-    // 512 x V
-    btreemap_get_blob_512_4,       get_helper_v1, Blob512,    Blob4;
-    btreemap_get_blob_512_4_v2,    get_helper_v2, Blob512,    Blob4;
-    btreemap_get_blob_512_8,       get_helper_v1, Blob512,    Blob8;
-    btreemap_get_blob_512_8_v2,    get_helper_v2, Blob512,    Blob8;
-    btreemap_get_blob_512_16,      get_helper_v1, Blob512,   Blob16;
-    btreemap_get_blob_512_16_v2,   get_helper_v2, Blob512,   Blob16;
-    btreemap_get_blob_512_32,      get_helper_v1, Blob512,   Blob32;
-    btreemap_get_blob_512_32_v2,   get_helper_v2, Blob512,   Blob32;
-    btreemap_get_blob_512_64,      get_helper_v1, Blob512,   Blob64;
-    btreemap_get_blob_512_64_v2,   get_helper_v2, Blob512,   Blob64;
-    btreemap_get_blob_512_128,     get_helper_v1, Blob512,  Blob128;
-    btreemap_get_blob_512_128_v2,  get_helper_v2, Blob512,  Blob128;
-    btreemap_get_blob_512_256,     get_helper_v1, Blob512,  Blob256;
-    btreemap_get_blob_512_256_v2,  get_helper_v2, Blob512,  Blob256;
-    btreemap_get_blob_512_512,     get_helper_v1, Blob512,  Blob512;
-    btreemap_get_blob_512_512_v2,  get_helper_v2, Blob512,  Blob512;
+    btreemap_get_blob_512_1024_v2_mem_manager,  get_helper_v2_mem_manager,  Blob512, Blob1024;
 
     // 1024 x V
     btreemap_get_blob_1024_4,       get_helper_v1, Blob1024,    Blob4;
@@ -603,14 +171,14 @@ bench_tests! {
     btreemap_get_blob_1024_1024,     get_helper_v1,  Blob1024, Blob1024;
     btreemap_get_blob_1024_1024_v2,  get_helper_v2,  Blob1024, Blob1024;
 
-    // btreemap_get_u64_u64,            get_helper_v1,   u64,     u64;
-    // btreemap_get_u64_u64_v2,         get_helper_v2,   u64,     u64;
-    // btreemap_get_u64_u64_v2_mem_manager, get_helper_v2_mem_manager, u64, u64;
+    btreemap_get_u64_u64,            get_helper_v1,   u64,     u64;
+    btreemap_get_u64_u64_v2,         get_helper_v2,   u64,     u64;
+    btreemap_get_u64_u64_v2_mem_manager, get_helper_v2_mem_manager, u64, u64;
 
-    // btreemap_get_u64_blob_8,         get_helper_v1,   u64,   Blob8;
-    // btreemap_get_u64_blob_8_v2,      get_helper_v2,   u64,   Blob8;
-    // btreemap_get_blob_8_u64,         get_helper_v1,   Blob8,   u64;
-    // btreemap_get_blob_8_u64_v2,      get_helper_v2,   Blob8,   u64;
+    btreemap_get_u64_blob_8,         get_helper_v1,   u64,   Blob8;
+    btreemap_get_u64_blob_8_v2,      get_helper_v2,   u64,   Blob8;
+    btreemap_get_blob_8_u64,         get_helper_v1,   Blob8,   u64;
+    btreemap_get_blob_8_u64_v2,      get_helper_v2,   Blob8,   u64;
 }
 
 // Benchmarks `contains_key` of a BTreeMap.
