@@ -219,43 +219,6 @@ impl<const N: usize> Storable for FixedVec<N> {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-// impl<const N: usize> FixedVec<N> {
-//     /// Always produces exactly N random bytes.
-//     pub fn random_fill(rng: &mut Rng) -> Self {
-//         let mut buf = Vec::with_capacity(N);
-//         for _ in 0..N {
-//             buf.push(rng.rand_u8());
-//         }
-//         FixedVec(buf)
-//     }
-// }
-
-// impl<const N: usize> Deref for FixedVec<N> {
-//     type Target = Vec<u8>;
-//     fn deref(&self) -> &Vec<u8> {
-//         &self.0
-//     }
-// }
-
-// impl<const N: usize> DerefMut for FixedVec<N> {
-//     fn deref_mut(&mut self) -> &mut Vec<u8> {
-//         &mut self.0
-//     }
-// }
-
-// impl<const N: usize> Random for FixedVec<N> {
-//     fn random(rng: &mut Rng) -> Self {
-//         Self::random_fill(rng)
-//     }
-// }
-
-// impl<const N: usize> TryFrom<&[u8]> for FixedVec<N> {
-//     type Error = std::convert::Infallible;
-//     fn try_from(slice: &[u8]) -> Result<Self, Self::Error> {
-//         Ok(FixedVec(slice.to_vec()))
-//     }
-// }
-
 // NOTE: Below are a few implementations of `Storable` for common types.
 // Some of these implementations use `unwrap`, as opposed to returning a `Result`
 // with a possible error. The reason behind this decision is that these
