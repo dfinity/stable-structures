@@ -618,70 +618,150 @@ fn traverse_helper(count: u32, value_size: usize, traversal_mode: TraversalMode)
     }
 }
 
-#[bench(raw)]
-pub fn btreemap_10mib_values_insert_v2() -> BenchResult {
-    let count = 20;
+/// Helper macro to generate range benchmarks.
+macro_rules! bench_range_tests {
+    ($( $fn_name:ident, $helper:ident, $count:expr, $size:expr );+ $(;)?) => {
+        $(
+            #[bench(raw)]
+            pub fn $fn_name() -> BenchResult {
+                $helper($count, $size)
+            }
+        )+
+    };
+}
+
+bench_range_tests! {
+    // === V1 ===
+    // V1 does not support unbounded types, eg. Vec<_>.
+
+    // === V2 ===
+    btreemap_range_key_sum_small_v2,    range_key_sum_helper_v2, 1_000, 0;
+    btreemap_range_key_sum_medium_v2,   range_key_sum_helper_v2, 1_000, 10 * KiB;
+    btreemap_range_key_sum_large_v2,    range_key_sum_helper_v2, 20, 10 * MiB;
+
+    btreemap_range_value_sum_small_v2,  range_value_sum_helper_v2, 1_000, 0;
+    btreemap_range_value_sum_medium_v2, range_value_sum_helper_v2, 1_000, 10 * KiB;
+    btreemap_range_value_sum_large_v2,  range_value_sum_helper_v2, 20, 10 * MiB;
+
+    btreemap_range_count_small_v2,      range_count_helper_v2, 1_000, 0;
+    btreemap_range_count_medium_v2,     range_count_helper_v2, 1_000, 10 * KiB;
+    btreemap_range_count_large_v2,      range_count_helper_v2, 20, 10 * MiB;
+}
+
+fn range_key_sum_helper_v2(count: usize, size: usize) -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let mut rng = Rng::from_seed(0);
-    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+    let values = generate_random_blocks(count, size, &mut rng);
+    for (i, value) in values.into_iter().enumerate() {
+        btree.insert(i as u32, value);
+    }
 
+    // Read a range of entries but only process the key of each entry.
     bench_fn(|| {
-        for (i, value) in values.into_iter().enumerate() {
-            btree.insert(i as u32, value);
-        }
+        btree
+            .range((Bound::Included(0), Bound::Included(size as u32)))
+            .map(|(k, _)| k)
+            .sum::<u32>()
     })
 }
 
-#[bench(raw)]
-pub fn btreemap_10mib_values_remove_v2() -> BenchResult {
-    let count = 20;
+fn range_value_sum_helper_v2(count: usize, size: usize) -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let mut rng = Rng::from_seed(0);
-    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+    let values = generate_random_blocks(count, size, &mut rng);
+    for (i, value) in values.into_iter().enumerate() {
+        btree.insert(i as u32, value);
+    }
+
+    // Read a range of entries but only process the value from every third entry.
+    bench_fn(|| {
+        btree
+            .range((Bound::Included(0), Bound::Included(size as u32)))
+            .filter(|(k, _)| k % 3 == 0)
+            .map(|(_, v)| v.len())
+            .sum::<usize>()
+    })
+}
+
+fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let values = generate_random_blocks(count, size, &mut rng);
     for (i, value) in values.into_iter().enumerate() {
         btree.insert(i as u32, value);
     }
 
     bench_fn(|| {
-        for i in 0..count {
-            btree.remove(&(i as u32));
-        }
+        btree
+            .range((Bound::Included(0), Bound::Included(size as u32)))
+            .count()
     })
 }
 
-#[bench(raw)]
-pub fn btreemap_10mib_values_get_v2() -> BenchResult {
-    let count = 20;
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let mut rng = Rng::from_seed(0);
-    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
-    for (i, value) in values.into_iter().enumerate() {
-        btree.insert(i as u32, value);
-    }
+// #[bench(raw)]
+// pub fn btreemap_10mib_values_insert_v2() -> BenchResult {
+//     let count = 20;
+//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+//     let mut rng = Rng::from_seed(0);
+//     let values = generate_random_blocks(count, 10 * MiB, &mut rng);
 
-    bench_fn(|| {
-        for i in 0..count {
-            btree.get(&(i as u32));
-        }
-    })
-}
+//     bench_fn(|| {
+//         for (i, value) in values.into_iter().enumerate() {
+//             btree.insert(i as u32, value);
+//         }
+//     })
+// }
 
-#[bench(raw)]
-pub fn btreemap_10mib_values_contains_key_v2() -> BenchResult {
-    let count = 20;
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let mut rng = Rng::from_seed(0);
-    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
-    for (i, value) in values.into_iter().enumerate() {
-        btree.insert(i as u32, value);
-    }
+// #[bench(raw)]
+// pub fn btreemap_10mib_values_remove_v2() -> BenchResult {
+//     let count = 20;
+//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+//     let mut rng = Rng::from_seed(0);
+//     let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+//     for (i, value) in values.into_iter().enumerate() {
+//         btree.insert(i as u32, value);
+//     }
 
-    bench_fn(|| {
-        for i in 0..count {
-            btree.contains_key(&(i as u32));
-        }
-    })
-}
+//     bench_fn(|| {
+//         for i in 0..count {
+//             btree.remove(&(i as u32));
+//         }
+//     })
+// }
+
+// #[bench(raw)]
+// pub fn btreemap_10mib_values_get_v2() -> BenchResult {
+//     let count = 20;
+//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+//     let mut rng = Rng::from_seed(0);
+//     let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+//     for (i, value) in values.into_iter().enumerate() {
+//         btree.insert(i as u32, value);
+//     }
+
+//     bench_fn(|| {
+//         for i in 0..count {
+//             btree.get(&(i as u32));
+//         }
+//     })
+// }
+
+// #[bench(raw)]
+// pub fn btreemap_10mib_values_contains_key_v2() -> BenchResult {
+//     let count = 20;
+//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+//     let mut rng = Rng::from_seed(0);
+//     let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+//     for (i, value) in values.into_iter().enumerate() {
+//         btree.insert(i as u32, value);
+//     }
+
+//     bench_fn(|| {
+//         for i in 0..count {
+//             btree.contains_key(&(i as u32));
+//         }
+//     })
+// }
 
 // // Read a range of entries but only process the key of each entry.
 // #[bench(raw)]
