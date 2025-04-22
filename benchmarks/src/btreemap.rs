@@ -8,6 +8,7 @@ use ic_stable_structures::{
 use std::ops::Bound;
 use tiny_rng::{Rand, Rng};
 
+// Bounded types.
 type Blob4 = Blob<4>;
 type Blob8 = Blob<8>;
 type Blob16 = Blob<16>;
@@ -18,6 +19,7 @@ type Blob256 = Blob<256>;
 type Blob512 = Blob<512>;
 type Blob1024 = Blob<1024>;
 
+// Unbounded types.
 type FixedVec4 = FixedVec<4>;
 type FixedVec8 = FixedVec<8>;
 type FixedVec16 = FixedVec<16>;
@@ -56,6 +58,8 @@ fn generate_random_kv<K: TestKey, V: TestValue>(n: usize, rng: &mut Rng) -> Vec<
 
 // Benchmarks inserting data into a BTreeMap.
 bench_tests! {
+    // === V1 ===
+
     // V1 blob K x 1024
     btreemap_insert_blob_4_1024_v1,    insert_helper_v1,    Blob4, Blob1024;
     btreemap_insert_blob_8_1024_v1,    insert_helper_v1,    Blob8, Blob1024;
@@ -75,6 +79,13 @@ bench_tests! {
     btreemap_insert_blob_1024_128_v1,  insert_helper_v1, Blob1024,  Blob128;
     btreemap_insert_blob_1024_256_v1,  insert_helper_v1, Blob1024,  Blob256;
     btreemap_insert_blob_1024_512_v1,  insert_helper_v1, Blob1024,  Blob512;
+
+    // V1 u64 / blob8
+    btreemap_insert_u64_u64_v1,        insert_helper_v1, u64,     u64;
+    btreemap_insert_u64_blob_8_v1,     insert_helper_v1, u64,   Blob8;
+    btreemap_insert_blob_8_u64_v1,     insert_helper_v1, Blob8,   u64;
+
+    // === V2 ===
 
     // V2 blob K x 1024
     btreemap_insert_blob_4_1024_v2,    insert_helper_v2,    Blob4, Blob1024;
@@ -116,16 +127,19 @@ bench_tests! {
     btreemap_insert_vec_1024_256_v2,  insert_helper_v2, FixedVec1024,  FixedVec256;
     btreemap_insert_vec_1024_512_v2,  insert_helper_v2, FixedVec1024,  FixedVec512;
 
-    // btreemap_insert_blob_1024_512_v2_mem_manager, insert_helper_v2_mem_manager, Blob1024, Blob512;
+    // V2 u64 / blob8 / vec8
+    btreemap_insert_u64_u64_v2,        insert_helper_v2,       u64,       u64;
+    btreemap_insert_u64_blob_8_v2,     insert_helper_v2,       u64,     Blob8;
+    btreemap_insert_blob_8_u64_v2,     insert_helper_v2,     Blob8,       u64;
+    btreemap_insert_u64_vec_8_v2,      insert_helper_v2,       u64, FixedVec8;
+    btreemap_insert_vec_8_u64_v2,      insert_helper_v2, FixedVec8,       u64;
 
-    // btreemap_insert_u64_u64,           insert_helper_v1, u64,     u64;
-    // btreemap_insert_u64_u64_v2,        insert_helper_v2, u64,     u64;
-    // btreemap_insert_u64_u64_v2_mem_manager, insert_helper_v2_mem_manager, u64, u64;
-
-    // btreemap_insert_u64_blob_8,        insert_helper_v1, u64,   Blob8;
-    // btreemap_insert_u64_blob_8_v2,     insert_helper_v2, u64,   Blob8;
-    // btreemap_insert_blob_8_u64,        insert_helper_v1, Blob8,   u64;
-    // btreemap_insert_blob_8_u64_v2,     insert_helper_v2, Blob8,   u64;
+    // V2 memory manager u64 / blob512 / vec512
+    btreemap_insert_u64_u64_v2_mem_manager,      insert_helper_v2_mem_manager,         u64,         u64;
+    btreemap_insert_u64_blob_512_v2_mem_manager, insert_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_insert_blob_512_u64_v2_mem_manager, insert_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_insert_u64_vec_512_v2_mem_manager,  insert_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_insert_vec_512_u64_v2_mem_manager,  insert_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 // Profiles inserting a large number of random blobs into a btreemap.
@@ -161,6 +175,8 @@ fn insert_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory
 
 // Benchmarks removing keys from a BTreeMap.
 bench_tests! {
+    // === V1 ===
+
     // V1 blob K x 1024
     btreemap_remove_blob_4_1024_v1,    remove_helper_v1,    Blob4, Blob1024;
     btreemap_remove_blob_8_1024_v1,    remove_helper_v1,    Blob8, Blob1024;
@@ -180,6 +196,13 @@ bench_tests! {
     btreemap_remove_blob_1024_128_v1,  remove_helper_v1, Blob1024,  Blob128;
     btreemap_remove_blob_1024_256_v1,  remove_helper_v1, Blob1024,  Blob256;
     btreemap_remove_blob_1024_512_v1,  remove_helper_v1, Blob1024,  Blob512;
+
+    // V1 u64 / blob8
+    btreemap_remove_u64_u64_v1,        remove_helper_v1, u64,     u64;
+    btreemap_remove_u64_blob_8_v1,     remove_helper_v1, u64,   Blob8;
+    btreemap_remove_blob_8_u64_v1,     remove_helper_v1, Blob8,   u64;
+
+    // === V2 ===
 
     // V2 blob K x 1024
     btreemap_remove_blob_4_1024_v2,    remove_helper_v2,    Blob4, Blob1024;
@@ -221,13 +244,20 @@ bench_tests! {
     btreemap_remove_vec_1024_256_v2,  remove_helper_v2, FixedVec1024,  FixedVec256;
     btreemap_remove_vec_1024_512_v2,  remove_helper_v2, FixedVec1024,  FixedVec512;
 
-    // btreemap_remove_u64_u64,            remove_helper_v1,   u64,     u64;
-    // btreemap_remove_u64_u64_v2,         remove_helper_v2,   u64,     u64;
+    // V2 u64 / blob8 / vec8
+    btreemap_remove_u64_u64_v2,        remove_helper_v2,       u64,       u64;
+    btreemap_remove_u64_blob_8_v2,     remove_helper_v2,       u64,     Blob8;
+    btreemap_remove_blob_8_u64_v2,     remove_helper_v2,     Blob8,       u64;
+    btreemap_remove_u64_vec_8_v2,      remove_helper_v2,       u64, FixedVec8;
+    btreemap_remove_vec_8_u64_v2,      remove_helper_v2, FixedVec8,       u64;
 
-    // btreemap_remove_u64_blob_8,         remove_helper_v1,   u64,   Blob8;
-    // btreemap_remove_u64_blob_8_v2,      remove_helper_v2,   u64,   Blob8;
-    // btreemap_remove_blob_8_u64,         remove_helper_v1,   Blob8,   u64;
-    // btreemap_remove_blob_8_u64_v2,      remove_helper_v2,   Blob8,   u64;
+    // V2 memory manager u64 / blob512 / vec512
+    btreemap_remove_u64_u64_v2_mem_manager,      remove_helper_v2_mem_manager,         u64,         u64;
+    btreemap_remove_u64_blob_512_v2_mem_manager, remove_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_remove_blob_512_u64_v2_mem_manager, remove_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_remove_u64_vec_512_v2_mem_manager,  remove_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_remove_vec_512_u64_v2_mem_manager,  remove_helper_v2_mem_manager, FixedVec512,         u64;
+
 }
 
 // Inserts a large number of random blobs into a btreemap, then profiles removing them.
@@ -241,9 +271,13 @@ fn remove_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
     remove_helper::<K, V>(btree)
 }
 
-fn remove_helper<K: TestKey, V: TestValue>(
-    mut btree: BTreeMap<K, V, DefaultMemoryImpl>,
-) -> BenchResult {
+fn remove_helper_v2_mem_manager<K: TestKey, V: TestValue>() -> BenchResult {
+    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
+    remove_helper::<K, V>(btree)
+}
+
+fn remove_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory>) -> BenchResult {
     let count = 10_000;
     let mut rng = Rng::from_seed(0);
     let items = generate_random_kv::<K, V>(count, &mut rng);
@@ -262,6 +296,8 @@ fn remove_helper<K: TestKey, V: TestValue>(
 
 // Benchmarks getting keys from a BTreeMap.
 bench_tests! {
+    // === V1 ===
+
     // V1 blob K x 1024
     btreemap_get_blob_4_1024_v1,    get_helper_v1,    Blob4, Blob1024;
     btreemap_get_blob_8_1024_v1,    get_helper_v1,    Blob8, Blob1024;
@@ -281,6 +317,13 @@ bench_tests! {
     btreemap_get_blob_1024_128_v1,  get_helper_v1, Blob1024,  Blob128;
     btreemap_get_blob_1024_256_v1,  get_helper_v1, Blob1024,  Blob256;
     btreemap_get_blob_1024_512_v1,  get_helper_v1, Blob1024,  Blob512;
+
+    // V1 u64 / blob8
+    btreemap_get_u64_u64_v1,        get_helper_v1, u64,     u64;
+    btreemap_get_u64_blob_8_v1,     get_helper_v1, u64,   Blob8;
+    btreemap_get_blob_8_u64_v1,     get_helper_v1, Blob8,   u64;
+
+    // === V2 ===
 
     // V2 blob K x 1024
     btreemap_get_blob_4_1024_v2,    get_helper_v2,    Blob4, Blob1024;
@@ -322,16 +365,19 @@ bench_tests! {
     btreemap_get_vec_1024_256_v2,  get_helper_v2, FixedVec1024,  FixedVec256;
     btreemap_get_vec_1024_512_v2,  get_helper_v2, FixedVec1024,  FixedVec512;
 
-    // btreemap_get_blob_512_1024_v2_mem_manager,  get_helper_v2_mem_manager,  Blob512, Blob1024;
+    // V2 u64 / blob8 / vec8
+    btreemap_get_u64_u64_v2,        get_helper_v2,       u64,       u64;
+    btreemap_get_u64_blob_8_v2,     get_helper_v2,       u64,     Blob8;
+    btreemap_get_blob_8_u64_v2,     get_helper_v2,     Blob8,       u64;
+    btreemap_get_u64_vec_8_v2,      get_helper_v2,       u64, FixedVec8;
+    btreemap_get_vec_8_u64_v2,      get_helper_v2, FixedVec8,       u64;
 
-    // btreemap_get_u64_u64,            get_helper_v1,   u64,     u64;
-    // btreemap_get_u64_u64_v2,         get_helper_v2,   u64,     u64;
-    // btreemap_get_u64_u64_v2_mem_manager, get_helper_v2_mem_manager, u64, u64;
-
-    // btreemap_get_u64_blob_8,         get_helper_v1,   u64,   Blob8;
-    // btreemap_get_u64_blob_8_v2,      get_helper_v2,   u64,   Blob8;
-    // btreemap_get_blob_8_u64,         get_helper_v1,   Blob8,   u64;
-    // btreemap_get_blob_8_u64_v2,      get_helper_v2,   Blob8,   u64;
+    // V2 memory manager u64 / blob512 / vec512
+    btreemap_get_u64_u64_v2_mem_manager,      get_helper_v2_mem_manager,         u64,         u64;
+    btreemap_get_u64_blob_512_v2_mem_manager, get_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_get_blob_512_u64_v2_mem_manager, get_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_get_u64_vec_512_v2_mem_manager,  get_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_get_vec_512_u64_v2_mem_manager,  get_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 // Profiles getting a large number of random blobs from a btreemap.
@@ -370,6 +416,8 @@ fn get_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory>) 
 
 // Benchmarks `contains_key` of a BTreeMap.
 bench_tests! {
+    // === V1 ===
+
     // V1 blob K x 1024
     btreemap_contains_blob_4_1024_v1,    contains_helper_v1,    Blob4, Blob1024;
     btreemap_contains_blob_8_1024_v1,    contains_helper_v1,    Blob8, Blob1024;
@@ -389,6 +437,13 @@ bench_tests! {
     btreemap_contains_blob_1024_128_v1,  contains_helper_v1, Blob1024,  Blob128;
     btreemap_contains_blob_1024_256_v1,  contains_helper_v1, Blob1024,  Blob256;
     btreemap_contains_blob_1024_512_v1,  contains_helper_v1, Blob1024,  Blob512;
+
+    // V1 u64 / blob8
+    btreemap_contains_u64_u64_v1,        contains_helper_v1, u64,     u64;
+    btreemap_contains_u64_blob_8_v1,     contains_helper_v1, u64,   Blob8;
+    btreemap_contains_blob_8_u64_v1,     contains_helper_v1, Blob8,   u64;
+
+    // === V2 ===
 
     // V2 blob K x 1024
     btreemap_contains_blob_4_1024_v2,    contains_helper_v2,    Blob4, Blob1024;
@@ -429,6 +484,20 @@ bench_tests! {
     btreemap_contains_vec_1024_128_v2,  contains_helper_v2, FixedVec1024,  FixedVec128;
     btreemap_contains_vec_1024_256_v2,  contains_helper_v2, FixedVec1024,  FixedVec256;
     btreemap_contains_vec_1024_512_v2,  contains_helper_v2, FixedVec1024,  FixedVec512;
+
+    // V2 u64 / blob8 / vec8
+    btreemap_contains_u64_u64_v2,        contains_helper_v2,       u64,       u64;
+    btreemap_contains_u64_blob_8_v2,     contains_helper_v2,       u64,     Blob8;
+    btreemap_contains_blob_8_u64_v2,     contains_helper_v2,     Blob8,       u64;
+    btreemap_contains_u64_vec_8_v2,      contains_helper_v2,       u64, FixedVec8;
+    btreemap_contains_vec_8_u64_v2,      contains_helper_v2, FixedVec8,       u64;
+
+    // V2 memory manager u64 / blob512 / vec512
+    btreemap_contains_u64_u64_v2_mem_manager,      contains_helper_v2_mem_manager,         u64,         u64;
+    btreemap_contains_u64_blob_512_v2_mem_manager, contains_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_contains_blob_512_u64_v2_mem_manager, contains_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_contains_u64_vec_512_v2_mem_manager,  contains_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_contains_vec_512_u64_v2_mem_manager,  contains_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 // Profiles `contains_key` on a large number of random blobs from a btreemap.
@@ -439,6 +508,12 @@ fn contains_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
 
 fn contains_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    contains_helper::<K, V>(btree)
+}
+
+fn contains_helper_v2_mem_manager<K: TestKey, V: TestValue>() -> BenchResult {
+    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+    let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
     contains_helper::<K, V>(btree)
 }
 
