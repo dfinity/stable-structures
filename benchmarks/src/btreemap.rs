@@ -201,62 +201,62 @@ pub fn btreemap_read_every_third_value_from_range() -> BenchResult {
 
 #[bench(raw)]
 pub fn btreemap_iter_small_values() -> BenchResult {
-    iter_helper(10_000, 0, IterType::Iter)
+    traversal_helper(10_000, 0, TraversalMode::Iter)
 }
 
 #[bench(raw)]
 pub fn btreemap_iter_rev_small_values() -> BenchResult {
-    iter_helper(10_000, 0, IterType::IterRev)
+    traversal_helper(10_000, 0, TraversalMode::IterRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_iter_10mib_values() -> BenchResult {
-    iter_helper(200, 10 * 1024, IterType::Iter)
+    traversal_helper(200, 10 * 1024, TraversalMode::Iter)
 }
 
 #[bench(raw)]
 pub fn btreemap_iter_rev_10mib_values() -> BenchResult {
-    iter_helper(200, 10 * 1024, IterType::IterRev)
+    traversal_helper(200, 10 * 1024, TraversalMode::IterRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_keys_small_values() -> BenchResult {
-    iter_helper(10_000, 0, IterType::Keys)
+    traversal_helper(10_000, 0, TraversalMode::Keys)
 }
 
 #[bench(raw)]
 pub fn btreemap_keys_rev_small_values() -> BenchResult {
-    iter_helper(10_000, 0, IterType::KeysRev)
+    traversal_helper(10_000, 0, TraversalMode::KeysRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_keys_10mib_values() -> BenchResult {
-    iter_helper(200, 10 * 1024, IterType::Keys)
+    traversal_helper(200, 10 * 1024, TraversalMode::Keys)
 }
 
 #[bench(raw)]
 pub fn btreemap_keys_rev_10mib_values() -> BenchResult {
-    iter_helper(200, 10 * 1024, IterType::KeysRev)
+    traversal_helper(200, 10 * 1024, TraversalMode::KeysRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_values_small_values() -> BenchResult {
-    iter_helper(10_000, 0, IterType::Values)
+    traversal_helper(10_000, 0, TraversalMode::Values)
 }
 
 #[bench(raw)]
 pub fn btreemap_values_rev_small_values() -> BenchResult {
-    iter_helper(10_000, 0, IterType::ValuesRev)
+    traversal_helper(10_000, 0, TraversalMode::ValuesRev)
 }
 
 #[bench(raw)]
 pub fn btreemap_values_10mib_values() -> BenchResult {
-    iter_helper(200, 10 * 1024, IterType::Values)
+    traversal_helper(200, 10 * 1024, TraversalMode::Values)
 }
 
 #[bench(raw)]
 pub fn btreemap_values_rev_10mib_values() -> BenchResult {
-    iter_helper(200, 10 * 1024, IterType::ValuesRev)
+    traversal_helper(200, 10 * 1024, TraversalMode::ValuesRev)
 }
 
 #[bench(raw)]
@@ -332,20 +332,20 @@ fn insert_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
     })
 }
 
-// Profiles iterating over a btreemap.
-fn iter_helper(size: u32, value_size: u32, iter_type: IterType) -> BenchResult {
+/// Benchmarks BTreeMap traversal for the given traversal mode.
+fn traversal_helper(size: u32, value_size: u32, traversal_mode: TraversalMode) -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     for i in 0..size {
         btree.insert(i, vec![0u8; value_size as usize]);
     }
 
-    match iter_type {
-        IterType::Iter => bench_fn(|| for _ in btree.iter() {}),
-        IterType::IterRev => bench_fn(|| for _ in btree.iter().rev() {}),
-        IterType::Keys => bench_fn(|| for _ in btree.keys() {}),
-        IterType::KeysRev => bench_fn(|| for _ in btree.keys().rev() {}),
-        IterType::Values => bench_fn(|| for _ in btree.values() {}),
-        IterType::ValuesRev => bench_fn(|| for _ in btree.values().rev() {}),
+    match traversal_mode {
+        TraversalMode::Iter => bench_fn(|| for _ in btree.iter() {}),
+        TraversalMode::IterRev => bench_fn(|| for _ in btree.iter().rev() {}),
+        TraversalMode::Keys => bench_fn(|| for _ in btree.keys() {}),
+        TraversalMode::KeysRev => bench_fn(|| for _ in btree.keys().rev() {}),
+        TraversalMode::Values => bench_fn(|| for _ in btree.values() {}),
+        TraversalMode::ValuesRev => bench_fn(|| for _ in btree.values().rev() {}),
     }
 }
 
@@ -469,7 +469,7 @@ fn remove_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
     })
 }
 
-enum IterType {
+enum TraversalMode {
     Iter,
     IterRev,
     Keys,
