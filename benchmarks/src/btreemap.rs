@@ -631,29 +631,33 @@ macro_rules! bench_traversal_tests {
 }
 
 bench_traversal_tests! {
+    // === V1 ===
+    // V1 does not support unbounded types, eg. Vec<_>.
+
+    // === V2 ===
     // Small values
-    btreemap_scan_iter_small,        traverse_helper, 1_000, 0, TraversalMode::Iter;
-    btreemap_scan_iter_rev_small,    traverse_helper, 1_000, 0, TraversalMode::IterRev;
-    btreemap_scan_keys_small,        traverse_helper, 1_000, 0, TraversalMode::Keys;
-    btreemap_scan_keys_rev_small,    traverse_helper, 1_000, 0, TraversalMode::KeysRev;
-    btreemap_scan_values_small,      traverse_helper, 1_000, 0, TraversalMode::Values;
-    btreemap_scan_values_rev_small,  traverse_helper, 1_000, 0, TraversalMode::ValuesRev;
+    btreemap_scan_iter_small_v2,        traverse_helper_v2, 1_000, 0, TraversalMode::Iter;
+    btreemap_scan_iter_rev_small_v2,    traverse_helper_v2, 1_000, 0, TraversalMode::IterRev;
+    btreemap_scan_keys_small_v2,        traverse_helper_v2, 1_000, 0, TraversalMode::Keys;
+    btreemap_scan_keys_rev_small_v2,    traverse_helper_v2, 1_000, 0, TraversalMode::KeysRev;
+    btreemap_scan_values_small_v2,      traverse_helper_v2, 1_000, 0, TraversalMode::Values;
+    btreemap_scan_values_rev_small_v2,  traverse_helper_v2, 1_000, 0, TraversalMode::ValuesRev;
 
     // Medium values
-    btreemap_scan_iter_medium,       traverse_helper, 1_000, 10 * KiB, TraversalMode::Iter;
-    btreemap_scan_iter_rev_medium,   traverse_helper, 1_000, 10 * KiB, TraversalMode::IterRev;
-    btreemap_scan_keys_medium,       traverse_helper, 1_000, 10 * KiB, TraversalMode::Keys;
-    btreemap_scan_keys_rev_medium,   traverse_helper, 1_000, 10 * KiB, TraversalMode::KeysRev;
-    btreemap_scan_values_medium,     traverse_helper, 1_000, 10 * KiB, TraversalMode::Values;
-    btreemap_scan_values_rev_medium, traverse_helper, 1_000, 10 * KiB, TraversalMode::ValuesRev;
+    btreemap_scan_iter_medium_v2,       traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Iter;
+    btreemap_scan_iter_rev_medium_v2,   traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::IterRev;
+    btreemap_scan_keys_medium_v2,       traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Keys;
+    btreemap_scan_keys_rev_medium_v2,   traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::KeysRev;
+    btreemap_scan_values_medium_v2,     traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Values;
+    btreemap_scan_values_rev_medium_v2, traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::ValuesRev;
 
     // Large values
-    btreemap_scan_iter_large,        traverse_helper, 20, 10 * MiB, TraversalMode::Iter;
-    btreemap_scan_iter_rev_large,    traverse_helper, 20, 10 * MiB, TraversalMode::IterRev;
-    btreemap_scan_keys_large,        traverse_helper, 20, 10 * MiB, TraversalMode::Keys;
-    btreemap_scan_keys_rev_large,    traverse_helper, 20, 10 * MiB, TraversalMode::KeysRev;
-    btreemap_scan_values_large,      traverse_helper, 20, 10 * MiB, TraversalMode::Values;
-    btreemap_scan_values_rev_large,  traverse_helper, 20, 10 * MiB, TraversalMode::ValuesRev;
+    btreemap_scan_iter_large_v2,        traverse_helper_v2, 20, 10 * MiB, TraversalMode::Iter;
+    btreemap_scan_iter_rev_large_v2,    traverse_helper_v2, 20, 10 * MiB, TraversalMode::IterRev;
+    btreemap_scan_keys_large_v2,        traverse_helper_v2, 20, 10 * MiB, TraversalMode::Keys;
+    btreemap_scan_keys_rev_large_v2,    traverse_helper_v2, 20, 10 * MiB, TraversalMode::KeysRev;
+    btreemap_scan_values_large_v2,      traverse_helper_v2, 20, 10 * MiB, TraversalMode::Values;
+    btreemap_scan_values_rev_large_v2,  traverse_helper_v2, 20, 10 * MiB, TraversalMode::ValuesRev;
 }
 
 enum TraversalMode {
@@ -666,7 +670,7 @@ enum TraversalMode {
 }
 
 /// Benchmarks BTreeMap traversal for the given traversal mode.
-fn traverse_helper(count: u32, value_size: usize, traversal_mode: TraversalMode) -> BenchResult {
+fn traverse_helper_v2(count: u32, value_size: usize, traversal_mode: TraversalMode) -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     for i in 0..count {
         btree.insert(i, vec![0u8; value_size]);
