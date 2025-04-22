@@ -66,9 +66,6 @@ bench_tests! {
     btreemap_insert_blob_1024_512_v2,  insert_helper_v2, Blob1024,  Blob512;
     btreemap_insert_blob_1024_512_v2_mem_manager, insert_helper_v2_mem_manager, Blob1024, Blob512;
 
-    btreemap_insert_blob_1024_1024,     insert_helper_v1,  Blob1024, Blob1024;
-    btreemap_insert_blob_1024_1024_v2,  insert_helper_v2,  Blob1024, Blob1024;
-
     btreemap_insert_u64_u64,           insert_helper_v1, u64,     u64;
     btreemap_insert_u64_u64_v2,        insert_helper_v2, u64,     u64;
     btreemap_insert_u64_u64_v2_mem_manager, insert_helper_v2_mem_manager, u64, u64;
@@ -99,27 +96,6 @@ bench_tests! {
     btreemap_remove_blob_512_1024,      remove_helper_v1,   Blob512, Blob1024;
     btreemap_remove_blob_512_1024_v2,   remove_helper_v2,   Blob512, Blob1024;
 
-    // 1024 x V
-    btreemap_remove_blob_1024_4,       remove_helper_v1, Blob1024,    Blob4;
-    btreemap_remove_blob_1024_4_v2,    remove_helper_v2, Blob1024,    Blob4;
-    btreemap_remove_blob_1024_8,       remove_helper_v1, Blob1024,    Blob8;
-    btreemap_remove_blob_1024_8_v2,    remove_helper_v2, Blob1024,    Blob8;
-    btreemap_remove_blob_1024_16,      remove_helper_v1, Blob1024,   Blob16;
-    btreemap_remove_blob_1024_16_v2,   remove_helper_v2, Blob1024,   Blob16;
-    btreemap_remove_blob_1024_32,      remove_helper_v1, Blob1024,   Blob32;
-    btreemap_remove_blob_1024_32_v2,   remove_helper_v2, Blob1024,   Blob32;
-    btreemap_remove_blob_1024_64,      remove_helper_v1, Blob1024,   Blob64;
-    btreemap_remove_blob_1024_64_v2,   remove_helper_v2, Blob1024,   Blob64;
-    btreemap_remove_blob_1024_128,     remove_helper_v1, Blob1024,  Blob128;
-    btreemap_remove_blob_1024_128_v2,  remove_helper_v2, Blob1024,  Blob128;
-    btreemap_remove_blob_1024_256,     remove_helper_v1, Blob1024,  Blob256;
-    btreemap_remove_blob_1024_256_v2,  remove_helper_v2, Blob1024,  Blob256;
-    btreemap_remove_blob_1024_512,     remove_helper_v1, Blob1024,  Blob512;
-    btreemap_remove_blob_1024_512_v2,  remove_helper_v2, Blob1024,  Blob512;
-
-    btreemap_remove_blob_1024_1024,     remove_helper_v1,  Blob1024, Blob1024;
-    btreemap_remove_blob_1024_1024_v2,  remove_helper_v2,  Blob1024, Blob1024;
-
     btreemap_remove_u64_u64,            remove_helper_v1,   u64,     u64;
     btreemap_remove_u64_u64_v2,         remove_helper_v2,   u64,     u64;
 
@@ -149,27 +125,6 @@ bench_tests! {
     btreemap_get_blob_512_1024,      get_helper_v1,   Blob512, Blob1024;
     btreemap_get_blob_512_1024_v2,   get_helper_v2,   Blob512, Blob1024;
     btreemap_get_blob_512_1024_v2_mem_manager,  get_helper_v2_mem_manager,  Blob512, Blob1024;
-
-    // 1024 x V
-    btreemap_get_blob_1024_4,       get_helper_v1, Blob1024,    Blob4;
-    btreemap_get_blob_1024_4_v2,    get_helper_v2, Blob1024,    Blob4;
-    btreemap_get_blob_1024_8,       get_helper_v1, Blob1024,    Blob8;
-    btreemap_get_blob_1024_8_v2,    get_helper_v2, Blob1024,    Blob8;
-    btreemap_get_blob_1024_16,      get_helper_v1, Blob1024,   Blob16;
-    btreemap_get_blob_1024_16_v2,   get_helper_v2, Blob1024,   Blob16;
-    btreemap_get_blob_1024_32,      get_helper_v1, Blob1024,   Blob32;
-    btreemap_get_blob_1024_32_v2,   get_helper_v2, Blob1024,   Blob32;
-    btreemap_get_blob_1024_64,      get_helper_v1, Blob1024,   Blob64;
-    btreemap_get_blob_1024_64_v2,   get_helper_v2, Blob1024,   Blob64;
-    btreemap_get_blob_1024_128,     get_helper_v1, Blob1024,  Blob128;
-    btreemap_get_blob_1024_128_v2,  get_helper_v2, Blob1024,  Blob128;
-    btreemap_get_blob_1024_256,     get_helper_v1, Blob1024,  Blob256;
-    btreemap_get_blob_1024_256_v2,  get_helper_v2, Blob1024,  Blob256;
-    btreemap_get_blob_1024_512,     get_helper_v1, Blob1024,  Blob512;
-    btreemap_get_blob_1024_512_v2,  get_helper_v2, Blob1024,  Blob512;
-
-    btreemap_get_blob_1024_1024,     get_helper_v1,  Blob1024, Blob1024;
-    btreemap_get_blob_1024_1024_v2,  get_helper_v2,  Blob1024, Blob1024;
 
     btreemap_get_u64_u64,            get_helper_v1,   u64,     u64;
     btreemap_get_u64_u64_v2,         get_helper_v2,   u64,     u64;
