@@ -56,7 +56,7 @@ fn generate_random_kv<K: TestKey, V: TestValue>(n: usize, rng: &mut Rng) -> Vec<
     pairs
 }
 
-// Benchmarks inserting data into a BTreeMap.
+// Benchmarks for `BTreeMap::insert`.
 bench_tests! {
     // === V1 ===
 
@@ -173,7 +173,7 @@ fn insert_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory
     })
 }
 
-// Benchmarks removing keys from a BTreeMap.
+// Benchmarks for `BTreeMap::remove`.
 bench_tests! {
     // === V1 ===
 
@@ -294,7 +294,7 @@ fn remove_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory
     })
 }
 
-// Benchmarks getting keys from a BTreeMap.
+// Benchmarks for `BTreeMap::get`.
 bench_tests! {
     // === V1 ===
 
@@ -414,7 +414,7 @@ fn get_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory>) 
     })
 }
 
-// Benchmarks `contains_key` of a BTreeMap.
+// Benchmarks for `BTreeMap::contains_key`.
 bench_tests! {
     // === V1 ===
 
