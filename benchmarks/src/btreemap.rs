@@ -17,6 +17,12 @@ macro_rules! bench_tests {
     };
 }
 
+trait TestKey: Clone + Ord + Storable + Random {}
+impl<T> TestKey for T where T: Clone + Ord + Storable + Random {}
+
+trait TestValue: Storable + Random {}
+impl<T> TestValue for T where T: Storable + Random {}
+
 type Blob4 = Blob<4>;
 type Blob8 = Blob<8>;
 type Blob16 = Blob<16>;
@@ -293,27 +299,24 @@ pub fn btreemap_iter_count_10mib_values() -> BenchResult {
 }
 
 // Profiles inserting a large number of random blobs into a btreemap.
-fn insert_helper_v1<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
+fn insert_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     insert_helper::<K, V>(btree)
 }
 
-fn insert_helper_v2<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
+fn insert_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
     insert_helper::<K, V>(btree)
 }
 
-fn insert_helper_v2_mem_manager<K: Clone + Ord + Storable + Random, V: Storable + Random>(
-) -> BenchResult {
+fn insert_helper_v2_mem_manager<K: TestKey, V: TestValue>() -> BenchResult {
     let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
     let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
     insert_helper::<K, V>(btree)
 }
 
 // Profiles inserting a large number of random blobs into a btreemap.
-fn insert_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
-    mut btree: BTreeMap<K, V, impl Memory>,
-) -> BenchResult {
+fn insert_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory>) -> BenchResult {
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
     let mut random_keys = Vec::with_capacity(num_keys);
@@ -350,26 +353,23 @@ fn traversal_helper(size: u32, value_size: u32, traversal_mode: TraversalMode) -
 }
 
 // Profiles getting a large number of random blobs from a btreemap.
-fn get_helper_v1<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
+fn get_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     get_helper::<K, V>(btree)
 }
 
-fn get_helper_v2<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
+fn get_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
     get_helper::<K, V>(btree)
 }
 
-fn get_helper_v2_mem_manager<K: Clone + Ord + Storable + Random, V: Storable + Random>(
-) -> BenchResult {
+fn get_helper_v2_mem_manager<K: TestKey, V: TestValue>() -> BenchResult {
     let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
     let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
     get_helper::<K, V>(btree)
 }
 
-fn get_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
-    mut btree: BTreeMap<K, V, impl Memory>,
-) -> BenchResult {
+fn get_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory>) -> BenchResult {
     let num_keys = 10_000;
     let mut rng = Rng::from_seed(0);
     let mut random_keys = Vec::with_capacity(num_keys);
@@ -394,19 +394,17 @@ fn get_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
 }
 
 // Profiles `contains_key` on a large number of random blobs from a btreemap.
-fn contains_key_helper_v1<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult
-{
+fn contains_key_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     contains_key_helper::<K, V>(btree)
 }
 
-fn contains_key_helper_v2<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult
-{
+fn contains_key_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
     contains_key_helper::<K, V>(btree)
 }
 
-fn contains_key_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
+fn contains_key_helper<K: TestKey, V: TestValue>(
     mut btree: BTreeMap<K, V, impl Memory>,
 ) -> BenchResult {
     let num_keys = 10_000;
@@ -433,17 +431,17 @@ fn contains_key_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>
 }
 
 // Inserts a large number of random blobs into a btreemap, then profiles removing them.
-fn remove_helper_v1<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
+fn remove_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new_v1(DefaultMemoryImpl::default());
     remove_helper::<K, V>(btree)
 }
 
-fn remove_helper_v2<K: Clone + Ord + Storable + Random, V: Storable + Random>() -> BenchResult {
+fn remove_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
     remove_helper::<K, V>(btree)
 }
 
-fn remove_helper<K: Clone + Ord + Storable + Random, V: Storable + Random>(
+fn remove_helper<K: TestKey, V: TestValue>(
     mut btree: BTreeMap<K, V, DefaultMemoryImpl>,
 ) -> BenchResult {
     let num_keys = 10_000;
