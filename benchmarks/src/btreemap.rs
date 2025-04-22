@@ -200,62 +200,62 @@ pub fn btreemap_read_every_third_value_from_range() -> BenchResult {
 }
 
 #[bench(raw)]
-pub fn btreemap_iter_small_values() -> BenchResult {
+pub fn btreemap_traverse_iter_small_values() -> BenchResult {
     traversal_helper(10_000, 0, TraversalMode::Iter)
 }
 
 #[bench(raw)]
-pub fn btreemap_iter_rev_small_values() -> BenchResult {
+pub fn btreemap_traverse_iter_rev_small_values() -> BenchResult {
     traversal_helper(10_000, 0, TraversalMode::IterRev)
 }
 
 #[bench(raw)]
-pub fn btreemap_iter_10mib_values() -> BenchResult {
+pub fn btreemap_traverse_iter_10mib_values() -> BenchResult {
     traversal_helper(200, 10 * 1024, TraversalMode::Iter)
 }
 
 #[bench(raw)]
-pub fn btreemap_iter_rev_10mib_values() -> BenchResult {
+pub fn btreemap_traverse_iter_rev_10mib_values() -> BenchResult {
     traversal_helper(200, 10 * 1024, TraversalMode::IterRev)
 }
 
 #[bench(raw)]
-pub fn btreemap_keys_small_values() -> BenchResult {
+pub fn btreemap_traverse_keys_small_values() -> BenchResult {
     traversal_helper(10_000, 0, TraversalMode::Keys)
 }
 
 #[bench(raw)]
-pub fn btreemap_keys_rev_small_values() -> BenchResult {
+pub fn btreemap_traverse_keys_rev_small_values() -> BenchResult {
     traversal_helper(10_000, 0, TraversalMode::KeysRev)
 }
 
 #[bench(raw)]
-pub fn btreemap_keys_10mib_values() -> BenchResult {
+pub fn btreemap_traverse_keys_10mib_values() -> BenchResult {
     traversal_helper(200, 10 * 1024, TraversalMode::Keys)
 }
 
 #[bench(raw)]
-pub fn btreemap_keys_rev_10mib_values() -> BenchResult {
+pub fn btreemap_traverse_keys_rev_10mib_values() -> BenchResult {
     traversal_helper(200, 10 * 1024, TraversalMode::KeysRev)
 }
 
 #[bench(raw)]
-pub fn btreemap_values_small_values() -> BenchResult {
+pub fn btreemap_traverse_values_small_values() -> BenchResult {
     traversal_helper(10_000, 0, TraversalMode::Values)
 }
 
 #[bench(raw)]
-pub fn btreemap_values_rev_small_values() -> BenchResult {
+pub fn btreemap_traverse_values_rev_small_values() -> BenchResult {
     traversal_helper(10_000, 0, TraversalMode::ValuesRev)
 }
 
 #[bench(raw)]
-pub fn btreemap_values_10mib_values() -> BenchResult {
+pub fn btreemap_traverse_values_10mib_values() -> BenchResult {
     traversal_helper(200, 10 * 1024, TraversalMode::Values)
 }
 
 #[bench(raw)]
-pub fn btreemap_values_rev_10mib_values() -> BenchResult {
+pub fn btreemap_traverse_values_rev_10mib_values() -> BenchResult {
     traversal_helper(200, 10 * 1024, TraversalMode::ValuesRev)
 }
 
