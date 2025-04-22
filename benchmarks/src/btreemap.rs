@@ -562,28 +562,28 @@ macro_rules! bench_traversal_tests {
 
 bench_traversal_tests! {
     // Small values
-    btreemap_scan_iter_small, traverse_helper, 1_000, 0, TraversalMode::Iter;
-    btreemap_scan_iter_rev_small, traverse_helper, 1_000, 0, TraversalMode::IterRev;
-    btreemap_scan_keys_small, traverse_helper, 1_000, 0, TraversalMode::Keys;
-    btreemap_scan_keys_rev_small, traverse_helper, 1_000, 0, TraversalMode::KeysRev;
-    btreemap_scan_small, traverse_helper, 1_000, 0, TraversalMode::Values;
-    btreemap_scan_rev_small, traverse_helper, 1_000, 0, TraversalMode::ValuesRev;
+    btreemap_scan_iter_small,      traverse_helper, 1_000, 0, TraversalMode::Iter;
+    btreemap_scan_iter_rev_small,  traverse_helper, 1_000, 0, TraversalMode::IterRev;
+    btreemap_scan_keys_small,      traverse_helper, 1_000, 0, TraversalMode::Keys;
+    btreemap_scan_keys_rev_small,  traverse_helper, 1_000, 0, TraversalMode::KeysRev;
+    btreemap_scan_small,           traverse_helper, 1_000, 0, TraversalMode::Values;
+    btreemap_scan_rev_small,       traverse_helper, 1_000, 0, TraversalMode::ValuesRev;
 
     // Medium values
-    btreemap_scan_iter_medium, traverse_helper, 1_000, 10 * KiB, TraversalMode::Iter;
+    btreemap_scan_iter_medium,     traverse_helper, 1_000, 10 * KiB, TraversalMode::Iter;
     btreemap_scan_iter_rev_medium, traverse_helper, 1_000, 10 * KiB, TraversalMode::IterRev;
-    btreemap_scan_keys_medium, traverse_helper, 1_000, 10 * KiB, TraversalMode::Keys;
+    btreemap_scan_keys_medium,     traverse_helper, 1_000, 10 * KiB, TraversalMode::Keys;
     btreemap_scan_keys_rev_medium, traverse_helper, 1_000, 10 * KiB, TraversalMode::KeysRev;
-    btreemap_scan_medium, traverse_helper, 1_000, 10 * KiB, TraversalMode::Values;
-    btreemap_scan_rev_medium, traverse_helper, 1_000, 10 * KiB, TraversalMode::ValuesRev;
+    btreemap_scan_medium,          traverse_helper, 1_000, 10 * KiB, TraversalMode::Values;
+    btreemap_scan_rev_medium,      traverse_helper, 1_000, 10 * KiB, TraversalMode::ValuesRev;
 
     // Large values
-    btreemap_scan_iter_large, traverse_helper, 1_000, 10 * MiB, TraversalMode::Iter;
-    btreemap_scan_iter_rev_large, traverse_helper, 1_000, 10 * MiB, TraversalMode::IterRev;
-    btreemap_scan_keys_large, traverse_helper, 1_000, 10 * MiB, TraversalMode::Keys;
-    btreemap_scan_keys_rev_large, traverse_helper, 1_000, 10 * MiB, TraversalMode::KeysRev;
-    btreemap_scan_large, traverse_helper, 1_000, 10 * MiB, TraversalMode::Values;
-    btreemap_scan_rev_large, traverse_helper, 1_000, 10 * MiB, TraversalMode::ValuesRev;
+    btreemap_scan_iter_large,      traverse_helper, 1_000, 10 * MiB, TraversalMode::Iter;
+    btreemap_scan_iter_rev_large,  traverse_helper, 1_000, 10 * MiB, TraversalMode::IterRev;
+    btreemap_scan_keys_large,      traverse_helper, 1_000, 10 * MiB, TraversalMode::Keys;
+    btreemap_scan_keys_rev_large,  traverse_helper, 1_000, 10 * MiB, TraversalMode::KeysRev;
+    btreemap_scan_large,           traverse_helper, 1_000, 10 * MiB, TraversalMode::Values;
+    btreemap_scan_rev_large,       traverse_helper, 1_000, 10 * MiB, TraversalMode::ValuesRev;
 }
 
 enum TraversalMode {
