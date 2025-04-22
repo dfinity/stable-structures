@@ -962,7 +962,7 @@ fn pop_helper<K: TestKey, V: TestValue>(
     let count = 10_000;
     let mut rng = Rng::from_seed(0);
     let items = generate_random_kv::<K, V>(count, &mut rng);
-    for (k, v) in items.clone() {
+    for (k, v) in items {
         btree.insert(k, v);
     }
 
