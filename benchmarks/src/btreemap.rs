@@ -61,6 +61,12 @@ fn generate_random_kv<K: TestKey, V: TestValue>(n: usize, rng: &mut Rng) -> Vec<
     pairs
 }
 
+fn generate_random_blocks(count: usize, block_size: usize, rng: &mut Rng) -> Vec<Vec<u8>> {
+    (0..count)
+        .map(|_| (0..block_size).map(|_| rng.rand_u8()).collect())
+        .collect()
+}
+
 // Benchmarks for `BTreeMap::insert`.
 bench_tests! {
     // === V1 ===
@@ -578,12 +584,12 @@ bench_traversal_tests! {
     btreemap_scan_values_rev_medium, traverse_helper, 1_000, 10 * KiB, TraversalMode::ValuesRev;
 
     // Large values
-    btreemap_scan_iter_large,        traverse_helper, 1_000, 10 * MiB, TraversalMode::Iter;
-    btreemap_scan_iter_rev_large,    traverse_helper, 1_000, 10 * MiB, TraversalMode::IterRev;
-    btreemap_scan_keys_large,        traverse_helper, 1_000, 10 * MiB, TraversalMode::Keys;
-    btreemap_scan_keys_rev_large,    traverse_helper, 1_000, 10 * MiB, TraversalMode::KeysRev;
-    btreemap_scan_values_large,      traverse_helper, 1_000, 10 * MiB, TraversalMode::Values;
-    btreemap_scan_values_rev_large,  traverse_helper, 1_000, 10 * MiB, TraversalMode::ValuesRev;
+    btreemap_scan_iter_large,        traverse_helper, 20, 10 * MiB, TraversalMode::Iter;
+    btreemap_scan_iter_rev_large,    traverse_helper, 20, 10 * MiB, TraversalMode::IterRev;
+    btreemap_scan_keys_large,        traverse_helper, 20, 10 * MiB, TraversalMode::Keys;
+    btreemap_scan_keys_rev_large,    traverse_helper, 20, 10 * MiB, TraversalMode::KeysRev;
+    btreemap_scan_values_large,      traverse_helper, 20, 10 * MiB, TraversalMode::Values;
+    btreemap_scan_values_rev_large,  traverse_helper, 20, 10 * MiB, TraversalMode::ValuesRev;
 }
 
 enum TraversalMode {
@@ -612,27 +618,70 @@ fn traverse_helper(count: u32, value_size: usize, traversal_mode: TraversalMode)
     }
 }
 
-// #[bench(raw)]
-// pub fn btreemap_insert_10mib_values() -> BenchResult {
-//     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+#[bench(raw)]
+pub fn btreemap_10mib_values_insert_v2() -> BenchResult {
+    let count = 20;
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
 
-//     // Insert 20 10MiB values.
-//     let mut rng = Rng::from_seed(0);
-//     let mut values = vec![];
-//     for _ in 0..20 {
-//         values.push(
-//             rng.iter(Rand::rand_u8)
-//                 .take(10 * 1024 * 1024)
-//                 .collect::<Vec<_>>(),
-//         );
-//     }
+    bench_fn(|| {
+        for (i, value) in values.into_iter().enumerate() {
+            btree.insert(i as u32, value);
+        }
+    })
+}
 
-//     bench_fn(|| {
-//         for (i, value) in values.into_iter().enumerate() {
-//             btree.insert(i as u32, value);
-//         }
-//     })
-// }
+#[bench(raw)]
+pub fn btreemap_10mib_values_remove_v2() -> BenchResult {
+    let count = 20;
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+    for (i, value) in values.into_iter().enumerate() {
+        btree.insert(i as u32, value);
+    }
+
+    bench_fn(|| {
+        for i in 0..count {
+            btree.remove(&(i as u32));
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_10mib_values_get_v2() -> BenchResult {
+    let count = 20;
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+    for (i, value) in values.into_iter().enumerate() {
+        btree.insert(i as u32, value);
+    }
+
+    bench_fn(|| {
+        for i in 0..count {
+            btree.get(&(i as u32));
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_10mib_values_contains_key_v2() -> BenchResult {
+    let count = 20;
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+    for (i, value) in values.into_iter().enumerate() {
+        btree.insert(i as u32, value);
+    }
+
+    bench_fn(|| {
+        for i in 0..count {
+            btree.contains_key(&(i as u32));
+        }
+    })
+}
 
 // // Read a range of entries but only process the key of each entry.
 // #[bench(raw)]
