@@ -146,11 +146,11 @@ bench_tests! {
     btreemap_v2_insert_vec8_u64,       insert_helper_v2, FixedVec8,       u64;
 
     // V2 memory manager u64 / blob512 / vec512
-    btreemap_v2_insert_u64_u64_mem_manager,      insert_helper_v2_mem_manager,         u64,         u64;
-    btreemap_v2_insert_u64_blob512_mem_manager,  insert_helper_v2_mem_manager,         u64,     Blob512;
-    btreemap_v2_insert_blob512_u64_mem_manager,  insert_helper_v2_mem_manager,     Blob512,         u64;
-    btreemap_v2_insert_u64_vec512_mem_manager,   insert_helper_v2_mem_manager,         u64, FixedVec512;
-    btreemap_v2_insert_vec512_u64_mem_manager,   insert_helper_v2_mem_manager, FixedVec512,         u64;
+    btreemap_v2_mem_manager_insert_u64_u64,      insert_helper_v2_mem_manager,         u64,         u64;
+    btreemap_v2_mem_manager_insert_u64_blob512,  insert_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_v2_mem_manager_insert_blob512_u64,  insert_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_v2_mem_manager_insert_u64_vec512,   insert_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_v2_mem_manager_insert_vec512_u64,   insert_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 fn insert_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
@@ -276,11 +276,11 @@ bench_tests! {
     btreemap_v2_remove_vec8_u64,       remove_helper_v2, FixedVec8,       u64;
 
     // V2 memory manager u64 / blob512 / vec512
-    btreemap_v2_remove_u64_u64_mem_manager,      remove_helper_v2_mem_manager,         u64,         u64;
-    btreemap_v2_remove_u64_blob512_mem_manager,  remove_helper_v2_mem_manager,         u64,     Blob512;
-    btreemap_v2_remove_blob512_u64_mem_manager,  remove_helper_v2_mem_manager,     Blob512,         u64;
-    btreemap_v2_remove_u64_vec512_mem_manager,   remove_helper_v2_mem_manager,         u64, FixedVec512;
-    btreemap_v2_remove_vec512_u64_mem_manager,   remove_helper_v2_mem_manager, FixedVec512,         u64;
+    btreemap_v2_mem_manager_remove_u64_u64,      remove_helper_v2_mem_manager,         u64,         u64;
+    btreemap_v2_mem_manager_remove_u64_blob512,  remove_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_v2_mem_manager_remove_blob512_u64,  remove_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_v2_mem_manager_remove_u64_vec512,   remove_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_v2_mem_manager_remove_vec512_u64,   remove_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 fn remove_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
@@ -413,11 +413,11 @@ bench_tests! {
     btreemap_v2_get_vec8_u64,       get_helper_v2, FixedVec8,       u64;
 
     // V2 memory manager u64 / blob512 / vec512
-    btreemap_v2_get_u64_u64_mem_manager,      get_helper_v2_mem_manager,         u64,         u64;
-    btreemap_v2_get_u64_blob512_mem_manager,  get_helper_v2_mem_manager,         u64,     Blob512;
-    btreemap_v2_get_blob512_u64_mem_manager,  get_helper_v2_mem_manager,     Blob512,         u64;
-    btreemap_v2_get_u64_vec512_mem_manager,   get_helper_v2_mem_manager,         u64, FixedVec512;
-    btreemap_v2_get_vec512_u64_mem_manager,   get_helper_v2_mem_manager, FixedVec512,         u64;
+    btreemap_v2_mem_manager_get_u64_u64,      get_helper_v2_mem_manager,         u64,         u64;
+    btreemap_v2_mem_manager_get_u64_blob512,  get_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_v2_mem_manager_get_blob512_u64,  get_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_v2_mem_manager_get_u64_vec512,   get_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_v2_mem_manager_get_vec512_u64,   get_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 fn get_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
@@ -550,11 +550,11 @@ bench_tests! {
     btreemap_v2_contains_vec8_u64,       contains_helper_v2, FixedVec8,       u64;
 
     // V2 memory manager u64 / blob512 / vec512
-    btreemap_v2_contains_u64_u64_mem_manager,      contains_helper_v2_mem_manager,         u64,         u64;
-    btreemap_v2_contains_u64_blob512_mem_manager,  contains_helper_v2_mem_manager,         u64,     Blob512;
-    btreemap_v2_contains_blob512_u64_mem_manager,  contains_helper_v2_mem_manager,     Blob512,         u64;
-    btreemap_v2_contains_u64_vec512_mem_manager,   contains_helper_v2_mem_manager,         u64, FixedVec512;
-    btreemap_v2_contains_vec512_u64_mem_manager,   contains_helper_v2_mem_manager, FixedVec512,         u64;
+    btreemap_v2_mem_manager_contains_u64_u64,      contains_helper_v2_mem_manager,         u64,         u64;
+    btreemap_v2_mem_manager_contains_u64_blob512,  contains_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_v2_mem_manager_contains_blob512_u64,  contains_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_v2_mem_manager_contains_u64_vec512,   contains_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_v2_mem_manager_contains_vec512_u64,   contains_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 fn contains_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
