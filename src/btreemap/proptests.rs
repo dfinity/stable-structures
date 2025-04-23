@@ -1,6 +1,6 @@
 use crate::{
     btreemap::{
-        test::{b, btree_test, make_memory},
+        test::{b, make_memory, run_btree_test},
         BTreeMap,
     },
     storable::Blob,
@@ -16,6 +16,9 @@ use test_strategy::proptest;
 enum Operation {
     Insert { key: Vec<u8>, value: Vec<u8> },
     Iter { from: usize, len: usize },
+    IterRev { from: usize, len: usize },
+    Keys { from: usize, len: usize },
+    Values { from: usize, len: usize },
     Get(usize),
     Remove(usize),
     Range { from: usize, len: usize },
@@ -32,6 +35,12 @@ fn operation_strategy() -> impl Strategy<Value = Operation> {
             .prop_map(|(key, value)| Operation::Insert { key, value }),
         5 => (any::<usize>(), any::<usize>())
             .prop_map(|(from, len)| Operation::Iter { from, len }),
+        5 => (any::<usize>(), any::<usize>())
+            .prop_map(|(from, len)| Operation::IterRev { from, len }),
+        5 => (any::<usize>(), any::<usize>())
+            .prop_map(|(from, len)| Operation::Keys { from, len }),
+        5 => (any::<usize>(), any::<usize>())
+            .prop_map(|(from, len)| Operation::Values { from, len }),
         50 => (any::<usize>()).prop_map(Operation::Get),
         15 => (any::<usize>()).prop_map(Operation::Remove),
         5 => (any::<usize>(), any::<usize>())
@@ -96,7 +105,7 @@ fn comprehensive_fuzz() {
 
 #[proptest(cases = 10)]
 fn insert(#[strategy(pset(arb_blob(), 1000..10_000))] keys: BTreeSet<Blob<10>>) {
-    btree_test(|mut btree| {
+    run_btree_test(|mut btree| {
         let keys = keys.clone();
         for key in keys.iter() {
             assert_eq!(btree.insert(*key, *key), None);
@@ -113,7 +122,7 @@ fn insert(#[strategy(pset(arb_blob(), 1000..10_000))] keys: BTreeSet<Blob<10>>) 
 
 #[proptest]
 fn map_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
-    btree_test(|mut map| {
+    run_btree_test(|mut map| {
         prop_assert_eq!(map.first_key_value(), None);
         prop_assert_eq!(map.last_key_value(), None);
 
@@ -133,7 +142,7 @@ fn map_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
 
 #[proptest]
 fn map_upper_bound_iter(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: Vec<u64>) {
-    btree_test(|mut map| {
+    run_btree_test(|mut map| {
         for k in keys.iter() {
             map.insert(*k, ());
 
@@ -146,7 +155,7 @@ fn map_upper_bound_iter(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: Vec
 
 #[proptest(cases = 10)]
 fn iter_count_test(#[strategy(0..250u8)] start: u8, #[strategy(#start..255u8)] end: u8) {
-    btree_test(|mut btree| {
+    run_btree_test(|mut btree| {
         for i in start..end {
             assert_eq!(btree.insert(b(&[i]), b(&[])), None);
         }
@@ -157,6 +166,25 @@ fn iter_count_test(#[strategy(0..250u8)] start: u8, #[strategy(#start..255u8)] e
             }
         }
     });
+}
+
+#[proptest]
+fn no_memory_leaks(#[strategy(pvec(pvec(0..u8::MAX, 100..10_000), 100))] keys: Vec<Vec<u8>>) {
+    let mem = make_memory();
+    let mut btree = BTreeMap::new(mem);
+
+    // Insert entries.
+    for k in keys.iter() {
+        btree.insert(k.clone(), ());
+    }
+
+    // Remove entries.
+    for k in keys.iter() {
+        btree.remove(k);
+    }
+
+    // After inserting and deleting all the entries, there should be no allocated chunks.
+    assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 }
 
 // Given an operation, executes it on the given stable btreemap and standard btreemap, verifying
@@ -185,11 +213,68 @@ fn execute_operation<M: Memory>(
 
             eprintln!("Iterate({}, {})", from, len);
             let std_iter = std_btree.iter().skip(from).take(len);
-            let stable_iter = btree.iter().skip(from).take(len);
-            for ((k1, v1), (k2, v2)) in std_iter.zip(stable_iter) {
+            let mut stable_iter = btree.iter().skip(from).take(len);
+            for (k1, v1) in std_iter {
+                let (k2, v2) = stable_iter.next().unwrap();
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
             }
+            assert!(stable_iter.next().is_none());
+        }
+        Operation::IterRev { from, len } => {
+            assert_eq!(std_btree.len(), btree.len() as usize);
+            if std_btree.is_empty() {
+                return;
+            }
+
+            let from = from % std_btree.len();
+            let len = len % std_btree.len();
+
+            eprintln!("IterateRev({}, {})", from, len);
+            let std_iter = std_btree.iter().rev().skip(from).take(len);
+            let mut stable_iter = btree.iter().rev().skip(from).take(len);
+            for (k1, v1) in std_iter {
+                let (k2, v2) = stable_iter.next().unwrap();
+                assert_eq!(k1, &k2);
+                assert_eq!(v1, &v2);
+            }
+            assert!(stable_iter.next().is_none());
+        }
+        Operation::Keys { from, len } => {
+            assert_eq!(std_btree.len(), btree.len() as usize);
+            if std_btree.is_empty() {
+                return;
+            }
+
+            let from = from % std_btree.len();
+            let len = len % std_btree.len();
+
+            eprintln!("Keys({}, {})", from, len);
+            let std_iter = std_btree.keys().skip(from).take(len);
+            let mut stable_iter = btree.keys().skip(from).take(len);
+            for k1 in std_iter {
+                let k2 = stable_iter.next().unwrap();
+                assert_eq!(k1, &k2);
+            }
+            assert!(stable_iter.next().is_none());
+        }
+        Operation::Values { from, len } => {
+            assert_eq!(std_btree.len(), btree.len() as usize);
+            if std_btree.is_empty() {
+                return;
+            }
+
+            let from = from % std_btree.len();
+            let len = len % std_btree.len();
+
+            eprintln!("Values({}, {})", from, len);
+            let std_iter = std_btree.values().skip(from).take(len);
+            let mut stable_iter = btree.values().skip(from).take(len);
+            for v1 in std_iter {
+                let v2 = stable_iter.next().unwrap();
+                assert_eq!(v1, &v2);
+            }
+            assert!(stable_iter.next().is_none());
         }
         Operation::Get(idx) => {
             assert_eq!(std_btree.len(), btree.len() as usize);

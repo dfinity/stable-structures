@@ -52,7 +52,7 @@ impl<'a, M: Memory> Reader<'a, M> {
     }
 }
 
-impl<'a, M: Memory> io::Read for Reader<'a, M> {
+impl<M: Memory> io::Read for Reader<'_, M> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, io::Error> {
         self.read(buf).or(Ok(0)) // Read defines EOF to be success
     }
@@ -63,7 +63,7 @@ pub struct BufferedReader<'a, M> {
     inner: io::BufReader<Reader<'a, M>>,
 }
 
-impl<'a, M: Memory> BufferedReader<'a, M> {
+impl<M: Memory> BufferedReader<'_, M> {
     /// Creates a new `BufferedReader` which reads from the selected memory
     pub fn new(buffer_size: usize, reader: Reader<M>) -> BufferedReader<M> {
         BufferedReader {
@@ -72,7 +72,7 @@ impl<'a, M: Memory> BufferedReader<'a, M> {
     }
 }
 
-impl<'a, M: Memory> io::Read for BufferedReader<'a, M> {
+impl<M: Memory> io::Read for BufferedReader<'_, M> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
     }

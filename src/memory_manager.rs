@@ -5,8 +5,8 @@
 //!
 //! 1. The developer needs to put in advance an upper bound on the memory of each stable structure.
 //! 2. It wastes the canister's memory allocation. For example, if a canister creates two stable
-//! structures A and B, and gives each one of them a 1GiB region of memory, then writing to B will
-//! require growing > 1GiB of memory just to be able to write to it.
+//!    structures A and B, and gives each one of them a 1GiB region of memory, then writing to B will
+//!    require growing > 1GiB of memory just to be able to write to it.
 //!
 //! The [`MemoryManager`] in this module solves both of these problems. It simulates having
 //! multiple memories, each being able to grow without bound. That way, a developer doesn't need to
@@ -41,13 +41,11 @@
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 use crate::{
-    read_struct,
+    read_struct, read_to_vec,
     types::{Address, Bytes},
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
-use std::cell::RefCell;
-use std::cmp::min;
-use std::collections::BTreeMap;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 const MAGIC: &[u8; 3] = b"MGR";
@@ -153,7 +151,17 @@ impl<M: Memory> MemoryManager<M> {
         VirtualMemory {
             id,
             memory_manager: self.inner.clone(),
+            cache: BucketCache::new(),
         }
+    }
+
+    /// Returns the underlying memory.
+    ///
+    /// # Returns
+    /// - The underlying memory, if there is exactly one strong reference to the memory manager.  Please see [`Rc::try_unwrap`](https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap) for more details.
+    /// - None otherwise.
+    pub fn into_memory(self) -> Option<M> {
+        Rc::into_inner(self.inner).map(|inner| inner.into_inner().into_memory())
     }
 }
 
@@ -163,16 +171,16 @@ struct Header {
 
     version: u8,
 
-    // The number of buckets allocated by the memory manager.
+    /// The number of buckets allocated by the memory manager.
     num_allocated_buckets: u16,
 
-    // The size of a bucket in Wasm pages.
+    /// The size of a bucket in Wasm pages.
     bucket_size_in_pages: u16,
 
-    // Reserved bytes for future extensions
+    /// Reserved bytes for future extensions
     _reserved: [u8; HEADER_RESERVED_BYTES],
 
-    // The size of each individual memory that can be created by the memory manager.
+    /// The size of each individual memory that can be created by the memory manager.
     memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
 }
 
@@ -186,6 +194,7 @@ impl Header {
 pub struct VirtualMemory<M: Memory> {
     id: MemoryId,
     memory_manager: Rc<RefCell<MemoryManagerInner<M>>>,
+    cache: BucketCache,
 }
 
 impl<M: Memory> Memory for VirtualMemory<M> {
@@ -198,11 +207,21 @@ impl<M: Memory> Memory for VirtualMemory<M> {
     }
 
     fn read(&self, offset: u64, dst: &mut [u8]) {
-        self.memory_manager.borrow().read(self.id, offset, dst)
+        self.memory_manager
+            .borrow()
+            .read(self.id, offset, dst, &self.cache)
+    }
+
+    unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
+        self.memory_manager
+            .borrow()
+            .read_unsafe(self.id, offset, dst, count, &self.cache)
     }
 
     fn write(&self, offset: u64, src: &[u8]) {
-        self.memory_manager.borrow().write(self.id, offset, src)
+        self.memory_manager
+            .borrow()
+            .write(self.id, offset, src, &self.cache)
     }
 }
 
@@ -210,16 +229,16 @@ impl<M: Memory> Memory for VirtualMemory<M> {
 struct MemoryManagerInner<M: Memory> {
     memory: M,
 
-    // The number of buckets that have been allocated.
+    /// The number of buckets that have been allocated.
     allocated_buckets: u16,
 
     bucket_size_in_pages: u16,
 
-    // An array storing the size (in pages) of each of the managed memories.
+    /// An array storing the size (in pages) of each of the managed memories.
     memory_sizes_in_pages: [u64; MAX_NUM_MEMORIES as usize],
 
-    // A map mapping each managed memory to the bucket ids that are allocated to it.
-    memory_buckets: BTreeMap<MemoryId, Vec<BucketId>>,
+    /// A map mapping each managed memory to the bucket ids that are allocated to it.
+    memory_buckets: Vec<Vec<BucketId>>,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -230,9 +249,9 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         // Check if the magic in the memory corresponds to this object.
-        let mut dst = vec![0; 3];
+        let mut dst = [0; 3];
         memory.read(0, &mut dst);
-        if dst != MAGIC {
+        if &dst != MAGIC {
             // No memory manager found. Create a new instance.
             MemoryManagerInner::new(memory, bucket_size_in_pages)
         } else {
@@ -246,7 +265,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory,
             allocated_buckets: 0,
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
-            memory_buckets: BTreeMap::new(),
+            memory_buckets: vec![vec![]; MAX_NUM_MEMORIES as usize],
             bucket_size_in_pages,
         };
 
@@ -268,16 +287,18 @@ impl<M: Memory> MemoryManagerInner<M> {
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
         assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
 
-        let mut buckets = vec![0; MAX_NUM_BUCKETS as usize];
-        memory.read(bucket_allocations_address(BucketId(0)).get(), &mut buckets);
+        let mut buckets = vec![];
+        read_to_vec(
+            &memory,
+            bucket_allocations_address(BucketId(0)),
+            &mut buckets,
+            MAX_NUM_BUCKETS as usize,
+        );
 
-        let mut memory_buckets = BTreeMap::new();
+        let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
         for (bucket_idx, memory) in buckets.into_iter().enumerate() {
             if memory != UNALLOCATED_BUCKET_MARKER {
-                memory_buckets
-                    .entry(MemoryId(memory))
-                    .or_insert_with(Vec::new)
-                    .push(BucketId(bucket_idx as u16));
+                memory_buckets[memory as usize].push(BucketId(bucket_idx as u16));
             }
         }
 
@@ -303,12 +324,12 @@ impl<M: Memory> MemoryManagerInner<M> {
         write_struct(&header, Address::from(0), &self.memory);
     }
 
-    // Returns the size of a memory (in pages).
+    /// Returns the size of a memory (in pages).
     fn memory_size(&self, id: MemoryId) -> u64 {
         self.memory_sizes_in_pages[id.0 as usize]
     }
 
-    // Grows the memory with the given id by the given number of pages.
+    /// Grows the memory with the given id by the given number of pages.
     fn grow(&mut self, id: MemoryId, pages: u64) -> i64 {
         // Compute how many additional buckets are needed.
         let old_size = self.memory_size(id);
@@ -322,14 +343,12 @@ impl<M: Memory> MemoryManagerInner<M> {
             return -1;
         }
 
+        let memory_bucket = &mut self.memory_buckets[id.0 as usize];
         // Allocate new buckets as needed.
+        memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
             let new_bucket_id = BucketId(self.allocated_buckets);
-
-            self.memory_buckets
-                .entry(id)
-                .or_default()
-                .push(new_bucket_id);
+            memory_bucket.push(new_bucket_id);
 
             // Write in stable store that this bucket belongs to the memory with the provided `id`.
             write(
@@ -360,53 +379,163 @@ impl<M: Memory> MemoryManagerInner<M> {
         old_size as i64
     }
 
-    fn write(&self, id: MemoryId, offset: u64, src: &[u8]) {
+    fn write(&self, id: MemoryId, offset: u64, src: &[u8], bucket_cache: &BucketCache) {
+        if let Some(real_address) = bucket_cache.get(VirtualSegment {
+            address: offset.into(),
+            length: src.len().into(),
+        }) {
+            self.memory.write(real_address.get(), src);
+            return;
+        }
+
         if (offset + src.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
             panic!("{id:?}: write out of bounds");
         }
 
         let mut bytes_written = 0;
-        for Segment { address, length } in self.bucket_iter(id, offset, src.len()) {
-            self.memory.write(
-                address.get(),
-                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-            );
+        self.for_each_bucket(
+            id,
+            VirtualSegment {
+                address: offset.into(),
+                length: src.len().into(),
+            },
+            bucket_cache,
+            |RealSegment { address, length }| {
+                self.memory.write(
+                    address.get(),
+                    &src[bytes_written as usize..(bytes_written + length.get()) as usize],
+                );
 
-            bytes_written += length.get();
-        }
+                bytes_written += length.get();
+            },
+        );
     }
 
-    fn read(&self, id: MemoryId, offset: u64, dst: &mut [u8]) {
-        if (offset + dst.len() as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
+    #[inline]
+    fn read(&self, id: MemoryId, offset: u64, dst: &mut [u8], bucket_cache: &BucketCache) {
+        // SAFETY: this is trivially safe because dst has dst.len() space.
+        unsafe { self.read_unsafe(id, offset, dst.as_mut_ptr(), dst.len(), bucket_cache) }
+    }
+
+    /// # Safety
+    ///
+    /// Callers must guarantee that
+    ///   * it is valid to write `count` number of bytes starting from `dst`,
+    ///   * `dst..dst + count` does not overlap with `self`.
+    unsafe fn read_unsafe(
+        &self,
+        id: MemoryId,
+        offset: u64,
+        dst: *mut u8,
+        count: usize,
+        bucket_cache: &BucketCache,
+    ) {
+        // First try to find the virtual segment in the cache.
+        if let Some(real_address) = bucket_cache.get(VirtualSegment {
+            address: offset.into(),
+            length: count.into(),
+        }) {
+            self.memory.read_unsafe(real_address.get(), dst, count);
+            return;
+        }
+
+        if (offset + count as u64) > self.memory_size(id) * WASM_PAGE_SIZE {
             panic!("{id:?}: read out of bounds");
         }
 
-        let mut bytes_read = 0;
-        for Segment { address, length } in self.bucket_iter(id, offset, dst.len()) {
-            self.memory.read(
-                address.get(),
-                &mut dst[bytes_read as usize..(bytes_read + length.get()) as usize],
-            );
+        let mut bytes_read = Bytes::new(0);
+        self.for_each_bucket(
+            id,
+            VirtualSegment {
+                address: offset.into(),
+                length: count.into(),
+            },
+            bucket_cache,
+            |RealSegment { address, length }| {
+                self.memory.read_unsafe(
+                    address.get(),
+                    // The cast to usize is safe because `bytes_read` and `length` are bounded by
+                    // usize `count`.
+                    dst.add(bytes_read.get() as usize),
+                    length.get() as usize,
+                );
 
-            bytes_read += length.get();
-        }
+                bytes_read += length;
+            },
+        )
     }
 
-    // Initializes a [`BucketIterator`].
-    fn bucket_iter(&self, id: MemoryId, offset: u64, length: usize) -> BucketIterator {
+    /// Maps a segment of virtual memory to segments of real memory.
+    ///
+    /// `func` is invoked with real memory segments of real memory that `virtual_segment` is mapped
+    /// to.
+    ///
+    /// A segment in virtual memory can map to multiple segments of real memory. Here's an example:
+    ///
+    /// Virtual Memory
+    /// ```text
+    /// --------------------------------------------------------
+    ///          (A) ---------- SEGMENT ---------- (B)
+    /// --------------------------------------------------------
+    /// ↑               ↑               ↑               ↑
+    /// Bucket 0        Bucket 1        Bucket 2        Bucket 3
+    /// ```
+    ///
+    /// The [`VirtualMemory`] is internally divided into fixed-size buckets. In the memory's virtual
+    /// address space, all these buckets are consecutive, but in real memory this may not be the case.
+    ///
+    /// A virtual segment would first be split at the bucket boundaries. The example virtual segment
+    /// above would be split into the following segments:
+    ///
+    ///    (A, end of bucket 0)
+    ///    (start of bucket 1, end of bucket 1)
+    ///    (start of bucket 2, B)
+    ///
+    /// Each of the segments above can then be translated into the real address space by looking up
+    /// the underlying buckets' addresses in real memory.
+    fn for_each_bucket(
+        &self,
+        MemoryId(id): MemoryId,
+        virtual_segment: VirtualSegment,
+        bucket_cache: &BucketCache,
+        mut func: impl FnMut(RealSegment),
+    ) {
         // Get the buckets allocated to the given memory id.
-        let buckets = match self.memory_buckets.get(&id) {
-            Some(s) => s.as_slice(),
-            None => &[],
-        };
+        let buckets = self.memory_buckets[id as usize].as_slice();
+        let bucket_size_in_bytes = self.bucket_size_in_bytes().get();
 
-        BucketIterator {
-            virtual_segment: Segment {
-                address: Address::from(offset),
-                length: Bytes::from(length as u64),
-            },
-            buckets,
-            bucket_size_in_bytes: self.bucket_size_in_bytes(),
+        let virtual_offset = virtual_segment.address.get();
+
+        let mut length = virtual_segment.length.get();
+        let mut bucket_idx = (virtual_offset / bucket_size_in_bytes) as usize;
+        // The start offset where we start reading from in a bucket. In the first iteration the
+        // value is calculated from `virtual_offset`, in later iterations, it's always 0.
+        let mut start_offset_in_bucket = virtual_offset % bucket_size_in_bytes;
+
+        while length > 0 {
+            let bucket_address =
+                self.bucket_address(buckets.get(bucket_idx).expect("bucket idx out of bounds"));
+
+            let bucket_start = bucket_idx as u64 * bucket_size_in_bytes;
+            let segment_len = (bucket_size_in_bytes - start_offset_in_bucket).min(length);
+
+            // Cache this bucket.
+            bucket_cache.store(
+                VirtualSegment {
+                    address: bucket_start.into(),
+                    length: self.bucket_size_in_bytes(),
+                },
+                bucket_address,
+            );
+
+            func(RealSegment {
+                address: bucket_address + start_offset_in_bucket.into(),
+                length: segment_len.into(),
+            });
+
+            length -= segment_len;
+            bucket_idx += 1;
+            start_offset_in_bucket = 0;
         }
     }
 
@@ -414,95 +543,38 @@ impl<M: Memory> MemoryManagerInner<M> {
         Bytes::from(self.bucket_size_in_pages as u64 * WASM_PAGE_SIZE)
     }
 
-    // Returns the number of buckets needed to accommodate the given number of pages.
+    /// Returns the number of buckets needed to accommodate the given number of pages.
     fn num_buckets_needed(&self, num_pages: u64) -> u64 {
         // Ceiling division.
-        (num_pages + self.bucket_size_in_pages as u64 - 1) / self.bucket_size_in_pages as u64
+        num_pages.div_ceil(self.bucket_size_in_pages as u64)
+    }
+
+    /// Returns the underlying memory.
+    pub fn into_memory(self) -> M {
+        self.memory
+    }
+
+    #[inline]
+    fn bucket_address(&self, id: &BucketId) -> Address {
+        Address::from(BUCKETS_OFFSET_IN_BYTES) + self.bucket_size_in_bytes() * Bytes::from(id.0)
     }
 }
 
-struct Segment {
+#[derive(Copy, Clone)]
+struct VirtualSegment {
     address: Address,
     length: Bytes,
 }
 
-// An iterator that maps a segment of virtual memory to segments of real memory.
-//
-// A segment in virtual memory can map to multiple segments of real memory. Here's an example:
-//
-// Virtual Memory
-// --------------------------------------------------------
-//          (A) ---------- SEGMENT ---------- (B)
-// --------------------------------------------------------
-// ↑               ↑               ↑               ↑
-// Bucket 0        Bucket 1        Bucket 2        Bucket 3
-//
-// The [`VirtualMemory`] is internally divided into fixed-size buckets. In the memory's virtual
-// address space, all these buckets are consecutive, but in real memory this may not be the case.
-//
-// A virtual segment would first be split at the bucket boundaries. The example virtual segment
-// above would be split into the following segments:
-//
-//    (A, end of bucket 0)
-//    (start of bucket 1, end of bucket 1)
-//    (start of bucket 2, B)
-//
-// Each of the segments above can then be translated into the real address space by looking up
-// the underlying buckets' addresses in real memory.
-struct BucketIterator<'a> {
-    virtual_segment: Segment,
-    buckets: &'a [BucketId],
-    bucket_size_in_bytes: Bytes,
-}
-
-impl Iterator for BucketIterator<'_> {
-    type Item = Segment;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.virtual_segment.length == Bytes::from(0u64) {
-            return None;
-        }
-
-        // Map the virtual segment's address to a real address.
-        let bucket_idx =
-            (self.virtual_segment.address.get() / self.bucket_size_in_bytes.get()) as usize;
-        let bucket_address = self.bucket_address(
-            *self
-                .buckets
-                .get(bucket_idx)
-                .expect("bucket idx out of bounds"),
-        );
-
-        let real_address = bucket_address
-            + Bytes::from(self.virtual_segment.address.get() % self.bucket_size_in_bytes.get());
-
-        // Compute how many bytes are in this real segment.
-        let bytes_in_segment = {
-            let next_bucket_address = bucket_address + self.bucket_size_in_bytes;
-
-            // Write up to either the end of the bucket, or the end of the segment.
-            min(
-                Bytes::from(next_bucket_address.get() - real_address.get()),
-                self.virtual_segment.length,
-            )
-        };
-
-        // Update the virtual segment to exclude the portion we're about to return.
-        self.virtual_segment.length -= bytes_in_segment;
-        self.virtual_segment.address += bytes_in_segment;
-
-        Some(Segment {
-            address: real_address,
-            length: bytes_in_segment,
-        })
+impl VirtualSegment {
+    fn contains_segment(&self, other: &VirtualSegment) -> bool {
+        self.address <= other.address && other.address + other.length <= self.address + self.length
     }
 }
 
-impl<'a> BucketIterator<'a> {
-    // Returns the address of a given bucket.
-    fn bucket_address(&self, id: BucketId) -> Address {
-        Address::from(BUCKETS_OFFSET_IN_BYTES) + self.bucket_size_in_bytes * Bytes::from(id.0)
-    }
+struct RealSegment {
+    address: Address,
+    length: Bytes,
 }
 
 #[derive(Clone, Copy, Ord, Eq, PartialEq, PartialOrd, Debug)]
@@ -526,10 +598,53 @@ fn bucket_allocations_address(id: BucketId) -> Address {
     Address::from(0) + Header::size() + Bytes::from(id.0)
 }
 
+/// Cache which stores the last touched bucket and the corresponding real address.
+///
+/// If a segment from this bucket is accessed, we can return the real address faster.
+#[derive(Clone)]
+struct BucketCache {
+    bucket: Cell<VirtualSegment>,
+    /// The real address that corresponds to bucket.address
+    real_address: Cell<Address>,
+}
+
+impl BucketCache {
+    #[inline]
+    fn new() -> Self {
+        BucketCache {
+            bucket: Cell::new(VirtualSegment {
+                address: Address::from(0),
+                length: Bytes::new(0),
+            }),
+            real_address: Cell::new(Address::from(0)),
+        }
+    }
+}
+
+impl BucketCache {
+    /// Returns the real address corresponding to `virtual_segment.address` if `virtual_segment`
+    /// is fully contained within the cached bucket, otherwise `None`.
+    #[inline]
+    fn get(&self, virtual_segment: VirtualSegment) -> Option<Address> {
+        let cached_bucket = self.bucket.get();
+
+        cached_bucket
+            .contains_segment(&virtual_segment)
+            .then(|| self.real_address.get() + (virtual_segment.address - cached_bucket.address))
+    }
+
+    /// Stores the mapping of a bucket to a real address.
+    #[inline]
+    fn store(&self, bucket: VirtualSegment, real_address: Address) {
+        self.bucket.set(bucket);
+        self.real_address.set(real_address);
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use maplit::btreemap;
+    use crate::safe_write;
     use proptest::prelude::*;
 
     const MAX_MEMORY_IN_PAGES: u64 = MAX_NUM_BUCKETS * BUCKET_SIZE_IN_PAGES;
@@ -558,12 +673,11 @@ mod test {
         memory.read(0, &mut bytes);
         assert_eq!(bytes, vec![1, 2, 3]);
 
-        assert_eq!(
-            mem_mgr.inner.borrow().memory_buckets,
-            btreemap! {
-                MemoryId(0) => vec![BucketId(0)]
-            }
-        );
+        assert_eq!(mem_mgr.inner.borrow().memory_buckets[0], vec![BucketId(0)]);
+
+        assert!(mem_mgr.inner.borrow().memory_buckets[1..]
+            .iter()
+            .all(|x| x.is_empty()));
     }
 
     #[test]
@@ -580,12 +694,13 @@ mod test {
         assert_eq!(memory_1.size(), 1);
 
         assert_eq!(
-            mem_mgr.inner.borrow().memory_buckets,
-            btreemap! {
-                MemoryId(0) => vec![BucketId(0)],
-                MemoryId(1) => vec![BucketId(1)],
-            }
+            &mem_mgr.inner.borrow().memory_buckets[..2],
+            &[vec![BucketId(0)], vec![BucketId(1)],]
         );
+
+        assert!(mem_mgr.inner.borrow().memory_buckets[2..]
+            .iter()
+            .all(|x| x.is_empty()));
 
         memory_0.write(0, &[1, 2, 3]);
         memory_0.write(0, &[1, 2, 3]);
@@ -806,10 +921,28 @@ mod test {
                 // Write a random blob into the memory, growing the memory as it needs to.
                 write(memory, offset, &data);
 
-                // Verify the blob can be read back.
-                let mut bytes = vec![0; data.len()];
-                memory.read(offset, &mut bytes);
-                assert_eq!(bytes, data);
+                {
+                    // Verify the blob can be read back using read.
+                    let mut bytes = vec![0; data.len()];
+                    memory.read(offset, &mut bytes);
+                    assert_eq!(bytes, data);
+                }
+
+                {
+                    // Verify the blob can be read back using read_to_vec.
+                    let mut bytes = vec![];
+                    read_to_vec(memory, offset.into(), &mut bytes, data.len());
+                    assert_eq!(bytes, data);
+                }
+
+                {
+                    // Verify the blob can be read back using read_unsafe.
+                    let mut bytes = vec![0; data.len()];
+                    unsafe {
+                        memory.read_unsafe(offset, bytes.as_mut_ptr(), data.len());
+                    }
+                    assert_eq!(bytes, data);
+                }
             }
         });
     }
@@ -852,5 +985,121 @@ mod test {
 
         memory_1.read(0, &mut buf);
         assert_eq!(buf, vec![2; 1000]);
+    }
+
+    // Make a few reads and writes and compare the results against golden files that should stay
+    // stable between commits.
+    // The operations were chosen so that they exercise most of the implementation.
+    #[test]
+    fn stability() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init_with_bucket_size(mem.clone(), 1); // very small bucket size.
+
+        let data: Vec<_> = (0u8..=255u8)
+            .cycle()
+            .take((WASM_PAGE_SIZE * 2 + 901) as usize)
+            .collect();
+
+        const MEMORIES: u8 = 3;
+        let mut memory_id = 0;
+        let mut next_memory = || {
+            memory_id += 1;
+            memory_id %= MEMORIES;
+            mem_mgr.get(MemoryId(memory_id))
+        };
+
+        // There are 5 operations
+        for _ in 0..MEMORIES * 5 {
+            safe_write(&next_memory(), 0, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE / 2, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE - 1, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE + 1, data.as_slice()).unwrap();
+            safe_write(
+                &next_memory(),
+                2 * WASM_PAGE_SIZE + WASM_PAGE_SIZE / 2,
+                data.as_slice(),
+            )
+            .unwrap();
+        }
+
+        let expected_write = include_bytes!("memory_manager/stability_write.golden");
+        assert!(expected_write.as_slice() == mem.borrow().as_slice());
+
+        let mut read = vec![0; 4 * WASM_PAGE_SIZE as usize];
+
+        // There are 4 operations
+        for _ in 0..MEMORIES * 4 {
+            next_memory().read(0, &mut read[0..WASM_PAGE_SIZE as usize / 2]);
+            next_memory().read(
+                WASM_PAGE_SIZE / 2 - 150,
+                &mut read[WASM_PAGE_SIZE as usize / 2..WASM_PAGE_SIZE as usize],
+            );
+            next_memory().read(
+                WASM_PAGE_SIZE - 473,
+                &mut read[WASM_PAGE_SIZE as usize..WASM_PAGE_SIZE as usize * 2],
+            );
+            next_memory().read(WASM_PAGE_SIZE * 2, &mut read[WASM_PAGE_SIZE as usize * 2..]);
+        }
+
+        let expected_read = include_bytes!("memory_manager/stability_read.golden");
+        assert!(expected_read.as_slice() == read.as_slice());
+    }
+
+    #[test]
+    fn bucket_cache() {
+        let bucket_cache = BucketCache::new();
+
+        // No match, nothing has been stored.
+        assert_eq!(
+            bucket_cache.get(VirtualSegment {
+                address: Address::from(0),
+                length: Bytes::from(1u64)
+            }),
+            None
+        );
+
+        bucket_cache.store(
+            VirtualSegment {
+                address: Address::from(0),
+                length: Bytes::from(335u64),
+            },
+            Address::from(983),
+        );
+
+        // Match at the beginning
+        assert_eq!(
+            bucket_cache.get(VirtualSegment {
+                address: Address::from(1),
+                length: Bytes::from(2u64)
+            }),
+            Some(Address::from(984))
+        );
+
+        // Match at the end
+        assert_eq!(
+            bucket_cache.get(VirtualSegment {
+                address: Address::from(334),
+                length: Bytes::from(1u64)
+            }),
+            Some(Address::from(1317))
+        );
+
+        // Match entire segment
+        assert_eq!(
+            bucket_cache.get(VirtualSegment {
+                address: Address::from(0),
+                length: Bytes::from(335u64),
+            }),
+            Some(Address::from(983))
+        );
+
+        // No match - outside cached segment
+        assert_eq!(
+            bucket_cache.get(VirtualSegment {
+                address: Address::from(1),
+                length: Bytes::from(335u64)
+            }),
+            None
+        );
     }
 }

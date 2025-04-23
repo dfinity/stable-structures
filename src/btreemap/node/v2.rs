@@ -98,8 +98,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             address,
             node_type,
             version: Version::V2(page_size),
-            keys: vec![],
-            encoded_values: RefCell::default(),
+            keys_and_encoded_values: vec![],
             children: vec![],
             overflows: Vec::with_capacity(0),
         }
@@ -142,6 +141,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut children = vec![];
         if node_type == NodeType::Internal {
             // The number of children is equal to the number of entries + 1.
+            children.reserve_exact(num_entries + 1);
             for _ in 0..num_entries + 1 {
                 let child = Address::from(read_u64(&reader, offset));
                 offset += Address::size();
@@ -150,8 +150,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Load the keys.
-        let mut keys = Vec::with_capacity(num_entries);
-        let mut encoded_values = Vec::with_capacity(num_entries);
+        let mut keys_encoded_values = Vec::with_capacity(num_entries);
         let mut buf = vec![];
         for _ in 0..num_entries {
             // Load the key's size.
@@ -166,25 +165,23 @@ impl<K: Storable + Ord + Clone> Node<K> {
             };
 
             // Load the key.
-            buf.resize(key_size as usize, 0);
-            reader.read(offset.get(), &mut buf);
+            read_to_vec(&reader, offset, &mut buf, key_size as usize);
             let key = K::from_bytes(Cow::Borrowed(&buf));
             offset += Bytes::from(key_size);
-            keys.push(key);
+            keys_encoded_values.push((key, Value::by_ref(Bytes::from(0usize))));
         }
 
         // Load the values
-        for _ in 0..num_entries {
+        for (_key, value) in keys_encoded_values.iter_mut() {
             // Load the values lazily.
-            encoded_values.push(Value::ByRef(Bytes::from(offset.get())));
+            *value = Value::by_ref(Bytes::from(offset.get()));
             let value_size = read_u32(&reader, offset) as usize;
             offset += U32_SIZE + Bytes::from(value_size as u64);
         }
 
         Self {
             address,
-            keys,
-            encoded_values: RefCell::new(encoded_values),
+            keys_and_encoded_values: keys_encoded_values,
             children,
             node_type,
             version: Version::V2(page_size),
@@ -199,11 +196,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
-        assert_eq!(self.keys.len(), self.encoded_values.borrow().len());
 
         // Load all the values. This is necessary so that we don't overwrite referenced
         // values when writing the entries to the node.
-        for i in 0..self.keys.len() {
+        for i in 0..self.keys_and_encoded_values.len() {
             self.value(i, allocator.memory());
         }
 
@@ -225,7 +221,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 NodeType::Leaf => LEAF_NODE_TYPE,
                 NodeType::Internal => INTERNAL_NODE_TYPE,
             },
-            num_entries: self.keys.len() as u16,
+            num_entries: self.keys_and_encoded_values.len() as u16,
         };
 
         writer.write_struct(&header, offset);
@@ -243,7 +239,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the keys.
-        for key in self.keys.iter() {
+        for (key, _) in self.keys_and_encoded_values.iter() {
             let key_bytes = key.to_bytes_checked();
 
             // Write the size of the key if it isn't fixed in size.
@@ -265,7 +261,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += U32_SIZE;
 
             // Write the value.
-            writer.write(offset, &value);
+            writer.write(offset, value);
             offset += Bytes::from(value.len());
         }
 
