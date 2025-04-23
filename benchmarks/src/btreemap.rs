@@ -72,85 +72,85 @@ bench_tests! {
     // === V1 ===
 
     // V1 blob K x 1024
-    btreemap_insert_blob_4_1024_v1,    insert_helper_v1,    Blob4, Blob1024;
-    btreemap_insert_blob_8_1024_v1,    insert_helper_v1,    Blob8, Blob1024;
-    btreemap_insert_blob_16_1024_v1,   insert_helper_v1,   Blob16, Blob1024;
-    btreemap_insert_blob_32_1024_v1,   insert_helper_v1,   Blob32, Blob1024;
-    btreemap_insert_blob_64_1024_v1,   insert_helper_v1,   Blob64, Blob1024;
-    btreemap_insert_blob_128_1024_v1,  insert_helper_v1,  Blob128, Blob1024;
-    btreemap_insert_blob_256_1024_v1,  insert_helper_v1,  Blob256, Blob1024;
-    btreemap_insert_blob_512_1024_v1,  insert_helper_v1,  Blob512, Blob1024;
+    btreemap_v1_insert_blob_4_1024,    insert_helper_v1,    Blob4, Blob1024;
+    btreemap_v1_insert_blob_8_1024,    insert_helper_v1,    Blob8, Blob1024;
+    btreemap_v1_insert_blob_16_1024,   insert_helper_v1,   Blob16, Blob1024;
+    btreemap_v1_insert_blob_32_1024,   insert_helper_v1,   Blob32, Blob1024;
+    btreemap_v1_insert_blob_64_1024,   insert_helper_v1,   Blob64, Blob1024;
+    btreemap_v1_insert_blob_128_1024,  insert_helper_v1,  Blob128, Blob1024;
+    btreemap_v1_insert_blob_256_1024,  insert_helper_v1,  Blob256, Blob1024;
+    btreemap_v1_insert_blob_512_1024,  insert_helper_v1,  Blob512, Blob1024;
 
     // V1 blob 1024 x V
-    btreemap_insert_blob_1024_4_v1,    insert_helper_v1, Blob1024,    Blob4;
-    btreemap_insert_blob_1024_8_v1,    insert_helper_v1, Blob1024,    Blob8;
-    btreemap_insert_blob_1024_16_v1,   insert_helper_v1, Blob1024,   Blob16;
-    btreemap_insert_blob_1024_32_v1,   insert_helper_v1, Blob1024,   Blob32;
-    btreemap_insert_blob_1024_64_v1,   insert_helper_v1, Blob1024,   Blob64;
-    btreemap_insert_blob_1024_128_v1,  insert_helper_v1, Blob1024,  Blob128;
-    btreemap_insert_blob_1024_256_v1,  insert_helper_v1, Blob1024,  Blob256;
-    btreemap_insert_blob_1024_512_v1,  insert_helper_v1, Blob1024,  Blob512;
+    btreemap_v1_insert_blob_1024_4,    insert_helper_v1, Blob1024,    Blob4;
+    btreemap_v1_insert_blob_1024_8,    insert_helper_v1, Blob1024,    Blob8;
+    btreemap_v1_insert_blob_1024_16,   insert_helper_v1, Blob1024,   Blob16;
+    btreemap_v1_insert_blob_1024_32,   insert_helper_v1, Blob1024,   Blob32;
+    btreemap_v1_insert_blob_1024_64,   insert_helper_v1, Blob1024,   Blob64;
+    btreemap_v1_insert_blob_1024_128,  insert_helper_v1, Blob1024,  Blob128;
+    btreemap_v1_insert_blob_1024_256,  insert_helper_v1, Blob1024,  Blob256;
+    btreemap_v1_insert_blob_1024_512,  insert_helper_v1, Blob1024,  Blob512;
 
     // V1 u64 / blob8
-    btreemap_insert_u64_u64_v1,        insert_helper_v1, u64,     u64;
-    btreemap_insert_u64_blob_8_v1,     insert_helper_v1, u64,   Blob8;
-    btreemap_insert_blob_8_u64_v1,     insert_helper_v1, Blob8,   u64;
+    btreemap_v1_insert_u64_u64,        insert_helper_v1, u64,     u64;
+    btreemap_v1_insert_u64_blob_8,     insert_helper_v1, u64,   Blob8;
+    btreemap_v1_insert_blob_8_u64,     insert_helper_v1, Blob8,   u64;
 
     // === V2 ===
 
     // V2 blob K x 1024
-    btreemap_insert_blob_4_1024_v2,    insert_helper_v2,    Blob4, Blob1024;
-    btreemap_insert_blob_8_1024_v2,    insert_helper_v2,    Blob8, Blob1024;
-    btreemap_insert_blob_16_1024_v2,   insert_helper_v2,   Blob16, Blob1024;
-    btreemap_insert_blob_32_1024_v2,   insert_helper_v2,   Blob32, Blob1024;
-    btreemap_insert_blob_64_1024_v2,   insert_helper_v2,   Blob64, Blob1024;
-    btreemap_insert_blob_128_1024_v2,  insert_helper_v2,  Blob128, Blob1024;
-    btreemap_insert_blob_256_1024_v2,  insert_helper_v2,  Blob256, Blob1024;
-    btreemap_insert_blob_512_1024_v2,  insert_helper_v2,  Blob512, Blob1024;
+    btreemap_v2_insert_blob_4_1024,    insert_helper_v2,    Blob4, Blob1024;
+    btreemap_v2_insert_blob_8_1024,    insert_helper_v2,    Blob8, Blob1024;
+    btreemap_v2_insert_blob_16_1024,   insert_helper_v2,   Blob16, Blob1024;
+    btreemap_v2_insert_blob_32_1024,   insert_helper_v2,   Blob32, Blob1024;
+    btreemap_v2_insert_blob_64_1024,   insert_helper_v2,   Blob64, Blob1024;
+    btreemap_v2_insert_blob_128_1024,  insert_helper_v2,  Blob128, Blob1024;
+    btreemap_v2_insert_blob_256_1024,  insert_helper_v2,  Blob256, Blob1024;
+    btreemap_v2_insert_blob_512_1024,  insert_helper_v2,  Blob512, Blob1024;
 
     // V2 blob 1024 x V
-    btreemap_insert_blob_1024_4_v2,    insert_helper_v2, Blob1024,    Blob4;
-    btreemap_insert_blob_1024_8_v2,    insert_helper_v2, Blob1024,    Blob8;
-    btreemap_insert_blob_1024_16_v2,   insert_helper_v2, Blob1024,   Blob16;
-    btreemap_insert_blob_1024_32_v2,   insert_helper_v2, Blob1024,   Blob32;
-    btreemap_insert_blob_1024_64_v2,   insert_helper_v2, Blob1024,   Blob64;
-    btreemap_insert_blob_1024_128_v2,  insert_helper_v2, Blob1024,  Blob128;
-    btreemap_insert_blob_1024_256_v2,  insert_helper_v2, Blob1024,  Blob256;
-    btreemap_insert_blob_1024_512_v2,  insert_helper_v2, Blob1024,  Blob512;
+    btreemap_v2_insert_blob_1024_4,    insert_helper_v2, Blob1024,    Blob4;
+    btreemap_v2_insert_blob_1024_8,    insert_helper_v2, Blob1024,    Blob8;
+    btreemap_v2_insert_blob_1024_16,   insert_helper_v2, Blob1024,   Blob16;
+    btreemap_v2_insert_blob_1024_32,   insert_helper_v2, Blob1024,   Blob32;
+    btreemap_v2_insert_blob_1024_64,   insert_helper_v2, Blob1024,   Blob64;
+    btreemap_v2_insert_blob_1024_128,  insert_helper_v2, Blob1024,  Blob128;
+    btreemap_v2_insert_blob_1024_256,  insert_helper_v2, Blob1024,  Blob256;
+    btreemap_v2_insert_blob_1024_512,  insert_helper_v2, Blob1024,  Blob512;
 
     // V2 vec K x 1024
-    btreemap_insert_vec_4_1024_v2,    insert_helper_v2,    FixedVec4, FixedVec1024;
-    btreemap_insert_vec_8_1024_v2,    insert_helper_v2,    FixedVec8, FixedVec1024;
-    btreemap_insert_vec_16_1024_v2,   insert_helper_v2,   FixedVec16, FixedVec1024;
-    btreemap_insert_vec_32_1024_v2,   insert_helper_v2,   FixedVec32, FixedVec1024;
-    btreemap_insert_vec_64_1024_v2,   insert_helper_v2,   FixedVec64, FixedVec1024;
-    btreemap_insert_vec_128_1024_v2,  insert_helper_v2,  FixedVec128, FixedVec1024;
-    btreemap_insert_vec_256_1024_v2,  insert_helper_v2,  FixedVec256, FixedVec1024;
-    btreemap_insert_vec_512_1024_v2,  insert_helper_v2,  FixedVec512, FixedVec1024;
+    btreemap_v2_insert_vec_4_1024,    insert_helper_v2,    FixedVec4, FixedVec1024;
+    btreemap_v2_insert_vec_8_1024,    insert_helper_v2,    FixedVec8, FixedVec1024;
+    btreemap_v2_insert_vec_16_1024,   insert_helper_v2,   FixedVec16, FixedVec1024;
+    btreemap_v2_insert_vec_32_1024,   insert_helper_v2,   FixedVec32, FixedVec1024;
+    btreemap_v2_insert_vec_64_1024,   insert_helper_v2,   FixedVec64, FixedVec1024;
+    btreemap_v2_insert_vec_128_1024,  insert_helper_v2,  FixedVec128, FixedVec1024;
+    btreemap_v2_insert_vec_256_1024,  insert_helper_v2,  FixedVec256, FixedVec1024;
+    btreemap_v2_insert_vec_512_1024,  insert_helper_v2,  FixedVec512, FixedVec1024;
 
     // V2 vec 1024 x V
-    btreemap_insert_vec_1024_4_v2,    insert_helper_v2, FixedVec1024,    FixedVec4;
-    btreemap_insert_vec_1024_8_v2,    insert_helper_v2, FixedVec1024,    FixedVec8;
-    btreemap_insert_vec_1024_16_v2,   insert_helper_v2, FixedVec1024,   FixedVec16;
-    btreemap_insert_vec_1024_32_v2,   insert_helper_v2, FixedVec1024,   FixedVec32;
-    btreemap_insert_vec_1024_64_v2,   insert_helper_v2, FixedVec1024,   FixedVec64;
-    btreemap_insert_vec_1024_128_v2,  insert_helper_v2, FixedVec1024,  FixedVec128;
-    btreemap_insert_vec_1024_256_v2,  insert_helper_v2, FixedVec1024,  FixedVec256;
-    btreemap_insert_vec_1024_512_v2,  insert_helper_v2, FixedVec1024,  FixedVec512;
+    btreemap_v2_insert_vec_1024_4,    insert_helper_v2, FixedVec1024,    FixedVec4;
+    btreemap_v2_insert_vec_1024_8,    insert_helper_v2, FixedVec1024,    FixedVec8;
+    btreemap_v2_insert_vec_1024_16,   insert_helper_v2, FixedVec1024,   FixedVec16;
+    btreemap_v2_insert_vec_1024_32,   insert_helper_v2, FixedVec1024,   FixedVec32;
+    btreemap_v2_insert_vec_1024_64,   insert_helper_v2, FixedVec1024,   FixedVec64;
+    btreemap_v2_insert_vec_1024_128,  insert_helper_v2, FixedVec1024,  FixedVec128;
+    btreemap_v2_insert_vec_1024_256,  insert_helper_v2, FixedVec1024,  FixedVec256;
+    btreemap_v2_insert_vec_1024_512,  insert_helper_v2, FixedVec1024,  FixedVec512;
 
     // V2 u64 / blob8 / vec8
-    btreemap_insert_u64_u64_v2,        insert_helper_v2,       u64,       u64;
-    btreemap_insert_u64_blob_8_v2,     insert_helper_v2,       u64,     Blob8;
-    btreemap_insert_blob_8_u64_v2,     insert_helper_v2,     Blob8,       u64;
-    btreemap_insert_u64_vec_8_v2,      insert_helper_v2,       u64, FixedVec8;
-    btreemap_insert_vec_8_u64_v2,      insert_helper_v2, FixedVec8,       u64;
+    btreemap_v2_insert_u64_u64,        insert_helper_v2,       u64,       u64;
+    btreemap_v2_insert_u64_blob_8,     insert_helper_v2,       u64,     Blob8;
+    btreemap_v2_insert_blob_8_u64,     insert_helper_v2,     Blob8,       u64;
+    btreemap_v2_insert_u64_vec_8,      insert_helper_v2,       u64, FixedVec8;
+    btreemap_v2_insert_vec_8_u64,      insert_helper_v2, FixedVec8,       u64;
 
     // V2 memory manager u64 / blob512 / vec512
-    btreemap_insert_u64_u64_v2_mem_manager,      insert_helper_v2_mem_manager,         u64,         u64;
-    btreemap_insert_u64_blob_512_v2_mem_manager, insert_helper_v2_mem_manager,         u64,     Blob512;
-    btreemap_insert_blob_512_u64_v2_mem_manager, insert_helper_v2_mem_manager,     Blob512,         u64;
-    btreemap_insert_u64_vec_512_v2_mem_manager,  insert_helper_v2_mem_manager,         u64, FixedVec512;
-    btreemap_insert_vec_512_u64_v2_mem_manager,  insert_helper_v2_mem_manager, FixedVec512,         u64;
+    btreemap_v2_insert_u64_u64_mem_manager,      insert_helper_v2_mem_manager,         u64,         u64;
+    btreemap_v2_insert_u64_blob_512_mem_manager, insert_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_v2_insert_blob_512_u64_mem_manager, insert_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_v2_insert_u64_vec_512_mem_manager,  insert_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_v2_insert_vec_512_u64_mem_manager,  insert_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 fn insert_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
@@ -184,7 +184,7 @@ fn insert_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory
 }
 
 #[bench(raw)]
-pub fn btreemap_insert_10mib_values_v2() -> BenchResult {
+pub fn btreemap_v2_insert_10mib_values() -> BenchResult {
     let count = 20;
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let mut rng = Rng::from_seed(0);
@@ -202,85 +202,85 @@ bench_tests! {
     // === V1 ===
 
     // V1 blob K x 1024
-    btreemap_remove_blob_4_1024_v1,    remove_helper_v1,    Blob4, Blob1024;
-    btreemap_remove_blob_8_1024_v1,    remove_helper_v1,    Blob8, Blob1024;
-    btreemap_remove_blob_16_1024_v1,   remove_helper_v1,   Blob16, Blob1024;
-    btreemap_remove_blob_32_1024_v1,   remove_helper_v1,   Blob32, Blob1024;
-    btreemap_remove_blob_64_1024_v1,   remove_helper_v1,   Blob64, Blob1024;
-    btreemap_remove_blob_128_1024_v1,  remove_helper_v1,  Blob128, Blob1024;
-    btreemap_remove_blob_256_1024_v1,  remove_helper_v1,  Blob256, Blob1024;
-    btreemap_remove_blob_512_1024_v1,  remove_helper_v1,  Blob512, Blob1024;
+    btreemap_v1_remove_blob_4_1024_v1,    remove_helper_v1,    Blob4, Blob1024;
+    btreemap_v1_remove_blob_8_1024_v1,    remove_helper_v1,    Blob8, Blob1024;
+    btreemap_v1_remove_blob_16_1024_v1,   remove_helper_v1,   Blob16, Blob1024;
+    btreemap_v1_remove_blob_32_1024_v1,   remove_helper_v1,   Blob32, Blob1024;
+    btreemap_v1_remove_blob_64_1024_v1,   remove_helper_v1,   Blob64, Blob1024;
+    btreemap_v1_remove_blob_128_1024_v1,  remove_helper_v1,  Blob128, Blob1024;
+    btreemap_v1_remove_blob_256_1024_v1,  remove_helper_v1,  Blob256, Blob1024;
+    btreemap_v1_remove_blob_512_1024_v1,  remove_helper_v1,  Blob512, Blob1024;
 
     // V1 blob 1024 x V
-    btreemap_remove_blob_1024_4_v1,    remove_helper_v1, Blob1024,    Blob4;
-    btreemap_remove_blob_1024_8_v1,    remove_helper_v1, Blob1024,    Blob8;
-    btreemap_remove_blob_1024_16_v1,   remove_helper_v1, Blob1024,   Blob16;
-    btreemap_remove_blob_1024_32_v1,   remove_helper_v1, Blob1024,   Blob32;
-    btreemap_remove_blob_1024_64_v1,   remove_helper_v1, Blob1024,   Blob64;
-    btreemap_remove_blob_1024_128_v1,  remove_helper_v1, Blob1024,  Blob128;
-    btreemap_remove_blob_1024_256_v1,  remove_helper_v1, Blob1024,  Blob256;
-    btreemap_remove_blob_1024_512_v1,  remove_helper_v1, Blob1024,  Blob512;
+    btreemap_v1_remove_blob_1024_4_v1,    remove_helper_v1, Blob1024,    Blob4;
+    btreemap_v1_remove_blob_1024_8_v1,    remove_helper_v1, Blob1024,    Blob8;
+    btreemap_v1_remove_blob_1024_16_v1,   remove_helper_v1, Blob1024,   Blob16;
+    btreemap_v1_remove_blob_1024_32_v1,   remove_helper_v1, Blob1024,   Blob32;
+    btreemap_v1_remove_blob_1024_64_v1,   remove_helper_v1, Blob1024,   Blob64;
+    btreemap_v1_remove_blob_1024_128_v1,  remove_helper_v1, Blob1024,  Blob128;
+    btreemap_v1_remove_blob_1024_256_v1,  remove_helper_v1, Blob1024,  Blob256;
+    btreemap_v1_remove_blob_1024_512_v1,  remove_helper_v1, Blob1024,  Blob512;
 
     // V1 u64 / blob8
-    btreemap_remove_u64_u64_v1,        remove_helper_v1, u64,     u64;
-    btreemap_remove_u64_blob_8_v1,     remove_helper_v1, u64,   Blob8;
-    btreemap_remove_blob_8_u64_v1,     remove_helper_v1, Blob8,   u64;
+    btreemap_v1_remove_u64_u64_v1,        remove_helper_v1, u64,     u64;
+    btreemap_v1_remove_u64_blob_8_v1,     remove_helper_v1, u64,   Blob8;
+    btreemap_v1_remove_blob_8_u64_v1,     remove_helper_v1, Blob8,   u64;
 
     // === V2 ===
 
     // V2 blob K x 1024
-    btreemap_remove_blob_4_1024_v2,    remove_helper_v2,    Blob4, Blob1024;
-    btreemap_remove_blob_8_1024_v2,    remove_helper_v2,    Blob8, Blob1024;
-    btreemap_remove_blob_16_1024_v2,   remove_helper_v2,   Blob16, Blob1024;
-    btreemap_remove_blob_32_1024_v2,   remove_helper_v2,   Blob32, Blob1024;
-    btreemap_remove_blob_64_1024_v2,   remove_helper_v2,   Blob64, Blob1024;
-    btreemap_remove_blob_128_1024_v2,  remove_helper_v2,  Blob128, Blob1024;
-    btreemap_remove_blob_256_1024_v2,  remove_helper_v2,  Blob256, Blob1024;
-    btreemap_remove_blob_512_1024_v2,  remove_helper_v2,  Blob512, Blob1024;
+    btreemap_v2_remove_blob_4_1024,    remove_helper_v2,    Blob4, Blob1024;
+    btreemap_v2_remove_blob_8_1024,    remove_helper_v2,    Blob8, Blob1024;
+    btreemap_v2_remove_blob_16_1024,   remove_helper_v2,   Blob16, Blob1024;
+    btreemap_v2_remove_blob_32_1024,   remove_helper_v2,   Blob32, Blob1024;
+    btreemap_v2_remove_blob_64_1024,   remove_helper_v2,   Blob64, Blob1024;
+    btreemap_v2_remove_blob_128_1024,  remove_helper_v2,  Blob128, Blob1024;
+    btreemap_v2_remove_blob_256_1024,  remove_helper_v2,  Blob256, Blob1024;
+    btreemap_v2_remove_blob_512_1024,  remove_helper_v2,  Blob512, Blob1024;
 
     // V2 blob 1024 x V
-    btreemap_remove_blob_1024_4_v2,    remove_helper_v2, Blob1024,    Blob4;
-    btreemap_remove_blob_1024_8_v2,    remove_helper_v2, Blob1024,    Blob8;
-    btreemap_remove_blob_1024_16_v2,   remove_helper_v2, Blob1024,   Blob16;
-    btreemap_remove_blob_1024_32_v2,   remove_helper_v2, Blob1024,   Blob32;
-    btreemap_remove_blob_1024_64_v2,   remove_helper_v2, Blob1024,   Blob64;
-    btreemap_remove_blob_1024_128_v2,  remove_helper_v2, Blob1024,  Blob128;
-    btreemap_remove_blob_1024_256_v2,  remove_helper_v2, Blob1024,  Blob256;
-    btreemap_remove_blob_1024_512_v2,  remove_helper_v2, Blob1024,  Blob512;
+    btreemap_v2_remove_blob_1024_4,    remove_helper_v2, Blob1024,    Blob4;
+    btreemap_v2_remove_blob_1024_8,    remove_helper_v2, Blob1024,    Blob8;
+    btreemap_v2_remove_blob_1024_16,   remove_helper_v2, Blob1024,   Blob16;
+    btreemap_v2_remove_blob_1024_32,   remove_helper_v2, Blob1024,   Blob32;
+    btreemap_v2_remove_blob_1024_64,   remove_helper_v2, Blob1024,   Blob64;
+    btreemap_v2_remove_blob_1024_128,  remove_helper_v2, Blob1024,  Blob128;
+    btreemap_v2_remove_blob_1024_256,  remove_helper_v2, Blob1024,  Blob256;
+    btreemap_v2_remove_blob_1024_512,  remove_helper_v2, Blob1024,  Blob512;
 
     // V2 vec K x 1024
-    btreemap_remove_vec_4_1024_v2,    remove_helper_v2,    FixedVec4, FixedVec1024;
-    btreemap_remove_vec_8_1024_v2,    remove_helper_v2,    FixedVec8, FixedVec1024;
-    btreemap_remove_vec_16_1024_v2,   remove_helper_v2,   FixedVec16, FixedVec1024;
-    btreemap_remove_vec_32_1024_v2,   remove_helper_v2,   FixedVec32, FixedVec1024;
-    btreemap_remove_vec_64_1024_v2,   remove_helper_v2,   FixedVec64, FixedVec1024;
-    btreemap_remove_vec_128_1024_v2,  remove_helper_v2,  FixedVec128, FixedVec1024;
-    btreemap_remove_vec_256_1024_v2,  remove_helper_v2,  FixedVec256, FixedVec1024;
-    btreemap_remove_vec_512_1024_v2,  remove_helper_v2,  FixedVec512, FixedVec1024;
+    btreemap_v2_remove_vec_4_1024,    remove_helper_v2,    FixedVec4, FixedVec1024;
+    btreemap_v2_remove_vec_8_1024,    remove_helper_v2,    FixedVec8, FixedVec1024;
+    btreemap_v2_remove_vec_16_1024,   remove_helper_v2,   FixedVec16, FixedVec1024;
+    btreemap_v2_remove_vec_32_1024,   remove_helper_v2,   FixedVec32, FixedVec1024;
+    btreemap_v2_remove_vec_64_1024,   remove_helper_v2,   FixedVec64, FixedVec1024;
+    btreemap_v2_remove_vec_128_1024,  remove_helper_v2,  FixedVec128, FixedVec1024;
+    btreemap_v2_remove_vec_256_1024,  remove_helper_v2,  FixedVec256, FixedVec1024;
+    btreemap_v2_remove_vec_512_1024,  remove_helper_v2,  FixedVec512, FixedVec1024;
 
     // V2 vec 1024 x V
-    btreemap_remove_vec_1024_4_v2,    remove_helper_v2, FixedVec1024,    FixedVec4;
-    btreemap_remove_vec_1024_8_v2,    remove_helper_v2, FixedVec1024,    FixedVec8;
-    btreemap_remove_vec_1024_16_v2,   remove_helper_v2, FixedVec1024,   FixedVec16;
-    btreemap_remove_vec_1024_32_v2,   remove_helper_v2, FixedVec1024,   FixedVec32;
-    btreemap_remove_vec_1024_64_v2,   remove_helper_v2, FixedVec1024,   FixedVec64;
-    btreemap_remove_vec_1024_128_v2,  remove_helper_v2, FixedVec1024,  FixedVec128;
-    btreemap_remove_vec_1024_256_v2,  remove_helper_v2, FixedVec1024,  FixedVec256;
-    btreemap_remove_vec_1024_512_v2,  remove_helper_v2, FixedVec1024,  FixedVec512;
+    btreemap_v2_remove_vec_1024_4,    remove_helper_v2, FixedVec1024,    FixedVec4;
+    btreemap_v2_remove_vec_1024_8,    remove_helper_v2, FixedVec1024,    FixedVec8;
+    btreemap_v2_remove_vec_1024_16,   remove_helper_v2, FixedVec1024,   FixedVec16;
+    btreemap_v2_remove_vec_1024_32,   remove_helper_v2, FixedVec1024,   FixedVec32;
+    btreemap_v2_remove_vec_1024_64,   remove_helper_v2, FixedVec1024,   FixedVec64;
+    btreemap_v2_remove_vec_1024_128,  remove_helper_v2, FixedVec1024,  FixedVec128;
+    btreemap_v2_remove_vec_1024_256,  remove_helper_v2, FixedVec1024,  FixedVec256;
+    btreemap_v2_remove_vec_1024_512,  remove_helper_v2, FixedVec1024,  FixedVec512;
 
     // V2 u64 / blob8 / vec8
-    btreemap_remove_u64_u64_v2,        remove_helper_v2,       u64,       u64;
-    btreemap_remove_u64_blob_8_v2,     remove_helper_v2,       u64,     Blob8;
-    btreemap_remove_blob_8_u64_v2,     remove_helper_v2,     Blob8,       u64;
-    btreemap_remove_u64_vec_8_v2,      remove_helper_v2,       u64, FixedVec8;
-    btreemap_remove_vec_8_u64_v2,      remove_helper_v2, FixedVec8,       u64;
+    btreemap_v2_remove_u64_u64,        remove_helper_v2,       u64,       u64;
+    btreemap_v2_remove_u64_blob_8,     remove_helper_v2,       u64,     Blob8;
+    btreemap_v2_remove_blob_8_u64,     remove_helper_v2,     Blob8,       u64;
+    btreemap_v2_remove_u64_vec_8,      remove_helper_v2,       u64, FixedVec8;
+    btreemap_v2_remove_vec_8_u64,      remove_helper_v2, FixedVec8,       u64;
 
     // V2 memory manager u64 / blob512 / vec512
-    btreemap_remove_u64_u64_v2_mem_manager,      remove_helper_v2_mem_manager,         u64,         u64;
-    btreemap_remove_u64_blob_512_v2_mem_manager, remove_helper_v2_mem_manager,         u64,     Blob512;
-    btreemap_remove_blob_512_u64_v2_mem_manager, remove_helper_v2_mem_manager,     Blob512,         u64;
-    btreemap_remove_u64_vec_512_v2_mem_manager,  remove_helper_v2_mem_manager,         u64, FixedVec512;
-    btreemap_remove_vec_512_u64_v2_mem_manager,  remove_helper_v2_mem_manager, FixedVec512,         u64;
+    btreemap_v2_remove_u64_u64_mem_manager,      remove_helper_v2_mem_manager,         u64,         u64;
+    btreemap_v2_remove_u64_blob_512_mem_manager, remove_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_v2_remove_blob_512_u64_mem_manager, remove_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_v2_remove_u64_vec_512_mem_manager,  remove_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_v2_remove_vec_512_u64_mem_manager,  remove_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 fn remove_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
@@ -318,7 +318,7 @@ fn remove_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory
 }
 
 #[bench(raw)]
-pub fn btreemap_remove_10mib_values_v2() -> BenchResult {
+pub fn btreemap_v2_remove_10mib_values() -> BenchResult {
     let count = 20;
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let mut rng = Rng::from_seed(0);
@@ -339,85 +339,85 @@ bench_tests! {
     // === V1 ===
 
     // V1 blob K x 1024
-    btreemap_get_blob_4_1024_v1,    get_helper_v1,    Blob4, Blob1024;
-    btreemap_get_blob_8_1024_v1,    get_helper_v1,    Blob8, Blob1024;
-    btreemap_get_blob_16_1024_v1,   get_helper_v1,   Blob16, Blob1024;
-    btreemap_get_blob_32_1024_v1,   get_helper_v1,   Blob32, Blob1024;
-    btreemap_get_blob_64_1024_v1,   get_helper_v1,   Blob64, Blob1024;
-    btreemap_get_blob_128_1024_v1,  get_helper_v1,  Blob128, Blob1024;
-    btreemap_get_blob_256_1024_v1,  get_helper_v1,  Blob256, Blob1024;
-    btreemap_get_blob_512_1024_v1,  get_helper_v1,  Blob512, Blob1024;
+    btreemap_v1_get_blob_4_1024,    get_helper_v1,    Blob4, Blob1024;
+    btreemap_v1_get_blob_8_1024,    get_helper_v1,    Blob8, Blob1024;
+    btreemap_v1_get_blob_16_1024,   get_helper_v1,   Blob16, Blob1024;
+    btreemap_v1_get_blob_32_1024,   get_helper_v1,   Blob32, Blob1024;
+    btreemap_v1_get_blob_64_1024,   get_helper_v1,   Blob64, Blob1024;
+    btreemap_v1_get_blob_128_1024,  get_helper_v1,  Blob128, Blob1024;
+    btreemap_v1_get_blob_256_1024,  get_helper_v1,  Blob256, Blob1024;
+    btreemap_v1_get_blob_512_1024,  get_helper_v1,  Blob512, Blob1024;
 
     // V1 blob 1024 x V
-    btreemap_get_blob_1024_4_v1,    get_helper_v1, Blob1024,    Blob4;
-    btreemap_get_blob_1024_8_v1,    get_helper_v1, Blob1024,    Blob8;
-    btreemap_get_blob_1024_16_v1,   get_helper_v1, Blob1024,   Blob16;
-    btreemap_get_blob_1024_32_v1,   get_helper_v1, Blob1024,   Blob32;
-    btreemap_get_blob_1024_64_v1,   get_helper_v1, Blob1024,   Blob64;
-    btreemap_get_blob_1024_128_v1,  get_helper_v1, Blob1024,  Blob128;
-    btreemap_get_blob_1024_256_v1,  get_helper_v1, Blob1024,  Blob256;
-    btreemap_get_blob_1024_512_v1,  get_helper_v1, Blob1024,  Blob512;
+    btreemap_v1_get_blob_1024_4,    get_helper_v1, Blob1024,    Blob4;
+    btreemap_v1_get_blob_1024_8,    get_helper_v1, Blob1024,    Blob8;
+    btreemap_v1_get_blob_1024_16,   get_helper_v1, Blob1024,   Blob16;
+    btreemap_v1_get_blob_1024_32,   get_helper_v1, Blob1024,   Blob32;
+    btreemap_v1_get_blob_1024_64,   get_helper_v1, Blob1024,   Blob64;
+    btreemap_v1_get_blob_1024_128,  get_helper_v1, Blob1024,  Blob128;
+    btreemap_v1_get_blob_1024_256,  get_helper_v1, Blob1024,  Blob256;
+    btreemap_v1_get_blob_1024_512,  get_helper_v1, Blob1024,  Blob512;
 
     // V1 u64 / blob8
-    btreemap_get_u64_u64_v1,        get_helper_v1, u64,     u64;
-    btreemap_get_u64_blob_8_v1,     get_helper_v1, u64,   Blob8;
-    btreemap_get_blob_8_u64_v1,     get_helper_v1, Blob8,   u64;
+    btreemap_v1_get_u64_u64,        get_helper_v1, u64,     u64;
+    btreemap_v1_get_u64_blob_8,     get_helper_v1, u64,   Blob8;
+    btreemap_v1_get_blob_8_u64,     get_helper_v1, Blob8,   u64;
 
     // === V2 ===
 
     // V2 blob K x 1024
-    btreemap_get_blob_4_1024_v2,    get_helper_v2,    Blob4, Blob1024;
-    btreemap_get_blob_8_1024_v2,    get_helper_v2,    Blob8, Blob1024;
-    btreemap_get_blob_16_1024_v2,   get_helper_v2,   Blob16, Blob1024;
-    btreemap_get_blob_32_1024_v2,   get_helper_v2,   Blob32, Blob1024;
-    btreemap_get_blob_64_1024_v2,   get_helper_v2,   Blob64, Blob1024;
-    btreemap_get_blob_128_1024_v2,  get_helper_v2,  Blob128, Blob1024;
-    btreemap_get_blob_256_1024_v2,  get_helper_v2,  Blob256, Blob1024;
-    btreemap_get_blob_512_1024_v2,  get_helper_v2,  Blob512, Blob1024;
+    btreemap_v2_get_blob_4_1024,    get_helper_v2,    Blob4, Blob1024;
+    btreemap_v2_get_blob_8_1024,    get_helper_v2,    Blob8, Blob1024;
+    btreemap_v2_get_blob_16_1024,   get_helper_v2,   Blob16, Blob1024;
+    btreemap_v2_get_blob_32_1024,   get_helper_v2,   Blob32, Blob1024;
+    btreemap_v2_get_blob_64_1024,   get_helper_v2,   Blob64, Blob1024;
+    btreemap_v2_get_blob_128_1024,  get_helper_v2,  Blob128, Blob1024;
+    btreemap_v2_get_blob_256_1024,  get_helper_v2,  Blob256, Blob1024;
+    btreemap_v2_get_blob_512_1024,  get_helper_v2,  Blob512, Blob1024;
 
     // V2 blob 1024 x V
-    btreemap_get_blob_1024_4_v2,    get_helper_v2, Blob1024,    Blob4;
-    btreemap_get_blob_1024_8_v2,    get_helper_v2, Blob1024,    Blob8;
-    btreemap_get_blob_1024_16_v2,   get_helper_v2, Blob1024,   Blob16;
-    btreemap_get_blob_1024_32_v2,   get_helper_v2, Blob1024,   Blob32;
-    btreemap_get_blob_1024_64_v2,   get_helper_v2, Blob1024,   Blob64;
-    btreemap_get_blob_1024_128_v2,  get_helper_v2, Blob1024,  Blob128;
-    btreemap_get_blob_1024_256_v2,  get_helper_v2, Blob1024,  Blob256;
-    btreemap_get_blob_1024_512_v2,  get_helper_v2, Blob1024,  Blob512;
+    btreemap_v2_get_blob_1024_4,    get_helper_v2, Blob1024,    Blob4;
+    btreemap_v2_get_blob_1024_8,    get_helper_v2, Blob1024,    Blob8;
+    btreemap_v2_get_blob_1024_16,   get_helper_v2, Blob1024,   Blob16;
+    btreemap_v2_get_blob_1024_32,   get_helper_v2, Blob1024,   Blob32;
+    btreemap_v2_get_blob_1024_64,   get_helper_v2, Blob1024,   Blob64;
+    btreemap_v2_get_blob_1024_128,  get_helper_v2, Blob1024,  Blob128;
+    btreemap_v2_get_blob_1024_256,  get_helper_v2, Blob1024,  Blob256;
+    btreemap_v2_get_blob_1024_512,  get_helper_v2, Blob1024,  Blob512;
 
     // V2 vec K x 1024
-    btreemap_get_vec_4_1024_v2,    get_helper_v2,    FixedVec4, FixedVec1024;
-    btreemap_get_vec_8_1024_v2,    get_helper_v2,    FixedVec8, FixedVec1024;
-    btreemap_get_vec_16_1024_v2,   get_helper_v2,   FixedVec16, FixedVec1024;
-    btreemap_get_vec_32_1024_v2,   get_helper_v2,   FixedVec32, FixedVec1024;
-    btreemap_get_vec_64_1024_v2,   get_helper_v2,   FixedVec64, FixedVec1024;
-    btreemap_get_vec_128_1024_v2,  get_helper_v2,  FixedVec128, FixedVec1024;
-    btreemap_get_vec_256_1024_v2,  get_helper_v2,  FixedVec256, FixedVec1024;
-    btreemap_get_vec_512_1024_v2,  get_helper_v2,  FixedVec512, FixedVec1024;
+    btreemap_v2_get_vec_4_1024,    get_helper_v2,    FixedVec4, FixedVec1024;
+    btreemap_v2_get_vec_8_1024,    get_helper_v2,    FixedVec8, FixedVec1024;
+    btreemap_v2_get_vec_16_1024,   get_helper_v2,   FixedVec16, FixedVec1024;
+    btreemap_v2_get_vec_32_1024,   get_helper_v2,   FixedVec32, FixedVec1024;
+    btreemap_v2_get_vec_64_1024,   get_helper_v2,   FixedVec64, FixedVec1024;
+    btreemap_v2_get_vec_128_1024,  get_helper_v2,  FixedVec128, FixedVec1024;
+    btreemap_v2_get_vec_256_1024,  get_helper_v2,  FixedVec256, FixedVec1024;
+    btreemap_v2_get_vec_512_1024,  get_helper_v2,  FixedVec512, FixedVec1024;
 
     // V2 vec 1024 x V
-    btreemap_get_vec_1024_4_v2,    get_helper_v2, FixedVec1024,    FixedVec4;
-    btreemap_get_vec_1024_8_v2,    get_helper_v2, FixedVec1024,    FixedVec8;
-    btreemap_get_vec_1024_16_v2,   get_helper_v2, FixedVec1024,   FixedVec16;
-    btreemap_get_vec_1024_32_v2,   get_helper_v2, FixedVec1024,   FixedVec32;
-    btreemap_get_vec_1024_64_v2,   get_helper_v2, FixedVec1024,   FixedVec64;
-    btreemap_get_vec_1024_128_v2,  get_helper_v2, FixedVec1024,  FixedVec128;
-    btreemap_get_vec_1024_256_v2,  get_helper_v2, FixedVec1024,  FixedVec256;
-    btreemap_get_vec_1024_512_v2,  get_helper_v2, FixedVec1024,  FixedVec512;
+    btreemap_v2_get_vec_1024_4,    get_helper_v2, FixedVec1024,    FixedVec4;
+    btreemap_v2_get_vec_1024_8,    get_helper_v2, FixedVec1024,    FixedVec8;
+    btreemap_v2_get_vec_1024_16,   get_helper_v2, FixedVec1024,   FixedVec16;
+    btreemap_v2_get_vec_1024_32,   get_helper_v2, FixedVec1024,   FixedVec32;
+    btreemap_v2_get_vec_1024_64,   get_helper_v2, FixedVec1024,   FixedVec64;
+    btreemap_v2_get_vec_1024_128,  get_helper_v2, FixedVec1024,  FixedVec128;
+    btreemap_v2_get_vec_1024_256,  get_helper_v2, FixedVec1024,  FixedVec256;
+    btreemap_v2_get_vec_1024_512,  get_helper_v2, FixedVec1024,  FixedVec512;
 
     // V2 u64 / blob8 / vec8
-    btreemap_get_u64_u64_v2,        get_helper_v2,       u64,       u64;
-    btreemap_get_u64_blob_8_v2,     get_helper_v2,       u64,     Blob8;
-    btreemap_get_blob_8_u64_v2,     get_helper_v2,     Blob8,       u64;
-    btreemap_get_u64_vec_8_v2,      get_helper_v2,       u64, FixedVec8;
-    btreemap_get_vec_8_u64_v2,      get_helper_v2, FixedVec8,       u64;
+    btreemap_v2_get_u64_u64,        get_helper_v2,       u64,       u64;
+    btreemap_v2_get_u64_blob_8,     get_helper_v2,       u64,     Blob8;
+    btreemap_v2_get_blob_8_u64,     get_helper_v2,     Blob8,       u64;
+    btreemap_v2_get_u64_vec_8,      get_helper_v2,       u64, FixedVec8;
+    btreemap_v2_get_vec_8_u64,      get_helper_v2, FixedVec8,       u64;
 
     // V2 memory manager u64 / blob512 / vec512
-    btreemap_get_u64_u64_v2_mem_manager,      get_helper_v2_mem_manager,         u64,         u64;
-    btreemap_get_u64_blob_512_v2_mem_manager, get_helper_v2_mem_manager,         u64,     Blob512;
-    btreemap_get_blob_512_u64_v2_mem_manager, get_helper_v2_mem_manager,     Blob512,         u64;
-    btreemap_get_u64_vec_512_v2_mem_manager,  get_helper_v2_mem_manager,         u64, FixedVec512;
-    btreemap_get_vec_512_u64_v2_mem_manager,  get_helper_v2_mem_manager, FixedVec512,         u64;
+    btreemap_v2_get_u64_u64_mem_manager,      get_helper_v2_mem_manager,         u64,         u64;
+    btreemap_v2_get_u64_blob_512_mem_manager, get_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_v2_get_blob_512_u64_mem_manager, get_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_v2_get_u64_vec_512_mem_manager,  get_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_v2_get_vec_512_u64_mem_manager,  get_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 fn get_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
@@ -455,7 +455,7 @@ fn get_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory>) 
 }
 
 #[bench(raw)]
-pub fn btreemap_get_10mib_values_v2() -> BenchResult {
+pub fn btreemap_v2_get_10mib_values() -> BenchResult {
     let count = 20;
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let mut rng = Rng::from_seed(0);
@@ -476,85 +476,85 @@ bench_tests! {
     // === V1 ===
 
     // V1 blob K x 1024
-    btreemap_contains_blob_4_1024_v1,    contains_helper_v1,    Blob4, Blob1024;
-    btreemap_contains_blob_8_1024_v1,    contains_helper_v1,    Blob8, Blob1024;
-    btreemap_contains_blob_16_1024_v1,   contains_helper_v1,   Blob16, Blob1024;
-    btreemap_contains_blob_32_1024_v1,   contains_helper_v1,   Blob32, Blob1024;
-    btreemap_contains_blob_64_1024_v1,   contains_helper_v1,   Blob64, Blob1024;
-    btreemap_contains_blob_128_1024_v1,  contains_helper_v1,  Blob128, Blob1024;
-    btreemap_contains_blob_256_1024_v1,  contains_helper_v1,  Blob256, Blob1024;
-    btreemap_contains_blob_512_1024_v1,  contains_helper_v1,  Blob512, Blob1024;
+    btreemap_v1_contains_blob_4_1024,    contains_helper_v1,    Blob4, Blob1024;
+    btreemap_v1_contains_blob_8_1024,    contains_helper_v1,    Blob8, Blob1024;
+    btreemap_v1_contains_blob_16_1024,   contains_helper_v1,   Blob16, Blob1024;
+    btreemap_v1_contains_blob_32_1024,   contains_helper_v1,   Blob32, Blob1024;
+    btreemap_v1_contains_blob_64_1024,   contains_helper_v1,   Blob64, Blob1024;
+    btreemap_v1_contains_blob_128_1024,  contains_helper_v1,  Blob128, Blob1024;
+    btreemap_v1_contains_blob_256_1024,  contains_helper_v1,  Blob256, Blob1024;
+    btreemap_v1_contains_blob_512_1024,  contains_helper_v1,  Blob512, Blob1024;
 
     // V1 blob 1024 x V
-    btreemap_contains_blob_1024_4_v1,    contains_helper_v1, Blob1024,    Blob4;
-    btreemap_contains_blob_1024_8_v1,    contains_helper_v1, Blob1024,    Blob8;
-    btreemap_contains_blob_1024_16_v1,   contains_helper_v1, Blob1024,   Blob16;
-    btreemap_contains_blob_1024_32_v1,   contains_helper_v1, Blob1024,   Blob32;
-    btreemap_contains_blob_1024_64_v1,   contains_helper_v1, Blob1024,   Blob64;
-    btreemap_contains_blob_1024_128_v1,  contains_helper_v1, Blob1024,  Blob128;
-    btreemap_contains_blob_1024_256_v1,  contains_helper_v1, Blob1024,  Blob256;
-    btreemap_contains_blob_1024_512_v1,  contains_helper_v1, Blob1024,  Blob512;
+    btreemap_v1_contains_blob_1024_4,    contains_helper_v1, Blob1024,    Blob4;
+    btreemap_v1_contains_blob_1024_8,    contains_helper_v1, Blob1024,    Blob8;
+    btreemap_v1_contains_blob_1024_16,   contains_helper_v1, Blob1024,   Blob16;
+    btreemap_v1_contains_blob_1024_32,   contains_helper_v1, Blob1024,   Blob32;
+    btreemap_v1_contains_blob_1024_64,   contains_helper_v1, Blob1024,   Blob64;
+    btreemap_v1_contains_blob_1024_128,  contains_helper_v1, Blob1024,  Blob128;
+    btreemap_v1_contains_blob_1024_256,  contains_helper_v1, Blob1024,  Blob256;
+    btreemap_v1_contains_blob_1024_512,  contains_helper_v1, Blob1024,  Blob512;
 
     // V1 u64 / blob8
-    btreemap_contains_u64_u64_v1,        contains_helper_v1, u64,     u64;
-    btreemap_contains_u64_blob_8_v1,     contains_helper_v1, u64,   Blob8;
-    btreemap_contains_blob_8_u64_v1,     contains_helper_v1, Blob8,   u64;
+    btreemap_v1_contains_u64_u64,        contains_helper_v1, u64,     u64;
+    btreemap_v1_contains_u64_blob_8,     contains_helper_v1, u64,   Blob8;
+    btreemap_v1_contains_blob_8_u64,     contains_helper_v1, Blob8,   u64;
 
     // === V2 ===
 
     // V2 blob K x 1024
-    btreemap_contains_blob_4_1024_v2,    contains_helper_v2,    Blob4, Blob1024;
-    btreemap_contains_blob_8_1024_v2,    contains_helper_v2,    Blob8, Blob1024;
-    btreemap_contains_blob_16_1024_v2,   contains_helper_v2,   Blob16, Blob1024;
-    btreemap_contains_blob_32_1024_v2,   contains_helper_v2,   Blob32, Blob1024;
-    btreemap_contains_blob_64_1024_v2,   contains_helper_v2,   Blob64, Blob1024;
-    btreemap_contains_blob_128_1024_v2,  contains_helper_v2,  Blob128, Blob1024;
-    btreemap_contains_blob_256_1024_v2,  contains_helper_v2,  Blob256, Blob1024;
-    btreemap_contains_blob_512_1024_v2,  contains_helper_v2,  Blob512, Blob1024;
+    btreemap_v2_contains_blob_4_1024,    contains_helper_v2,    Blob4, Blob1024;
+    btreemap_v2_contains_blob_8_1024,    contains_helper_v2,    Blob8, Blob1024;
+    btreemap_v2_contains_blob_16_1024,   contains_helper_v2,   Blob16, Blob1024;
+    btreemap_v2_contains_blob_32_1024,   contains_helper_v2,   Blob32, Blob1024;
+    btreemap_v2_contains_blob_64_1024,   contains_helper_v2,   Blob64, Blob1024;
+    btreemap_v2_contains_blob_128_1024,  contains_helper_v2,  Blob128, Blob1024;
+    btreemap_v2_contains_blob_256_1024,  contains_helper_v2,  Blob256, Blob1024;
+    btreemap_v2_contains_blob_512_1024,  contains_helper_v2,  Blob512, Blob1024;
 
     // V2 blob 1024 x V
-    btreemap_contains_blob_1024_4_v2,    contains_helper_v2, Blob1024,    Blob4;
-    btreemap_contains_blob_1024_8_v2,    contains_helper_v2, Blob1024,    Blob8;
-    btreemap_contains_blob_1024_16_v2,   contains_helper_v2, Blob1024,   Blob16;
-    btreemap_contains_blob_1024_32_v2,   contains_helper_v2, Blob1024,   Blob32;
-    btreemap_contains_blob_1024_64_v2,   contains_helper_v2, Blob1024,   Blob64;
-    btreemap_contains_blob_1024_128_v2,  contains_helper_v2, Blob1024,  Blob128;
-    btreemap_contains_blob_1024_256_v2,  contains_helper_v2, Blob1024,  Blob256;
-    btreemap_contains_blob_1024_512_v2,  contains_helper_v2, Blob1024,  Blob512;
+    btreemap_v2_contains_blob_1024_4,    contains_helper_v2, Blob1024,    Blob4;
+    btreemap_v2_contains_blob_1024_8,    contains_helper_v2, Blob1024,    Blob8;
+    btreemap_v2_contains_blob_1024_16,   contains_helper_v2, Blob1024,   Blob16;
+    btreemap_v2_contains_blob_1024_32,   contains_helper_v2, Blob1024,   Blob32;
+    btreemap_v2_contains_blob_1024_64,   contains_helper_v2, Blob1024,   Blob64;
+    btreemap_v2_contains_blob_1024_128,  contains_helper_v2, Blob1024,  Blob128;
+    btreemap_v2_contains_blob_1024_256,  contains_helper_v2, Blob1024,  Blob256;
+    btreemap_v2_contains_blob_1024_512,  contains_helper_v2, Blob1024,  Blob512;
 
     // V2 vec K x 1024
-    btreemap_contains_vec_4_1024_v2,    contains_helper_v2,    FixedVec4, FixedVec1024;
-    btreemap_contains_vec_8_1024_v2,    contains_helper_v2,    FixedVec8, FixedVec1024;
-    btreemap_contains_vec_16_1024_v2,   contains_helper_v2,   FixedVec16, FixedVec1024;
-    btreemap_contains_vec_32_1024_v2,   contains_helper_v2,   FixedVec32, FixedVec1024;
-    btreemap_contains_vec_64_1024_v2,   contains_helper_v2,   FixedVec64, FixedVec1024;
-    btreemap_contains_vec_128_1024_v2,  contains_helper_v2,  FixedVec128, FixedVec1024;
-    btreemap_contains_vec_256_1024_v2,  contains_helper_v2,  FixedVec256, FixedVec1024;
-    btreemap_contains_vec_512_1024_v2,  contains_helper_v2,  FixedVec512, FixedVec1024;
+    btreemap_v2_contains_vec_4_1024,    contains_helper_v2,    FixedVec4, FixedVec1024;
+    btreemap_v2_contains_vec_8_1024,    contains_helper_v2,    FixedVec8, FixedVec1024;
+    btreemap_v2_contains_vec_16_1024,   contains_helper_v2,   FixedVec16, FixedVec1024;
+    btreemap_v2_contains_vec_32_1024,   contains_helper_v2,   FixedVec32, FixedVec1024;
+    btreemap_v2_contains_vec_64_1024,   contains_helper_v2,   FixedVec64, FixedVec1024;
+    btreemap_v2_contains_vec_128_1024,  contains_helper_v2,  FixedVec128, FixedVec1024;
+    btreemap_v2_contains_vec_256_1024,  contains_helper_v2,  FixedVec256, FixedVec1024;
+    btreemap_v2_contains_vec_512_1024,  contains_helper_v2,  FixedVec512, FixedVec1024;
 
     // V2 vec 1024 x V
-    btreemap_contains_vec_1024_4_v2,    contains_helper_v2, FixedVec1024,    FixedVec4;
-    btreemap_contains_vec_1024_8_v2,    contains_helper_v2, FixedVec1024,    FixedVec8;
-    btreemap_contains_vec_1024_16_v2,   contains_helper_v2, FixedVec1024,   FixedVec16;
-    btreemap_contains_vec_1024_32_v2,   contains_helper_v2, FixedVec1024,   FixedVec32;
-    btreemap_contains_vec_1024_64_v2,   contains_helper_v2, FixedVec1024,   FixedVec64;
-    btreemap_contains_vec_1024_128_v2,  contains_helper_v2, FixedVec1024,  FixedVec128;
-    btreemap_contains_vec_1024_256_v2,  contains_helper_v2, FixedVec1024,  FixedVec256;
-    btreemap_contains_vec_1024_512_v2,  contains_helper_v2, FixedVec1024,  FixedVec512;
+    btreemap_v2_contains_vec_1024_4,    contains_helper_v2, FixedVec1024,    FixedVec4;
+    btreemap_v2_contains_vec_1024_8,    contains_helper_v2, FixedVec1024,    FixedVec8;
+    btreemap_v2_contains_vec_1024_16,   contains_helper_v2, FixedVec1024,   FixedVec16;
+    btreemap_v2_contains_vec_1024_32,   contains_helper_v2, FixedVec1024,   FixedVec32;
+    btreemap_v2_contains_vec_1024_64,   contains_helper_v2, FixedVec1024,   FixedVec64;
+    btreemap_v2_contains_vec_1024_128,  contains_helper_v2, FixedVec1024,  FixedVec128;
+    btreemap_v2_contains_vec_1024_256,  contains_helper_v2, FixedVec1024,  FixedVec256;
+    btreemap_v2_contains_vec_1024_512,  contains_helper_v2, FixedVec1024,  FixedVec512;
 
     // V2 u64 / blob8 / vec8
-    btreemap_contains_u64_u64_v2,        contains_helper_v2,       u64,       u64;
-    btreemap_contains_u64_blob_8_v2,     contains_helper_v2,       u64,     Blob8;
-    btreemap_contains_blob_8_u64_v2,     contains_helper_v2,     Blob8,       u64;
-    btreemap_contains_u64_vec_8_v2,      contains_helper_v2,       u64, FixedVec8;
-    btreemap_contains_vec_8_u64_v2,      contains_helper_v2, FixedVec8,       u64;
+    btreemap_v2_contains_u64_u64,        contains_helper_v2,       u64,       u64;
+    btreemap_v2_contains_u64_blob_8,     contains_helper_v2,       u64,     Blob8;
+    btreemap_v2_contains_blob_8_u64,     contains_helper_v2,     Blob8,       u64;
+    btreemap_v2_contains_u64_vec_8,      contains_helper_v2,       u64, FixedVec8;
+    btreemap_v2_contains_vec_8_u64,      contains_helper_v2, FixedVec8,       u64;
 
     // V2 memory manager u64 / blob512 / vec512
-    btreemap_contains_u64_u64_v2_mem_manager,      contains_helper_v2_mem_manager,         u64,         u64;
-    btreemap_contains_u64_blob_512_v2_mem_manager, contains_helper_v2_mem_manager,         u64,     Blob512;
-    btreemap_contains_blob_512_u64_v2_mem_manager, contains_helper_v2_mem_manager,     Blob512,         u64;
-    btreemap_contains_u64_vec_512_v2_mem_manager,  contains_helper_v2_mem_manager,         u64, FixedVec512;
-    btreemap_contains_vec_512_u64_v2_mem_manager,  contains_helper_v2_mem_manager, FixedVec512,         u64;
+    btreemap_v2_contains_u64_u64_mem_manager,      contains_helper_v2_mem_manager,         u64,         u64;
+    btreemap_v2_contains_u64_blob_512_mem_manager, contains_helper_v2_mem_manager,         u64,     Blob512;
+    btreemap_v2_contains_blob_512_u64_mem_manager, contains_helper_v2_mem_manager,     Blob512,         u64;
+    btreemap_v2_contains_u64_vec_512_mem_manager,  contains_helper_v2_mem_manager,         u64, FixedVec512;
+    btreemap_v2_contains_vec_512_u64_mem_manager,  contains_helper_v2_mem_manager, FixedVec512,         u64;
 }
 
 fn contains_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
@@ -594,7 +594,7 @@ fn contains_helper<K: TestKey, V: TestValue>(
 }
 
 #[bench(raw)]
-pub fn btreemap_contains_10mib_values_v2() -> BenchResult {
+pub fn btreemap_v2_contains_10mib_values() -> BenchResult {
     let count = 20;
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
     let mut rng = Rng::from_seed(0);
@@ -636,28 +636,28 @@ bench_traversal_tests! {
 
     // === V2 ===
     // 1k items of 0 bytes
-    btreemap_scan_iter_1k_0b_v2,        traverse_helper_v2, 1_000, 0, TraversalMode::Iter;
-    btreemap_scan_iter_rev_1k_0b_v2,    traverse_helper_v2, 1_000, 0, TraversalMode::IterRev;
-    btreemap_scan_keys_1k_0b_v2,        traverse_helper_v2, 1_000, 0, TraversalMode::Keys;
-    btreemap_scan_keys_rev_1k_0b_v2,    traverse_helper_v2, 1_000, 0, TraversalMode::KeysRev;
-    btreemap_scan_values_1k_0b_v2,      traverse_helper_v2, 1_000, 0, TraversalMode::Values;
-    btreemap_scan_values_rev_1k_0b_v2,  traverse_helper_v2, 1_000, 0, TraversalMode::ValuesRev;
+    btreemap_v2_scan_iter_1k_0b,        traverse_helper_v2, 1_000, 0, TraversalMode::Iter;
+    btreemap_v2_scan_iter_rev_1k_0b,    traverse_helper_v2, 1_000, 0, TraversalMode::IterRev;
+    btreemap_v2_scan_keys_1k_0b,        traverse_helper_v2, 1_000, 0, TraversalMode::Keys;
+    btreemap_v2_scan_keys_rev_1k_0b,    traverse_helper_v2, 1_000, 0, TraversalMode::KeysRev;
+    btreemap_v2_scan_values_1k_0b,      traverse_helper_v2, 1_000, 0, TraversalMode::Values;
+    btreemap_v2_scan_values_rev_1k_0b,  traverse_helper_v2, 1_000, 0, TraversalMode::ValuesRev;
 
     // 1k items of 10 KiB
-    btreemap_scan_iter_1k_10kib_v2,       traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Iter;
-    btreemap_scan_iter_rev_1k_10kib_v2,   traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::IterRev;
-    btreemap_scan_keys_1k_10kib_v2,       traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Keys;
-    btreemap_scan_keys_rev_1k_10kib_v2,   traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::KeysRev;
-    btreemap_scan_values_1k_10kib_v2,     traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Values;
-    btreemap_scan_values_rev_1k_10kib_v2, traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::ValuesRev;
+    btreemap_v2_scan_iter_1k_10kib,       traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Iter;
+    btreemap_v2_scan_iter_rev_1k_10kib,   traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::IterRev;
+    btreemap_v2_scan_keys_1k_10kib,       traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Keys;
+    btreemap_v2_scan_keys_rev_1k_10kib,   traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::KeysRev;
+    btreemap_v2_scan_values_1k_10kib,     traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::Values;
+    btreemap_v2_scan_values_rev_1k_10kib, traverse_helper_v2, 1_000, 10 * KiB, TraversalMode::ValuesRev;
 
     // 20 items of 10 MiB
-    btreemap_scan_iter_20_10mib_v2,        traverse_helper_v2, 20, 10 * MiB, TraversalMode::Iter;
-    btreemap_scan_iter_rev_20_10mib_v2,    traverse_helper_v2, 20, 10 * MiB, TraversalMode::IterRev;
-    btreemap_scan_keys_20_10mib_v2,        traverse_helper_v2, 20, 10 * MiB, TraversalMode::Keys;
-    btreemap_scan_keys_rev_20_10mib_v2,    traverse_helper_v2, 20, 10 * MiB, TraversalMode::KeysRev;
-    btreemap_scan_values_20_10mib_v2,      traverse_helper_v2, 20, 10 * MiB, TraversalMode::Values;
-    btreemap_scan_values_rev_20_10mib_v2,  traverse_helper_v2, 20, 10 * MiB, TraversalMode::ValuesRev;
+    btreemap_v2_scan_iter_20_10mib,        traverse_helper_v2, 20, 10 * MiB, TraversalMode::Iter;
+    btreemap_v2_scan_iter_rev_20_10mib,    traverse_helper_v2, 20, 10 * MiB, TraversalMode::IterRev;
+    btreemap_v2_scan_keys_20_10mib,        traverse_helper_v2, 20, 10 * MiB, TraversalMode::Keys;
+    btreemap_v2_scan_keys_rev_20_10mib,    traverse_helper_v2, 20, 10 * MiB, TraversalMode::KeysRev;
+    btreemap_v2_scan_values_20_10mib,      traverse_helper_v2, 20, 10 * MiB, TraversalMode::Values;
+    btreemap_v2_scan_values_rev_20_10mib,  traverse_helper_v2, 20, 10 * MiB, TraversalMode::ValuesRev;
 }
 
 enum TraversalMode {
@@ -703,17 +703,17 @@ bench_range_tests! {
     // V1 does not support unbounded types, eg. Vec<_>.
 
     // === V2 ===
-    btreemap_range_key_sum_1k_0b_v2,    range_key_sum_helper_v2, 1_000, 0;
-    btreemap_range_key_sum_1k_10kib_v2,   range_key_sum_helper_v2, 1_000, 10 * KiB;
-    btreemap_range_key_sum_20_10mib_v2,    range_key_sum_helper_v2, 20, 10 * MiB;
+    btreemap_v2_range_key_sum_1k_0b,    range_key_sum_helper_v2, 1_000, 0;
+    btreemap_v2_range_key_sum_1k_10kib,   range_key_sum_helper_v2, 1_000, 10 * KiB;
+    btreemap_v2_range_key_sum_20_10mib,    range_key_sum_helper_v2, 20, 10 * MiB;
 
-    btreemap_range_value_sum_1k_0b_v2,  range_value_sum_helper_v2, 1_000, 0;
-    btreemap_range_value_sum_1k_10kib_v2, range_value_sum_helper_v2, 1_000, 10 * KiB;
-    btreemap_range_value_sum_20_10mib_v2,  range_value_sum_helper_v2, 20, 10 * MiB;
+    btreemap_v2_range_value_sum_1k_0b,  range_value_sum_helper_v2, 1_000, 0;
+    btreemap_v2_range_value_sum_1k_10kib, range_value_sum_helper_v2, 1_000, 10 * KiB;
+    btreemap_v2_range_value_sum_20_10mib,  range_value_sum_helper_v2, 20, 10 * MiB;
 
-    btreemap_range_count_1k_0b_v2,      range_count_helper_v2, 1_000, 0;
-    btreemap_range_count_1k_10kib_v2,     range_count_helper_v2, 1_000, 10 * KiB;
-    btreemap_range_count_20_10mib_v2,      range_count_helper_v2, 20, 10 * MiB;
+    btreemap_v2_range_count_1k_0b,      range_count_helper_v2, 1_000, 0;
+    btreemap_v2_range_count_1k_10kib,     range_count_helper_v2, 1_000, 10 * KiB;
+    btreemap_v2_range_count_20_10mib,      range_count_helper_v2, 20, 10 * MiB;
 }
 
 fn range_key_sum_helper_v2(count: usize, size: usize) -> BenchResult {
@@ -771,78 +771,78 @@ bench_tests! {
     // === V1 ===
 
     // V1 blob K x 1024
-    btreemap_pop_first_blob_4_1024_v1,    pop_first_helper_v1,    Blob4, Blob1024;
-    btreemap_pop_first_blob_8_1024_v1,    pop_first_helper_v1,    Blob8, Blob1024;
-    btreemap_pop_first_blob_16_1024_v1,   pop_first_helper_v1,   Blob16, Blob1024;
-    btreemap_pop_first_blob_32_1024_v1,   pop_first_helper_v1,   Blob32, Blob1024;
-    btreemap_pop_first_blob_64_1024_v1,   pop_first_helper_v1,   Blob64, Blob1024;
-    btreemap_pop_first_blob_128_1024_v1,  pop_first_helper_v1,  Blob128, Blob1024;
-    btreemap_pop_first_blob_256_1024_v1,  pop_first_helper_v1,  Blob256, Blob1024;
-    btreemap_pop_first_blob_512_1024_v1,  pop_first_helper_v1,  Blob512, Blob1024;
+    btreemap_v1_pop_first_blob_4_1024,    pop_first_helper_v1,    Blob4, Blob1024;
+    btreemap_v1_pop_first_blob_8_1024,    pop_first_helper_v1,    Blob8, Blob1024;
+    btreemap_v1_pop_first_blob_16_1024,   pop_first_helper_v1,   Blob16, Blob1024;
+    btreemap_v1_pop_first_blob_32_1024,   pop_first_helper_v1,   Blob32, Blob1024;
+    btreemap_v1_pop_first_blob_64_1024,   pop_first_helper_v1,   Blob64, Blob1024;
+    btreemap_v1_pop_first_blob_128_1024,  pop_first_helper_v1,  Blob128, Blob1024;
+    btreemap_v1_pop_first_blob_256_1024,  pop_first_helper_v1,  Blob256, Blob1024;
+    btreemap_v1_pop_first_blob_512_1024,  pop_first_helper_v1,  Blob512, Blob1024;
 
     // V1 blob 1024 x V
-    btreemap_pop_first_blob_1024_4_v1,    pop_first_helper_v1, Blob1024,    Blob4;
-    btreemap_pop_first_blob_1024_8_v1,    pop_first_helper_v1, Blob1024,    Blob8;
-    btreemap_pop_first_blob_1024_16_v1,   pop_first_helper_v1, Blob1024,   Blob16;
-    btreemap_pop_first_blob_1024_32_v1,   pop_first_helper_v1, Blob1024,   Blob32;
-    btreemap_pop_first_blob_1024_64_v1,   pop_first_helper_v1, Blob1024,   Blob64;
-    btreemap_pop_first_blob_1024_128_v1,  pop_first_helper_v1, Blob1024,  Blob128;
-    btreemap_pop_first_blob_1024_256_v1,  pop_first_helper_v1, Blob1024,  Blob256;
-    btreemap_pop_first_blob_1024_512_v1,  pop_first_helper_v1, Blob1024,  Blob512;
+    btreemap_v1_pop_first_blob_1024_4,    pop_first_helper_v1, Blob1024,    Blob4;
+    btreemap_v1_pop_first_blob_1024_8,    pop_first_helper_v1, Blob1024,    Blob8;
+    btreemap_v1_pop_first_blob_1024_16,   pop_first_helper_v1, Blob1024,   Blob16;
+    btreemap_v1_pop_first_blob_1024_32,   pop_first_helper_v1, Blob1024,   Blob32;
+    btreemap_v1_pop_first_blob_1024_64,   pop_first_helper_v1, Blob1024,   Blob64;
+    btreemap_v1_pop_first_blob_1024_128,  pop_first_helper_v1, Blob1024,  Blob128;
+    btreemap_v1_pop_first_blob_1024_256,  pop_first_helper_v1, Blob1024,  Blob256;
+    btreemap_v1_pop_first_blob_1024_512,  pop_first_helper_v1, Blob1024,  Blob512;
 
     // V1 u64 / blob8
-    btreemap_pop_first_u64_u64_v1,        pop_first_helper_v1, u64,     u64;
-    btreemap_pop_first_u64_blob_8_v1,     pop_first_helper_v1, u64,   Blob8;
-    btreemap_pop_first_blob_8_u64_v1,     pop_first_helper_v1, Blob8,   u64;
+    btreemap_v1_pop_first_u64_u64,        pop_first_helper_v1, u64,     u64;
+    btreemap_v1_pop_first_u64_blob_8,     pop_first_helper_v1, u64,   Blob8;
+    btreemap_v1_pop_first_blob_8_u64,     pop_first_helper_v1, Blob8,   u64;
 
     // === V2 ===
 
     // V2 blob K x 1024
-    btreemap_pop_first_blob_4_1024_v2,    pop_first_helper_v2,    Blob4, Blob1024;
-    btreemap_pop_first_blob_8_1024_v2,    pop_first_helper_v2,    Blob8, Blob1024;
-    btreemap_pop_first_blob_16_1024_v2,   pop_first_helper_v2,   Blob16, Blob1024;
-    btreemap_pop_first_blob_32_1024_v2,   pop_first_helper_v2,   Blob32, Blob1024;
-    btreemap_pop_first_blob_64_1024_v2,   pop_first_helper_v2,   Blob64, Blob1024;
-    btreemap_pop_first_blob_128_1024_v2,  pop_first_helper_v2,  Blob128, Blob1024;
-    btreemap_pop_first_blob_256_1024_v2,  pop_first_helper_v2,  Blob256, Blob1024;
-    btreemap_pop_first_blob_512_1024_v2,  pop_first_helper_v2,  Blob512, Blob1024;
+    btreemap_v2_pop_first_blob_4_1024,    pop_first_helper_v2,    Blob4, Blob1024;
+    btreemap_v2_pop_first_blob_8_1024,    pop_first_helper_v2,    Blob8, Blob1024;
+    btreemap_v2_pop_first_blob_16_1024,   pop_first_helper_v2,   Blob16, Blob1024;
+    btreemap_v2_pop_first_blob_32_1024,   pop_first_helper_v2,   Blob32, Blob1024;
+    btreemap_v2_pop_first_blob_64_1024,   pop_first_helper_v2,   Blob64, Blob1024;
+    btreemap_v2_pop_first_blob_128_1024,  pop_first_helper_v2,  Blob128, Blob1024;
+    btreemap_v2_pop_first_blob_256_1024,  pop_first_helper_v2,  Blob256, Blob1024;
+    btreemap_v2_pop_first_blob_512_1024,  pop_first_helper_v2,  Blob512, Blob1024;
 
     // V2 blob 1024 x V
-    btreemap_pop_first_blob_1024_4_v2,    pop_first_helper_v2, Blob1024,    Blob4;
-    btreemap_pop_first_blob_1024_8_v2,    pop_first_helper_v2, Blob1024,    Blob8;
-    btreemap_pop_first_blob_1024_16_v2,   pop_first_helper_v2, Blob1024,   Blob16;
-    btreemap_pop_first_blob_1024_32_v2,   pop_first_helper_v2, Blob1024,   Blob32;
-    btreemap_pop_first_blob_1024_64_v2,   pop_first_helper_v2, Blob1024,   Blob64;
-    btreemap_pop_first_blob_1024_128_v2,  pop_first_helper_v2, Blob1024,  Blob128;
-    btreemap_pop_first_blob_1024_256_v2,  pop_first_helper_v2, Blob1024,  Blob256;
-    btreemap_pop_first_blob_1024_512_v2,  pop_first_helper_v2, Blob1024,  Blob512;
+    btreemap_v2_pop_first_blob_1024_4,    pop_first_helper_v2, Blob1024,    Blob4;
+    btreemap_v2_pop_first_blob_1024_8,    pop_first_helper_v2, Blob1024,    Blob8;
+    btreemap_v2_pop_first_blob_1024_16,   pop_first_helper_v2, Blob1024,   Blob16;
+    btreemap_v2_pop_first_blob_1024_32,   pop_first_helper_v2, Blob1024,   Blob32;
+    btreemap_v2_pop_first_blob_1024_64,   pop_first_helper_v2, Blob1024,   Blob64;
+    btreemap_v2_pop_first_blob_1024_128,  pop_first_helper_v2, Blob1024,  Blob128;
+    btreemap_v2_pop_first_blob_1024_256,  pop_first_helper_v2, Blob1024,  Blob256;
+    btreemap_v2_pop_first_blob_1024_512,  pop_first_helper_v2, Blob1024,  Blob512;
 
     // V2 vec K x 1024
-    btreemap_pop_first_vec_4_1024_v2,    pop_first_helper_v2,    FixedVec4, FixedVec1024;
-    btreemap_pop_first_vec_8_1024_v2,    pop_first_helper_v2,    FixedVec8, FixedVec1024;
-    btreemap_pop_first_vec_16_1024_v2,   pop_first_helper_v2,   FixedVec16, FixedVec1024;
-    btreemap_pop_first_vec_32_1024_v2,   pop_first_helper_v2,   FixedVec32, FixedVec1024;
-    btreemap_pop_first_vec_64_1024_v2,   pop_first_helper_v2,   FixedVec64, FixedVec1024;
-    btreemap_pop_first_vec_128_1024_v2,  pop_first_helper_v2,  FixedVec128, FixedVec1024;
-    btreemap_pop_first_vec_256_1024_v2,  pop_first_helper_v2,  FixedVec256, FixedVec1024;
-    btreemap_pop_first_vec_512_1024_v2,  pop_first_helper_v2,  FixedVec512, FixedVec1024;
+    btreemap_v2_pop_first_vec_4_1024,    pop_first_helper_v2,    FixedVec4, FixedVec1024;
+    btreemap_v2_pop_first_vec_8_1024,    pop_first_helper_v2,    FixedVec8, FixedVec1024;
+    btreemap_v2_pop_first_vec_16_1024,   pop_first_helper_v2,   FixedVec16, FixedVec1024;
+    btreemap_v2_pop_first_vec_32_1024,   pop_first_helper_v2,   FixedVec32, FixedVec1024;
+    btreemap_v2_pop_first_vec_64_1024,   pop_first_helper_v2,   FixedVec64, FixedVec1024;
+    btreemap_v2_pop_first_vec_128_1024,  pop_first_helper_v2,  FixedVec128, FixedVec1024;
+    btreemap_v2_pop_first_vec_256_1024,  pop_first_helper_v2,  FixedVec256, FixedVec1024;
+    btreemap_v2_pop_first_vec_512_1024,  pop_first_helper_v2,  FixedVec512, FixedVec1024;
 
     // V2 vec 1024 x V
-    btreemap_pop_first_vec_1024_4_v2,    pop_first_helper_v2, FixedVec1024,    FixedVec4;
-    btreemap_pop_first_vec_1024_8_v2,    pop_first_helper_v2, FixedVec1024,    FixedVec8;
-    btreemap_pop_first_vec_1024_16_v2,   pop_first_helper_v2, FixedVec1024,   FixedVec16;
-    btreemap_pop_first_vec_1024_32_v2,   pop_first_helper_v2, FixedVec1024,   FixedVec32;
-    btreemap_pop_first_vec_1024_64_v2,   pop_first_helper_v2, FixedVec1024,   FixedVec64;
-    btreemap_pop_first_vec_1024_128_v2,  pop_first_helper_v2, FixedVec1024,  FixedVec128;
-    btreemap_pop_first_vec_1024_256_v2,  pop_first_helper_v2, FixedVec1024,  FixedVec256;
-    btreemap_pop_first_vec_1024_512_v2,  pop_first_helper_v2, FixedVec1024,  FixedVec512;
+    btreemap_v2_pop_first_vec_1024_4,    pop_first_helper_v2, FixedVec1024,    FixedVec4;
+    btreemap_v2_pop_first_vec_1024_8,    pop_first_helper_v2, FixedVec1024,    FixedVec8;
+    btreemap_v2_pop_first_vec_1024_16,   pop_first_helper_v2, FixedVec1024,   FixedVec16;
+    btreemap_v2_pop_first_vec_1024_32,   pop_first_helper_v2, FixedVec1024,   FixedVec32;
+    btreemap_v2_pop_first_vec_1024_64,   pop_first_helper_v2, FixedVec1024,   FixedVec64;
+    btreemap_v2_pop_first_vec_1024_128,  pop_first_helper_v2, FixedVec1024,  FixedVec128;
+    btreemap_v2_pop_first_vec_1024_256,  pop_first_helper_v2, FixedVec1024,  FixedVec256;
+    btreemap_v2_pop_first_vec_1024_512,  pop_first_helper_v2, FixedVec1024,  FixedVec512;
 
     // V2 u64 / blob8 / vec8
-    btreemap_pop_first_u64_u64_v2,        pop_first_helper_v2,       u64,       u64;
-    btreemap_pop_first_u64_blob_8_v2,     pop_first_helper_v2,       u64,     Blob8;
-    btreemap_pop_first_blob_8_u64_v2,     pop_first_helper_v2,     Blob8,       u64;
-    btreemap_pop_first_u64_vec_8_v2,      pop_first_helper_v2,       u64, FixedVec8;
-    btreemap_pop_first_vec_8_u64_v2,      pop_first_helper_v2, FixedVec8,       u64;
+    btreemap_v2_pop_first_u64_u64,        pop_first_helper_v2,       u64,       u64;
+    btreemap_v2_pop_first_u64_blob_8,     pop_first_helper_v2,       u64,     Blob8;
+    btreemap_v2_pop_first_blob_8_u64,     pop_first_helper_v2,     Blob8,       u64;
+    btreemap_v2_pop_first_u64_vec_8,      pop_first_helper_v2,       u64, FixedVec8;
+    btreemap_v2_pop_first_vec_8_u64,      pop_first_helper_v2, FixedVec8,       u64;
 }
 
 // Last
@@ -850,78 +850,78 @@ bench_tests! {
     // === V1 ===
 
     // V1 blob K x 1024
-    btreemap_pop_last_blob_4_1024_v1,    pop_last_helper_v1,    Blob4, Blob1024;
-    btreemap_pop_last_blob_8_1024_v1,    pop_last_helper_v1,    Blob8, Blob1024;
-    btreemap_pop_last_blob_16_1024_v1,   pop_last_helper_v1,   Blob16, Blob1024;
-    btreemap_pop_last_blob_32_1024_v1,   pop_last_helper_v1,   Blob32, Blob1024;
-    btreemap_pop_last_blob_64_1024_v1,   pop_last_helper_v1,   Blob64, Blob1024;
-    btreemap_pop_last_blob_128_1024_v1,  pop_last_helper_v1,  Blob128, Blob1024;
-    btreemap_pop_last_blob_256_1024_v1,  pop_last_helper_v1,  Blob256, Blob1024;
-    btreemap_pop_last_blob_512_1024_v1,  pop_last_helper_v1,  Blob512, Blob1024;
+    btreemap_v1_pop_last_blob_4_1024,    pop_last_helper_v1,    Blob4, Blob1024;
+    btreemap_v1_pop_last_blob_8_1024,    pop_last_helper_v1,    Blob8, Blob1024;
+    btreemap_v1_pop_last_blob_16_1024,   pop_last_helper_v1,   Blob16, Blob1024;
+    btreemap_v1_pop_last_blob_32_1024,   pop_last_helper_v1,   Blob32, Blob1024;
+    btreemap_v1_pop_last_blob_64_1024,   pop_last_helper_v1,   Blob64, Blob1024;
+    btreemap_v1_pop_last_blob_128_1024,  pop_last_helper_v1,  Blob128, Blob1024;
+    btreemap_v1_pop_last_blob_256_1024,  pop_last_helper_v1,  Blob256, Blob1024;
+    btreemap_v1_pop_last_blob_512_1024,  pop_last_helper_v1,  Blob512, Blob1024;
 
     // V1 blob 1024 x V
-    btreemap_pop_last_blob_1024_4_v1,    pop_last_helper_v1, Blob1024,    Blob4;
-    btreemap_pop_last_blob_1024_8_v1,    pop_last_helper_v1, Blob1024,    Blob8;
-    btreemap_pop_last_blob_1024_16_v1,   pop_last_helper_v1, Blob1024,   Blob16;
-    btreemap_pop_last_blob_1024_32_v1,   pop_last_helper_v1, Blob1024,   Blob32;
-    btreemap_pop_last_blob_1024_64_v1,   pop_last_helper_v1, Blob1024,   Blob64;
-    btreemap_pop_last_blob_1024_128_v1,  pop_last_helper_v1, Blob1024,  Blob128;
-    btreemap_pop_last_blob_1024_256_v1,  pop_last_helper_v1, Blob1024,  Blob256;
-    btreemap_pop_last_blob_1024_512_v1,  pop_last_helper_v1, Blob1024,  Blob512;
+    btreemap_v1_pop_last_blob_1024_4,    pop_last_helper_v1, Blob1024,    Blob4;
+    btreemap_v1_pop_last_blob_1024_8,    pop_last_helper_v1, Blob1024,    Blob8;
+    btreemap_v1_pop_last_blob_1024_16,   pop_last_helper_v1, Blob1024,   Blob16;
+    btreemap_v1_pop_last_blob_1024_32,   pop_last_helper_v1, Blob1024,   Blob32;
+    btreemap_v1_pop_last_blob_1024_64,   pop_last_helper_v1, Blob1024,   Blob64;
+    btreemap_v1_pop_last_blob_1024_128,  pop_last_helper_v1, Blob1024,  Blob128;
+    btreemap_v1_pop_last_blob_1024_256,  pop_last_helper_v1, Blob1024,  Blob256;
+    btreemap_v1_pop_last_blob_1024_512,  pop_last_helper_v1, Blob1024,  Blob512;
 
     // V1 u64 / blob8
-    btreemap_pop_last_u64_u64_v1,        pop_last_helper_v1, u64,     u64;
-    btreemap_pop_last_u64_blob_8_v1,     pop_last_helper_v1, u64,   Blob8;
-    btreemap_pop_last_blob_8_u64_v1,     pop_last_helper_v1, Blob8,   u64;
+    btreemap_v1_pop_last_u64_u64,        pop_last_helper_v1, u64,     u64;
+    btreemap_v1_pop_last_u64_blob_8,     pop_last_helper_v1, u64,   Blob8;
+    btreemap_v1_pop_last_blob_8_u64,     pop_last_helper_v1, Blob8,   u64;
 
     // === V2 ===
 
     // V2 blob K x 1024
-    btreemap_pop_last_blob_4_1024_v2,    pop_last_helper_v2,    Blob4, Blob1024;
-    btreemap_pop_last_blob_8_1024_v2,    pop_last_helper_v2,    Blob8, Blob1024;
-    btreemap_pop_last_blob_16_1024_v2,   pop_last_helper_v2,   Blob16, Blob1024;
-    btreemap_pop_last_blob_32_1024_v2,   pop_last_helper_v2,   Blob32, Blob1024;
-    btreemap_pop_last_blob_64_1024_v2,   pop_last_helper_v2,   Blob64, Blob1024;
-    btreemap_pop_last_blob_128_1024_v2,  pop_last_helper_v2,  Blob128, Blob1024;
-    btreemap_pop_last_blob_256_1024_v2,  pop_last_helper_v2,  Blob256, Blob1024;
-    btreemap_pop_last_blob_512_1024_v2,  pop_last_helper_v2,  Blob512, Blob1024;
+    btreemap_v2_pop_last_blob_4_1024,    pop_last_helper_v2,    Blob4, Blob1024;
+    btreemap_v2_pop_last_blob_8_1024,    pop_last_helper_v2,    Blob8, Blob1024;
+    btreemap_v2_pop_last_blob_16_1024,   pop_last_helper_v2,   Blob16, Blob1024;
+    btreemap_v2_pop_last_blob_32_1024,   pop_last_helper_v2,   Blob32, Blob1024;
+    btreemap_v2_pop_last_blob_64_1024,   pop_last_helper_v2,   Blob64, Blob1024;
+    btreemap_v2_pop_last_blob_128_1024,  pop_last_helper_v2,  Blob128, Blob1024;
+    btreemap_v2_pop_last_blob_256_1024,  pop_last_helper_v2,  Blob256, Blob1024;
+    btreemap_v2_pop_last_blob_512_1024,  pop_last_helper_v2,  Blob512, Blob1024;
 
     // V2 blob 1024 x V
-    btreemap_pop_last_blob_1024_4_v2,    pop_last_helper_v2, Blob1024,    Blob4;
-    btreemap_pop_last_blob_1024_8_v2,    pop_last_helper_v2, Blob1024,    Blob8;
-    btreemap_pop_last_blob_1024_16_v2,   pop_last_helper_v2, Blob1024,   Blob16;
-    btreemap_pop_last_blob_1024_32_v2,   pop_last_helper_v2, Blob1024,   Blob32;
-    btreemap_pop_last_blob_1024_64_v2,   pop_last_helper_v2, Blob1024,   Blob64;
-    btreemap_pop_last_blob_1024_128_v2,  pop_last_helper_v2, Blob1024,  Blob128;
-    btreemap_pop_last_blob_1024_256_v2,  pop_last_helper_v2, Blob1024,  Blob256;
-    btreemap_pop_last_blob_1024_512_v2,  pop_last_helper_v2, Blob1024,  Blob512;
+    btreemap_v2_pop_last_blob_1024_4,    pop_last_helper_v2, Blob1024,    Blob4;
+    btreemap_v2_pop_last_blob_1024_8,    pop_last_helper_v2, Blob1024,    Blob8;
+    btreemap_v2_pop_last_blob_1024_16,   pop_last_helper_v2, Blob1024,   Blob16;
+    btreemap_v2_pop_last_blob_1024_32,   pop_last_helper_v2, Blob1024,   Blob32;
+    btreemap_v2_pop_last_blob_1024_64,   pop_last_helper_v2, Blob1024,   Blob64;
+    btreemap_v2_pop_last_blob_1024_128,  pop_last_helper_v2, Blob1024,  Blob128;
+    btreemap_v2_pop_last_blob_1024_256,  pop_last_helper_v2, Blob1024,  Blob256;
+    btreemap_v2_pop_last_blob_1024_512,  pop_last_helper_v2, Blob1024,  Blob512;
 
     // V2 vec K x 1024
-    btreemap_pop_last_vec_4_1024_v2,    pop_last_helper_v2,    FixedVec4, FixedVec1024;
-    btreemap_pop_last_vec_8_1024_v2,    pop_last_helper_v2,    FixedVec8, FixedVec1024;
-    btreemap_pop_last_vec_16_1024_v2,   pop_last_helper_v2,   FixedVec16, FixedVec1024;
-    btreemap_pop_last_vec_32_1024_v2,   pop_last_helper_v2,   FixedVec32, FixedVec1024;
-    btreemap_pop_last_vec_64_1024_v2,   pop_last_helper_v2,   FixedVec64, FixedVec1024;
-    btreemap_pop_last_vec_128_1024_v2,  pop_last_helper_v2,  FixedVec128, FixedVec1024;
-    btreemap_pop_last_vec_256_1024_v2,  pop_last_helper_v2,  FixedVec256, FixedVec1024;
-    btreemap_pop_last_vec_512_1024_v2,  pop_last_helper_v2,  FixedVec512, FixedVec1024;
+    btreemap_v2_pop_last_vec_4_1024,    pop_last_helper_v2,    FixedVec4, FixedVec1024;
+    btreemap_v2_pop_last_vec_8_1024,    pop_last_helper_v2,    FixedVec8, FixedVec1024;
+    btreemap_v2_pop_last_vec_16_1024,   pop_last_helper_v2,   FixedVec16, FixedVec1024;
+    btreemap_v2_pop_last_vec_32_1024,   pop_last_helper_v2,   FixedVec32, FixedVec1024;
+    btreemap_v2_pop_last_vec_64_1024,   pop_last_helper_v2,   FixedVec64, FixedVec1024;
+    btreemap_v2_pop_last_vec_128_1024,  pop_last_helper_v2,  FixedVec128, FixedVec1024;
+    btreemap_v2_pop_last_vec_256_1024,  pop_last_helper_v2,  FixedVec256, FixedVec1024;
+    btreemap_v2_pop_last_vec_512_1024,  pop_last_helper_v2,  FixedVec512, FixedVec1024;
 
     // V2 vec 1024 x V
-    btreemap_pop_last_vec_1024_4_v2,    pop_last_helper_v2, FixedVec1024,    FixedVec4;
-    btreemap_pop_last_vec_1024_8_v2,    pop_last_helper_v2, FixedVec1024,    FixedVec8;
-    btreemap_pop_last_vec_1024_16_v2,   pop_last_helper_v2, FixedVec1024,   FixedVec16;
-    btreemap_pop_last_vec_1024_32_v2,   pop_last_helper_v2, FixedVec1024,   FixedVec32;
-    btreemap_pop_last_vec_1024_64_v2,   pop_last_helper_v2, FixedVec1024,   FixedVec64;
-    btreemap_pop_last_vec_1024_128_v2,  pop_last_helper_v2, FixedVec1024,  FixedVec128;
-    btreemap_pop_last_vec_1024_256_v2,  pop_last_helper_v2, FixedVec1024,  FixedVec256;
-    btreemap_pop_last_vec_1024_512_v2,  pop_last_helper_v2, FixedVec1024,  FixedVec512;
+    btreemap_v2_pop_last_vec_1024_4,    pop_last_helper_v2, FixedVec1024,    FixedVec4;
+    btreemap_v2_pop_last_vec_1024_8,    pop_last_helper_v2, FixedVec1024,    FixedVec8;
+    btreemap_v2_pop_last_vec_1024_16,   pop_last_helper_v2, FixedVec1024,   FixedVec16;
+    btreemap_v2_pop_last_vec_1024_32,   pop_last_helper_v2, FixedVec1024,   FixedVec32;
+    btreemap_v2_pop_last_vec_1024_64,   pop_last_helper_v2, FixedVec1024,   FixedVec64;
+    btreemap_v2_pop_last_vec_1024_128,  pop_last_helper_v2, FixedVec1024,  FixedVec128;
+    btreemap_v2_pop_last_vec_1024_256,  pop_last_helper_v2, FixedVec1024,  FixedVec256;
+    btreemap_v2_pop_last_vec_1024_512,  pop_last_helper_v2, FixedVec1024,  FixedVec512;
 
     // V2 u64 / blob8 / vec8
-    btreemap_pop_last_u64_u64_v2,        pop_last_helper_v2,       u64,       u64;
-    btreemap_pop_last_u64_blob_8_v2,     pop_last_helper_v2,       u64,     Blob8;
-    btreemap_pop_last_blob_8_u64_v2,     pop_last_helper_v2,     Blob8,       u64;
-    btreemap_pop_last_u64_vec_8_v2,      pop_last_helper_v2,       u64, FixedVec8;
-    btreemap_pop_last_vec_8_u64_v2,      pop_last_helper_v2, FixedVec8,       u64;
+    btreemap_v2_pop_last_u64_u64,        pop_last_helper_v2,       u64,       u64;
+    btreemap_v2_pop_last_u64_blob_8,     pop_last_helper_v2,       u64,     Blob8;
+    btreemap_v2_pop_last_blob_8_u64,     pop_last_helper_v2,     Blob8,       u64;
+    btreemap_v2_pop_last_u64_vec_8,      pop_last_helper_v2,       u64, FixedVec8;
+    btreemap_v2_pop_last_vec_8_u64,      pop_last_helper_v2, FixedVec8,       u64;
 }
 
 fn pop_first_helper_v1<K: TestKey, V: TestValue>() -> BenchResult {
