@@ -148,8 +148,8 @@ def load_benchmarks(path, verbose=False, logger=None):
     return out
 
 
-def save_all_tables(tables, sizes, filename, scientific=False, sci_fmt="{:.2e}"):
-    fmt_instr = lambda v: "" if v is None else (sci_fmt.format(v) if scientific else str(v))
+def save_all_tables(tables, sizes, filename):
+    fmt_instr = lambda v: "" if v is None else '{:.3f}'.format(v / 1e9)
     fmt_change = lambda v: "" if v is None else '{:.1f}%'.format(v * 100.0)
 
     with open(filename, 'w', newline='') as f:
@@ -230,7 +230,7 @@ def main():
         if bench['name'] not in used:
             logger.warning(f"Unused benchmark: {bench['name']}")
 
-    save_all_tables(all_tables, size_grid, './tmp/all_benchmarks.csv', scientific=True)
+    save_all_tables(all_tables, size_grid, './tmp/all_benchmarks.csv')
 
 
 if __name__ == '__main__':
