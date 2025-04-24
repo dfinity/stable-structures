@@ -1310,10 +1310,40 @@ mod test {
         }
     }
 
-    macro_rules! verify_and_run {
-        ($runner:ident, $K:ty, $V:ty) => {{
+    /// Asserts that the associated `BOUND` for `$ty` is _not_ `Unbounded`.
+    macro_rules! assert_bounded {
+        ($ty:ty) => {
+            assert_ne!(<$ty>::BOUND, StorableBound::Unbounded, "Must be Bounded");
+        };
+    }
+
+    /// Asserts that the associated `BOUND` for `$ty` _is_ `Unbounded`.
+    macro_rules! assert_unbounded {
+        ($ty:ty) => {
+            assert_eq!(<$ty>::BOUND, StorableBound::Unbounded, "Must be Unbounded");
+        };
+    }
+
+    macro_rules! run_with_key {
+        ($runner:ident, $K:ty) => {{
             verify_monotonic::<$K>();
-            $runner::<$K, $V>();
+
+            // Empty value.
+            $runner::<$K, ()>();
+
+            // Bounded values.
+            assert_bounded!(u32);
+            $runner::<$K, u32>();
+
+            assert_bounded!(Blob<20>);
+            $runner::<$K, Blob<20>>();
+
+            // Unbounded values.
+            assert_unbounded!(MonotonicVec32);
+            $runner::<$K, MonotonicVec32>();
+
+            assert_unbounded!(MonotonicString32);
+            $runner::<$K, MonotonicString32>();
         }};
     }
 
@@ -1322,37 +1352,19 @@ mod test {
         ($name:ident, $runner:ident) => {
             #[test]
             fn $name() {
-                use StorableBound::Unbounded;
+                // Bounded keys.
+                assert_bounded!(u32);
+                run_with_key!($runner, u32);
 
-                // Set, empty value, bounded.
-                {
-                    type Value = ();
-                    assert_ne!(<Value>::BOUND, Unbounded, "Must be Bounded");
-                    verify_and_run!($runner, u32, Value);
-                    verify_and_run!($runner, Blob<10>, Value);
-                    verify_and_run!($runner, MonotonicVec32, Value);
-                    verify_and_run!($runner, MonotonicString32, Value);
-                }
+                assert_bounded!(Blob<10>);
+                run_with_key!($runner, Blob<10>);
 
-                // Map, bounded value.
-                {
-                    type Value = u32;
-                    assert_ne!(Value::BOUND, Unbounded, "Must be Bounded");
-                    verify_and_run!($runner, u32, Value);
-                    verify_and_run!($runner, Blob<10>, Value);
-                    verify_and_run!($runner, MonotonicVec32, Value);
-                    verify_and_run!($runner, MonotonicString32, Value);
-                }
+                // Unbounded keys.
+                assert_unbounded!(MonotonicVec32);
+                run_with_key!($runner, MonotonicVec32);
 
-                // Map, unbounded value.
-                {
-                    type Value = MonotonicVec32;
-                    assert_eq!(Value::BOUND, Unbounded, "Must be Unbounded");
-                    verify_and_run!($runner, u32, Value);
-                    verify_and_run!($runner, Blob<10>, Value);
-                    verify_and_run!($runner, MonotonicVec32, Value);
-                    verify_and_run!($runner, MonotonicString32, Value);
-                }
+                assert_unbounded!(MonotonicString32);
+                run_with_key!($runner, MonotonicString32);
             }
         };
     }
