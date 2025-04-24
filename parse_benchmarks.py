@@ -156,7 +156,7 @@ def save_all_tables(tables, sizes, filename, scientific=False, sci_fmt="{:.2e}")
         writer = csv.writer(f, delimiter='\t')
         for tbl in tables:
             writer.writerow([tbl['name']])
-            writer.writerow([''] + sizes + [''] + sizes)
+            writer.writerow(['{} | {}'.format(tbl['rows'], tbl['columns'])] + sizes + [''] + sizes)
             instr, change = tbl['instructions'], tbl['instructions_change']
             for r in sizes:
                 writer.writerow(
@@ -188,8 +188,8 @@ def main():
         name = f'btreemap_v{version}_{func}_{type_}'
         table = {
             'name': name,
-            'columns': 'key_size',
-            'rows': 'value_size',
+            'columns': 'keys',
+            'rows': 'values',
             'instructions': {r: {c: None for c in size_grid} for r in size_grid},
             'instructions_change': {r: {c: None for c in size_grid} for r in size_grid}
         }
