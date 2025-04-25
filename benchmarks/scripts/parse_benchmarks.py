@@ -235,5 +235,6 @@ def main():
     save_all_tables(all_tables, size_grid, './tmp/all_benchmarks.csv')
 
 
+# This script allows to extract btreemap benchmarks into a CSV file.
 if __name__ == '__main__':
     main()
