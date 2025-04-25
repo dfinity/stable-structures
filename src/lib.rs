@@ -22,6 +22,7 @@ pub use vec::{Vec as StableVec, Vec};
 pub mod vec_mem;
 pub mod writer;
 pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
+pub use btreeset::{BTreeSet, BTreeSet as StableBTreeSet};
 pub use file_mem::FileMemory;
 #[cfg(target_arch = "wasm32")]
 pub use ic0_memory::Ic0StableMemory;
