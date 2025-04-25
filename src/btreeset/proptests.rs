@@ -71,7 +71,6 @@ fn set_upper_bound_iter(#[strategy(pvec(0u64..u64::MAX - 1, 10..100))] keys: Vec
         for k in keys.iter() {
             set.insert(*k);
 
-            // Fixed: Removed `.copied()` as `Option<u64>` is not an iterator.
             prop_assert_eq!(Some(*k), set.iter_upper_bound(&(k + 1)).next());
         }
 
