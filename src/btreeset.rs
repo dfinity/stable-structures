@@ -304,6 +304,8 @@ mod test {
         assert_eq!(btreeset.pop_first(), Some(1u32));
         assert_eq!(btreeset.pop_last(), Some(3u32));
         assert_eq!(btreeset.len(), 1);
+        assert_eq!(btreeset.first_key(), Some(2u32));
+        assert_eq!(btreeset.last_key(), Some(2u32));
     }
 
     #[test]
