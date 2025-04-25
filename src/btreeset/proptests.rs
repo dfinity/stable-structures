@@ -50,8 +50,8 @@ fn comprehensive(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Op
 #[proptest]
 fn set_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
     crate::btreeset::test::run_btree_test(|mut set| {
-        prop_assert_eq!(set.first_key(), None);
-        prop_assert_eq!(set.last_key(), None);
+        prop_assert_eq!(set.first(), None);
+        prop_assert_eq!(set.last(), None);
 
         for (n, key) in keys.iter().enumerate() {
             set.insert(*key);
@@ -59,8 +59,8 @@ fn set_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
             let min = keys[0..=n].iter().min().unwrap();
             let max = keys[0..=n].iter().max().unwrap();
 
-            prop_assert_eq!(set.first_key(), Some(*min));
-            prop_assert_eq!(set.last_key(), Some(*max));
+            prop_assert_eq!(set.first(), Some(*min));
+            prop_assert_eq!(set.last(), Some(*max));
         }
 
         Ok(())
@@ -106,7 +106,7 @@ fn execute_operation<M: Memory>(
             let std_res = std_btreeset.contains(&key);
 
             eprintln!("Contains({})", hex::encode(&key));
-            let res = btreeset.contains_key(&key);
+            let res = btreeset.contains(&key);
             assert_eq!(std_res, res);
         }
         Operation::Iter { from, len } => {

@@ -114,17 +114,17 @@ where
         self.map.insert(key, ()).is_none()
     }
 
-    /// Returns `true` if the key exists in the map, `false` otherwise.
-    pub fn contains_key(&self, key: &K) -> bool {
+    /// Returns `true` if the key exists in the set, `false` otherwise.
+    pub fn contains(&self, key: &K) -> bool {
         self.map.get(key).is_some()
     }
 
-    /// Returns `true` if the map contains no elements.
+    /// Returns `true` if the set contains no elements.
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
 
-    /// Returns the number of elements in the map.
+    /// Returns the number of elements in the set.
     pub fn len(&self) -> u64 {
         self.map.len()
     }
@@ -139,19 +139,19 @@ where
         self.map.clear_new();
     }
 
-    /// Returns the first key in the map. This key
-    /// is the minimum key in the map.
-    pub fn first_key(&self) -> Option<K> {
+    /// Returns the first key in the set. This key
+    /// is the minimum key in the set.
+    pub fn first(&self) -> Option<K> {
         self.map.first_key_value().map(|(a, _)| a)
     }
 
     /// Returns the last key in the set. This key
     /// is the maximum key in the set.
-    pub fn last_key(&self) -> Option<K> {
+    pub fn last(&self) -> Option<K> {
         self.map.last_key_value().map(|(a, _)| a)
     }
 
-    /// Removes a key from the map, returning true if it exists.
+    /// Removes a key from the set, returning true if it exists.
     pub fn remove(&mut self, key: &K) -> bool {
         self.map.remove(key).is_some()
     }
@@ -216,13 +216,13 @@ mod test {
     fn init_preserves_data_set() {
         run_btree_test(|mut btree| {
             assert!(btree.insert(b(&[1, 2, 3])));
-            assert!(btree.contains_key(&b(&[1, 2, 3])));
+            assert!(btree.contains(&b(&[1, 2, 3])));
 
             // Reload the btree
             let btree = BTreeSet::init(btree.into_memory());
 
             // Data still exists.
-            assert!(btree.contains_key(&b(&[1, 2, 3])));
+            assert!(btree.contains(&b(&[1, 2, 3])));
         });
     }
 
@@ -231,9 +231,9 @@ mod test {
         let mem = make_memory();
         let mut btreeset = BTreeSet::new(mem);
 
-        assert!(!btreeset.contains_key(&1u32));
+        assert!(!btreeset.contains(&1u32));
         btreeset.insert(1u32);
-        assert!(btreeset.contains_key(&1u32));
+        assert!(btreeset.contains(&1u32));
     }
 
     #[test]
@@ -242,9 +242,9 @@ mod test {
         let mut btreeset = BTreeSet::new(mem);
 
         btreeset.insert(1u32);
-        assert!(btreeset.contains_key(&1u32));
+        assert!(btreeset.contains(&1u32));
         btreeset.remove(&1u32);
-        assert!(!btreeset.contains_key(&1u32));
+        assert!(!btreeset.contains(&1u32));
     }
 
     #[test]
@@ -305,8 +305,8 @@ mod test {
         btreeset.insert(1u32);
         btreeset.insert(2u32);
 
-        assert_eq!(btreeset.first_key(), Some(1u32));
-        assert_eq!(btreeset.last_key(), Some(3u32));
+        assert_eq!(btreeset.first(), Some(1u32));
+        assert_eq!(btreeset.last(), Some(3u32));
     }
 
     #[test]
@@ -334,8 +334,8 @@ mod test {
         assert_eq!(btreeset.pop_first(), Some(1u32));
         assert_eq!(btreeset.pop_last(), Some(3u32));
         assert_eq!(btreeset.len(), 1);
-        assert_eq!(btreeset.first_key(), Some(2u32));
-        assert_eq!(btreeset.last_key(), Some(2u32));
+        assert_eq!(btreeset.first(), Some(2u32));
+        assert_eq!(btreeset.last(), Some(2u32));
     }
 
     #[test]
