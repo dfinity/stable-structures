@@ -16,6 +16,8 @@ enum Operation {
 }
 
 // A custom strategy that gives unequal weights to the different operations.
+// Note that `Insert` has a higher weight than `Remove` so that, on average, BTreeSets
+// are growing in size the more operations are executed.
 fn operation_strategy() -> impl Strategy<Value = Operation> {
     prop_oneof![
         50 => any::<Vec<u8>>().prop_map(Operation::Insert),
