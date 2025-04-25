@@ -162,6 +162,7 @@ mod test {
     use std::cell::RefCell;
     use std::rc::Rc;
 
+    /// Creates a new shared memory instance.
     pub(crate) fn make_memory() -> Rc<RefCell<Vec<u8>>> {
         Rc::new(RefCell::new(Vec::new()))
     }
@@ -193,18 +194,6 @@ mod test {
             // Data still exists.
             assert!(btree.contains_key(&b(&[1, 2, 3])));
         });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
-    /// Creates a new shared memory instance.
-    pub(crate) fn make_memory() -> Rc<RefCell<Vec<u8>>> {
-        Rc::new(RefCell::new(Vec::new()))
     }
 
     #[test]
