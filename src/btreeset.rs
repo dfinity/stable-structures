@@ -1,6 +1,9 @@
 use crate::{btreemap::Iter as IterMap, BTreeMap, Memory, Storable};
 use core::ops::RangeBounds;
 
+#[cfg(test)]
+mod proptests;
+
 /// An iterator over the entries of a [`BTreeSet`].
 pub struct Iter<'a, K, M>
 where
@@ -154,10 +157,8 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        storable::{Blob, Bound as StorableBound},
-        VectorMemory,
-    };
+    use crate::storable::Blob;
+    use crate::VectorMemory;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -165,17 +166,12 @@ mod test {
         Rc::new(RefCell::new(Vec::new()))
     }
 
-    // A helper method to succinctly create an entry.
-    fn e(x: u8) -> (Blob<10>, Vec<u8>) {
-        (b(&[x]), vec![])
-    }
-
     pub(crate) fn b(x: &[u8]) -> Blob<10> {
         Blob::<10>::try_from(x).unwrap()
     }
 
-    // A test runner that runs the test using both V1 and V2 btrees.
-    pub fn btree_test<K, R, F>(f: F)
+    /// A test runner that runs the test using `BTreeSet`.
+    pub fn run_btree_test<K, R, F>(f: F)
     where
         K: Storable + Ord + Clone,
         F: Fn(BTreeSet<K, VectorMemory>) -> R,
@@ -187,7 +183,7 @@ mod test {
 
     #[test]
     fn init_preserves_data_set() {
-        btree_test(|mut btree| {
+        run_btree_test(|mut btree| {
             assert!(btree.insert(b(&[1, 2, 3])));
             assert!(btree.contains_key(&b(&[1, 2, 3])));
 
@@ -197,5 +193,161 @@ mod test {
             // Data still exists.
             assert!(btree.contains_key(&b(&[1, 2, 3])));
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// Creates a new shared memory instance.
+    pub(crate) fn make_memory() -> Rc<RefCell<Vec<u8>>> {
+        Rc::new(RefCell::new(Vec::new()))
+    }
+
+    #[test]
+    fn test_insert_and_contains() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        assert!(!btreeset.contains_key(&1u32));
+        btreeset.insert(1u32);
+        assert!(btreeset.contains_key(&1u32));
+    }
+
+    #[test]
+    fn test_remove() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        btreeset.insert(1u32);
+        assert!(btreeset.contains_key(&1u32));
+        btreeset.remove(&1u32);
+        assert!(!btreeset.contains_key(&1u32));
+    }
+
+    #[test]
+    fn test_iter_upper_bound() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        for i in 0u32..100 {
+            btreeset.insert(i);
+            for j in 0u32..=i {
+                assert_eq!(
+                    btreeset.iter_upper_bound(&(j + 1)).next(),
+                    Some(j),
+                    "failed to get an upper bound for {}",
+                    j + 1
+                );
+            }
+            assert_eq!(
+                btreeset.iter_upper_bound(&0).next(),
+                None,
+                "0 must not have an upper bound"
+            );
+        }
+    }
+
+    #[test]
+    fn test_iter() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        btreeset.insert(1u32);
+        btreeset.insert(2u32);
+        btreeset.insert(3u32);
+
+        let elements: Vec<_> = btreeset.iter().collect();
+        assert_eq!(elements, vec![1u32, 2u32, 3u32]);
+    }
+
+    #[test]
+    fn test_range() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        for i in 1u32..=10 {
+            btreeset.insert(i);
+        }
+
+        let range: Vec<_> = btreeset.range(4u32..8u32).collect();
+        assert_eq!(range, vec![4u32, 5u32, 6u32, 7u32]);
+    }
+
+    #[test]
+    fn test_first_and_last() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        btreeset.insert(3u32);
+        btreeset.insert(1u32);
+        btreeset.insert(2u32);
+
+        assert_eq!(btreeset.first_key(), Some(1u32));
+        assert_eq!(btreeset.last_key(), Some(3u32));
+    }
+
+    #[test]
+    fn test_len_and_is_empty() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        assert!(btreeset.is_empty());
+        assert_eq!(btreeset.len(), 0);
+
+        btreeset.insert(1u32);
+        assert!(!btreeset.is_empty());
+        assert_eq!(btreeset.len(), 1);
+    }
+
+    #[test]
+    fn test_pop_first_and_last() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        btreeset.insert(3u32);
+        btreeset.insert(1u32);
+        btreeset.insert(2u32);
+
+        assert_eq!(btreeset.pop_first(), Some(1u32));
+        assert_eq!(btreeset.pop_last(), Some(3u32));
+        assert_eq!(btreeset.len(), 1);
+    }
+
+    #[test]
+    fn test_clear() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        btreeset.insert(1u32);
+        btreeset.insert(2u32);
+        btreeset.clear();
+
+        assert!(btreeset.is_empty());
+        assert_eq!(btreeset.len(), 0);
+    }
+
+    #[test]
+    fn test_range_various_prefixes() {
+        let mem = make_memory();
+        let mut btreeset = BTreeSet::new(mem);
+
+        for i in [
+            1u32, 2u32, 3u32, 4u32, 11u32, 12u32, 13u32, 14u32, 21u32, 22u32, 23u32, 24u32,
+        ] {
+            btreeset.insert(i);
+        }
+
+        let range: Vec<_> = btreeset.range(10u32..20u32).collect();
+        assert_eq!(range, vec![11u32, 12u32, 13u32, 14u32]);
+
+        let range: Vec<_> = btreeset.range(0u32..10u32).collect();
+        assert_eq!(range, vec![1u32, 2u32, 3u32, 4u32]);
+
+        let range: Vec<_> = btreeset.range(20u32..30u32).collect();
+        assert_eq!(range, vec![21u32, 22u32, 23u32, 24u32]);
     }
 }
