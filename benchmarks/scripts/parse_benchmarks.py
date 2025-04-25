@@ -227,51 +227,6 @@ def main():
             )
             if has_any:
                 all_tables.append(table)
-        
-        # Small tables u64/blob/vec 8-512
-        name = f'btreemap_v{version}_{func}'
-        type_grid = ['u64', 'blob8', 'vec8', 'blob512', 'vec512']
-        table = {
-            'name': name,
-            'columns': 'keys',
-            'rows': 'values',
-            'instructions': {r: {c: None for c in size_grid} for r in size_grid},
-            'instructions_change': {r: {c: None for c in size_grid} for r in size_grid}
-        }
-        for key, value, mem_manager in product(
-            type_grid,
-            type_grid,
-            [False, True],
-        ):
-            filters = {
-                'version': version,
-                'mem_manager': mem_manager,
-                'func': func,
-                'schema': 'types-a-b',
-                'type_a': key,
-                'type_b': value,
-            }
-            selected = [
-                b for b in benchmarks
-                if all(b.get(k) == v for k, v in filters.items())
-            ]
-            if len(selected) == 0:
-                continue
-            if len(selected) > 1:
-                logger.error(f"Multiple matches for {filters}: {selected}")
-                continue
-            data = selected[0] if selected else None
-            table['instructions'][value_size][key_size] = data['instructions'] if data else None
-            table['instructions_change'][value_size][key_size] = data['instructions_change'] if data else None
-            used.add(data['name']) if data else None
-
-        has_any = any(
-            cell is not None
-            for row in table['instructions'].values()
-            for cell in row.values()
-        )
-        if has_any:
-            all_tables.append(table)
 
     for bench in benchmarks:
         if bench['name'] not in used:
