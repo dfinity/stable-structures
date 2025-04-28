@@ -124,7 +124,15 @@ where
     /// ```rust
     /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
     ///
-    /// let set: BTreeSet<u64, _> = BTreeSet::load(DefaultMemoryImpl::default());
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    ///
+    /// // Save the set to memory
+    /// let memory = set.into_memory();
+    ///
+    /// // Load the set from memory
+    /// let loaded_set: BTreeSet<u64, _> = BTreeSet::load(memory);
+    /// assert!(loaded_set.contains(&42));
     /// ```
     pub fn load(memory: M) -> Self {
         BTreeSet {
@@ -343,8 +351,8 @@ where
         Iter::new(self.map.range(key_range))
     }
 
-    /// Returns an iterator pointing to the first element below the given bound.
-    /// Returns an empty iterator if there are no keys below the given bound.
+    /// Returns an iterator pointing to the first element strictly below the given bound.
+    /// Returns an empty iterator if there are no keys strictly below the given bound.
     ///
     /// # Example
     ///
@@ -355,8 +363,9 @@ where
     /// set.insert(1);
     /// set.insert(2);
     /// set.insert(3);
-    /// let upper_bound: Vec<_> = set.iter_upper_bound(&3).collect();
-    /// assert_eq!(upper_bound, vec![1, 2, 3]);
+    ///
+    /// let upper_bound: Option<u64> = set.iter_upper_bound(&3).next();
+    /// assert_eq!(upper_bound, Some(2));
     /// ```
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, M> {
         Iter::new(self.map.iter_upper_bound(bound))
@@ -433,7 +442,9 @@ mod test {
 
         for i in 0u32..100 {
             btreeset.insert(i);
-            for j in 0u32..=i {
+
+            // Test that `iter_upper_bound` returns the largest element strictly below the bound.
+            for j in 1u32..=i {
                 assert_eq!(
                     btreeset.iter_upper_bound(&(j + 1)).next(),
                     Some(j),
