@@ -37,24 +37,30 @@ where
     }
 }
 
-/// This module implements a set based on a B-Tree
-/// in stable memory.
+/// This module implements a set based on a B-Tree in stable memory.
 ///
 /// # Overview
 ///
-/// A `BTreeSet` is a "stable" set based on a B-tree. It is designed to work directly in stable memory,
-/// allowing it to persist across upgrades and scale to large sizes.
+/// A `BTreeSet` is a "stable" set implementation based on a B-tree, designed to work directly in stable memory.
 ///
-/// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
-/// by Cormen et al.
+/// # Memory Implementations
 ///
-/// ## Features
+/// `BTreeSet` works with any memory implementation that satisfies the [`Memory`] trait:
 ///
-/// - **Efficient Operations**: Provides efficient insertion, deletion, and lookup operations.
-/// - **Persistence**: Works directly in stable memory, persisting across upgrades.
-/// - **Scalability**: Can scale to gigabytes in size.
+/// - [`Ic0StableMemory`](crate::Ic0StableMemory): Stores data in the Internet Computer's stable memory.
+/// - [`VectorMemory`](crate::VectorMemory): In-memory implementation backed by a Rust `Vec<u8>`.
+/// - [`FileMemory`](crate::FileMemory): Persists data to disk using a file.
+/// - [`DefaultMemoryImpl`](crate::DefaultMemoryImpl): Automatically selects the appropriate memory backend
+///   based on the environment:
+///   - Uses `Ic0StableMemory` when running in an Internet Computer canister (wasm32 target).
+///   - Falls back to `VectorMemory` in other environments (like tests or non-IC contexts).
 ///
-/// ## Example
+/// For most use cases, [`DefaultMemoryImpl`](crate::DefaultMemoryImpl) is recommended as it provides
+/// the right implementation based on the runtime context.
+///
+/// # Examples
+///
+/// ## Basic Usage
 ///
 /// ```rust
 /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
@@ -66,6 +72,78 @@ where
 /// assert_eq!(set.pop_first(), Some(42));
 /// assert!(set.is_empty());
 /// ```
+///
+/// ## Range Queries
+///
+/// ```rust
+/// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+///
+/// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+/// set.insert(1);
+/// set.insert(2);
+/// set.insert(3);
+///
+/// let range: Vec<_> = set.range(2..).collect();
+/// assert_eq!(range, vec![2, 3]);
+/// ```
+///
+/// ## Custom Types
+///
+/// You can store custom types in a `BTreeSet` by implementing the `Storable` trait:
+///
+/// ```rust
+/// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl, Storable};
+/// use std::borrow::Cow;
+///
+/// #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+/// struct CustomType {
+///     id: u64,
+/// }
+///
+/// impl Storable for CustomType {
+///     fn to_bytes(&self) -> Cow<[u8]> {
+///         Cow::Owned(self.id.to_le_bytes().to_vec())
+///     }
+///
+///     fn from_bytes(bytes: Cow<[u8]>) -> Self {
+///         let id = u64::from_le_bytes(bytes.as_ref().try_into().unwrap());
+///         CustomType { id }
+///     }
+///
+///     const BOUND: ic_stable_structures::storable::Bound =
+///         ic_stable_structures::storable::Bound::Bounded {
+///             max_size: 8,
+///             is_fixed_size: true,
+///         };
+/// }
+///
+/// let mut set: BTreeSet<CustomType, _> = BTreeSet::new(DefaultMemoryImpl::default());
+/// set.insert(CustomType { id: 42 });
+/// assert!(set.contains(&CustomType { id: 42 }));
+/// ```
+///
+/// ### Bounded vs Unbounded Types
+///
+/// When implementing `Storable`, you must specify whether your type is bounded or unbounded:
+///
+/// - **Unbounded (`Bound::Unbounded`)**:
+///   - Use when your type's serialized size can vary or has no fixed maximum.
+///   - Recommended for most custom types, especially those containing Strings or Vecs.
+///   - Example: `const BOUND: Bound = Bound::Unbounded;`
+///
+/// - **Bounded (`Bound::Bounded{ max_size, is_fixed_size }`)**:
+///   - Use when you know the maximum serialized size of your type.
+///   - Enables memory optimizations in the `BTreeSet`.
+///   - Example: `const BOUND: Bound = Bound::Bounded { max_size: 100, is_fixed_size: false };`
+///   - For types with truly fixed size (like primitive types), set `is_fixed_size: true`.
+///
+/// If unsure, use `Bound::Unbounded` as it's the safer choice.
+///
+/// # Warning
+///
+/// Once you've deployed with a bounded type, you cannot increase its `max_size` in
+/// future versions without risking data corruption. You can, however, migrate from a bounded type
+/// to an unbounded type if needed. For evolving data structures, prefer `Bound::Unbounded`.
 pub struct BTreeSet<K, M>
 where
     K: Storable + Ord + Clone,
