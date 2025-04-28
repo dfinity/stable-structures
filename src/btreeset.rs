@@ -531,34 +531,118 @@ mod test {
     #[test]
     fn test_clear() {
         let mem = make_memory();
-        let mut btreeset = BTreeSet::new(mem);
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
 
-        btreeset.insert(1u32);
-        btreeset.insert(2u32);
+        btreeset.insert(1);
+        btreeset.insert(2);
+        btreeset.insert(3);
+
+        assert_eq!(btreeset.len(), 3);
         btreeset.clear();
-
         assert!(btreeset.is_empty());
         assert_eq!(btreeset.len(), 0);
+        assert_eq!(btreeset.iter().next(), None);
     }
 
     #[test]
-    fn test_range_various_prefixes() {
+    fn test_iterate_large_set() {
         let mem = make_memory();
-        let mut btreeset = BTreeSet::new(mem);
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
 
-        for i in [
-            1u32, 2u32, 3u32, 4u32, 11u32, 12u32, 13u32, 14u32, 21u32, 22u32, 23u32, 24u32,
-        ] {
+        for i in 0..1000 {
             btreeset.insert(i);
         }
 
-        let range: Vec<_> = btreeset.range(10u32..20u32).collect();
-        assert_eq!(range, vec![11u32, 12u32, 13u32, 14u32]);
+        let elements: Vec<_> = btreeset.iter().collect();
+        assert_eq!(elements.len(), 1000);
+        assert_eq!(elements[0], 0);
+        assert_eq!(elements[999], 999);
+    }
 
-        let range: Vec<_> = btreeset.range(0u32..10u32).collect();
-        assert_eq!(range, vec![1u32, 2u32, 3u32, 4u32]);
+    #[test]
+    fn test_iter_upper_bound_large_set() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
 
-        let range: Vec<_> = btreeset.range(20u32..30u32).collect();
-        assert_eq!(range, vec![21u32, 22u32, 23u32, 24u32]);
+        for i in 0u32..1000 {
+            btreeset.insert(i);
+        }
+
+        assert_eq!(btreeset.iter_upper_bound(&500).next(), Some(499));
+        assert_eq!(btreeset.iter_upper_bound(&0).next(), None);
+        assert_eq!(btreeset.iter_upper_bound(&1000).next(), Some(999));
+    }
+
+    #[test]
+    fn test_range_large_set() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        for i in 0u32..1000 {
+            btreeset.insert(i);
+        }
+
+        let range: Vec<_> = btreeset.range(100..200).collect();
+        assert_eq!(range.len(), 100);
+        assert_eq!(range[0], 100);
+        assert_eq!(range[99], 199);
+    }
+
+    #[test]
+    fn test_empty_set() {
+        let mem = make_memory();
+        let btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        assert!(btreeset.is_empty());
+        assert_eq!(btreeset.len(), 0);
+        assert_eq!(btreeset.first(), None);
+        assert_eq!(btreeset.last(), None);
+        assert_eq!(btreeset.iter().next(), None);
+    }
+
+    #[test]
+    fn test_insert_duplicate() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        assert!(btreeset.insert(42));
+        assert!(!btreeset.insert(42)); // Duplicate insert
+        assert_eq!(btreeset.len(), 1);
+        assert!(btreeset.contains(&42));
+    }
+
+    #[test]
+    fn test_remove_nonexistent() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        assert!(!btreeset.remove(&42)); // Removing a non-existent element
+        assert!(btreeset.is_empty());
+    }
+
+    #[test]
+    fn test_pop_first_and_last_empty() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        assert_eq!(btreeset.pop_first(), None);
+        assert_eq!(btreeset.pop_last(), None);
+    }
+
+    #[test]
+    fn test_iter_upper_bound_empty() {
+        let mem = make_memory();
+        let btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        assert_eq!(btreeset.iter_upper_bound(&42u32).next(), None);
+    }
+
+    #[test]
+    fn test_range_empty() {
+        let mem = make_memory();
+        let btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        let range: Vec<_> = btreeset.range(10..20).collect();
+        assert!(range.is_empty());
     }
 }
