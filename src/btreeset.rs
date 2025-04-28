@@ -645,4 +645,111 @@ mod test {
         let range: Vec<_> = btreeset.range(10..20).collect();
         assert!(range.is_empty());
     }
+
+    #[test]
+    fn test_insert_and_remove_large_set() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        for i in 0..1_000 {
+            assert!(btreeset.insert(i));
+        }
+        assert_eq!(btreeset.len(), 1_000);
+
+        for i in 0..1_000 {
+            assert!(btreeset.remove(&i));
+        }
+        assert!(btreeset.is_empty());
+    }
+
+    #[test]
+    fn test_remove_nonexistent_large_set() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        for i in 0..1_000 {
+            assert!(btreeset.insert(i));
+        }
+
+        for i in 1_000..2_000 {
+            assert!(!btreeset.remove(&i)); // Non-existent elements
+        }
+        assert_eq!(btreeset.len(), 1_000);
+    }
+
+    #[test]
+    fn test_iterate_empty_set() {
+        let mem = make_memory();
+        let btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        let elements: Vec<_> = btreeset.iter().collect();
+        assert!(elements.is_empty());
+    }
+
+    #[test]
+    fn test_range_with_no_matches() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        for i in 0..10 {
+            btreeset.insert(i);
+        }
+
+        let range: Vec<_> = btreeset.range(20..30).collect();
+        assert!(range.is_empty());
+    }
+
+    #[test]
+    fn test_clear_and_reuse() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        for i in 0..100 {
+            btreeset.insert(i);
+        }
+        assert_eq!(btreeset.len(), 100);
+
+        btreeset.clear();
+        assert!(btreeset.is_empty());
+
+        for i in 100..200 {
+            btreeset.insert(i);
+        }
+        assert_eq!(btreeset.len(), 100);
+        assert!(btreeset.contains(&150));
+    }
+
+    #[test]
+    fn test_pop_first_and_last_large_set() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        for i in 0..1_000 {
+            btreeset.insert(i);
+        }
+
+        for i in 0..500 {
+            assert_eq!(btreeset.pop_first(), Some(i));
+        }
+
+        for i in (500..1_000).rev() {
+            assert_eq!(btreeset.pop_last(), Some(i));
+        }
+
+        assert!(btreeset.is_empty());
+    }
+
+    #[test]
+    fn test_iter_upper_bound_edge_cases() {
+        let mem = make_memory();
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
+
+        for i in 1..=10 {
+            btreeset.insert(i);
+        }
+
+        assert_eq!(btreeset.iter_upper_bound(&1).next(), None); // No element strictly below 1
+        assert_eq!(btreeset.iter_upper_bound(&5).next(), Some(4)); // Largest element below 5
+        assert_eq!(btreeset.iter_upper_bound(&11).next(), Some(10)); // Largest element below 11
+    }
 }
