@@ -88,13 +88,29 @@ where
     ///
     /// If the memory provided already contains a `BTreeSet`, then that
     /// map is loaded. Otherwise, a new `BTreeSet` instance is created.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let set: BTreeSet<u64, _> = BTreeSet::init(DefaultMemoryImpl::default());
+    /// ```
     pub fn init(memory: M) -> Self {
         BTreeSet {
             map: BTreeMap::<K, (), M>::init(memory),
         }
     }
 
-    /// Creates a new instance a `BTreeSet`.
+    /// Creates a new instance of a `BTreeSet`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// ```
     pub fn new(memory: M) -> Self {
         BTreeSet {
             map: BTreeMap::<K, (), M>::new(memory),
@@ -102,83 +118,246 @@ where
     }
 
     /// Loads the set from memory.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let set: BTreeSet<u64, _> = BTreeSet::load(DefaultMemoryImpl::default());
+    /// ```
     pub fn load(memory: M) -> Self {
         BTreeSet {
             map: BTreeMap::<K, (), M>::load(memory),
         }
     }
 
-    /// Inserts a key into the set. Returns true if key
+    /// Inserts a key into the set. Returns `true` if the key
     /// did not exist in the set before.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// assert!(set.insert(42));
+    /// assert!(!set.insert(42)); // Key already exists
+    /// ```
     pub fn insert(&mut self, key: K) -> bool {
         self.map.insert(key, ()).is_none()
     }
 
     /// Returns `true` if the key exists in the set, `false` otherwise.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// assert!(set.contains(&42));
+    /// assert!(!set.contains(&7));
+    /// ```
     pub fn contains(&self, key: &K) -> bool {
         self.map.get(key).is_some()
     }
 
     /// Returns `true` if the set contains no elements.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// assert!(set.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
 
     /// Returns the number of elements in the set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// set.insert(7);
+    /// assert_eq!(set.len(), 2);
+    /// ```
     pub fn len(&self) -> u64 {
         self.map.len()
     }
 
     /// Returns the underlying memory.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// let memory = set.into_memory();
+    /// ```
     pub fn into_memory(self) -> M {
         self.map.into_memory()
     }
 
     /// Removes all elements from the set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// set.clear();
+    /// assert!(set.is_empty());
+    /// ```
     pub fn clear(&mut self) {
         self.map.clear_new();
     }
 
     /// Returns the first key in the set. This key
     /// is the minimum key in the set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// set.insert(7);
+    /// assert_eq!(set.first(), Some(7));
+    /// ```
     pub fn first(&self) -> Option<K> {
         self.map.first_key_value().map(|(a, _)| a)
     }
 
     /// Returns the last key in the set. This key
     /// is the maximum key in the set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// set.insert(7);
+    /// assert_eq!(set.last(), Some(42));
+    /// ```
     pub fn last(&self) -> Option<K> {
         self.map.last_key_value().map(|(a, _)| a)
     }
 
-    /// Removes a key from the set, returning true if it exists.
+    /// Removes a key from the set, returning `true` if it exists.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// assert!(set.remove(&42));
+    /// assert!(!set.contains(&42));
+    /// ```
     pub fn remove(&mut self, key: &K) -> bool {
         self.map.remove(key).is_some()
     }
 
     /// Removes and returns the last element in the set. The key of this element is the maximum key that was in the set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// set.insert(7);
+    /// assert_eq!(set.pop_last(), Some(42));
+    /// ```
     pub fn pop_last(&mut self) -> Option<K> {
         self.map.pop_last().map(|(a, _)| a)
     }
 
     /// Removes and returns the first element in the set. The key of this element is the minimum key that was in the set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// set.insert(7);
+    /// assert_eq!(set.pop_first(), Some(7));
+    /// ```
     pub fn pop_first(&mut self) -> Option<K> {
         self.map.pop_first().map(|(a, _)| a)
     }
 
     /// Returns an iterator over the entries of the set, sorted by key.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(42);
+    /// set.insert(7);
+    /// for key in set.iter() {
+    ///     println!("{}", key);
+    /// }
+    /// ```
     pub fn iter(&self) -> Iter<K, M> {
         Iter::new(self.map.iter())
     }
 
     /// Returns an iterator over the entries in the set where keys
     /// belong to the specified range.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(1);
+    /// set.insert(2);
+    /// set.insert(3);
+    /// let range: Vec<_> = set.range(2..).collect();
+    /// assert_eq!(range, vec![2, 3]);
+    /// ```
     pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, M> {
         Iter::new(self.map.range(key_range))
     }
 
     /// Returns an iterator pointing to the first element below the given bound.
     /// Returns an empty iterator if there are no keys below the given bound.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert(1);
+    /// set.insert(2);
+    /// set.insert(3);
+    /// let upper_bound: Vec<_> = set.iter_upper_bound(&3).collect();
+    /// assert_eq!(upper_bound, vec![1, 2, 3]);
+    /// ```
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, M> {
         Iter::new(self.map.iter_upper_bound(bound))
     }
