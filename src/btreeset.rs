@@ -1,33 +1,3 @@
-//! This module implements a set based on a B-Tree
-//! in stable memory.
-//!
-//! # Overview
-//!
-//! A `BTreeSet` is a "stable" set based on a B-tree. It is designed to work directly in stable memory,
-//! allowing it to persist across upgrades and scale to large sizes.
-//!
-//! The implementation is based on the algorithm outlined in "Introduction to Algorithms"
-//! by Cormen et al.
-//!
-//! ## Features
-//!
-//! - **Efficient Operations**: Provides efficient insertion, deletion, and lookup operations.
-//! - **Persistence**: Works directly in stable memory, persisting across upgrades.
-//! - **Scalability**: Can scale to gigabytes in size.
-//!
-//! ## Example
-//!
-//! ```rust
-//! use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
-//!
-//! let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
-//!
-//! set.insert(42);
-//! assert!(set.contains(&42));
-//! assert_eq!(set.pop_first(), Some(42));
-//! assert!(set.is_empty());
-//! ```
-
 use crate::{btreemap::Iter as IterMap, BTreeMap, Memory, Storable};
 use core::ops::RangeBounds;
 
@@ -67,10 +37,35 @@ where
     }
 }
 
-/// A "stable" set based on a B-tree.
+/// This module implements a set based on a B-Tree
+/// in stable memory.
+///
+/// # Overview
+///
+/// A `BTreeSet` is a "stable" set based on a B-tree. It is designed to work directly in stable memory,
+/// allowing it to persist across upgrades and scale to large sizes.
 ///
 /// The implementation is based on the algorithm outlined in "Introduction to Algorithms"
 /// by Cormen et al.
+///
+/// ## Features
+///
+/// - **Efficient Operations**: Provides efficient insertion, deletion, and lookup operations.
+/// - **Persistence**: Works directly in stable memory, persisting across upgrades.
+/// - **Scalability**: Can scale to gigabytes in size.
+///
+/// ## Example
+///
+/// ```rust
+/// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+///
+/// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+///
+/// set.insert(42);
+/// assert!(set.contains(&42));
+/// assert_eq!(set.pop_first(), Some(42));
+/// assert!(set.is_empty());
+/// ```
 pub struct BTreeSet<K, M>
 where
     K: Storable + Ord + Clone,
