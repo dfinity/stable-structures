@@ -30,7 +30,7 @@ For more information about the philosophy behind the library, see [Roman's tutor
 
 ## Tutorials
 
-[Schema Upgrades](./docs/schema-upgrades.md)
+[Schema Upgrades](./docs/src/schema-upgrades.md)
 
 ## How it Works
 
