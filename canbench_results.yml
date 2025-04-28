@@ -629,54 +629,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreeset_insert_blob_8:
-    total:
-      instructions: 493151302
-      heap_increase: 0
-      stable_memory_increase: 6
-    scopes: {}
-  btreeset_insert_u32:
-    total:
-      instructions: 437528599
-      heap_increase: 0
-      stable_memory_increase: 5
-    scopes: {}
-  btreeset_iter_blob_8:
-    total:
-      instructions: 17485721
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreeset_iter_u32:
-    total:
-      instructions: 14354367
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreeset_range_blob_8:
-    total:
-      instructions: 11185498
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreeset_range_u32:
-    total:
-      instructions: 8666520
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreeset_remove_blob_8:
-    total:
-      instructions: 481746325
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreeset_remove_u32:
-    total:
-      instructions: 427326663
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   memory_manager_baseline:
     total:
       instructions: 1176576907

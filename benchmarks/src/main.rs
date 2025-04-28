@@ -2,7 +2,6 @@ use ic_stable_structures::storable::{Blob, Storable};
 use tiny_rng::{Rand, Rng};
 
 mod btreemap;
-mod btreeset;
 mod memory_manager;
 mod vec;
 
