@@ -718,7 +718,7 @@ where
 
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
-            // Loop loop until we detect a difference or exhaust either iterator.
+            // Loop until we detect a difference or exhaust either iterator.
             // This is to skip over duplicates in both iterators.
             while next_self
                 .as_ref()
