@@ -646,7 +646,9 @@ where
                         other_next = other_iter.next();
                     }
                     std::cmp::Ordering::Less => {
-                        // If `self_key` is not found in `other`, return false.
+                        // `self_key` is smaller than the current smallest item of
+                        // other which means that it cannot be found in `other`,
+                        // so return false.
                         return false;
                     }
                 },
@@ -718,7 +720,7 @@ where
 
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
-            // Loop loop until we detect a difference or exhaust either iterator.
+            // Loop until we detect a difference or exhaust either iterator.
             loop {
                 return match (next_self.clone(), next_other.clone()) {
                     (Some(ref a), Some(ref b)) => {
