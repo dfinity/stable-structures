@@ -480,22 +480,24 @@ where
         std::iter::from_fn(move || {
             match (next_self.clone(), next_other.clone()) {
                 // If both iterators have elements, compare the current elements.
-                (Some(ref a), Some(ref b)) => {
-                    if a < b {
+                (Some(ref a), Some(ref b)) => match a.cmp(b) {
+                    std::cmp::Ordering::Less => {
                         // If the element from `self` is smaller, yield it and advance `self`.
                         next_self = iter_self.next();
                         Some(a.clone())
-                    } else if a > b {
+                    }
+                    std::cmp::Ordering::Greater => {
                         // If the element from `other` is smaller, yield it and advance `other`.
                         next_other = iter_other.next();
                         Some(b.clone())
-                    } else {
+                    }
+                    std::cmp::Ordering::Equal => {
                         // If the elements are equal, yield one and advance both iterators.
                         next_self = iter_self.next();
                         next_other = iter_other.next();
                         Some(a.clone())
                     }
-                }
+                },
                 // If only `self` has elements remaining, yield them.
                 (Some(ref a), None) => {
                     next_self = iter_self.next();
@@ -544,17 +546,21 @@ where
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
             while let (Some(ref a), Some(ref b)) = (next_self.clone(), next_other.clone()) {
-                if a < b {
-                    // If the element from `self` is smaller, advance `self`.
-                    next_self = iter_self.next();
-                } else if a > b {
-                    // If the element from `other` is smaller, advance `other`.
-                    next_other = iter_other.next();
-                } else {
-                    // If the elements are equal, yield one and advance both iterators.
-                    next_self = iter_self.next();
-                    next_other = iter_other.next();
-                    return Some(a.clone());
+                match a.cmp(b) {
+                    std::cmp::Ordering::Less => {
+                        // If the element from `self` is smaller, advance `self`.
+                        next_self = iter_self.next();
+                    }
+                    std::cmp::Ordering::Greater => {
+                        // If the element from `other` is smaller, advance `other`.
+                        next_other = iter_other.next();
+                    }
+                    std::cmp::Ordering::Equal => {
+                        // If the elements are equal, yield one and advance both iterators.
+                        next_self = iter_self.next();
+                        next_other = iter_other.next();
+                        return Some(a.clone());
+                    }
                 }
             }
             // Stop the iteration when either iterator is exhausted.
