@@ -1401,7 +1401,7 @@ mod test {
         for i in 0..500 {
             set1.insert(i);
         }
-        for i in 0..1000 {
+        for i in 0..1500 {
             set2.insert(i);
         }
 
@@ -1581,5 +1581,65 @@ mod test {
         let intersection: Vec<_> = set1.symmetric_difference(&set2).collect();
         assert_eq!(intersection.len(), 500);
         assert_eq!(intersection, expected_res);
+    }
+
+    #[test]
+    fn test_is_subset_with_sparse_elements() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in (0..1000).step_by(10) {
+            set1.insert(i);
+        }
+        for i in (0..2000).step_by(5) {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_subset(&set2));
+
+        set1.insert(2001);
+        assert!(!set1.is_subset(&set2));
+    }
+
+    #[test]
+    fn test_is_disjoint_with_sparse_elements() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in (0..1000).step_by(10) {
+            set1.insert(i);
+        }
+        for i in (1..1000).step_by(10) {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_disjoint(&set2));
+
+        set2.insert(20);
+        assert!(!set1.is_disjoint(&set2));
+    }
+
+    #[test]
+    fn test_is_superset_with_sparse_elements() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in (0..2000).step_by(5) {
+            set1.insert(i);
+        }
+        for i in (0..1000).step_by(10) {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_superset(&set2));
+
+        set2.insert(2001);
+        assert!(!set1.is_superset(&set2));
     }
 }
