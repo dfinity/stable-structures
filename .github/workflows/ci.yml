@@ -136,9 +136,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v2
+        uses: jontze/action-mdbook@v3
         with:
-          mdbook-version: '0.4.48'
+          token: ${{secrets.GITHUB_TOKEN}}
+          mdbook-version: "0.4.48"
+          use-linkcheck: true
+          use-admonish: true
+          admonish-version: "1.19.0"
 
       - run: mdbook build ./docs
 
