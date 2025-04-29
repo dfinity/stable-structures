@@ -151,6 +151,10 @@ where
     K: Storable + Ord + Clone,
     M: Memory,
 {
+    // The underlying implementation uses a BTreeMap with unit values.
+    // This design allows us to reuse the existing BTreeMap implementation.
+    // However, if needed, this could be optimized in the future to avoid
+    // the overhead of storing unit values.
     map: BTreeMap<K, (), M>,
 }
 
