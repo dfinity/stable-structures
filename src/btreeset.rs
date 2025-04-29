@@ -476,29 +476,39 @@ where
         let mut next_self = iter_self.next();
         let mut next_other = iter_other.next();
 
-        std::iter::from_fn(move || match (next_self.clone(), next_other.clone()) {
-            (Some(ref a), Some(ref b)) => {
-                if a < b {
+        // Use a closure to merge the two iterators while maintaining sorted order.
+        std::iter::from_fn(move || {
+            match (next_self.clone(), next_other.clone()) {
+                // If both iterators have elements, compare the current elements.
+                (Some(ref a), Some(ref b)) => {
+                    if a < b {
+                        // If the element from `self` is smaller, yield it and advance `self`.
+                        next_self = iter_self.next();
+                        Some(a.clone())
+                    } else if a > b {
+                        // If the element from `other` is smaller, yield it and advance `other`.
+                        next_other = iter_other.next();
+                        Some(b.clone())
+                    } else {
+                        // If the elements are equal, yield one and advance both iterators.
+                        next_self = iter_self.next();
+                        next_other = iter_other.next();
+                        Some(a.clone())
+                    }
+                }
+                // If only `self` has elements remaining, yield them.
+                (Some(ref a), None) => {
                     next_self = iter_self.next();
-                    Some(a.clone())
-                } else if a > b {
-                    next_other = iter_other.next();
-                    Some(b.clone())
-                } else {
-                    next_self = iter_self.next();
-                    next_other = iter_other.next();
                     Some(a.clone())
                 }
+                // If only `other` has elements remaining, yield them.
+                (None, Some(ref b)) => {
+                    next_other = iter_other.next();
+                    Some(b.clone())
+                }
+                // If both iterators are exhausted, stop the iteration.
+                (None, None) => None,
             }
-            (Some(ref a), None) => {
-                next_self = iter_self.next();
-                Some(a.clone())
-            }
-            (None, Some(ref b)) => {
-                next_other = iter_other.next();
-                Some(b.clone())
-            }
-            (None, None) => None,
         })
     }
 
@@ -531,18 +541,23 @@ where
         let mut next_self = iter_self.next();
         let mut next_other = iter_other.next();
 
+        // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
             while let (Some(ref a), Some(ref b)) = (next_self.clone(), next_other.clone()) {
                 if a < b {
+                    // If the element from `self` is smaller, advance `self`.
                     next_self = iter_self.next();
                 } else if a > b {
+                    // If the element from `other` is smaller, advance `other`.
                     next_other = iter_other.next();
                 } else {
+                    // If the elements are equal, yield one and advance both iterators.
                     next_self = iter_self.next();
                     next_other = iter_other.next();
                     return Some(a.clone());
                 }
             }
+            // Stop the iteration when either iterator is exhausted.
             None
         })
     }
