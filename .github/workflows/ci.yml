@@ -142,7 +142,6 @@ jobs:
           mdbook-version: "0.4.48"
           use-linkcheck: true
           use-admonish: true
-          admonish-version: "1.19.0"
 
       - run: mdbook build ./docs
 
