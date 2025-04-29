@@ -705,10 +705,13 @@ where
 
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
-            while let (Some(ref a), Some(ref b)) = (next_self.clone(), next_other.clone()) {
-                if a != b {
-                    break;
-                }
+            // Loop loop until we detect a difference or exhaust either iterator.
+            // This is to skip over duplicates in both iterators.
+            while next_self
+                .as_ref()
+                .zip(next_other.as_ref())
+                .map_or(false, |(a, b)| a == b)
+            {
                 next_self = iter_self.next();
                 next_other = iter_other.next();
             }
