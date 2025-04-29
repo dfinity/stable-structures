@@ -223,7 +223,7 @@ where
     /// did not exist in the set before.
     ///
     /// # Complexity
-    /// O(log n)
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -241,7 +241,7 @@ where
     /// Returns `true` if the key exists in the set, `false` otherwise.
     ///
     /// # Complexity
-    /// O(log n)
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -332,7 +332,7 @@ where
     /// is the minimum key in the set.
     ///
     /// # Complexity
-    /// O(log n)
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -352,7 +352,7 @@ where
     /// is the maximum key in the set.
     ///
     /// # Complexity
-    /// O(log n)
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -371,7 +371,7 @@ where
     /// Removes a key from the set, returning `true` if it exists.
     ///
     /// # Complexity
-    /// O(log n)
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -390,7 +390,7 @@ where
     /// Removes and returns the last element in the set. The key of this element is the maximum key that was in the set.
     ///
     /// # Complexity
-    /// O(log n)
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -409,7 +409,7 @@ where
     /// Removes and returns the first element in the set. The key of this element is the minimum key that was in the set.
     ///
     /// # Complexity
-    /// O(log n)
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -472,7 +472,7 @@ where
     /// Returns an empty iterator if there are no keys strictly below the given bound.
     ///
     /// # Complexity
-    /// O(log n) for creating the iterator.
+    /// O(log n) for creating the iterator, where n is the number of elements in the set.
     ///
     /// # Example
     ///
