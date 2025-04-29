@@ -173,3 +173,61 @@ fn execute_operation<M: Memory>(
         }
     };
 }
+
+#[proptest]
+fn test_union(
+    #[strategy(pvec(any::<u64>(), 1..100))] keys1: Vec<u64>,
+    #[strategy(pvec(any::<u64>(), 1..100))] keys2: Vec<u64>,
+) {
+    crate::btreeset::test::run_btree_test(|mut set1| {
+        let mut set2 = BTreeSet::new(crate::btreeset::test::make_memory());
+        let mut std_set1 = StdBTreeSet::new();
+        let mut std_set2 = StdBTreeSet::new();
+
+        for key in &keys1 {
+            set1.insert(*key);
+            std_set1.insert(*key);
+        }
+
+        for key in &keys2 {
+            set2.insert(*key);
+            std_set2.insert(*key);
+        }
+
+        let union: Vec<_> = set1.union(&set2).collect();
+        let std_union: Vec<_> = std_set1.union(&std_set2).cloned().collect();
+
+        prop_assert_eq!(union, std_union);
+
+        Ok(())
+    });
+}
+
+#[proptest]
+fn test_intersection(
+    #[strategy(pvec(any::<u64>(), 1..100))] keys1: Vec<u64>,
+    #[strategy(pvec(any::<u64>(), 1..100))] keys2: Vec<u64>,
+) {
+    crate::btreeset::test::run_btree_test(|mut set1| {
+        let mut set2 = BTreeSet::new(crate::btreeset::test::make_memory());
+        let mut std_set1 = StdBTreeSet::new();
+        let mut std_set2 = StdBTreeSet::new();
+
+        for key in &keys1 {
+            set1.insert(*key);
+            std_set1.insert(*key);
+        }
+
+        for key in &keys2 {
+            set2.insert(*key);
+            std_set2.insert(*key);
+        }
+
+        let intersection: Vec<_> = set1.intersection(&set2).collect();
+        let std_intersection: Vec<_> = std_set1.intersection(&std_set2).cloned().collect();
+
+        prop_assert_eq!(intersection, std_intersection);
+
+        Ok(())
+    });
+}

@@ -445,6 +445,82 @@ where
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, M> {
         Iter::new(self.map.iter_upper_bound(bound))
     }
+
+    /// Returns an iterator over the union of this set and another.
+    ///
+    /// The union of two sets is a set containing all elements that are in either set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// let mut set2: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    ///
+    /// set1.insert(1);
+    /// set1.insert(2);
+    /// set2.insert(2);
+    /// set2.insert(3);
+    ///
+    /// let union: Vec<_> = set1.union(&set2).collect();
+    /// assert_eq!(union, vec![1, 2, 3]);
+    /// ```
+    pub fn union<'a>(&'a self, other: &'a BTreeSet<K, M>) -> impl Iterator<Item = K> + 'a {
+        let mut iter_self = self.iter();
+        let mut iter_other = other.iter();
+        let mut next_self = iter_self.next();
+        let mut next_other = iter_other.next();
+
+        std::iter::from_fn(move || match (next_self.clone(), next_other.clone()) {
+            (Some(ref a), Some(ref b)) => {
+                if a < b {
+                    next_self = iter_self.next();
+                    Some(a.clone())
+                } else if a > b {
+                    next_other = iter_other.next();
+                    Some(b.clone())
+                } else {
+                    next_self = iter_self.next();
+                    next_other = iter_other.next();
+                    Some(a.clone())
+                }
+            }
+            (Some(ref a), None) => {
+                next_self = iter_self.next();
+                Some(a.clone())
+            }
+            (None, Some(ref b)) => {
+                next_other = iter_other.next();
+                Some(b.clone())
+            }
+            (None, None) => None,
+        })
+    }
+
+    /// Returns an iterator over the intersection of this set and another.
+    ///
+    /// The intersection of two sets is a set containing only the elements that are in both sets.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// let mut set2: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    ///
+    /// set1.insert(1);
+    /// set1.insert(2);
+    /// set2.insert(2);
+    /// set2.insert(3);
+    ///
+    /// let intersection: Vec<_> = set1.intersection(&set2).collect();
+    /// assert_eq!(intersection, vec![2]);
+    /// ```
+    pub fn intersection<'a>(&'a self, other: &'a BTreeSet<K, M>) -> impl Iterator<Item = K> + 'a {
+        self.iter().filter(move |item| other.contains(item))
+    }
 }
 
 #[cfg(test)]
@@ -473,6 +549,161 @@ mod test {
         let mem = make_memory();
         let btree = BTreeSet::new(mem);
         f(btree);
+    }
+
+    #[test]
+    fn test_union_disjoint_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+
+        set2.insert(3);
+        set2.insert(4);
+
+        let union: Vec<_> = set1.union(&set2).collect();
+        assert_eq!(union, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_intersection_disjoint_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+
+        set2.insert(3);
+        set2.insert(4);
+
+        let intersection: Vec<_> = set1.intersection(&set2).collect();
+        assert!(intersection.is_empty());
+    }
+
+    #[test]
+    fn test_union_with_duplicates() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+        set1.insert(3);
+
+        set2.insert(2);
+        set2.insert(3);
+        set2.insert(4);
+
+        let union: Vec<_> = set1.union(&set2).collect();
+        assert_eq!(union, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_intersection_with_duplicates() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+        set1.insert(3);
+
+        set2.insert(2);
+        set2.insert(3);
+        set2.insert(4);
+
+        let intersection: Vec<_> = set1.intersection(&set2).collect();
+        assert_eq!(intersection, vec![2, 3]);
+    }
+
+    #[test]
+    fn test_union_and_intersection_with_identical_sets() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..100 {
+            set1.insert(i);
+            set2.insert(i);
+        }
+
+        let union: Vec<_> = set1.union(&set2).collect();
+        assert_eq!(union.len(), 100);
+        assert_eq!(union, (0..100).collect::<Vec<_>>());
+
+        let intersection: Vec<_> = set1.intersection(&set2).collect();
+        assert_eq!(intersection.len(), 100);
+        assert_eq!(intersection, (0..100).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_union_and_intersection_with_non_overlapping_sets() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..50 {
+            set1.insert(i);
+        }
+        for i in 50..100 {
+            set2.insert(i);
+        }
+
+        let union: Vec<_> = set1.union(&set2).collect();
+        assert_eq!(union.len(), 100);
+        assert_eq!(union, (0..100).collect::<Vec<_>>());
+
+        let intersection: Vec<_> = set1.intersection(&set2).collect();
+        assert!(intersection.is_empty());
+    }
+
+    #[test]
+    fn test_union_with_large_sets() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            set1.insert(i);
+        }
+        for i in 500..1500 {
+            set2.insert(i);
+        }
+
+        let union: Vec<_> = set1.union(&set2).collect();
+        assert_eq!(union.len(), 1500);
+        assert_eq!(union[0], 0);
+        assert_eq!(union[1499], 1499);
+    }
+
+    #[test]
+    fn test_intersection_with_large_sets() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            set1.insert(i);
+        }
+        for i in 500..1500 {
+            set2.insert(i);
+        }
+
+        let intersection: Vec<_> = set1.intersection(&set2).collect();
+        assert_eq!(intersection.len(), 500);
+        assert_eq!(intersection[0], 500);
+        assert_eq!(intersection[499], 999);
     }
 
     #[test]
