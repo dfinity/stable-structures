@@ -110,6 +110,76 @@ fn intersection_helper<K: Clone + Ord + Storable>() -> BenchResult {
     bench_fn(|| for _ in btreeset1.intersection(&btreeset2) {})
 }
 
+// Profiles the symmetric difference operation on two BTreeSets.
+fn symmetric_difference_helper<K: Clone + Ord + Storable>() -> BenchResult {
+    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let num_keys = 1_000;
+
+    for i in 0..num_keys {
+        btreeset1.insert(generate_key::<K>(i));
+        if i % 2 == 0 {
+            btreeset2.insert(generate_key::<K>(i));
+        }
+    }
+
+    bench_fn(|| for _ in btreeset1.symmetric_difference(&btreeset2) {})
+}
+
+// Profiles the is_subset operation on two BTreeSets.
+fn is_subset_helper<K: Clone + Ord + Storable>() -> BenchResult {
+    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let num_keys = 1_000;
+
+    for i in 0..num_keys {
+        btreeset1.insert(generate_key::<K>(i));
+        if i % 2 == 0 {
+            btreeset2.insert(generate_key::<K>(i));
+        }
+    }
+
+    bench_fn(|| {
+        let _ = btreeset1.is_subset(&btreeset2);
+    })
+}
+
+// Profiles the is_superset operation on two BTreeSets.
+fn is_superset_helper<K: Clone + Ord + Storable>() -> BenchResult {
+    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let num_keys = 1_000;
+
+    for i in 0..num_keys {
+        btreeset1.insert(generate_key::<K>(i));
+        if i % 2 == 0 {
+            btreeset2.insert(generate_key::<K>(i));
+        }
+    }
+
+    bench_fn(|| {
+        let _ = btreeset1.is_superset(&btreeset2);
+    })
+}
+
+// Profiles the is_disjoint operation on two BTreeSets.
+fn is_disjoint_helper<K: Clone + Ord + Storable>() -> BenchResult {
+    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let num_keys = 1_000;
+
+    for i in 0..num_keys {
+        btreeset1.insert(generate_key::<K>(i));
+        if i % 2 == 0 {
+            btreeset2.insert(generate_key::<K>(i + num_keys)); // Ensure disjoint sets
+        }
+    }
+
+    bench_fn(|| {
+        let _ = btreeset1.is_disjoint(&btreeset2);
+    })
+}
+
 // Generates keys directly based on the type `K`.
 fn generate_key<K: Storable>(i: u32) -> K {
     K::from_bytes(std::borrow::Cow::Owned(i.to_be_bytes().to_vec()))
@@ -127,7 +197,7 @@ bench_tests! {
     btreeset_range_blob_8, range_helper, Blob8;
 }
 
-// Add benchmarks for union and intersection with additional key types.
+// Add benchmarks for set operations with additional key types.
 bench_tests! {
     btreeset_union_u32, union_helper, u32;
     btreeset_union_u64, union_helper, u64;
@@ -149,4 +219,46 @@ bench_tests! {
     btreeset_intersection_blob_256, intersection_helper, Blob256;
     btreeset_intersection_blob_512, intersection_helper, Blob512;
     btreeset_intersection_blob_1024, intersection_helper, Blob1024;
+    btreeset_symmetric_difference_u32, symmetric_difference_helper, u32;
+    btreeset_symmetric_difference_u64, symmetric_difference_helper, u64;
+    btreeset_symmetric_difference_blob_8, symmetric_difference_helper, Blob8;
+    btreeset_symmetric_difference_blob_16, symmetric_difference_helper, Blob16;
+    btreeset_symmetric_difference_blob_32, symmetric_difference_helper, Blob32;
+    btreeset_symmetric_difference_blob_64, symmetric_difference_helper, Blob64;
+    btreeset_symmetric_difference_blob_128, symmetric_difference_helper, Blob128;
+    btreeset_symmetric_difference_blob_256, symmetric_difference_helper, Blob256;
+    btreeset_symmetric_difference_blob_512, symmetric_difference_helper, Blob512;
+    btreeset_symmetric_difference_blob_1024, symmetric_difference_helper, Blob1024;
+    btreeset_is_subset_u32, is_subset_helper, u32;
+    btreeset_is_subset_u64, is_subset_helper, u64;
+    btreeset_is_subset_blob_8, is_subset_helper, Blob8;
+    btreeset_is_subset_blob_16, is_subset_helper, Blob16;
+    btreeset_is_subset_blob_32, is_subset_helper, Blob32;
+    btreeset_is_subset_blob_64, is_subset_helper, Blob64;
+    btreeset_is_subset_blob_128, is_subset_helper, Blob128;
+    btreeset_is_subset_blob_256, is_subset_helper, Blob256;
+    btreeset_is_subset_blob_512, is_subset_helper, Blob512;
+    btreeset_is_subset_blob_1024, is_subset_helper, Blob1024;
+
+    btreeset_is_superset_u32, is_superset_helper, u32;
+    btreeset_is_superset_u64, is_superset_helper, u64;
+    btreeset_is_superset_blob_8, is_superset_helper, Blob8;
+    btreeset_is_superset_blob_16, is_superset_helper, Blob16;
+    btreeset_is_superset_blob_32, is_superset_helper, Blob32;
+    btreeset_is_superset_blob_64, is_superset_helper, Blob64;
+    btreeset_is_superset_blob_128, is_superset_helper, Blob128;
+    btreeset_is_superset_blob_256, is_superset_helper, Blob256;
+    btreeset_is_superset_blob_512, is_superset_helper, Blob512;
+    btreeset_is_superset_blob_1024, is_superset_helper, Blob1024;
+
+    btreeset_is_disjoint_u32, is_disjoint_helper, u32;
+    btreeset_is_disjoint_u64, is_disjoint_helper, u64;
+    btreeset_is_disjoint_blob_8, is_disjoint_helper, Blob8;
+    btreeset_is_disjoint_blob_16, is_disjoint_helper, Blob16;
+    btreeset_is_disjoint_blob_32, is_disjoint_helper, Blob32;
+    btreeset_is_disjoint_blob_64, is_disjoint_helper, Blob64;
+    btreeset_is_disjoint_blob_128, is_disjoint_helper, Blob128;
+    btreeset_is_disjoint_blob_256, is_disjoint_helper, Blob256;
+    btreeset_is_disjoint_blob_512, is_disjoint_helper, Blob512;
+    btreeset_is_disjoint_blob_1024, is_disjoint_helper, Blob1024;
 }
