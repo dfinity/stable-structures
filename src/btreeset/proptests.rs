@@ -175,9 +175,9 @@ fn execute_operation<M: Memory>(
 }
 
 #[proptest]
-fn test_union(
-    #[strategy(pvec(any::<u64>(), 1..100))] keys1: Vec<u64>,
-    #[strategy(pvec(any::<u64>(), 1..100))] keys2: Vec<u64>,
+fn test_set_operations(
+    #[strategy(pvec(any::<u64>(), 1..1000))] keys1: Vec<u64>,
+    #[strategy(pvec(any::<u64>(), 1..1000))] keys2: Vec<u64>,
 ) {
     crate::btreeset::test::run_btree_test(|mut set1| {
         let mut set2 = BTreeSet::new(crate::btreeset::test::make_memory());
@@ -194,39 +194,30 @@ fn test_union(
             std_set2.insert(*key);
         }
 
-        let union: Vec<_> = set1.union(&set2).collect();
-        let std_union: Vec<_> = std_set1.union(&std_set2).cloned().collect();
+        let is_subset = set1.is_subset(&set2);
+        let std_is_subset = std_set1.is_subset(&std_set2);
+        prop_assert_eq!(is_subset, std_is_subset);
 
-        prop_assert_eq!(union, std_union);
+        let is_superset = set1.is_superset(&set2);
+        let std_is_superset = std_set1.is_superset(&std_set2);
+        prop_assert_eq!(is_superset, std_is_superset);
 
-        Ok(())
-    });
-}
-
-#[proptest]
-fn test_intersection(
-    #[strategy(pvec(any::<u64>(), 1..100))] keys1: Vec<u64>,
-    #[strategy(pvec(any::<u64>(), 1..100))] keys2: Vec<u64>,
-) {
-    crate::btreeset::test::run_btree_test(|mut set1| {
-        let mut set2 = BTreeSet::new(crate::btreeset::test::make_memory());
-        let mut std_set1 = StdBTreeSet::new();
-        let mut std_set2 = StdBTreeSet::new();
-
-        for key in &keys1 {
-            set1.insert(*key);
-            std_set1.insert(*key);
-        }
-
-        for key in &keys2 {
-            set2.insert(*key);
-            std_set2.insert(*key);
-        }
+        let is_disjoint = set1.is_disjoint(&set2);
+        let std_is_disjoint = std_set1.is_disjoint(&std_set2);
+        prop_assert_eq!(is_disjoint, std_is_disjoint);
 
         let intersection: Vec<_> = set1.intersection(&set2).collect();
         let std_intersection: Vec<_> = std_set1.intersection(&std_set2).cloned().collect();
-
         prop_assert_eq!(intersection, std_intersection);
+
+        let union: Vec<_> = set1.union(&set2).collect();
+        let std_union: Vec<_> = std_set1.union(&std_set2).cloned().collect();
+        prop_assert_eq!(union, std_union);
+
+        let symmetric_diff: Vec<_> = set1.symmetric_difference(&set2).collect();
+        let std_symmetric_diff: Vec<_> =
+            std_set1.symmetric_difference(&std_set2).cloned().collect();
+        prop_assert_eq!(symmetric_diff, std_symmetric_diff);
 
         Ok(())
     });
