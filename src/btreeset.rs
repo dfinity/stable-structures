@@ -545,6 +545,7 @@ where
 
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
+            // Loop until we find a common element or exhaust either iterator.
             while let (Some(ref a), Some(ref b)) = (next_self.clone(), next_other.clone()) {
                 match a.cmp(b) {
                     std::cmp::Ordering::Less => {
@@ -565,6 +566,196 @@ where
             }
             // Stop the iteration when either iterator is exhausted.
             None
+        })
+    }
+
+    /// Returns `true` if this set has no elements in common with another set.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// let mut set2: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    ///
+    /// set1.insert(1);
+    /// set1.insert(2);
+    /// set2.insert(3);
+    /// set2.insert(4);
+    ///
+    /// assert!(set1.is_disjoint(&set2));
+    /// set2.insert(2);
+    /// assert!(!set1.is_disjoint(&set2));
+    /// ```
+    pub fn is_disjoint(&self, other: &BTreeSet<K, M>) -> bool {
+        let mut iter_self = self.iter();
+        let mut iter_other = other.iter();
+        let mut next_self = iter_self.next();
+        let mut next_other = iter_other.next();
+
+        while let (Some(a), Some(b)) = (next_self.as_ref(), next_other.as_ref()) {
+            match a.cmp(b) {
+                std::cmp::Ordering::Less => next_self = iter_self.next(),
+                std::cmp::Ordering::Greater => next_other = iter_other.next(),
+                std::cmp::Ordering::Equal => return false, // Common element found
+            }
+        }
+
+        true // No common elements
+    }
+
+    /// Returns `true` if this set is a subset of another set.
+    ///
+    /// A set `A` is a subset of a set `B` if all elements of `A` are also elements of `B`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// let mut set2: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    ///
+    /// set1.insert(1);
+    /// set1.insert(2);
+    /// set2.insert(1);
+    /// set2.insert(2);
+    /// set2.insert(3);
+    ///
+    /// assert!(set1.is_subset(&set2));
+    /// assert!(!set2.is_subset(&set1));
+    /// ```
+    pub fn is_subset(&self, other: &BTreeSet<K, M>) -> bool {
+        let mut self_iter = self.iter();
+        let mut other_iter = other.iter();
+
+        let mut self_next = self_iter.next();
+        let mut other_next = other_iter.next();
+
+        while let Some(ref self_key) = self_next {
+            match other_next {
+                Some(ref other_key) => match self_key.cmp(other_key) {
+                    std::cmp::Ordering::Equal => {
+                        // Keys match, advance both iterators.
+                        self_next = self_iter.next();
+                        other_next = other_iter.next();
+                    }
+                    std::cmp::Ordering::Greater => {
+                        // Advance the `other` iterator if its key is smaller.
+                        other_next = other_iter.next();
+                    }
+                    std::cmp::Ordering::Less => {
+                        // `self_key` is smaller than the current smallest item of
+                        // other which means that it cannot be found in `other`,
+                        // so return false.
+                        return false;
+                    }
+                },
+                None => {
+                    // If `other` is exhausted but `self` is not, return false.
+                    return false;
+                }
+            }
+        }
+
+        // If we exhaust `self`, it is a subset of `other`.
+        true
+    }
+
+    /// Returns `true` if this set is a superset of another set.
+    ///
+    /// A set `A` is a superset of a set `B` if all elements of `B` are also elements of `A`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// let mut set2: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    ///
+    /// set1.insert(1);
+    /// set1.insert(2);
+    /// set1.insert(3);
+    /// set2.insert(1);
+    /// set2.insert(2);
+    ///
+    /// assert!(set1.is_superset(&set2));
+    /// assert!(!set2.is_superset(&set1));
+    /// ```
+    pub fn is_superset(&self, other: &BTreeSet<K, M>) -> bool {
+        other.is_subset(self)
+    }
+
+    /// Returns an iterator over the symmetric difference of this set and another.
+    ///
+    /// The symmetric difference of two sets is the set of elements that are in either of the sets,
+    /// but not in their intersection.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// let mut set2: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    ///
+    /// set1.insert(1);
+    /// set1.insert(2);
+    /// set2.insert(2);
+    /// set2.insert(3);
+    ///
+    /// let symmetric_diff: Vec<_> = set1.symmetric_difference(&set2).collect();
+    /// assert_eq!(symmetric_diff, vec![1, 3]);
+    /// ```
+    pub fn symmetric_difference<'a>(
+        &'a self,
+        other: &'a BTreeSet<K, M>,
+    ) -> impl Iterator<Item = K> + 'a {
+        let mut iter_self = self.iter();
+        let mut iter_other = other.iter();
+        let mut next_self = iter_self.next();
+        let mut next_other = iter_other.next();
+
+        // Use a closure to find common elements by traversing both iterators simultaneously.
+        std::iter::from_fn(move || {
+            // Loop until we detect a difference or exhaust either iterator.
+            loop {
+                return match (next_self.clone(), next_other.clone()) {
+                    (Some(ref a), Some(ref b)) => {
+                        match a.cmp(b) {
+                            std::cmp::Ordering::Less => {
+                                // If the element from `self` is smaller, yield it and advance `self`.
+                                next_self = iter_self.next();
+                                Some(a.clone())
+                            }
+                            std::cmp::Ordering::Greater => {
+                                // If the element from `other` is smaller, yield it and advance `other`.
+                                next_other = iter_other.next();
+                                Some(b.clone())
+                            }
+                            std::cmp::Ordering::Equal => {
+                                // Skip elements that are in both sets and advance both iterators.
+                                next_self = iter_self.next();
+                                next_other = iter_other.next();
+                                continue;
+                            }
+                        }
+                    }
+                    (Some(ref a), None) => {
+                        // If only `self` has elements remaining, yield them.
+                        next_self = iter_self.next();
+                        Some(a.clone())
+                    }
+                    (None, Some(ref b)) => {
+                        // If only `other` has elements remaining, yield them.
+                        next_other = iter_other.next();
+                        Some(b.clone())
+                    }
+                    (None, None) => None,
+                };
+            }
         })
     }
 }
@@ -696,6 +887,45 @@ mod test {
         assert_eq!(union.len(), 1500);
         assert_eq!(union[0], 0);
         assert_eq!(union[1499], 1499);
+    }
+
+    #[test]
+    fn test_union_odd_even() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            if i % 2 != 0 {
+                set1.insert(i);
+            } else {
+                set2.insert(i);
+            }
+        }
+
+        let intersection: Vec<_> = set1.union(&set2).collect();
+        assert_eq!(intersection.len(), 1000);
+        assert_eq!(intersection, (0..1000).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_intersection_even() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            set1.insert(i);
+            if i % 2 == 0 {
+                set2.insert(i);
+            }
+        }
+
+        let intersection: Vec<_> = set1.intersection(&set2).collect();
+        assert_eq!(intersection.len(), 500);
+        assert_eq!(intersection, set2.iter().collect::<Vec<_>>());
     }
 
     #[test]
@@ -1069,5 +1299,343 @@ mod test {
         assert_eq!(btreeset.iter_upper_bound(&1).next(), None); // No element strictly below 1
         assert_eq!(btreeset.iter_upper_bound(&5).next(), Some(4)); // Largest element below 5
         assert_eq!(btreeset.iter_upper_bound(&11).next(), Some(10)); // Largest element below 11
+    }
+
+    #[test]
+    fn test_is_disjoint_with_disjoint_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+
+        set2.insert(3);
+        set2.insert(4);
+
+        assert!(set1.is_disjoint(&set2));
+    }
+
+    #[test]
+    fn test_is_disjoint_with_overlapping_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+
+        set2.insert(2);
+        set2.insert(3);
+
+        assert!(!set1.is_disjoint(&set2));
+    }
+
+    #[test]
+    fn test_is_disjoint_with_large_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            set1.insert(i);
+        }
+        for i in 1000..2000 {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_disjoint(&set2));
+
+        set2.insert(500);
+        assert!(!set1.is_disjoint(&set2));
+    }
+
+    #[test]
+    fn test_is_subset_with_subset() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+
+        set2.insert(1);
+        set2.insert(2);
+        set2.insert(3);
+
+        assert!(set1.is_subset(&set2));
+    }
+
+    #[test]
+    fn test_is_subset_with_non_subset() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(4);
+
+        set2.insert(1);
+        set2.insert(2);
+        set2.insert(3);
+
+        assert!(!set1.is_subset(&set2));
+    }
+
+    #[test]
+    fn test_is_subset_with_large_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..500 {
+            set1.insert(i);
+        }
+        for i in 0..1500 {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_subset(&set2));
+
+        set1.insert(1500);
+        assert!(!set1.is_subset(&set2));
+    }
+
+    #[test]
+    fn test_is_superset_with_superset() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+        set1.insert(3);
+
+        set2.insert(1);
+        set2.insert(2);
+
+        assert!(set1.is_superset(&set2));
+    }
+
+    #[test]
+    fn test_is_superset_with_non_superset() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+
+        set2.insert(1);
+        set2.insert(3);
+
+        assert!(!set1.is_superset(&set2));
+    }
+
+    #[test]
+    fn test_is_superset_with_large_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            set1.insert(i);
+        }
+        for i in 500..1000 {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_superset(&set2));
+
+        set2.insert(1500);
+        assert!(!set1.is_superset(&set2));
+    }
+
+    #[test]
+    fn test_symmetric_difference_with_disjoint_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+
+        set2.insert(3);
+        set2.insert(4);
+
+        let symmetric_diff: Vec<_> = set1.symmetric_difference(&set2).collect();
+        assert_eq!(symmetric_diff, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_symmetric_difference_with_overlapping_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+        set1.insert(3);
+
+        set2.insert(2);
+        set2.insert(3);
+        set2.insert(4);
+
+        let symmetric_diff: Vec<_> = set1.symmetric_difference(&set2).collect();
+        assert_eq!(symmetric_diff, vec![1, 4]);
+    }
+
+    #[test]
+    fn test_symmetric_difference_with_identical_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        set1.insert(1);
+        set1.insert(2);
+        set1.insert(3);
+
+        set2.insert(1);
+        set2.insert(2);
+        set2.insert(3);
+
+        let symmetric_diff: Vec<_> = set1.symmetric_difference(&set2).collect();
+        assert!(symmetric_diff.is_empty());
+    }
+
+    #[test]
+    fn test_symmetric_difference_with_large_sets() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            set1.insert(i);
+        }
+        for i in 500..1500 {
+            set2.insert(i);
+        }
+
+        let symmetric_diff: Vec<_> = set1.symmetric_difference(&set2).collect();
+        assert_eq!(symmetric_diff.len(), 1000);
+        assert_eq!(symmetric_diff[..500], (0..500).collect::<Vec<_>>());
+        assert_eq!(symmetric_diff[500..], (1000..1500).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_symmetric_difference_odd_even() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            if i % 2 != 0 {
+                set1.insert(i);
+            } else {
+                set2.insert(i);
+            }
+        }
+
+        let intersection: Vec<_> = set1.symmetric_difference(&set2).collect();
+        assert_eq!(intersection.len(), 1000);
+        assert_eq!(intersection, (0..1000).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_symmetric_difference_even() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        let mut expected_res = vec![];
+
+        for i in 0..1000 {
+            set1.insert(i);
+
+            if i % 2 == 0 {
+                set2.insert(i);
+            } else {
+                expected_res.push(i);
+            }
+        }
+
+        let intersection: Vec<_> = set1.symmetric_difference(&set2).collect();
+        assert_eq!(intersection.len(), 500);
+        assert_eq!(intersection, expected_res);
+    }
+
+    #[test]
+    fn test_is_subset_with_sparse_elements() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in (0..1000).step_by(10) {
+            set1.insert(i);
+        }
+        for i in (0..2000).step_by(5) {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_subset(&set2));
+
+        set1.insert(2001);
+        assert!(!set1.is_subset(&set2));
+    }
+
+    #[test]
+    fn test_is_disjoint_with_sparse_elements() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in (0..1000).step_by(10) {
+            set1.insert(i);
+        }
+        for i in (1..1000).step_by(10) {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_disjoint(&set2));
+
+        set2.insert(20);
+        assert!(!set1.is_disjoint(&set2));
+    }
+
+    #[test]
+    fn test_is_superset_with_sparse_elements() {
+        let mem1 = make_memory();
+        let mem2 = make_memory();
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in (0..2000).step_by(5) {
+            set1.insert(i);
+        }
+        for i in (0..1000).step_by(10) {
+            set2.insert(i);
+        }
+
+        assert!(set1.is_superset(&set2));
+
+        set2.insert(2001);
+        assert!(!set1.is_superset(&set2));
     }
 }
