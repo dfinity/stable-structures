@@ -192,7 +192,7 @@ where
         }
     }
 
-    /// Loads the set from memory.
+    /// Loads the `BTreeSet` from memory.
     ///
     /// # Example
     ///
