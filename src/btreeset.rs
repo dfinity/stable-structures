@@ -717,24 +717,24 @@ where
             }
 
             match (next_self.clone(), next_other.clone()) {
-                (Some(ref a), Some(ref b)) => match a.cmp(b) {
-                    std::cmp::Ordering::Less => {
-                        // If the element from `self` is smaller, yield it and advance `self`.
-                        next_self = iter_self.next();
-                        Some(a.clone())
+                (Some(ref a), Some(ref b)) => {
+                    match a.cmp(b) {
+                        std::cmp::Ordering::Less => {
+                            // If the element from `self` is smaller, yield it and advance `self`.
+                            next_self = iter_self.next();
+                            Some(a.clone())
+                        }
+                        std::cmp::Ordering::Greater => {
+                            // If the element from `other` is smaller, yield it and advance `other`.
+                            next_other = iter_other.next();
+                            Some(b.clone())
+                        }
+                        std::cmp::Ordering::Equal => {
+                            // This branch is unreachable because equal elements are already skipped earlier.
+                            unreachable!("Equal elements should have been skipped before reaching this point.");
+                        }
                     }
-                    std::cmp::Ordering::Greater => {
-                        // If the element from `other` is smaller, yield it and advance `other`.
-                        next_other = iter_other.next();
-                        Some(b.clone())
-                    }
-                    std::cmp::Ordering::Equal => {
-                        // If the elements are equal, advance both iterators.
-                        next_self = iter_self.next();
-                        next_other = iter_other.next();
-                        None
-                    }
-                },
+                }
                 (Some(ref a), None) => {
                     // If only `self` has elements remaining, yield them.
                     next_self = iter_self.next();
