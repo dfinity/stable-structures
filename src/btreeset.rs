@@ -598,40 +598,6 @@ mod test {
     }
 
     #[test]
-    fn test_union_disjoint_sets() {
-        let mem1 = make_memory();
-        let mem2 = make_memory();
-        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
-        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
-
-        set1.insert(1);
-        set1.insert(2);
-
-        set2.insert(3);
-        set2.insert(4);
-
-        let union: Vec<_> = set1.union(&set2).collect();
-        assert_eq!(union, vec![1, 2, 3, 4]);
-    }
-
-    #[test]
-    fn test_intersection_disjoint_sets() {
-        let mem1 = make_memory();
-        let mem2 = make_memory();
-        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
-        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
-
-        set1.insert(1);
-        set1.insert(2);
-
-        set2.insert(3);
-        set2.insert(4);
-
-        let intersection: Vec<_> = set1.intersection(&set2).collect();
-        assert!(intersection.is_empty());
-    }
-
-    #[test]
     fn test_union_with_duplicates() {
         let mem1 = make_memory();
         let mem2 = make_memory();
@@ -691,7 +657,7 @@ mod test {
     }
 
     #[test]
-    fn test_union_and_intersection_with_non_overlapping_sets() {
+    fn test_union_and_intersection_with_disjoin_sets() {
         let mem1 = Rc::new(RefCell::new(Vec::new()));
         let mem2 = Rc::new(RefCell::new(Vec::new()));
         let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
