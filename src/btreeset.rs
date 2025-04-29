@@ -516,14 +516,35 @@ where
     ///
     /// set1.insert(1);
     /// set1.insert(2);
+    /// set1.insert(3);
+    ///
     /// set2.insert(2);
     /// set2.insert(3);
+    /// set2.insert(4);
     ///
     /// let intersection: Vec<_> = set1.intersection(&set2).collect();
-    /// assert_eq!(intersection, vec![2]);
+    /// assert_eq!(intersection, vec![2, 3]);
     /// ```
     pub fn intersection<'a>(&'a self, other: &'a BTreeSet<K, M>) -> impl Iterator<Item = K> + 'a {
-        self.iter().filter(move |item| other.contains(item))
+        let mut iter_self = self.iter();
+        let mut iter_other = other.iter();
+        let mut next_self = iter_self.next();
+        let mut next_other = iter_other.next();
+
+        std::iter::from_fn(move || {
+            while let (Some(ref a), Some(ref b)) = (next_self.clone(), next_other.clone()) {
+                if a < b {
+                    next_self = iter_self.next();
+                } else if a > b {
+                    next_other = iter_other.next();
+                } else {
+                    next_self = iter_self.next();
+                    next_other = iter_other.next();
+                    return Some(a.clone());
+                }
+            }
+            None
+        })
     }
 }
 
