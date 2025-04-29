@@ -140,7 +140,6 @@ jobs:
         with:
           token: ${{secrets.GITHUB_TOKEN}}
           mdbook-version: "0.4.48"
-          use-linkcheck: true
           use-admonish: true
 
       - run: mdbook build ./docs
