@@ -719,39 +719,40 @@ where
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
             // Loop loop until we detect a difference or exhaust either iterator.
-            // This is to skip over duplicates in both iterators.
             loop {
-                match (next_self.clone(), next_other.clone()) {
+                return match (next_self.clone(), next_other.clone()) {
                     (Some(ref a), Some(ref b)) => {
                         match a.cmp(b) {
                             std::cmp::Ordering::Less => {
                                 // If the element from `self` is smaller, yield it and advance `self`.
                                 next_self = iter_self.next();
-                                return Some(a.clone());
+                                Some(a.clone())
                             }
                             std::cmp::Ordering::Greater => {
                                 // If the element from `other` is smaller, yield it and advance `other`.
                                 next_other = iter_other.next();
-                                return Some(b.clone());
+                                Some(b.clone())
                             }
                             std::cmp::Ordering::Equal => {
+                                // Skip elements that are in both sets and advance both iterators.
                                 next_self = iter_self.next();
                                 next_other = iter_other.next();
+                                continue;
                             }
                         }
                     }
                     (Some(ref a), None) => {
                         // If only `self` has elements remaining, yield them.
                         next_self = iter_self.next();
-                        return Some(a.clone());
+                        Some(a.clone())
                     }
                     (None, Some(ref b)) => {
                         // If only `other` has elements remaining, yield them.
                         next_other = iter_other.next();
-                        return Some(b.clone());
+                        Some(b.clone())
                     }
-                    (None, None) => return None,
-                }
+                    (None, None) => None,
+                };
             }
         })
     }
