@@ -589,7 +589,20 @@ where
     /// assert!(!set1.is_disjoint(&set2));
     /// ```
     pub fn is_disjoint(&self, other: &BTreeSet<K, M>) -> bool {
-        self.intersection(other).next().is_none()
+        let mut iter_self = self.iter();
+        let mut iter_other = other.iter();
+        let mut next_self = iter_self.next();
+        let mut next_other = iter_other.next();
+
+        while let (Some(a), Some(b)) = (next_self.as_ref(), next_other.as_ref()) {
+            match a.cmp(&b) {
+                std::cmp::Ordering::Less => next_self = iter_self.next(),
+                std::cmp::Ordering::Greater => next_other = iter_other.next(),
+                std::cmp::Ordering::Equal => return false, // Common element found
+            }
+        }
+
+        true // No common elements
     }
 
     /// Returns `true` if this set is a subset of another set.
