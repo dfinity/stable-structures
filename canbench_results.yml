@@ -157,7 +157,7 @@ benches:
     scopes: {}
   btreemap_insert_10mib_values:
     total:
-      instructions: 5239412179
+      instructions: 5239421355
       heap_increase: 0
       stable_memory_increase: 3613
     scopes: {}
