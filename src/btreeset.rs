@@ -1,3 +1,5 @@
+//! This module implements a set based on a B-Tree in stable memory.
+
 use crate::{btreemap::Iter as IterMap, BTreeMap, Memory, Storable};
 use core::ops::RangeBounds;
 
@@ -37,7 +39,7 @@ where
     }
 }
 
-/// This module implements a set based on a B-Tree in stable memory.
+/// A B-Tree set implementation that stores its data into a designated memory.
 ///
 /// # Overview
 ///
