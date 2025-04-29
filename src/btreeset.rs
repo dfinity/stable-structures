@@ -428,7 +428,7 @@ where
     /// Returns an iterator over the entries of the set, sorted by key.
     ///
     /// # Complexity
-    /// O(1) for creating the iterator. Iterating over all elements is O(n).
+    /// Creating the iterator is O(1), and iterating over k elements is O(k).
     ///
     /// # Example
     ///
