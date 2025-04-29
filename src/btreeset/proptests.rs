@@ -176,8 +176,8 @@ fn execute_operation<M: Memory>(
 
 #[proptest]
 fn test_set_operations(
-    #[strategy(pvec(any::<u64>(), 1..100))] keys1: Vec<u64>,
-    #[strategy(pvec(any::<u64>(), 1..100))] keys2: Vec<u64>,
+    #[strategy(pvec(any::<u64>(), 1..1000))] keys1: Vec<u64>,
+    #[strategy(pvec(any::<u64>(), 1..1000))] keys2: Vec<u64>,
 ) {
     crate::btreeset::test::run_btree_test(|mut set1| {
         let mut set2 = BTreeSet::new(crate::btreeset::test::make_memory());

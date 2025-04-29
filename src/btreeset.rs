@@ -702,40 +702,46 @@ where
         let mut next_self = iter_self.next();
         let mut next_other = iter_other.next();
 
+        // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
+            while let (Some(ref a), Some(ref b)) = (next_self.clone(), next_other.clone()) {
+                if a != b {
+                    break;
+                }
+                next_self = iter_self.next();
+                next_other = iter_other.next();
+            }
+
             match (next_self.clone(), next_other.clone()) {
                 (Some(ref a), Some(ref b)) => match a.cmp(b) {
                     std::cmp::Ordering::Less => {
-                        // If the current element in `self` is smaller, it is part of the symmetric difference.
-                        // Advance the `self` iterator.
+                        // If the element from `self` is smaller, yield it and advance `self`.
                         next_self = iter_self.next();
                         Some(a.clone())
                     }
                     std::cmp::Ordering::Greater => {
-                        // If the current element in `other` is smaller, it is part of the symmetric difference.
-                        // Advance the `other` iterator.
+                        // If the element from `other` is smaller, yield it and advance `other`.
                         next_other = iter_other.next();
                         Some(b.clone())
                     }
                     std::cmp::Ordering::Equal => {
-                        // If the elements are equal, they are part of the intersection and should be skipped.
-                        // Advance both iterators.
+                        // If the elements are equal, advance both iterators.
                         next_self = iter_self.next();
                         next_other = iter_other.next();
                         None
                     }
                 },
                 (Some(ref a), None) => {
-                    // If `other` is exhausted, all remaining elements in `self` are part of the symmetric difference.
+                    // If only `self` has elements remaining, yield them.
                     next_self = iter_self.next();
                     Some(a.clone())
                 }
                 (None, Some(ref b)) => {
-                    // If `self` is exhausted, all remaining elements in `other` are part of the symmetric difference.
+                    // If only `other` has elements remaining, yield them.
                     next_other = iter_other.next();
                     Some(b.clone())
                 }
-                (None, None) => None, // Both iterators are exhausted.
+                (None, None) => None,
             }
         })
     }
