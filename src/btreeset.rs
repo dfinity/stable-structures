@@ -595,7 +595,7 @@ where
         let mut next_other = iter_other.next();
 
         while let (Some(a), Some(b)) = (next_self.as_ref(), next_other.as_ref()) {
-            match a.cmp(&b) {
+            match a.cmp(b) {
                 std::cmp::Ordering::Less => next_self = iter_self.next(),
                 std::cmp::Ordering::Greater => next_other = iter_other.next(),
                 std::cmp::Ordering::Equal => return false, // Common element found
@@ -723,7 +723,7 @@ where
             while next_self
                 .as_ref()
                 .zip(next_other.as_ref())
-                .map_or(false, |(a, b)| a == b)
+                .is_some_and(|(a, b)| a == b)
             {
                 next_self = iter_self.next();
                 next_other = iter_other.next();
