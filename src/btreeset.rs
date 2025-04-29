@@ -309,6 +309,11 @@ where
 
     /// Removes all elements from the set.
     ///
+    /// This operation clears the set by deallocating all memory used by its elements.
+    ///
+    /// # Complexity
+    /// O(n), where n is the number of elements in the set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -491,7 +496,9 @@ where
     /// The union of two sets is a set containing all elements that are in either set.
     ///
     /// # Complexity
-    /// O(n + m), where n and m are the sizes of the two sets.
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
@@ -558,7 +565,9 @@ where
     /// The intersection of two sets is a set containing only the elements that are in both sets.
     ///
     /// # Complexity
-    /// O(n + m), where n and m are the sizes of the two sets.
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
@@ -614,7 +623,9 @@ where
     /// Returns `true` if this set has no elements in common with another set.
     ///
     /// # Complexity
-    /// O(n + m), where n and m are the sizes of the two sets.
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
@@ -655,7 +666,9 @@ where
     /// A set `A` is a subset of a set `B` if all elements of `A` are also elements of `B`.
     ///
     /// # Complexity
-    /// O(n + m), where n and m are the sizes of the two sets.
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
@@ -714,7 +727,9 @@ where
     /// A set `A` is a superset of a set `B` if all elements of `B` are also elements of `A`.
     ///
     /// # Complexity
-    /// O(n + m), where n and m are the sizes of the two sets.
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
@@ -743,7 +758,9 @@ where
     /// but not in their intersection.
     ///
     /// # Complexity
-    /// O(n + m), where n and m are the sizes of the two sets.
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
