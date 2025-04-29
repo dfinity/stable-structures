@@ -569,7 +569,6 @@ where
         })
     }
 
-
     /// Returns `true` if this set has no elements in common with another set.
     ///
     /// # Example
