@@ -646,7 +646,9 @@ where
                         other_next = other_iter.next();
                     }
                     std::cmp::Ordering::Less => {
-                        // If `self_key` is not found in `other`, return false.
+                        // `self_key` is smaller than the current smallest item of
+                        // other which means that it cannot be found in `other`,
+                        // so return false.
                         return false;
                     }
                 },
