@@ -546,26 +546,30 @@ where
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
             // Loop until we find a common element or exhaust either iterator.
-            while let (Some(ref a), Some(ref b)) = (next_self.clone(), next_other.clone()) {
-                match a.cmp(b) {
-                    std::cmp::Ordering::Less => {
-                        // If the element from `self` is smaller, advance `self`.
-                        next_self = iter_self.next();
+            loop {
+                match (next_self.clone(), next_other.clone()) {
+                    (Some(ref a), Some(ref b)) => {
+                        match a.cmp(b) {
+                            std::cmp::Ordering::Less => {
+                                // If the element from `self` is smaller, advance `self`.
+                                next_self = iter_self.next();
+                            }
+                            std::cmp::Ordering::Greater => {
+                                // If the element from `other` is smaller, advance `other`.
+                                next_other = iter_other.next();
+                            }
+                            std::cmp::Ordering::Equal => {
+                                // If the elements are equal, yield one and advance both iterators.
+                                next_self = iter_self.next();
+                                next_other = iter_other.next();
+                                return Some(a.clone());
+                            }
+                        }
                     }
-                    std::cmp::Ordering::Greater => {
-                        // If the element from `other` is smaller, advance `other`.
-                        next_other = iter_other.next();
-                    }
-                    std::cmp::Ordering::Equal => {
-                        // If the elements are equal, yield one and advance both iterators.
-                        next_self = iter_self.next();
-                        next_other = iter_other.next();
-                        return Some(a.clone());
-                    }
+                    // Stop the iteration when either iterator is exhausted.
+                    (Some(_), None) | (None, Some(_)) | (None, None) => return None,
                 }
             }
-            // Stop the iteration when either iterator is exhausted.
-            None
         })
     }
 
