@@ -545,6 +545,7 @@ where
 
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
+            // Loop until we find a common element or exhaust either iterator.
             while let (Some(ref a), Some(ref b)) = (next_self.clone(), next_other.clone()) {
                 match a.cmp(b) {
                     std::cmp::Ordering::Less => {
@@ -874,6 +875,45 @@ mod test {
         assert_eq!(union.len(), 1500);
         assert_eq!(union[0], 0);
         assert_eq!(union[1499], 1499);
+    }
+
+    #[test]
+    fn test_union_odd_even() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            if i % 2 != 0 {
+                set1.insert(i);
+            } else {
+                set2.insert(i);
+            }
+        }
+
+        let intersection: Vec<_> = set1.union(&set2).collect();
+        assert_eq!(intersection.len(), 1000);
+        assert_eq!(intersection, (0..1000).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_intersection_even() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            set1.insert(i);
+            if i % 2 == 0 {
+                set2.insert(i);
+            }
+        }
+
+        let intersection: Vec<_> = set1.intersection(&set2).collect();
+        assert_eq!(intersection.len(), 500);
+        assert_eq!(intersection, set2.iter().collect::<Vec<_>>());
     }
 
     #[test]
@@ -1481,5 +1521,49 @@ mod test {
         assert_eq!(symmetric_diff.len(), 1000);
         assert_eq!(symmetric_diff[..500], (0..500).collect::<Vec<_>>());
         assert_eq!(symmetric_diff[500..], (1000..1500).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_symmetric_difference_odd_even() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        for i in 0..1000 {
+            if i % 2 != 0 {
+                set1.insert(i);
+            } else {
+                set2.insert(i);
+            }
+        }
+
+        let intersection: Vec<_> = set1.symmetric_difference(&set2).collect();
+        assert_eq!(intersection.len(), 1000);
+        assert_eq!(intersection, (0..1000).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_symmetric_difference_even() {
+        let mem1 = Rc::new(RefCell::new(Vec::new()));
+        let mem2 = Rc::new(RefCell::new(Vec::new()));
+        let mut set1: BTreeSet<u32, _> = BTreeSet::new(mem1);
+        let mut set2: BTreeSet<u32, _> = BTreeSet::new(mem2);
+
+        let mut expected_res = vec![];
+
+        for i in 0..1000 {
+            set1.insert(i);
+
+            if i % 2 == 0 {
+                set2.insert(i);
+            } else {
+                expected_res.push(i);
+            }
+        }
+
+        let intersection: Vec<_> = set1.symmetric_difference(&set2).collect();
+        assert_eq!(intersection.len(), 500);
+        assert_eq!(intersection, expected_res);
     }
 }
