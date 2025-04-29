@@ -694,7 +694,9 @@ where
                         other_next = other_iter.next();
                     }
                     std::cmp::Ordering::Less => {
-                        // If `self_key` is not found in `other`, return false.
+                        // `self_key` is smaller than the current smallest item of
+                        // other which means that it cannot be found in `other`,
+                        // so return false.
                         return false;
                     }
                 },
@@ -772,47 +774,41 @@ where
 
         // Use a closure to find common elements by traversing both iterators simultaneously.
         std::iter::from_fn(move || {
-            // Loop loop until we detect a difference or exhaust either iterator.
-            // This is to skip over duplicates in both iterators.
-            while next_self
-                .as_ref()
-                .zip(next_other.as_ref())
-                .is_some_and(|(a, b)| a == b)
-            {
-                next_self = iter_self.next();
-                next_other = iter_other.next();
-            }
-
-            match (next_self.clone(), next_other.clone()) {
-                (Some(ref a), Some(ref b)) => {
-                    match a.cmp(b) {
-                        std::cmp::Ordering::Less => {
-                            // If the element from `self` is smaller, yield it and advance `self`.
-                            next_self = iter_self.next();
-                            Some(a.clone())
-                        }
-                        std::cmp::Ordering::Greater => {
-                            // If the element from `other` is smaller, yield it and advance `other`.
-                            next_other = iter_other.next();
-                            Some(b.clone())
-                        }
-                        std::cmp::Ordering::Equal => {
-                            // This branch is unreachable because equal elements are already skipped earlier.
-                            unreachable!("Equal elements should have been skipped before reaching this point.");
+            // Loop until we detect a difference or exhaust either iterator.
+            loop {
+                return match (next_self.clone(), next_other.clone()) {
+                    (Some(ref a), Some(ref b)) => {
+                        match a.cmp(b) {
+                            std::cmp::Ordering::Less => {
+                                // If the element from `self` is smaller, yield it and advance `self`.
+                                next_self = iter_self.next();
+                                Some(a.clone())
+                            }
+                            std::cmp::Ordering::Greater => {
+                                // If the element from `other` is smaller, yield it and advance `other`.
+                                next_other = iter_other.next();
+                                Some(b.clone())
+                            }
+                            std::cmp::Ordering::Equal => {
+                                // Skip elements that are in both sets and advance both iterators.
+                                next_self = iter_self.next();
+                                next_other = iter_other.next();
+                                continue;
+                            }
                         }
                     }
-                }
-                (Some(ref a), None) => {
-                    // If only `self` has elements remaining, yield them.
-                    next_self = iter_self.next();
-                    Some(a.clone())
-                }
-                (None, Some(ref b)) => {
-                    // If only `other` has elements remaining, yield them.
-                    next_other = iter_other.next();
-                    Some(b.clone())
-                }
-                (None, None) => None,
+                    (Some(ref a), None) => {
+                        // If only `self` has elements remaining, yield them.
+                        next_self = iter_self.next();
+                        Some(a.clone())
+                    }
+                    (None, Some(ref b)) => {
+                        // If only `other` has elements remaining, yield them.
+                        next_other = iter_other.next();
+                        Some(b.clone())
+                    }
+                    (None, None) => None,
+                };
             }
         })
     }
