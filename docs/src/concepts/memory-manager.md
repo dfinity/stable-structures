@@ -1,14 +1,14 @@
 # Memory Manager
 
 As mentioned in the previous section, each stable structure requires its own dedicated `Memory` instance.
-This is an intentional design decision that limits [the blast radius](./design-principles.md) of potential bugs, ensuring that issues only affect the specific data structure and its associated memory, not other structures.
+This is an intentional design decision that limits [the blast radius](./design-principles.md) of potential bugs, ensuring that issues only affect the specific stable structure and its associated memory, not other stable structures.
 
 ## Overview
 
 The Memory Manager enables the creation of up to 255 virtual memories from a single underlying memory instance.
 When used with stable memory, this allows you to maintain up to 255 separate stable structures, each with its own isolated memory space.
 
-## Usage
+## Usage Example
 
 The following example demonstrates how to use the Memory Manager to create multiple stable structures:
 
