@@ -222,6 +222,9 @@ where
     /// Inserts a key into the set. Returns `true` if the key
     /// did not exist in the set before.
     ///
+    /// # Complexity
+    /// O(log n), where n is the number of elements in the set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -236,6 +239,9 @@ where
     }
 
     /// Returns `true` if the key exists in the set, `false` otherwise.
+    ///
+    /// # Complexity
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -253,6 +259,9 @@ where
 
     /// Returns `true` if the set contains no elements.
     ///
+    /// # Complexity
+    /// O(1)
+    ///
     /// # Example
     ///
     /// ```rust
@@ -266,6 +275,9 @@ where
     }
 
     /// Returns the number of elements in the set.
+    ///
+    /// # Complexity
+    /// O(1)
     ///
     /// # Example
     ///
@@ -297,6 +309,11 @@ where
 
     /// Removes all elements from the set.
     ///
+    /// This operation clears the set by deallocating all memory used by its elements.
+    ///
+    /// # Complexity
+    /// O(n), where n is the number of elements in the set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -313,6 +330,9 @@ where
 
     /// Returns the first key in the set. This key
     /// is the minimum key in the set.
+    ///
+    /// # Complexity
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -331,6 +351,9 @@ where
     /// Returns the last key in the set. This key
     /// is the maximum key in the set.
     ///
+    /// # Complexity
+    /// O(log n), where n is the number of elements in the set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -346,6 +369,9 @@ where
     }
 
     /// Removes a key from the set, returning `true` if it exists.
+    ///
+    /// # Complexity
+    /// O(log n), where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -363,6 +389,9 @@ where
 
     /// Removes and returns the last element in the set. The key of this element is the maximum key that was in the set.
     ///
+    /// # Complexity
+    /// O(log n), where n is the number of elements in the set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -379,6 +408,9 @@ where
 
     /// Removes and returns the first element in the set. The key of this element is the minimum key that was in the set.
     ///
+    /// # Complexity
+    /// O(log n), where n is the number of elements in the set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -394,6 +426,9 @@ where
     }
 
     /// Returns an iterator over the entries of the set, sorted by key.
+    ///
+    /// # Complexity
+    /// Creating the iterator is O(1), and iterating over k elements is O(k).
     ///
     /// # Example
     ///
@@ -414,6 +449,9 @@ where
     /// Returns an iterator over the entries in the set where keys
     /// belong to the specified range.
     ///
+    /// # Complexity
+    /// O(log n) for creating the iterator. Iterating over the range is O(k), where k is the number of elements in the range.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -432,6 +470,9 @@ where
 
     /// Returns an iterator pointing to the first element strictly below the given bound.
     /// Returns an empty iterator if there are no keys strictly below the given bound.
+    ///
+    /// # Complexity
+    /// O(log n) for creating the iterator, where n is the number of elements in the set.
     ///
     /// # Example
     ///
@@ -453,6 +494,11 @@ where
     /// Returns an iterator over the union of this set and another.
     ///
     /// The union of two sets is a set containing all elements that are in either set.
+    ///
+    /// # Complexity
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
@@ -518,6 +564,11 @@ where
     ///
     /// The intersection of two sets is a set containing only the elements that are in both sets.
     ///
+    /// # Complexity
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -575,6 +626,11 @@ where
 
     /// Returns `true` if this set has no elements in common with another set.
     ///
+    /// # Complexity
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -612,6 +668,11 @@ where
     /// Returns `true` if this set is a subset of another set.
     ///
     /// A set `A` is a subset of a set `B` if all elements of `A` are also elements of `B`.
+    ///
+    /// # Complexity
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
@@ -671,6 +732,11 @@ where
     ///
     /// A set `A` is a superset of a set `B` if all elements of `B` are also elements of `A`.
     ///
+    /// # Complexity
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -696,6 +762,11 @@ where
     ///
     /// The symmetric difference of two sets is the set of elements that are in either of the sets,
     /// but not in their intersection.
+    ///
+    /// # Complexity
+    /// O(n + m), where:
+    /// - n is the size of the first set.
+    /// - m is the size of the second set.
     ///
     /// # Example
     ///
