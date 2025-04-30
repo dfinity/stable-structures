@@ -300,7 +300,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// POSTCONDITION:
     ///   * `source` is deallocated.
     ///   * all the entries of `source`, as well as the median, are merged into `self`, in sorted
-    ///      order.
+    ///     order.
     pub fn merge<M: Memory>(
         &mut self,
         mut source: Node<K>,
