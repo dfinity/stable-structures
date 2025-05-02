@@ -182,7 +182,13 @@ fn is_disjoint_helper<K: Clone + Ord + Storable>() -> BenchResult {
 
 // Generates keys directly based on the type `K`.
 fn generate_key<K: Storable>(i: u32) -> K {
-    K::from_bytes(std::borrow::Cow::Owned(i.to_be_bytes().to_vec()))
+    let bytes = i.to_be_bytes();
+    let padded_bytes = {
+        let mut buffer = vec![0; K::BOUND.max_size() as usize];
+        buffer[..bytes.len()].copy_from_slice(&bytes);
+        buffer
+    };
+    K::from_bytes(std::borrow::Cow::Owned(padded_bytes))
 }
 
 // Add benchmarks for insert, remove, and range with additional key types.
