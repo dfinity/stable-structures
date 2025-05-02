@@ -65,7 +65,8 @@ where
 /// ## Basic Usage
 ///
 /// ```rust
-/// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+/// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+/// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 ///
 /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
 /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -79,7 +80,8 @@ where
 /// ## Range Queries
 ///
 /// ```rust
-/// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+/// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+/// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 ///
 /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
 /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -96,7 +98,8 @@ where
 /// You can store custom types in a `BTreeSet` by implementing the `Storable` trait:
 ///
 /// ```rust
-/// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId, Storable};
+/// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl, Storable};
+/// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 /// use std::borrow::Cow;
 ///
 /// #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -174,7 +177,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let set: BTreeSet<u64, _> = BTreeSet::init(mem_mgr.get(MemoryId::new(0)));
@@ -190,7 +194,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -206,7 +211,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -234,7 +240,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -253,7 +260,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -273,7 +281,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -291,7 +300,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -308,7 +318,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -328,7 +339,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -349,7 +361,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -370,7 +383,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -390,7 +404,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -410,7 +425,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -430,7 +446,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -450,7 +467,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -473,7 +491,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -496,7 +515,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -523,7 +543,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -593,7 +614,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -652,7 +674,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -696,7 +719,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -760,7 +784,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
@@ -792,7 +817,8 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use ic_stable_structures::{BTreeSet, MemoryManager, MemoryId};
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
     ///
     /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
     /// let mut set1: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
