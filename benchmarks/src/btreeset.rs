@@ -1,4 +1,5 @@
 use canbench_rs::{bench, bench_fn, BenchResult};
+use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::storable::Blob;
 use ic_stable_structures::{btreeset::BTreeSet, DefaultMemoryImpl, Storable};
 
@@ -25,7 +26,8 @@ macro_rules! bench_tests {
 }
 // Profiles inserting a large number of keys into a BTreeSet.
 fn insert_helper<K: Clone + Ord + Storable>() -> BenchResult {
-    let mut btreeset = BTreeSet::new(DefaultMemoryImpl::default());
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+    let mut btreeset = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
     let num_keys = 10_000;
 
     bench_fn(|| {
@@ -38,7 +40,8 @@ fn insert_helper<K: Clone + Ord + Storable>() -> BenchResult {
 
 // Profiles removing a large number of keys from a BTreeSet.
 fn remove_helper<K: Clone + Ord + Storable>() -> BenchResult {
-    let mut btreeset = BTreeSet::new(DefaultMemoryImpl::default());
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+    let mut btreeset = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
     let num_keys = 10_000;
 
     for i in 0..num_keys {
@@ -80,8 +83,9 @@ fn range_helper<K: Clone + Ord + Storable>() -> BenchResult {
 
 // Profiles the union operation on two BTreeSets.
 fn union_helper<K: Clone + Ord + Storable>() -> BenchResult {
-    let mut btreeset1 = BTreeSet::new(DefaultMemoryImpl::default());
-    let mut btreeset2 = BTreeSet::new(DefaultMemoryImpl::default());
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+    let mut btreeset1 = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
+    let mut btreeset2 = BTreeSet::new(mem_mgr.get(MemoryId::new(1)));
     let num_keys = 1_000;
 
     for i in 0..num_keys {
@@ -96,8 +100,9 @@ fn union_helper<K: Clone + Ord + Storable>() -> BenchResult {
 
 // Profiles the intersection operation on two BTreeSets.
 fn intersection_helper<K: Clone + Ord + Storable>() -> BenchResult {
-    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
-    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+    let mut btreeset1 = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
+    let mut btreeset2 = BTreeSet::new(mem_mgr.get(MemoryId::new(1)));
     let num_keys = 1_000;
 
     for i in 0..num_keys {
@@ -112,8 +117,9 @@ fn intersection_helper<K: Clone + Ord + Storable>() -> BenchResult {
 
 // Profiles the symmetric difference operation on two BTreeSets.
 fn symmetric_difference_helper<K: Clone + Ord + Storable>() -> BenchResult {
-    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
-    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+    let mut btreeset1 = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
+    let mut btreeset2 = BTreeSet::new(mem_mgr.get(MemoryId::new(1)));
     let num_keys = 1_000;
 
     for i in 0..num_keys {
@@ -128,8 +134,9 @@ fn symmetric_difference_helper<K: Clone + Ord + Storable>() -> BenchResult {
 
 // Profiles the is_subset operation on two BTreeSets.
 fn is_subset_helper<K: Clone + Ord + Storable>() -> BenchResult {
-    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
-    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+    let mut btreeset1 = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
+    let mut btreeset2 = BTreeSet::new(mem_mgr.get(MemoryId::new(1)));
     let num_keys = 1_000;
 
     for i in 0..num_keys {
@@ -146,8 +153,9 @@ fn is_subset_helper<K: Clone + Ord + Storable>() -> BenchResult {
 
 // Profiles the is_superset operation on two BTreeSets.
 fn is_superset_helper<K: Clone + Ord + Storable>() -> BenchResult {
-    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
-    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+    let mut btreeset1 = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
+    let mut btreeset2 = BTreeSet::new(mem_mgr.get(MemoryId::new(1)));
     let num_keys = 1_000;
 
     for i in 0..num_keys {
@@ -164,8 +172,9 @@ fn is_superset_helper<K: Clone + Ord + Storable>() -> BenchResult {
 
 // Profiles the is_disjoint operation on two BTreeSets.
 fn is_disjoint_helper<K: Clone + Ord + Storable>() -> BenchResult {
-    let mut btreeset1 = BTreeSet::init(DefaultMemoryImpl::default());
-    let mut btreeset2 = BTreeSet::init(DefaultMemoryImpl::default());
+    let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+    let mut btreeset1 = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
+    let mut btreeset2 = BTreeSet::new(mem_mgr.get(MemoryId::new(1)));
     let num_keys = 1_000;
 
     for i in 0..num_keys {
