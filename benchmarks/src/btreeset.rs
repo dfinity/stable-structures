@@ -185,16 +185,40 @@ fn generate_key<K: Storable>(i: u32) -> K {
     K::from_bytes(std::borrow::Cow::Owned(i.to_be_bytes().to_vec()))
 }
 
-// Define benchmarks for various BTreeSet operations with different types.
+// Add benchmarks for insert, remove, and range with additional key types.
 bench_tests! {
     btreeset_insert_u32, insert_helper, u32;
+    btreeset_insert_u64, insert_helper, u64;
     btreeset_insert_blob_8, insert_helper, Blob8;
+    btreeset_insert_blob_16, insert_helper, Blob16;
+    btreeset_insert_blob_32, insert_helper, Blob32;
+    btreeset_insert_blob_64, insert_helper, Blob64;
+    btreeset_insert_blob_128, insert_helper, Blob128;
+    btreeset_insert_blob_256, insert_helper, Blob256;
+    btreeset_insert_blob_512, insert_helper, Blob512;
+    btreeset_insert_blob_1024, insert_helper, Blob1024;
+
     btreeset_remove_u32, remove_helper, u32;
+    btreeset_remove_u64, remove_helper, u64;
     btreeset_remove_blob_8, remove_helper, Blob8;
-    btreeset_iter_u32, iter_helper, u32;
-    btreeset_iter_blob_8, iter_helper, Blob8;
+    btreeset_remove_blob_16, remove_helper, Blob16;
+    btreeset_remove_blob_32, remove_helper, Blob32;
+    btreeset_remove_blob_64, remove_helper, Blob64;
+    btreeset_remove_blob_128, remove_helper, Blob128;
+    btreeset_remove_blob_256, remove_helper, Blob256;
+    btreeset_remove_blob_512, remove_helper, Blob512;
+    btreeset_remove_blob_1024, remove_helper, Blob1024;
+
     btreeset_range_u32, range_helper, u32;
+    btreeset_range_u64, range_helper, u64;
     btreeset_range_blob_8, range_helper, Blob8;
+    btreeset_range_blob_16, range_helper, Blob16;
+    btreeset_range_blob_32, range_helper, Blob32;
+    btreeset_range_blob_64, range_helper, Blob64;
+    btreeset_range_blob_128, range_helper, Blob128;
+    btreeset_range_blob_256, range_helper, Blob256;
+    btreeset_range_blob_512, range_helper, Blob512;
+    btreeset_range_blob_1024, range_helper, Blob1024;
 }
 
 // Add benchmarks for set operations with additional key types.
@@ -250,7 +274,6 @@ bench_tests! {
     btreeset_is_superset_blob_256, is_superset_helper, Blob256;
     btreeset_is_superset_blob_512, is_superset_helper, Blob512;
     btreeset_is_superset_blob_1024, is_superset_helper, Blob1024;
-
     btreeset_is_disjoint_u32, is_disjoint_helper, u32;
     btreeset_is_disjoint_u64, is_disjoint_helper, u64;
     btreeset_is_disjoint_blob_8, is_disjoint_helper, Blob8;
