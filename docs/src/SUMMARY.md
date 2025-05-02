@@ -1,7 +1,11 @@
 # Summary
 
-- [Introduction](./introduction.md)
-  - [Design Principles](./design-principles.md)
-  - [Available Data Structures](./available-data-structures.md)
+- [Introduction](./introduction/introduction.md)
+  - [Design Principles](./introduction/design-principles.md)
+  - [Available Data Structures](./introduction/available-data-structures.md)
+
+- [Concepts](./concepts/concepts.md)
+  - [The Memory Trait](./concepts/memory-trait.md)
+  - [Memory Manager](./concepts/memory-manager.md)
 
 - [Schema Upgrades](./schema-upgrades.md)
