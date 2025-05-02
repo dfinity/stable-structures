@@ -248,6 +248,7 @@ bench_tests! {
     btreeset_union_blob_256, union_helper, Blob256;
     btreeset_union_blob_512, union_helper, Blob512;
     btreeset_union_blob_1024, union_helper, Blob1024;
+
     btreeset_intersection_u32, intersection_helper, u32;
     btreeset_intersection_u64, intersection_helper, u64;
     btreeset_intersection_blob_8, intersection_helper, Blob8;
@@ -258,6 +259,7 @@ bench_tests! {
     btreeset_intersection_blob_256, intersection_helper, Blob256;
     btreeset_intersection_blob_512, intersection_helper, Blob512;
     btreeset_intersection_blob_1024, intersection_helper, Blob1024;
+
     btreeset_symmetric_difference_u32, symmetric_difference_helper, u32;
     btreeset_symmetric_difference_u64, symmetric_difference_helper, u64;
     btreeset_symmetric_difference_blob_8, symmetric_difference_helper, Blob8;
@@ -268,6 +270,7 @@ bench_tests! {
     btreeset_symmetric_difference_blob_256, symmetric_difference_helper, Blob256;
     btreeset_symmetric_difference_blob_512, symmetric_difference_helper, Blob512;
     btreeset_symmetric_difference_blob_1024, symmetric_difference_helper, Blob1024;
+
     btreeset_is_subset_u32, is_subset_helper, u32;
     btreeset_is_subset_u64, is_subset_helper, u64;
     btreeset_is_subset_blob_8, is_subset_helper, Blob8;
@@ -289,6 +292,7 @@ bench_tests! {
     btreeset_is_superset_blob_256, is_superset_helper, Blob256;
     btreeset_is_superset_blob_512, is_superset_helper, Blob512;
     btreeset_is_superset_blob_1024, is_superset_helper, Blob1024;
+
     btreeset_is_disjoint_u32, is_disjoint_helper, u32;
     btreeset_is_disjoint_u64, is_disjoint_helper, u64;
     btreeset_is_disjoint_blob_8, is_disjoint_helper, Blob8;
