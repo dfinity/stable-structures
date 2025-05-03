@@ -3,7 +3,7 @@ use core::ops::{Add, AddAssign, Div, Mul, Rem, Sub, SubAssign};
 pub const NULL: Address = Address(0);
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Address(u64);
 
 impl From<u64> for Address {
@@ -50,6 +50,12 @@ impl Sub<Bytes> for Address {
 impl AddAssign<Bytes> for Address {
     fn add_assign(&mut self, other: Bytes) {
         *self = Self(self.0 + other.0);
+    }
+}
+
+impl crate::btreemap::cache::ByteSize for Address {
+    fn byte_size(&self) -> usize {
+        std::mem::size_of_val(self)
     }
 }
 

@@ -64,6 +64,13 @@ pub struct Node<K: Storable + Ord + Clone> {
     overflows: Vec<Address>,
 }
 
+impl<K: Storable + Ord + Clone> crate::btreemap::cache::ByteSize for Node<K> {
+    fn byte_size(&self) -> usize {
+        // The size is not counting overflow pages, but that's close enough.
+        self.page_size().get() as usize
+    }
+}
+
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
@@ -448,6 +455,19 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 }
 
+impl<K: Storable + Ord + Clone> Clone for Node<K> {
+    fn clone(&self) -> Self {
+        Self {
+            address: self.address,
+            keys_and_encoded_values: self.keys_and_encoded_values.clone(),
+            children: self.children.clone(),
+            node_type: self.node_type,
+            version: self.version,
+            overflows: self.overflows.clone(),
+        }
+    }
+}
+
 // A transient data structure for reading/writing metadata into/from stable memory.
 #[repr(C, packed)]
 struct NodeHeader {
@@ -464,7 +484,7 @@ impl NodeHeader {
 }
 
 /// The value in a K/V pair.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Value {
     /// The value's encoded bytes.
     ByVal(Vec<u8>),

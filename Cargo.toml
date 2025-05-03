@@ -15,11 +15,11 @@ version = "0.6.8"
 ic_principal = { version = "0.1.1", default-features = false }
 # An optional dependency to benchmark parts of the code.
 canbench-rs = { version = "0.1.7", optional = true }
+ic-cdk.workspace = true
 
 [dev-dependencies]
 candid.workspace = true
 hex = "0.4.3"
-ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
 maplit = "1.0.2"
 proptest = "1"
