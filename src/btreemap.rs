@@ -244,6 +244,25 @@ where
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
+
+    destructor: Destructor,
+}
+
+#[derive(Default, Debug)]
+struct Destructor {}
+
+impl Drop for Destructor {
+    fn drop(&mut self) {
+        let stats = crate::debug::get_stats();
+        let sum_instructions: u64 = stats.iter().map(|s| s.1.total_instructions).sum();
+        for s in stats {
+            let percent = (s.1.total_instructions as f64 / sum_instructions as f64) * 100.0;
+            crate::debug::print(format!(
+                "{}: {:?} ({:>5.1} %), {}",
+                s.0, s.1.total_instructions, percent, s.1.call_count
+            ));
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -353,6 +372,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
+            destructor: Destructor::default(),
         };
 
         btree.save_header();
@@ -380,6 +400,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
+            destructor: Destructor::default(),
         };
 
         btree.save_header();
@@ -429,6 +450,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
+            destructor: Destructor::default(),
         }
     }
 
@@ -672,16 +694,42 @@ where
     where
         F: Fn(Node<K>, usize) -> R + Clone,
     {
-        let node = self.load_node(node_addr);
-        // Look for the key in the current node.
-        match node.search(key) {
-            Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
+        // #[cfg(feature = "canbench-rs")]
+        // let _p = crate::debug::InstructionCounter::new("traverse");
+
+        let node = {
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("load_node");
+            self.load_node(node_addr)
+        };
+
+        let search = {
+            // #[cfg(feature = "canbench-rs")]
+            // let _p = crate::debug::InstructionCounter::new("search");
+            node.search(key)
+        };
+        match search {
+            Ok(idx) => {
+                // Key found: apply `f`.
+                // #[cfg(feature = "canbench-rs")]
+                // let _p = crate::debug::InstructionCounter::new("f");
+
+                Some(f(node, idx))
+            }
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
                 NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
             },
         }
     }
+
+    /*
+    $ canbench btreemap_get_blob_8_1024_v2 --show-canister-output
+
+    load_node : 262_628_480 ( 81.6 %), 48_669
+    search    :  38_580_885 ( 12.0 %), 48_669
+    f         :  20_445_909 (  6.4 %), 10_000
+    */
 
     /// Returns `true` if the map contains no elements.
     pub fn is_empty(&self) -> bool {
