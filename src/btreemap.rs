@@ -50,7 +50,9 @@
 //! ```
 mod allocator;
 mod iter;
+mod key_address_cache;
 mod node;
+
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
     storable::Bound as StorableBound,
@@ -59,8 +61,10 @@ use crate::{
 };
 use allocator::Allocator;
 pub use iter::Iter;
+use key_address_cache::KeyAddressCache;
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -244,6 +248,9 @@ where
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
+
+    // A cache for storing the node addresses of keys.
+    cache: RefCell<KeyAddressCache<K>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -353,6 +360,7 @@ where
             version: Version::V2(page_size),
             length: 0,
             _phantom: PhantomData,
+            cache: RefCell::new(KeyAddressCache::new()),
         };
 
         btree.save_header();
@@ -380,6 +388,7 @@ where
             }),
             length: 0,
             _phantom: PhantomData,
+            cache: RefCell::new(KeyAddressCache::new()),
         };
 
         btree.save_header();
@@ -429,6 +438,7 @@ where
             version,
             length: header.length,
             _phantom: PhantomData,
+            cache: RefCell::new(KeyAddressCache::new()),
         }
     }
 
@@ -654,7 +664,8 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        self.traverse(self.root_addr, key, |node, idx| {
+        let node_addr = self.cache.borrow_mut().get(key).unwrap_or(self.root_addr);
+        self.traverse(node_addr, key, |node, idx| {
             node.into_entry(idx, self.memory()).1 // Extract value.
         })
         .map(Cow::Owned)
@@ -675,7 +686,11 @@ where
         let node = self.load_node(node_addr);
         // Look for the key in the current node.
         match node.search(key) {
-            Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
+            Ok(idx) => {
+                // Key found: apply `f`.
+                self.cache.borrow_mut().insert(key.clone(), node_addr);
+                Some(f(node, idx))
+            }
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
                 NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
@@ -1251,7 +1266,9 @@ where
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
+        //self.replace_cached_keys_for_address(source.address(), &[]);
         into.merge(source, median, &mut self.allocator);
+        //self.replace_cached_keys_for_address(into.address(), &into.keys());
         into
     }
 
@@ -1266,6 +1283,7 @@ where
     /// Deallocates a node.
     #[inline]
     fn deallocate_node(&mut self, node: Node<K>) {
+        self.replace_cached_keys_for_address(node.address(), &[]);
         node.deallocate(self.allocator_mut());
     }
 
@@ -1278,7 +1296,19 @@ where
     /// Saves the node to memory.
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
+        self.replace_cached_keys_for_address(node.address(), &node.keys());
         node.save(self.allocator_mut());
+    }
+
+    /// Replaces the cached keys for the given address with the provided keys.
+    fn replace_cached_keys_for_address(&mut self, address: Address, keys: &[K]) {
+        let mut cache = self.cache.borrow_mut();
+        if cache.capacity() > 0 {
+            cache.remove_address(&address);
+            keys.iter().for_each(|key| {
+                cache.insert(key.clone(), address);
+            });
+        }
     }
 
     /// Saves the map to memory.
