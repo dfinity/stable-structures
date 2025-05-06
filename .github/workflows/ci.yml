@@ -148,8 +148,9 @@ jobs:
 
       - name: Build book
         run: |
-          mdbook-admonish install ./docs
-          mdbook build ./docs
+          cd docs
+          mdbook-admonish install
+          mdbook build
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
