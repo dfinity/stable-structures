@@ -135,12 +135,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup mdBook
-        uses: jontze/action-mdbook@v3
-        with:
-          token: ${{secrets.GITHUB_TOKEN}}
-          mdbook-version: "0.4.48"
-          use-admonish: true
+      - name: Install Rust
+        run: |
+          rustup update ${{ matrix.rust }} --no-self-update
+          rustup default ${{ matrix.rust }}
+          rustup target add wasm32-unknown-unknown
+
+      - name: Install mdbook
+        run: |
+          cargo install mdbook --version 0.4.48
+          cargo install mdbook-admonish --version 1.19.0
 
       - run: mdbook build ./docs
 
