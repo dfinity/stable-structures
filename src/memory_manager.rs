@@ -58,7 +58,7 @@ const MAX_NUM_MEMORIES: u8 = 255;
 // With a bucket size of 128 pages this can support up to 256GiB of memory.
 const MAX_NUM_BUCKETS: u64 = 32768;
 
-const BUCKET_SIZE_IN_PAGES: u64 = 128;
+const BUCKET_SIZE_IN_PAGES: u64 = 1;
 
 // A value used internally to indicate that a bucket is unallocated.
 const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
