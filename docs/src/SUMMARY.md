@@ -8,8 +8,4 @@
   - [The Memory Trait](./concepts/memory-trait.md)
   - [Memory Manager](./concepts/memory-manager.md)
 
-- [Concepts](./concepts.md)
-  - [The Memory Trait](./memory-trait.md)
-  - [Memory Manager](./memory-manager.md)
-
 - [Schema Upgrades](./schema-upgrades.md)
