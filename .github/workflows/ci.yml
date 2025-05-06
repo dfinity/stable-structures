@@ -154,7 +154,7 @@ jobs:
   checks-pass:
     # Always run this job!
     if: always()
-    needs: [build, examples, benchmark]
+    needs: [build, examples, benchmark, documentation-book]
     runs-on: ubuntu-latest
     steps:
       - name: check build result
@@ -165,4 +165,7 @@ jobs:
         run: exit 1
       - name: check benchmark result
         if: ${{ needs.benchmark.result != 'success' }}
+        run: exit 1
+      - name: check documentation-book result
+        if: ${{ needs.documentation-book.result != 'success' }}
         run: exit 1
