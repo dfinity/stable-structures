@@ -13,6 +13,8 @@ create-missing = false
 git-repository-url = "https://github.com/dfinity/stable-structures"
 additional-css = ["./mdbook-admonish.css"]
 
+[output.linkcheck]
+
 [preprocessor]
 
 [preprocessor.admonish]
