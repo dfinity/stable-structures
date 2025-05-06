@@ -130,39 +130,10 @@ jobs:
         run: |
           bash ./scripts/ci_post_run_benchmark.sh
 
-  documentation-book:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
-          rustup target add wasm32-unknown-unknown
-
-      - name: Install mdbook
-        run: |
-          cargo install mdbook --version 0.4.48
-          cargo install mdbook-admonish --version 1.19.0
-
-      - name: Build book
-        run: |
-          cd docs
-          mdbook-admonish install
-          mdbook build
-
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
-        if: ${{ github.ref == 'refs/heads/main' }}
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs/book
-
   checks-pass:
     # Always run this job!
     if: always()
-    needs: [build, examples, benchmark, documentation-book]
+    needs: [build, examples, benchmark]
     runs-on: ubuntu-latest
     steps:
       - name: check build result
@@ -173,7 +144,4 @@ jobs:
         run: exit 1
       - name: check benchmark result
         if: ${{ needs.benchmark.result != 'success' }}
-        run: exit 1
-      - name: check documentation-book result
-        if: ${{ needs.documentation-book.result != 'success' }}
         run: exit 1
