@@ -1,4 +1,4 @@
-name: Deploy docs to Github Pages
+name: Github Pages Book
 
 on:
   # Only run this workflow when there are changes to the docs directory
@@ -17,8 +17,7 @@ permissions:
   contents: write
 
 jobs:
-  # Build job
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     env:
       MDBOOK_VERSION: 0.4.48
