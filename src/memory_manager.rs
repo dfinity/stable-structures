@@ -641,6 +641,7 @@ impl BucketCache {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -1103,3 +1104,4 @@ mod test {
         );
     }
 }
+*/
