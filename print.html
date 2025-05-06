@@ -1,0 +1,434 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Stable Structures</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Documentation for the Stable Structures library">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="./mdbook-admonish.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Stable Structures</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/dfinity/stable-structures" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<h2 id="background"><a class="header" href="#background">Background</a></h2>
+<p>Smart contracts on the <a href="https://internetcomputer.org">Internet Computer</a> are referred to as <a href="https://learn.internetcomputer.org/hc/en-us/articles/34210839162004-Canister-Smart-Contracts">canisters</a>.</p>
+<p>Canisters, compared to traditional smart contracts, have some unique properties including:</p>
+<p><strong>Mutability</strong>: A canister can have a set of controllers, and controllers are able to upgrade the code of the canister (e.g., to add new features, fix bugs, etc.)</p>
+<p><strong>Scale</strong>: Canisters have access to hundreds of gigabytes of memory and ample amounts of compute, allowing developers to build fully functioning dapps without relying on external cloud providers.</p>
+<h3 id="the-challenge-of-upgrades"><a class="header" href="#the-challenge-of-upgrades">The Challenge of Upgrades</a></h3>
+<p>When upgrading a canister, the canister's code is replaced with the new code.
+In Rust, the new version of the code is not guaranteed to understand the memory layout established by the previous version.
+This is because Rust's memory layout can change between different versions of the code, making it unsafe to directly access the old memory layout.
+Therefore, by default, when a canister is upgraded and a new module is installed, the canister's main memory is wiped.</p>
+<p>To persist state, the Internet Computer provides canisters with an additional memory called <em>stable memory</em>.
+The conventional approach to canister state persistence follows these steps:</p>
+<ol>
+<li>Serialize and store the state of the canister just before the upgrade using the <code>pre_upgrade</code> hook.</li>
+<li>Install the new Wasm module of the canister (and wipe out the canister's main memory).</li>
+<li>Deserialize the data that was stored in stable memory in step 1 using the <code>post_upgrade</code> hook.</li>
+</ol>
+<p>This approach is easy to implement and works well for relatively small datasets.
+Unfortunately, it does not scale well and can render a canister non-upgradable.</p>
+<h3 id="the-solution-stable-structures"><a class="header" href="#the-solution-stable-structures">The Solution: Stable Structures</a></h3>
+<p>Rather than using standard Rust data structures, which store their data in the canister's main memory, you can use stable structures.
+Stable structures are designed to use stable memory as the primary storage, allowing them to grow to gigabytes in size without the need for <code>pre_upgrade</code>/<code>post_upgrade</code> hooks.
+This is the key characteristic that distinguishes stable structures from Rust's standard data structures.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="design-principles"><a class="header" href="#design-principles">Design Principles</a></h1>
+<p>The library is built on several key principles:</p>
+<ul>
+<li>
+<p><strong>Radical simplicity</strong>: Each data structure follows the most straightforward design that solves the problem at hand.
+This makes the code easier to understand, debug, and maintain.</p>
+</li>
+<li>
+<p><strong>Backward compatibility</strong>: Upgrading the library version must preserve the data.
+All data structures have a metadata section with the layout version, ensuring that new versions can read data written by old versions.</p>
+</li>
+<li>
+<p><strong>No <a href="https://internetcomputer.org/docs/references/ic-interface-spec#system-api-upgrades"><code>pre_upgrade</code> hooks</a></strong>: A bug in the <code>pre_upgrade</code> hook can make your canister non-upgradable.
+The best way to avoid this issue is not to have a <code>pre_upgrade</code> hook at all.</p>
+</li>
+<li>
+<p><strong>Limited blast radius</strong>: If a single data structure has a bug, it should not corrupt the contents of other data structures.
+This isolation helps prevent cascading failures.</p>
+</li>
+<li>
+<p><strong>No reallocation</strong>: Moving large amounts of data is expensive and can lead to prohibitively high cycle consumption.
+All data structures must manage their memory without costly moves.</p>
+</li>
+<li>
+<p><strong>Compatibility with multi-memory WebAssembly</strong>: The design should work when canisters have multiple stable memories.
+This ensures future compatibility with upcoming IC features.</p>
+</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="available-data-structures"><a class="header" href="#available-data-structures">Available Data Structures</a></h1>
+<p>The library provides several stable data structures:</p>
+<ul>
+<li><strong>BTreeMap</strong>: A key-value store that maintains keys in sorted order</li>
+<li><strong>Vec</strong>: A growable array</li>
+<li><strong>Log</strong>: An append-only list of variable-size entries</li>
+<li><strong>Cell</strong>: A serializable value</li>
+<li><strong>MinHeap</strong>: A priority queue</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="concepts"><a class="header" href="#concepts">Concepts</a></h1>
+<p>This section covers fundamental concepts for understanding how stable structures work and how they can be used effectively and safely.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="the-memory-trait"><a class="header" href="#the-memory-trait">The Memory Trait</a></h1>
+<p>Stable structures are responsible for managing their own memory.
+To provide maximum flexibility, the library introduces the <code>Memory</code> trait:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait Memory {
+    /// Equivalent to WebAssembly memory.size.
+    fn size(&amp;self) -&gt; u64;
+
+    /// Equivalent to WebAssembly memory.grow.
+    fn grow(&amp;self, pages: u64) -&gt; i64;
+
+    /// Copies bytes from this memory to the heap (in Wasm, memory 0).
+    fn read(&amp;self, offset: u64, dst: &amp;mut [u8]);
+
+    /// Writes bytes from the heap (in Wasm, memory 0) to this memory.
+    fn write(&amp;self, offset: u64, src: &amp;[u8]);
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The <code>Memory</code> trait intentionally models a <a href="https://webassembly.github.io/multi-memory/core/exec/runtime.html#memory-instances">WebAssembly memory instance</a>.
+This design choice ensures consistency with the interface of memories available to canisters.
+It also provides future compatibility with potential multi-memory support in canisters.</p>
+<h2 id="available-memory-implementations"><a class="header" href="#available-memory-implementations">Available Memory Implementations</a></h2>
+<p>The library provides several implementations of the <code>Memory</code> trait, each designed for specific use cases:</p>
+<ul>
+<li><code>Ic0StableMemory</code>: Stores data in the Internet Computer's stable memory</li>
+<li><code>VectorMemory</code>: An in-memory implementation backed by a Rust <code>Vec&lt;u8&gt;</code></li>
+<li><code>DefaultMemoryImpl</code>: A smart implementation that automatically selects the appropriate memory backend:
+<ul>
+<li>Uses <code>Ic0StableMemory</code> when running in an Internet Computer canister (wasm32 target)</li>
+<li>Falls back to <code>VectorMemory</code> in other environments (like tests or non-IC contexts)</li>
+</ul>
+</li>
+</ul>
+<p>Additional implementations such as <code>FileMemory</code> and <code>RestrictedMemory</code> exist but are less commonly used.</p>
+<div id="admonition-default" class="admonition admonish-note" role="note">
+<div>
+<p>In most cases, you should use <code>DefaultMemoryImpl</code> as your memory implementation.</p>
+</div>
+</div>
+<h3 id="usage-example"><a class="header" href="#usage-example">Usage Example</a></h3>
+<p>Here's how to initialize a stable <code>BTreeMap</code> using <code>DefaultMemoryImpl</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+let mut map: BTreeMap&lt;u64, u64, _&gt; = BTreeMap::init(DefaultMemoryImpl::default());
+<span class="boring">}</span></code></pre></pre>
+<div id="admonition-default-1" class="admonition admonish-warning" role="note">
+<div>
+<p><strong>Important</strong>: Stable structures cannot share memories.
+Each memory must be dedicated to a single stable structure.</p>
+</div>
+</div>
+<p>While the above example works correctly, it demonstrates a potential issue: the <code>BTreeMap</code> will use the entire stable memory.
+This becomes problematic when trying to use multiple stable structures.
+For example, the following code will fail in a canister:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+let mut map_1: BTreeMap&lt;u64, u64, _&gt; = BTreeMap::init(DefaultMemoryImpl::default());
+let mut map_2: BTreeMap&lt;u64, u64, _&gt; = BTreeMap::init(DefaultMemoryImpl::default());
+
+map_1.insert(1, 2);
+map_2.insert(1, 3);
+assert_eq!(map_1.get(&amp;1), Some(2)); // This assertion fails.
+<span class="boring">}</span></code></pre></pre>
+<p>The code fails because both <code>map_1</code> and <code>map_2</code> are using the same stable memory.
+This causes changes in one map to affect or corrupt the other.</p>
+<p>To solve this problem, the library provides the <a href="concepts/./memory-manager.html">MemoryManager</a>, which creates up to 255 virtual memories from a single memory instance.
+We'll explore this solution in the next section.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="memory-manager"><a class="header" href="#memory-manager">Memory Manager</a></h1>
+<p>As mentioned in the previous section, each stable structure requires its own dedicated <code>Memory</code> instance.
+This is an intentional design decision that limits <a href="concepts/./design-principles.html">the blast radius</a> of potential bugs, ensuring that issues only affect the specific stable structure and its associated memory, not other stable structures.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>The Memory Manager enables the creation of up to 255 virtual memories from a single underlying memory instance.
+When used with stable memory, this allows you to maintain up to 255 separate stable structures, each with its own isolated memory space.</p>
+<h2 id="usage-example-1"><a class="header" href="#usage-example-1">Usage Example</a></h2>
+<p>The following example demonstrates how to use the Memory Manager to create multiple stable structures:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use ic_stable_structures::{
+   memory_manager::{MemoryId, MemoryManager},
+   BTreeMap, DefaultMemoryImpl,
+};
+
+// Initialize a MemoryManager with DefaultMemoryImpl as the underlying memory
+let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+
+// Create two separate BTreeMaps, each with its own virtual memory
+let mut map_1: BTreeMap&lt;u64, u64, _&gt; = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
+let mut map_2: BTreeMap&lt;u64, u64, _&gt; = BTreeMap::init(mem_mgr.get(MemoryId::new(1)));
+
+// Demonstrate independent operation of the two maps
+map_1.insert(1, 2);
+map_2.insert(1, 3);
+assert_eq!(map_1.get(&amp;1), Some(2)); // Succeeds as expected
+<span class="boring">}</span></code></pre></pre>
+<div id="admonition-default" class="admonition admonish-warning" role="note">
+<div>
+<p>Virtual memories from the <code>MemoryManager</code> cannot be shared between stable structures.
+Each memory instance should be assigned to exactly one stable structure.</p>
+</div>
+</div>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="schema-upgrades"><a class="header" href="#schema-upgrades">Schema Upgrades</a></h1>
+<p>Stable structures store data directly in stable memory and do not require upgrade hooks.
+Since these structures are designed to persist throughout the lifetime of the canister, it's nearly inevitable that developers would want to make modifications to the data's schema as the canister evolves.</p>
+<p>Let's say you are storing assets in your canister. The declaration of it can look something like this:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Serialize, Deserialize, CandidType)]
+struct Asset {
+    // The contents of the asset.
+    contents: Vec&lt;u8&gt;,
+}
+
+impl Storable for Asset {
+    fn to_bytes(&amp;self) -&gt; std::borrow::Cow&lt;[u8]&gt; {
+        let mut bytes = vec![];
+        ciborium::ser::into_writer(&amp;self, &amp;mut bytes).unwrap();
+        Cow::Owned(bytes)
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow&lt;[u8]&gt;) -&gt; Self {
+        ciborium::de::from_reader(&amp;*bytes).expect("deserialization must succeed.")
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+<span class="boring">}</span></code></pre></pre>
+<blockquote>
+<p><strong>Note:</strong> Stables structures do not enforce a specific data format.
+It's up to the developer to use the data format that fits their use-case.
+In this example, CBOR is used for encoding <code>Asset</code>.</p>
+</blockquote>
+<h2 id="adding-an-attribute"><a class="header" href="#adding-an-attribute">Adding an attribute</a></h2>
+<p>Adding a new field can be as simple as adding the field, like this:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Serialize, Deserialize)]
+struct Asset {
+    // The contents of the asset.
+    contents: Vec&lt;u8&gt;,
+
+    // The timestamp the asset was created at.
+    #[serde(default)]
+    created_at: u64,
+}
+<span class="boring">}</span></code></pre></pre>
+<p>If the new attribute being added doesn't have a sensible default value, consider wrapping it in an <code>Option</code>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Serialize, Deserialize, CandidType)]
+struct Asset {
+    // The contents of the asset.
+    contents: Vec&lt;u8&gt;,
+
+    // The timestamp the asset was created at.
+    #[serde(default)]
+    created_at: u64,
+
+    // The username of the uploader.
+    uploaded_by: Option&lt;String&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+    </div>
+    </body>
+</html>
