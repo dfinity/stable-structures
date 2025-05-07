@@ -11,6 +11,8 @@ A collection of scalable data structures for the [Internet Computer](https://int
 
 Stable structures are designed to use stable memory as the backing store, allowing them to grow to gigabytes in size without the need for `pre_upgrade`/`post_upgrade` hooks.
 
+You can read more about the library in the [Stable Structures Book](https://dfinity.github.io/stable-structures/)
+
 ## Background
 
 The conventional approach to canister state persistence is to serialize the entire state to stable memory in the `pre_upgrade` hook and decode it back in the `post_upgrade` hook.
@@ -18,11 +20,11 @@ This approach is easy to implement and works well for relatively small datasets.
 Unfortunately, it does not scale well and can render a canister non-upgradable.
 
 This library aims to simplify managing data structures directly in stable memory.
-For more information about the philosophy behind the library, see [Roman's tutorial on stable structures](https://mmapped.blog/posts/14-stable-structures.html).
 
 ## Available Data Structures
 
 - [BTreeMap]: A Key-Value store
+- [BTreeSet]: A set of unique elements
 - [Vec]: A growable array
 - [Log]: An append-only list of variable-size entries
 - [Cell]: A serializable value
@@ -30,7 +32,7 @@ For more information about the philosophy behind the library, see [Roman's tutor
 
 ## Tutorials
 
-[Schema Upgrades](./docs/schema-upgrades.md)
+[Schema Upgrades](./docs/src/schema-upgrades.md)
 
 ## How it Works
 
@@ -38,7 +40,9 @@ Stable structures are able to work directly in stable memory because each data s
 its own memory.
 When initializing a stable structure, a memory is provided that the data structure can use to store its data.
 
-Here's a basic example:
+Here's a basic examples:
+
+### Example: BTreeMap
 
 ```rust
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
@@ -54,11 +58,24 @@ This includes stable memory, a vector ([VectorMemory]), or even a flat file ([Fi
 
 The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which maps to stable memory when used in a canister and to a [VectorMemory] otherwise.
 
+### Example: BTreeSet
+
+The `BTreeSet` is a stable set implementation based on a B-Tree. It allows efficient insertion, deletion, and lookup of unique elements.
+
+```rust
+use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+
+set.insert(42);
+assert!(set.contains(&42));
+assert_eq!(set.pop_first(), Some(42));
+assert!(set.is_empty());
+```
+
 
 Note that **stable structures cannot share memories.**
 Each memory must belong to only one stable structure.
 For example, this fails when run in a canister:
-
 
 ```no_run
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
