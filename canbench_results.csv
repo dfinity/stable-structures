@@ -1,425 +1,425 @@
 status	name	instructions	instructions %	heap_increase	heap_increase %	stable_memory_increase	stable_memory_increase %
-	btreemap_v1_contains_blob8_u64	211759351	10.06%	0		0	
-	btreemap_v1_contains_blob_1024_128	2923070314	-39.62%	0		0	
-	btreemap_v1_contains_blob_128_128	586681710	-30.86%	0		0	
-	btreemap_v1_contains_blob_16_128	220858136	-3.88%	0		0	
-	btreemap_v1_contains_blob_256_128	905328105	-35.61%	0		0	
-	btreemap_v1_contains_blob_32_1024	242119920	-7.01%	0		0	
-	btreemap_v1_contains_blob_32_128	241308402	-3.84%	0		0	
-	btreemap_v1_contains_blob_32_16	239873765	-9.13%	0		0	
-	btreemap_v1_contains_blob_32_256	243386253	-5.01%	0		0	
-	btreemap_v1_contains_blob_32_32	243575003	-6.91%	0		0	
-	btreemap_v1_contains_blob_32_4	241410476	-6.97%	0		0	
-	btreemap_v1_contains_blob_32_512	240957040	-6.14%	0		0	
-	btreemap_v1_contains_blob_32_64	243475219	-3.84%	0		0	
-	btreemap_v1_contains_blob_32_8	242676389	-4.28%	0		0	
-	btreemap_v1_contains_blob_4_128	184183433	12.09%	0		0	
-	btreemap_v1_contains_blob_512_128	1576846144	-38.36%	0		0	
-	btreemap_v1_contains_blob_64_128	320540281	-35.80%	0		0	
-	btreemap_v1_contains_blob_8_128	203452595	6.88%	0		0	
-	btreemap_v1_contains_u64_blob8	195936121	16.24%	0		0	
-	btreemap_v1_contains_u64_u64	195637945	16.40%	0		0	
-	btreemap_v1_get_blob8_u64	228006700	13.53%	0		0	
-	btreemap_v1_get_blob_1024_128	3063370184	-37.42%	0		0	
-	btreemap_v1_get_blob_128_128	618071643	-28.66%	0		0	
-	btreemap_v1_get_blob_16_128	234460160	-4.01%	0		0	
-	btreemap_v1_get_blob_256_128	953014900	-33.34%	0		0	
-	btreemap_v1_get_blob_32_1024	261521483	-6.64%	0		0	
-	btreemap_v1_get_blob_32_128	255664415	-3.31%	0		0	
-	btreemap_v1_get_blob_32_16	251352906	-7.54%	0		0	
-	btreemap_v1_get_blob_32_256	258584257	-4.62%	0		0	
-	btreemap_v1_get_blob_32_32	255953363	-5.15%	0		0	
-	btreemap_v1_get_blob_32_4	251644862	-5.56%	0		0	
-	btreemap_v1_get_blob_32_512	257682989	-5.85%	0		0	
-	btreemap_v1_get_blob_32_64	257137603	-2.69%	0		0	
-	btreemap_v1_get_blob_32_8	253272462	-3.12%	0		0	
-	btreemap_v1_get_blob_4_128	197258791	11.19%	0		0	
-	btreemap_v1_get_blob_512_128	1655392974	-36.15%	0		0	
-	btreemap_v1_get_blob_64_128	343675563	-33.34%	0		0	
-	btreemap_v1_get_blob_8_128	217102964	5.79%	0		0	
-	btreemap_v1_get_u64_blob8	205884318	17.18%	0		0	
-	btreemap_v1_get_u64_u64	207146407	17.42%	0		0	
-	btreemap_v1_insert_blob8_u64	396246565	20.00%	0		6	0.00%
-	btreemap_v1_insert_blob_1024_128	4200937391	-16.24%	0		262	0.00%
-	btreemap_v1_insert_blob_128_128	959970566	-6.48%	0		61	0.00%
-	btreemap_v1_insert_blob_16_128	449743412	14.19%	0		32	0.00%
-	btreemap_v1_insert_blob_256_128	1414931268	-10.15%	0		90	0.00%
-	btreemap_v1_insert_blob_32_1024	633304276	7.89%	0		230	0.00%
-	btreemap_v1_insert_blob_32_128	476226800	12.09%	0		37	0.00%
-	btreemap_v1_insert_blob_32_16	453146051	11.67%	0		14	0.00%
-	btreemap_v1_insert_blob_32_256	503713185	11.24%	0		66	0.00%
-	btreemap_v1_insert_blob_32_32	457819021	12.08%	0		17	0.00%
-	btreemap_v1_insert_blob_32_4	442537289	12.16%	0		11	0.00%
-	btreemap_v1_insert_blob_32_512	545510072	9.86%	0		121	0.00%
-	btreemap_v1_insert_blob_32_64	465911227	13.11%	0		24	0.00%
-	btreemap_v1_insert_blob_32_8	448294913	12.86%	0		12	0.00%
-	btreemap_v1_insert_blob_4_128	385759253	22.49%	0		17	0.00%
-	btreemap_v1_insert_blob_512_128	2358031431	-14.43%	0		148	0.00%
-	btreemap_v1_insert_blob_64_128	589604672	-12.02%	0		46	0.00%
-	btreemap_v1_insert_blob_8_128	426050413	18.28%	0		27	0.00%
-	btreemap_v1_insert_u64_blob8	427286535	25.76%	0		7	0.00%
-	btreemap_v1_insert_u64_u64	433187735	25.44%	0		7	0.00%
-	btreemap_v1_pop_first_blob8_u64	473557853	6.48%	0		0	
-	btreemap_v1_pop_first_blob_1024_128	5970419483	-35.54%	0		0	
-	btreemap_v1_pop_first_blob_128_128	1353296147	-25.55%	0		0	
-	btreemap_v1_pop_first_blob_16_128	606479509	2.22%	0		0	
-	btreemap_v1_pop_first_blob_256_128	2003606210	-30.84%	0		0	
-	btreemap_v1_pop_first_blob_32_1024	944564093	-1.59%	0		0	
-	btreemap_v1_pop_first_blob_32_128	688721384	-1.51%	0		0	
-	btreemap_v1_pop_first_blob_32_16	631409287	-2.03%	0		0	
-	btreemap_v1_pop_first_blob_32_256	722689785	-1.86%	0		0	
-	btreemap_v1_pop_first_blob_32_32	641576789	-2.26%	0		0	
-	btreemap_v1_pop_first_blob_32_4	615187906	-1.60%	0		0	
-	btreemap_v1_pop_first_blob_32_512	791214259	-1.08%	0		0	
-	btreemap_v1_pop_first_blob_32_64	654987386	-1.91%	0		0	
-	btreemap_v1_pop_first_blob_32_8	630956289	-1.54%	0		0	
-	btreemap_v1_pop_first_blob_4_128	313012237	11.43%	0		0	
-	btreemap_v1_pop_first_blob_512_128	3331966529	-33.52%	0		0	
-	btreemap_v1_pop_first_blob_64_128	850715002	-26.13%	0		0	
-	btreemap_v1_pop_first_blob_8_128	499931006	6.56%	0		0	
-	btreemap_v1_pop_first_u64_blob8	629390088	13.10%	0		0	
-	btreemap_v1_pop_first_u64_u64	634110263	13.38%	0		0	
-	btreemap_v1_pop_last_blob8_u64	453208199	5.36%	0		0	
-	btreemap_v1_pop_last_blob_1024_128	5653622366	-37.62%	0		0	
-	btreemap_v1_pop_last_blob_128_128	1288294439	-27.35%	0		0	
-	btreemap_v1_pop_last_blob_16_128	580598535	-0.68%	0		0	
-	btreemap_v1_pop_last_blob_256_128	1897610675	-32.91%	0		0	
-	btreemap_v1_pop_last_blob_32_1024	914456697	-2.56%	0		0	
-	btreemap_v1_pop_last_blob_32_128	658535050	-2.63%	0		0	
-	btreemap_v1_pop_last_blob_32_16	601805413	-4.25%	0		0	
-	btreemap_v1_pop_last_blob_32_256	692264004	-3.16%	0		0	
-	btreemap_v1_pop_last_blob_32_32	613006457	-4.00%	0		0	
-	btreemap_v1_pop_last_blob_32_4	590425428	-4.20%	0		0	
-	btreemap_v1_pop_last_blob_32_512	763185085	-2.79%	0		0	
-	btreemap_v1_pop_last_blob_32_64	626386665	-2.98%	0		0	
-	btreemap_v1_pop_last_blob_32_8	602414937	-2.73%	0		0	
-	btreemap_v1_pop_last_blob_4_128	300024062	9.84%	0		0	
-	btreemap_v1_pop_last_blob_512_128	3166825350	-35.22%	0		0	
-	btreemap_v1_pop_last_blob_64_128	814156892	-27.39%	0		0	
-	btreemap_v1_pop_last_blob_8_128	486002981	4.31%	0		0	
-	btreemap_v1_pop_last_u64_blob8	605635567	11.28%	0		0	
-	btreemap_v1_pop_last_u64_u64	611140012	11.92%	0		0	
-	btreemap_v1_remove_blob8_u64	531002231	21.06%	0		0	
-	btreemap_v1_remove_blob_1024_128	5926512437	-6.80%	0		0	
-	btreemap_v1_remove_blob_128_128	1320209273	-0.01%	0		0	
-	btreemap_v1_remove_blob_16_128	622875413	14.92%	0		0	
-	btreemap_v1_remove_blob_256_128	1958643680	-4.22%	0		0	
-	btreemap_v1_remove_blob_32_1024	900339296	8.79%	0		0	
-	btreemap_v1_remove_blob_32_128	666065836	12.57%	0		0	
-	btreemap_v1_remove_blob_32_16	621144455	13.39%	0		0	
-	btreemap_v1_remove_blob_32_256	701793569	11.78%	0		0	
-	btreemap_v1_remove_blob_32_32	630637055	13.45%	0		0	
-	btreemap_v1_remove_blob_32_4	613532980	13.85%	0		0	
-	btreemap_v1_remove_blob_32_512	774589473	10.84%	0		0	
-	btreemap_v1_remove_blob_32_64	656148571	13.63%	0		0	
-	btreemap_v1_remove_blob_32_8	614925897	13.71%	0		0	
-	btreemap_v1_remove_blob_4_128	416145277	20.86%	0		0	
-	btreemap_v1_remove_blob_512_128	3309955653	-4.47%	0		0	
-	btreemap_v1_remove_blob_64_128	812816693	-7.43%	0		0	
-	btreemap_v1_remove_blob_8_128	557944980	18.02%	0		0	
-	btreemap_v1_remove_u64_blob8	603617818	24.26%	0		0	
-	btreemap_v1_remove_u64_u64	618985724	24.06%	0		0	
-	btreemap_v2_contains_10mib_values	142229061	0.04%	0		0	
-	btreemap_v2_contains_blob8_u64	289226191	5.38%	0		0	
-	btreemap_v2_contains_blob_1024_128	3005203865	-38.52%	0		0	
-	btreemap_v2_contains_blob_128_128	665161980	-27.83%	0		0	
-	btreemap_v2_contains_blob_16_128	297834362	-0.37%	0		0	
-	btreemap_v2_contains_blob_256_128	986418835	-33.19%	0		0	
-	btreemap_v2_contains_blob_32_1024	320717629	-3.32%	0		0	
-	btreemap_v2_contains_blob_32_128	320105518	-2.67%	0		0	
-	btreemap_v2_contains_blob_32_16	319122399	-4.15%	0		0	
-	btreemap_v2_contains_blob_32_256	322411139	-3.55%	0		0	
-	btreemap_v2_contains_blob_32_32	323180427	-3.04%	0		0	
-	btreemap_v2_contains_blob_32_4	320480094	-3.05%	0		0	
-	btreemap_v2_contains_blob_32_512	319717271	-2.93%	0		0	
-	btreemap_v2_contains_blob_32_64	322961913	-2.62%	0		0	
-	btreemap_v2_contains_blob_32_8	321660352	-2.90%	0		0	
-	btreemap_v2_contains_blob_4_128	264477664	8.01%	0		0	
-	btreemap_v2_contains_blob_512_128	1657965792	-36.79%	0		0	
-	btreemap_v2_contains_blob_64_128	399999970	-30.60%	0		0	
-	btreemap_v2_contains_blob_8_128	276684378	4.27%	0		0	
-	btreemap_v2_contains_u64_blob8	248830506	7.54%	0		0	
-	btreemap_v2_contains_u64_u64	252328166	7.57%	0		0	
-	btreemap_v2_contains_u64_vec8	248830521	7.54%	0		0	
-	btreemap_v2_contains_vec8_u64	330812594	-9.08%	0		0	
-	btreemap_v2_contains_vec_1024_128	1843714851	-34.88%	0		0	
-	btreemap_v2_contains_vec_128_128	558700681	-19.82%	0		0	
-	btreemap_v2_contains_vec_16_128	381089663	-11.33%	0		0	
-	btreemap_v2_contains_vec_256_128	913133811	-24.78%	0		0	
-	btreemap_v2_contains_vec_32_1024	525532811	-9.07%	0		0	
-	btreemap_v2_contains_vec_32_128	433817678	-11.32%	0		0	
-	btreemap_v2_contains_vec_32_16	362681237	-10.45%	0		0	
-	btreemap_v2_contains_vec_32_256	441968223	-15.18%	0		0	
-	btreemap_v2_contains_vec_32_32	362811328	-10.52%	0		0	
-	btreemap_v2_contains_vec_32_4	361801209	-10.34%	0		0	
-	btreemap_v2_contains_vec_32_512	477582588	-11.36%	0		0	
-	btreemap_v2_contains_vec_32_64	403656070	-12.62%	0		0	
-	btreemap_v2_contains_vec_32_8	361893193	-10.28%	0		0	
-	btreemap_v2_contains_vec_4_128	352654217	-11.33%	0		0	
-	btreemap_v2_contains_vec_512_128	1262723316	-30.36%	0		0	
-	btreemap_v2_contains_vec_64_128	508396314	-14.60%	0		0	
-	btreemap_v2_contains_vec_8_128	353928369	-6.40%	0		0	
-	btreemap_v2_get_10mib_values	1227489038	0.00%	0		0	
-	btreemap_v2_get_blob8_u64	311375610	4.69%	0		0	
-	btreemap_v2_get_blob_1024_128	3145327402	-36.48%	0		0	
-	btreemap_v2_get_blob_128_128	699353541	-26.33%	0		0	
-	btreemap_v2_get_blob_16_128	312328058	-2.58%	0		0	
-	btreemap_v2_get_blob_256_128	1033911664	-31.49%	0		0	
-	btreemap_v2_get_blob_32_1024	341317244	-4.68%	0		0	
-	btreemap_v2_get_blob_32_128	335497552	-4.34%	0		0	
-	btreemap_v2_get_blob_32_16	330797351	-6.38%	0		0	
-	btreemap_v2_get_blob_32_256	338773598	-5.03%	0		0	
-	btreemap_v2_get_blob_32_32	335953842	-5.16%	0		0	
-	btreemap_v2_get_blob_32_4	330634736	-5.00%	0		0	
-	btreemap_v2_get_blob_32_512	337631374	-4.38%	0		0	
-	btreemap_v2_get_blob_32_64	337542901	-4.37%	0		0	
-	btreemap_v2_get_blob_32_8	332027903	-5.29%	0		0	
-	btreemap_v2_get_blob_4_128	277362907	5.59%	0		0	
-	btreemap_v2_get_blob_512_128	1736330972	-34.87%	0		0	
-	btreemap_v2_get_blob_64_128	424734913	-29.39%	0		0	
-	btreemap_v2_get_blob_8_128	290961444	1.42%	0		0	
-	btreemap_v2_get_u64_blob8	258970434	3.58%	0		0	
-	btreemap_v2_get_u64_u64	264841316	3.17%	0		0	
-	btreemap_v2_get_u64_vec8	259682300	3.08%	0		0	
-	btreemap_v2_get_vec8_u64	342546743	-8.44%	0		0	
-	btreemap_v2_get_vec_1024_128	1902078541	-33.41%	0		0	
-	btreemap_v2_get_vec_128_128	571504421	-19.46%	0		0	
-	btreemap_v2_get_vec_16_128	392344000	-10.78%	0		0	
-	btreemap_v2_get_vec_256_128	926534339	-24.50%	0		0	
-	btreemap_v2_get_vec_32_1024	534959850	-10.84%	0		0	
-	btreemap_v2_get_vec_32_128	444486505	-11.01%	0		0	
-	btreemap_v2_get_vec_32_16	370797516	-10.24%	0		0	
-	btreemap_v2_get_vec_32_256	460035533	-14.65%	0		0	
-	btreemap_v2_get_vec_32_32	371058030	-10.30%	0		0	
-	btreemap_v2_get_vec_32_4	369795743	-10.13%	0		0	
-	btreemap_v2_get_vec_32_512	498363887	-8.28%	0		0	
-	btreemap_v2_get_vec_32_64	412651033	-12.30%	0		0	
-	btreemap_v2_get_vec_32_8	369932871	-10.07%	0		0	
-	btreemap_v2_get_vec_4_128	363627402	-10.74%	0		0	
-	btreemap_v2_get_vec_512_128	1275901478	-30.15%	0		0	
-	btreemap_v2_get_vec_64_128	519647911	-14.36%	0		0	
-	btreemap_v2_get_vec_8_128	364617986	-6.06%	0		0	
-	btreemap_v2_insert_10mib_values	5239496713	-0.15%	322	0.00%	3613	0.00%
-	btreemap_v2_insert_blob8_u64	501406012	13.69%	0		4	0.00%
-	btreemap_v2_insert_blob_1024_128	4301642559	-15.77%	0		196	0.00%
-	btreemap_v2_insert_blob_128_128	1063162256	-5.86%	0		46	0.00%
-	btreemap_v2_insert_blob_16_128	550704865	11.59%	0		24	0.00%
-	btreemap_v2_insert_blob_256_128	1518470887	-9.55%	0		67	0.00%
-	btreemap_v2_insert_blob_32_1024	733519556	7.19%	0		173	0.00%
-	btreemap_v2_insert_blob_32_128	577751249	9.80%	0		28	0.00%
-	btreemap_v2_insert_blob_32_16	555295702	9.87%	0		11	0.00%
-	btreemap_v2_insert_blob_32_256	603998784	8.41%	0		49	0.00%
-	btreemap_v2_insert_blob_32_32	561181272	9.83%	0		13	0.00%
-	btreemap_v2_insert_blob_32_4	544246473	10.22%	0		8	0.00%
-	btreemap_v2_insert_blob_32_512	645597894	8.54%	0		91	0.00%
-	btreemap_v2_insert_blob_32_64	568401524	10.03%	0		18	0.00%
-	btreemap_v2_insert_blob_32_8	549872785	9.79%	0		9	0.00%
-	btreemap_v2_insert_blob_4_128	478337516	15.99%	0		13	0.00%
-	btreemap_v2_insert_blob_512_128	2460920551	-13.83%	0		111	0.00%
-	btreemap_v2_insert_blob_64_128	691588465	-10.56%	0		34	0.00%
-	btreemap_v2_insert_blob_8_128	524887535	13.24%	0		20	0.00%
-	btreemap_v2_insert_u64_blob8	491267828	16.92%	0		5	0.00%
-	btreemap_v2_insert_u64_u64	500389354	16.70%	0		6	0.00%
-	btreemap_v2_insert_u64_vec8	500397911	17.54%	0		21	0.00%
-	btreemap_v2_insert_vec8_u64	615775979	6.17%	0		16	0.00%
-	btreemap_v2_insert_vec_1024_128	2789774196	-15.87%	0		193	0.00%
-	btreemap_v2_insert_vec_128_128	1043230064	-4.64%	0		51	0.00%
-	btreemap_v2_insert_vec_16_128	738652590	5.05%	0		31	0.00%
-	btreemap_v2_insert_vec_256_128	1435492594	-4.26%	0		71	0.00%
-	btreemap_v2_insert_vec_32_1024	1245163592	1.91%	0		171	0.00%
-	btreemap_v2_insert_vec_32_128	783483944	3.10%	0		33	0.00%
-	btreemap_v2_insert_vec_32_16	691915077	4.60%	0		20	0.00%
-	btreemap_v2_insert_vec_32_256	906700575	1.95%	0		54	0.00%
-	btreemap_v2_insert_vec_32_32	685726202	3.39%	0		20	0.00%
-	btreemap_v2_insert_vec_32_4	686747488	4.25%	0		20	0.00%
-	btreemap_v2_insert_vec_32_512	1023452540	1.82%	0		91	0.00%
-	btreemap_v2_insert_vec_32_64	717393138	4.06%	0		24	0.00%
-	btreemap_v2_insert_vec_32_8	685924657	4.12%	0		20	0.00%
-	btreemap_v2_insert_vec_4_128	648453626	6.56%	0		16	0.00%
-	btreemap_v2_insert_vec_512_128	1905084957	-10.20%	0		112	0.00%
-	btreemap_v2_insert_vec_64_128	874271746	-0.34%	0		41	0.00%
-	btreemap_v2_insert_vec_8_128	706827447	6.16%	0		23	0.00%
-	btreemap_v2_mem_manager_contains_blob512_u64	1774999668	-34.44%	0		0	
-	btreemap_v2_mem_manager_contains_u64_blob512	313977726	1.69%	0		0	
-	btreemap_v2_mem_manager_contains_u64_u64	317618134	1.63%	0		0	
-	btreemap_v2_mem_manager_contains_u64_vec512	399550369	2.34%	0		0	
-	btreemap_v2_mem_manager_contains_vec512_u64	1258962439	-28.05%	0		0	
-	btreemap_v2_mem_manager_get_blob512_u64	1862858506	-32.32%	0		0	
-	btreemap_v2_mem_manager_get_u64_blob512	332256827	-0.28%	0		0	
-	btreemap_v2_mem_manager_get_u64_u64	330627562	-1.66%	0		0	
-	btreemap_v2_mem_manager_get_u64_vec512	428458229	0.25%	0		0	
-	btreemap_v2_mem_manager_get_vec512_u64	1304137627	-27.03%	0		0	
-	btreemap_v2_mem_manager_insert_blob512_u64	2600002993	-12.04%	0		0	
-	btreemap_v2_mem_manager_insert_u64_blob512	706443234	9.62%	0		0	
-	btreemap_v2_mem_manager_insert_u64_u64	620833749	11.26%	0		0	
-	btreemap_v2_mem_manager_insert_u64_vec512	960101805	7.67%	0		0	
-	btreemap_v2_mem_manager_insert_vec512_u64	2034628657	-8.66%	0		0	
-	btreemap_v2_mem_manager_remove_blob512_u64	3735769042	-2.59%	0		0	
-	btreemap_v2_mem_manager_remove_u64_blob512	1034316689	9.02%	0		0	
-	btreemap_v2_mem_manager_remove_u64_u64	891255172	9.93%	0		0	
-	btreemap_v2_mem_manager_remove_u64_vec512	1374321734	7.12%	0		0	
-	btreemap_v2_mem_manager_remove_vec512_u64	3208154994	-2.71%	0		0	
-	btreemap_v2_pop_first_blob8_u64	631088340	2.23%	0		0	
-	btreemap_v2_pop_first_blob_1024_128	6148488854	-34.60%	0		0	
-	btreemap_v2_pop_first_blob_128_128	1533695548	-23.50%	0		0	
-	btreemap_v2_pop_first_blob_16_128	765876708	0.31%	0		0	
-	btreemap_v2_pop_first_blob_256_128	2187144686	-29.11%	0		0	
-	btreemap_v2_pop_first_blob_32_1024	1117750658	-1.58%	0		0	
-	btreemap_v2_pop_first_blob_32_128	862534207	-2.22%	0		0	
-	btreemap_v2_pop_first_blob_32_16	804111934	-2.78%	0		0	
-	btreemap_v2_pop_first_blob_32_256	894498313	-1.97%	0		0	
-	btreemap_v2_pop_first_blob_32_32	813850354	-2.98%	0		0	
-	btreemap_v2_pop_first_blob_32_4	787641034	-2.44%	0		0	
-	btreemap_v2_pop_first_blob_32_512	961994628	-1.55%	0		0	
-	btreemap_v2_pop_first_blob_32_64	825807026	-2.30%	0		0	
-	btreemap_v2_pop_first_blob_32_8	804781651	-2.44%	0		0	
-	btreemap_v2_pop_first_blob_4_128	399767601	6.50%	0		0	
-	btreemap_v2_pop_first_blob_512_128	3511373203	-32.09%	0		0	
-	btreemap_v2_pop_first_blob_64_128	1026931135	-22.79%	0		0	
-	btreemap_v2_pop_first_blob_8_128	635221526	2.90%	0		0	
-	btreemap_v2_pop_first_u64_blob8	754042045	5.62%	0		0	
-	btreemap_v2_pop_first_u64_u64	769803712	5.75%	0		0	
-	btreemap_v2_pop_first_u64_vec8	758178172	5.33%	0		0	
-	btreemap_v2_pop_first_vec8_u64	733451417	-6.68%	0		0	
-	btreemap_v2_pop_first_vec_1024_128	4085492377	-29.10%	0		0	
-	btreemap_v2_pop_first_vec_128_128	1540727192	-14.95%	0		0	
-	btreemap_v2_pop_first_vec_16_128	969444515	-5.63%	0		0	
-	btreemap_v2_pop_first_vec_256_128	2055925554	-18.47%	0		0	
-	btreemap_v2_pop_first_vec_32_1024	1716234050	-5.39%	0		0	
-	btreemap_v2_pop_first_vec_32_128	1116028836	-7.69%	0		0	
-	btreemap_v2_pop_first_vec_32_16	962987550	-7.38%	0		0	
-	btreemap_v2_pop_first_vec_32_256	1244569779	-6.33%	0		0	
-	btreemap_v2_pop_first_vec_32_32	956119681	-9.69%	0		0	
-	btreemap_v2_pop_first_vec_32_4	949164944	-9.21%	0		0	
-	btreemap_v2_pop_first_vec_32_512	1400657612	-6.08%	0		0	
-	btreemap_v2_pop_first_vec_32_64	1002684437	-8.33%	0		0	
-	btreemap_v2_pop_first_vec_32_8	960390900	-9.14%	0		0	
-	btreemap_v2_pop_first_vec_4_128	519698941	-3.58%	0		0	
-	btreemap_v2_pop_first_vec_512_128	2758804409	-23.33%	0		0	
-	btreemap_v2_pop_first_vec_64_128	1263023099	-9.90%	0		0	
-	btreemap_v2_pop_first_vec_8_128	809323878	-4.58%	0		0	
-	btreemap_v2_pop_last_blob8_u64	607439368	1.16%	0		0	
-	btreemap_v2_pop_last_blob_1024_128	5832426499	-36.72%	0		0	
-	btreemap_v2_pop_last_blob_128_128	1467537205	-25.02%	0		0	
-	btreemap_v2_pop_last_blob_16_128	739718766	-0.62%	0		0	
-	btreemap_v2_pop_last_blob_256_128	2081004971	-30.90%	0		0	
-	btreemap_v2_pop_last_blob_32_1024	1086858863	-2.56%	0		0	
-	btreemap_v2_pop_last_blob_32_128	832469601	-3.18%	0		0	
-	btreemap_v2_pop_last_blob_32_16	772186199	-4.24%	0		0	
-	btreemap_v2_pop_last_blob_32_256	863409770	-3.13%	0		0	
-	btreemap_v2_pop_last_blob_32_32	783418714	-4.26%	0		0	
-	btreemap_v2_pop_last_blob_32_4	762427090	-3.94%	0		0	
-	btreemap_v2_pop_last_blob_32_512	934735771	-2.54%	0		0	
-	btreemap_v2_pop_last_blob_32_64	797724621	-3.56%	0		0	
-	btreemap_v2_pop_last_blob_32_8	773667111	-3.86%	0		0	
-	btreemap_v2_pop_last_blob_4_128	386680341	5.42%	0		0	
-	btreemap_v2_pop_last_blob_512_128	3346682035	-33.77%	0		0	
-	btreemap_v2_pop_last_blob_64_128	991695186	-24.25%	0		0	
-	btreemap_v2_pop_last_blob_8_128	625286841	1.31%	0		0	
-	btreemap_v2_pop_last_u64_blob8	729561134	4.00%	0		0	
-	btreemap_v2_pop_last_u64_u64	745541863	4.40%	0		0	
-	btreemap_v2_pop_last_u64_vec8	733261353	3.90%	0		0	
-	btreemap_v2_pop_last_vec8_u64	709505630	-7.40%	0		0	
-	btreemap_v2_pop_last_vec_1024_128	4309218972	-28.33%	0		0	
-	btreemap_v2_pop_last_vec_128_128	1553713281	-15.02%	0		0	
-	btreemap_v2_pop_last_vec_16_128	947485094	-6.66%	0		0	
-	btreemap_v2_pop_last_vec_256_128	2130596399	-17.24%	0		0	
-	btreemap_v2_pop_last_vec_32_1024	1698020522	-6.15%	0		0	
-	btreemap_v2_pop_last_vec_32_128	1097506258	-9.12%	0		0	
-	btreemap_v2_pop_last_vec_32_16	941565660	-8.68%	0		0	
-	btreemap_v2_pop_last_vec_32_256	1227274752	-7.41%	0		0	
-	btreemap_v2_pop_last_vec_32_32	936683027	-10.63%	0		0	
-	btreemap_v2_pop_last_vec_32_4	934322536	-10.41%	0		0	
-	btreemap_v2_pop_last_vec_32_512	1390764407	-6.83%	0		0	
-	btreemap_v2_pop_last_vec_32_64	983151868	-9.66%	0		0	
-	btreemap_v2_pop_last_vec_32_8	938072784	-10.21%	0		0	
-	btreemap_v2_pop_last_vec_4_128	504146543	-4.91%	0		0	
-	btreemap_v2_pop_last_vec_512_128	2874258445	-22.77%	0		0	
-	btreemap_v2_pop_last_vec_64_128	1256318631	-11.17%	0		0	
-	btreemap_v2_pop_last_vec_8_128	801981363	-6.33%	0		0	
-	btreemap_v2_range_count_1k_0b	20349	20.47%	0		0	
-	btreemap_v2_range_count_1k_10kib	3045335	26.02%	0		0	
-	btreemap_v2_range_count_20_10mib	20585137	0.10%	0		0	
-	btreemap_v2_range_key_sum_1k_0b	20840	19.08%	0		0	
-	btreemap_v2_range_key_sum_1k_10kib	57762193	0.92%	0		0	
-	btreemap_v2_range_key_sum_20_10mib	1105837398	0.00%	0		0	
-	btreemap_v2_range_value_sum_1k_0b	20854	19.06%	0		0	
-	btreemap_v2_range_value_sum_1k_10kib	57774189	0.92%	0		0	
-	btreemap_v2_range_value_sum_20_10mib	1105837634	0.00%	0		0	
-	btreemap_v2_remove_10mib_values	5564493299	-0.16%	0		657	0.00%
-	btreemap_v2_remove_blob8_u64	668804448	13.92%	0		0	
-	btreemap_v2_remove_blob_1024_128	6065208536	-6.35%	0		0	
-	btreemap_v2_remove_blob_128_128	1459264335	-0.43%	0		0	
-	btreemap_v2_remove_blob_16_128	758014983	11.04%	0		0	
-	btreemap_v2_remove_blob_256_128	2099751636	-4.07%	0		0	
-	btreemap_v2_remove_blob_32_1024	1037909662	7.36%	0		0	
-	btreemap_v2_remove_blob_32_128	803140084	9.48%	0		0	
-	btreemap_v2_remove_blob_32_16	756969960	9.61%	0		0	
-	btreemap_v2_remove_blob_32_256	838700580	9.18%	0		0	
-	btreemap_v2_remove_blob_32_32	767167635	9.74%	0		0	
-	btreemap_v2_remove_blob_32_4	751873616	10.33%	0		0	
-	btreemap_v2_remove_blob_32_512	912806115	8.76%	0		0	
-	btreemap_v2_remove_blob_32_64	795027356	9.99%	0		0	
-	btreemap_v2_remove_blob_32_8	750612254	9.94%	0		0	
-	btreemap_v2_remove_blob_4_128	522853604	14.35%	0		0	
-	btreemap_v2_remove_blob_512_128	3450228763	-4.13%	0		0	
-	btreemap_v2_remove_blob_64_128	948856984	-6.97%	0		0	
-	btreemap_v2_remove_blob_8_128	686452108	12.41%	0		0	
-	btreemap_v2_remove_u64_blob8	689742274	14.76%	0		0	
-	btreemap_v2_remove_u64_u64	713265933	14.39%	0		0	
-	btreemap_v2_remove_u64_vec8	696380317	14.58%	0		0	
-	btreemap_v2_remove_vec8_u64	806781054	7.73%	0		0	
-	btreemap_v2_remove_vec_1024_128	4539882292	-9.85%	0		0	
-	btreemap_v2_remove_vec_128_128	1464082933	0.32%	0		0	
-	btreemap_v2_remove_vec_16_128	975339295	7.47%	0		0	
-	btreemap_v2_remove_vec_256_128	2294300929	-0.93%	0		0	
-	btreemap_v2_remove_vec_32_1024	1733753822	2.98%	0		0	
-	btreemap_v2_remove_vec_32_128	1070855323	5.72%	0		0	
-	btreemap_v2_remove_vec_32_16	891843519	7.13%	0		0	
-	btreemap_v2_remove_vec_32_256	1280799340	3.46%	0		0	
-	btreemap_v2_remove_vec_32_32	898799502	7.11%	0		0	
-	btreemap_v2_remove_vec_32_4	897668964	7.18%	0		0	
-	btreemap_v2_remove_vec_32_512	1455570807	4.75%	0		0	
-	btreemap_v2_remove_vec_32_64	983544352	6.99%	0		0	
-	btreemap_v2_remove_vec_32_8	891552185	7.24%	0		0	
-	btreemap_v2_remove_vec_4_128	688616727	4.94%	0		0	
-	btreemap_v2_remove_vec_512_128	3131183908	-4.20%	0		0	
-	btreemap_v2_remove_vec_64_128	1193393218	1.04%	0		0	
-	btreemap_v2_remove_vec_8_128	877538654	7.33%	0		0	
-	btreemap_v2_scan_iter_1k_0b	2040278	36.61%	0		0	
-	btreemap_v2_scan_iter_1k_10kib	57556076	0.85%	0		0	
-	btreemap_v2_scan_iter_20_10mib	1103728361	0.00%	0		0	
-	btreemap_v2_scan_iter_rev_1k_0b	2042771	36.57%	0		0	
-	btreemap_v2_scan_iter_rev_1k_10kib	57527921	0.84%	0		0	
-	btreemap_v2_scan_iter_rev_20_10mib	1103728224	0.00%	0		0	
-	btreemap_v2_scan_keys_1k_0b	1646692	73.67%	0		0	
-	btreemap_v2_scan_keys_1k_10kib	3053417	29.29%	0		0	
-	btreemap_v2_scan_keys_20_10mib	18479257	0.07%	0		0	
-	btreemap_v2_scan_keys_rev_1k_0b	1647441	70.62%	0		0	
-	btreemap_v2_scan_keys_rev_1k_10kib	3035323	28.74%	0		0	
-	btreemap_v2_scan_keys_rev_20_10mib	18479261	0.07%	0		0	
-	btreemap_v2_scan_values_1k_0b	2017444	35.31%	0		0	
-	btreemap_v2_scan_values_1k_10kib	57533242	0.82%	0		0	
-	btreemap_v2_scan_values_20_10mib	1103727903	0.00%	0		0	
-	btreemap_v2_scan_values_rev_1k_0b	2019543	35.25%	0		0	
-	btreemap_v2_scan_values_rev_1k_10kib	57504693	0.81%	0		0	
-	btreemap_v2_scan_values_rev_20_10mib	1103727760	0.00%	0		0	
-new	memory_manager_baseline	1176576907		0		8000	
-new	memory_manager_grow	346601964		2		32000	
-new	memory_manager_overhead	1181961735		0		8320	
-new	vec_get_blob_128	19156662		0		0	
-new	vec_get_blob_16	6375946		0		0	
-new	vec_get_blob_32	7093505		0		0	
-new	vec_get_blob_4	4824327		0		0	
-new	vec_get_blob_4_mem_manager	7191677		0		0	
-new	vec_get_blob_64	11260944		0		0	
-new	vec_get_blob_64_mem_manager	13581092		0		0	
-new	vec_get_blob_8	5723201		0		0	
-new	vec_get_u64	5270306		0		0	
-new	vec_insert_blob_128	4151425		0		19	
-new	vec_insert_blob_16	3316228		0		2	
-new	vec_insert_blob_32	3435468		0		5	
-new	vec_insert_blob_4	3227469		0		0	
-new	vec_insert_blob_64	3675805		0		9	
-new	vec_insert_blob_8	3256890		0		1	
-new	vec_insert_u64	5869520		0		1	
+	btreemap_v1_contains_blob8_u64	194964325	0.00%	0		0	
+	btreemap_v1_contains_blob_1024_128	4811678256	0.00%	0		0	
+	btreemap_v1_contains_blob_128_128	848821075	0.00%	0		0	
+	btreemap_v1_contains_blob_16_128	227130263	0.00%	0		0	
+	btreemap_v1_contains_blob_256_128	1400918183	0.00%	0		0	
+	btreemap_v1_contains_blob_32_1024	258423010	0.00%	0		0	
+	btreemap_v1_contains_blob_32_128	252967804	0.00%	0		0	
+	btreemap_v1_contains_blob_32_16	262136410	0.00%	0		0	
+	btreemap_v1_contains_blob_32_256	258805575	0.00%	0		0	
+	btreemap_v1_contains_blob_32_32	260774803	0.00%	0		0	
+	btreemap_v1_contains_blob_32_4	257441140	0.00%	0		0	
+	btreemap_v1_contains_blob_32_512	255106465	0.00%	0		0	
+	btreemap_v1_contains_blob_32_64	254263738	0.00%	0		0	
+	btreemap_v1_contains_blob_32_8	256262361	0.00%	0		0	
+	btreemap_v1_contains_blob_4_128	165470839	0.00%	0		0	
+	btreemap_v1_contains_blob_512_128	2543816260	0.00%	0		0	
+	btreemap_v1_contains_blob_64_128	494398463	0.00%	0		0	
+	btreemap_v1_contains_blob_8_128	188408544	0.00%	0		0	
+	btreemap_v1_contains_u64_blob8	165774167	0.00%	0		0	
+	btreemap_v1_contains_u64_u64	165565754	0.00%	0		0	
+	btreemap_v1_get_blob8_u64	203390426	0.00%	0		0	
+	btreemap_v1_get_blob_1024_128	4868477772	0.00%	0		0	
+	btreemap_v1_get_blob_128_128	867025588	0.00%	0		0	
+	btreemap_v1_get_blob_16_128	240229350	0.00%	0		0	
+	btreemap_v1_get_blob_256_128	1426193247	0.00%	0		0	
+	btreemap_v1_get_blob_32_1024	276684587	0.00%	0		0	
+	btreemap_v1_get_blob_32_128	265367267	0.00%	0		0	
+	btreemap_v1_get_blob_32_16	270023113	0.00%	0		0	
+	btreemap_v1_get_blob_32_256	272563236	0.00%	0		0	
+	btreemap_v1_get_blob_32_32	269464920	0.00%	0		0	
+	btreemap_v1_get_blob_32_4	264590610	0.00%	0		0	
+	btreemap_v1_get_blob_32_512	270506018	0.00%	0		0	
+	btreemap_v1_get_blob_32_64	264723575	0.00%	0		0	
+	btreemap_v1_get_blob_32_8	264461611	0.00%	0		0	
+	btreemap_v1_get_blob_4_128	178539304	0.00%	0		0	
+	btreemap_v1_get_blob_512_128	2578989071	0.00%	0		0	
+	btreemap_v1_get_blob_64_128	508633530	0.00%	0		0	
+	btreemap_v1_get_blob_8_128	201236677	0.00%	0		0	
+	btreemap_v1_get_u64_blob8	173008513	0.00%	0		0	
+	btreemap_v1_get_u64_u64	173995203	0.00%	0		0	
+	btreemap_v1_insert_blob8_u64	329986725	0.00%	0		6	0.00%
+	btreemap_v1_insert_blob_1024_128	5007942824	0.00%	0		262	0.00%
+	btreemap_v1_insert_blob_128_128	1026805160	0.00%	0		61	0.00%
+	btreemap_v1_insert_blob_16_128	391942071	0.00%	0		32	0.00%
+	btreemap_v1_insert_blob_256_128	1576965603	0.00%	0		90	0.00%
+	btreemap_v1_insert_blob_32_1024	585609756	0.00%	0		230	0.00%
+	btreemap_v1_insert_blob_32_128	424489333	0.00%	0		37	0.00%
+	btreemap_v1_insert_blob_32_16	405326475	0.00%	0		14	0.00%
+	btreemap_v1_insert_blob_32_256	454178716	0.00%	0		66	0.00%
+	btreemap_v1_insert_blob_32_32	408531668	0.00%	0		17	0.00%
+	btreemap_v1_insert_blob_32_4	393759972	0.00%	0		11	0.00%
+	btreemap_v1_insert_blob_32_512	495214435	0.00%	0		121	0.00%
+	btreemap_v1_insert_blob_32_64	412537755	0.00%	0		24	0.00%
+	btreemap_v1_insert_blob_32_8	398133513	0.00%	0		12	0.00%
+	btreemap_v1_insert_blob_4_128	313593329	0.00%	0		17	0.00%
+	btreemap_v1_insert_blob_512_128	2754557121	0.00%	0		148	0.00%
+	btreemap_v1_insert_blob_64_128	671082804	0.00%	0		46	0.00%
+	btreemap_v1_insert_blob_8_128	358579533	0.00%	0		27	0.00%
+	btreemap_v1_insert_u64_blob8	339932921	0.00%	0		7	0.00%
+	btreemap_v1_insert_u64_u64	345608503	0.00%	0		7	0.00%
+	btreemap_v1_pop_first_blob8_u64	441600212	0.00%	0		0	
+	btreemap_v1_pop_first_blob_1024_128	9210292778	0.00%	0		0	
+	btreemap_v1_pop_first_blob_128_128	1819146872	0.00%	0		0	
+	btreemap_v1_pop_first_blob_16_128	588472296	0.00%	0		0	
+	btreemap_v1_pop_first_blob_256_128	2896727052	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_1024	958303933	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_128	696856907	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_16	643862300	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_256	733623810	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_32	654116869	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_4	624710634	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_512	799092498	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_64	663763332	0.00%	0		0	
+	btreemap_v1_pop_first_blob_32_8	640838262	0.00%	0		0	
+	btreemap_v1_pop_first_blob_4_128	279547807	0.00%	0		0	
+	btreemap_v1_pop_first_blob_512_128	4985501756	0.00%	0		0	
+	btreemap_v1_pop_first_blob_64_128	1148383275	0.00%	0		0	
+	btreemap_v1_pop_first_blob_8_128	466033258	0.00%	0		0	
+	btreemap_v1_pop_first_u64_blob8	554388115	0.00%	0		0	
+	btreemap_v1_pop_first_u64_u64	557488351	0.00%	0		0	
+	btreemap_v1_pop_last_blob8_u64	426716755	0.00%	0		0	
+	btreemap_v1_pop_last_blob_1024_128	9027882338	0.00%	0		0	
+	btreemap_v1_pop_last_blob_128_128	1774788118	0.00%	0		0	
+	btreemap_v1_pop_last_blob_16_128	579169231	0.00%	0		0	
+	btreemap_v1_pop_last_blob_256_128	2829351769	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_1024	937223741	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_128	674115649	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_16	624838280	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_256	711983530	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_32	635001845	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_4	612396356	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_512	781703090	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_64	643402362	0.00%	0		0	
+	btreemap_v1_pop_last_blob_32_8	617542418	0.00%	0		0	
+	btreemap_v1_pop_last_blob_4_128	271975462	0.00%	0		0	
+	btreemap_v1_pop_last_blob_512_128	4867658077	0.00%	0		0	
+	btreemap_v1_pop_last_blob_64_128	1116571899	0.00%	0		0	
+	btreemap_v1_pop_last_blob_8_128	462788982	0.00%	0		0	
+	btreemap_v1_pop_last_u64_blob8	541957924	0.00%	0		0	
+	btreemap_v1_pop_last_u64_u64	544107722	0.00%	0		0	
+	btreemap_v1_remove_blob8_u64	440652789	0.00%	0		0	
+	btreemap_v1_remove_blob_1024_128	6330406626	0.00%	0		0	
+	btreemap_v1_remove_blob_128_128	1321192633	0.00%	0		0	
+	btreemap_v1_remove_blob_16_128	539010219	0.00%	0		0	
+	btreemap_v1_remove_blob_256_128	2046189107	0.00%	0		0	
+	btreemap_v1_remove_blob_32_1024	826965331	0.00%	0		0	
+	btreemap_v1_remove_blob_32_128	589987880	0.00%	0		0	
+	btreemap_v1_remove_blob_32_16	546351365	0.00%	0		0	
+	btreemap_v1_remove_blob_32_256	626317576	0.00%	0		0	
+	btreemap_v1_remove_blob_32_32	555010200	0.00%	0		0	
+	btreemap_v1_remove_blob_32_4	538629074	0.00%	0		0	
+	btreemap_v1_remove_blob_32_512	697870456	0.00%	0		0	
+	btreemap_v1_remove_blob_32_64	576024269	0.00%	0		0	
+	btreemap_v1_remove_blob_32_8	539283194	0.00%	0		0	
+	btreemap_v1_remove_blob_4_128	344004557	0.00%	0		0	
+	btreemap_v1_remove_blob_512_128	3456175013	0.00%	0		0	
+	btreemap_v1_remove_blob_64_128	876109417	0.00%	0		0	
+	btreemap_v1_remove_blob_8_128	470964477	0.00%	0		0	
+	btreemap_v1_remove_u64_blob8	486384152	0.00%	0		0	
+	btreemap_v1_remove_u64_u64	499799718	0.00%	0		0	
+	btreemap_v2_contains_10mib_values	142217957	0.00%	0		0	
+	btreemap_v2_contains_blob8_u64	277214343	0.00%	0		0	
+	btreemap_v2_contains_blob_1024_128	4898946611	0.00%	0		0	
+	btreemap_v2_contains_blob_128_128	925555742	0.00%	0		0	
+	btreemap_v2_contains_blob_16_128	300251473	0.00%	0		0	
+	btreemap_v2_contains_blob_256_128	1482925551	0.00%	0		0	
+	btreemap_v2_contains_blob_32_1024	337656769	0.00%	0		0	
+	btreemap_v2_contains_blob_32_128	333839954	0.00%	0		0	
+	btreemap_v2_contains_blob_32_16	338174754	0.00%	0		0	
+	btreemap_v2_contains_blob_32_256	340508248	0.00%	0		0	
+	btreemap_v2_contains_blob_32_32	339595438	0.00%	0		0	
+	btreemap_v2_contains_blob_32_4	336896704	0.00%	0		0	
+	btreemap_v2_contains_blob_32_512	334090366	0.00%	0		0	
+	btreemap_v2_contains_blob_32_64	339081358	0.00%	0		0	
+	btreemap_v2_contains_blob_32_8	337301632	0.00%	0		0	
+	btreemap_v2_contains_blob_4_128	244740121	0.00%	0		0	
+	btreemap_v2_contains_blob_512_128	2625290726	0.00%	0		0	
+	btreemap_v2_contains_blob_64_128	582248673	0.00%	0		0	
+	btreemap_v2_contains_blob_8_128	269128362	0.00%	0		0	
+	btreemap_v2_contains_u64_blob8	233256018	0.00%	0		0	
+	btreemap_v2_contains_u64_u64	238556483	0.00%	0		0	
+	btreemap_v2_contains_u64_vec8	233256018	0.00%	0		0	
+	btreemap_v2_contains_vec8_u64	366392438	0.00%	0		0	
+	btreemap_v2_contains_vec_1024_128	2831649126	0.00%	0		0	
+	btreemap_v2_contains_vec_128_128	697463829	0.00%	0		0	
+	btreemap_v2_contains_vec_16_128	429709958	0.00%	0		0	
+	btreemap_v2_contains_vec_256_128	1219637100	0.00%	0		0	
+	btreemap_v2_contains_vec_32_1024	583325661	0.00%	0		0	
+	btreemap_v2_contains_vec_32_128	488605668	0.00%	0		0	
+	btreemap_v2_contains_vec_32_16	407833357	0.00%	0		0	
+	btreemap_v2_contains_vec_32_256	518646836	0.00%	0		0	
+	btreemap_v2_contains_vec_32_32	408431266	0.00%	0		0	
+	btreemap_v2_contains_vec_32_4	406670633	0.00%	0		0	
+	btreemap_v2_contains_vec_32_512	535001628	0.00%	0		0	
+	btreemap_v2_contains_vec_32_64	463282662	0.00%	0		0	
+	btreemap_v2_contains_vec_32_8	406570012	0.00%	0		0	
+	btreemap_v2_contains_vec_4_128	396937070	0.00%	0		0	
+	btreemap_v2_contains_vec_512_128	1811262338	0.00%	0		0	
+	btreemap_v2_contains_vec_64_128	594718276	0.00%	0		0	
+	btreemap_v2_contains_vec_8_128	389233979	0.00%	0		0	
+	btreemap_v2_get_10mib_values	1227477610	0.00%	0		0	
+	btreemap_v2_get_blob8_u64	299887024	0.00%	0		0	
+	btreemap_v2_get_blob_1024_128	4955392518	0.00%	0		0	
+	btreemap_v2_get_blob_128_128	947748410	0.00%	0		0	
+	btreemap_v2_get_blob_16_128	314026459	0.00%	0		0	
+	btreemap_v2_get_blob_256_128	1508348279	0.00%	0		0	
+	btreemap_v2_get_blob_32_1024	356990156	0.00%	0		0	
+	btreemap_v2_get_blob_32_128	347448180	0.00%	0		0	
+	btreemap_v2_get_blob_32_16	347299656	0.00%	0		0	
+	btreemap_v2_get_blob_32_256	355303994	0.00%	0		0	
+	btreemap_v2_get_blob_32_32	349432439	0.00%	0		0	
+	btreemap_v2_get_blob_32_4	344295894	0.00%	0		0	
+	btreemap_v2_get_blob_32_512	350683063	0.00%	0		0	
+	btreemap_v2_get_blob_32_64	350846830	0.00%	0		0	
+	btreemap_v2_get_blob_32_8	345200526	0.00%	0		0	
+	btreemap_v2_get_blob_4_128	257331691	0.00%	0		0	
+	btreemap_v2_get_blob_512_128	2661000456	0.00%	0		0	
+	btreemap_v2_get_blob_64_128	599970891	0.00%	0		0	
+	btreemap_v2_get_blob_8_128	282280016	0.00%	0		0	
+	btreemap_v2_get_u64_blob8	243494852	0.00%	0		0	
+	btreemap_v2_get_u64_u64	250731335	0.00%	0		0	
+	btreemap_v2_get_u64_vec8	244234847	0.00%	0		0	
+	btreemap_v2_get_vec8_u64	376783066	0.00%	0		0	
+	btreemap_v2_get_vec_1024_128	2901574721	0.00%	0		0	
+	btreemap_v2_get_vec_128_128	710234642	0.00%	0		0	
+	btreemap_v2_get_vec_16_128	439609550	0.00%	0		0	
+	btreemap_v2_get_vec_256_128	1232922460	0.00%	0		0	
+	btreemap_v2_get_vec_32_1024	597773339	0.00%	0		0	
+	btreemap_v2_get_vec_32_128	498889261	0.00%	0		0	
+	btreemap_v2_get_vec_32_16	415897245	0.00%	0		0	
+	btreemap_v2_get_vec_32_256	538935052	0.00%	0		0	
+	btreemap_v2_get_vec_32_32	416645143	0.00%	0		0	
+	btreemap_v2_get_vec_32_4	414613272	0.00%	0		0	
+	btreemap_v2_get_vec_32_512	558129383	0.00%	0		0	
+	btreemap_v2_get_vec_32_64	471860937	0.00%	0		0	
+	btreemap_v2_get_vec_32_8	414552400	0.00%	0		0	
+	btreemap_v2_get_vec_4_128	406578925	0.00%	0		0	
+	btreemap_v2_get_vec_512_128	1824668003	0.00%	0		0	
+	btreemap_v2_get_vec_64_128	606199240	0.00%	0		0	
+	btreemap_v2_get_vec_8_128	399016651	0.00%	0		0	
+	btreemap_v2_insert_10mib_values	5247391058	0.00%	322	0.00%	3613	0.00%
+	btreemap_v2_insert_blob8_u64	441373352	0.00%	0		4	0.00%
+	btreemap_v2_insert_blob_1024_128	5106163080	0.00%	0		196	0.00%
+	btreemap_v2_insert_blob_128_128	1134482770	0.00%	0		46	0.00%
+	btreemap_v2_insert_blob_16_128	495587755	0.00%	0		24	0.00%
+	btreemap_v2_insert_blob_256_128	1684101470	0.00%	0		67	0.00%
+	btreemap_v2_insert_blob_32_1024	687624180	0.00%	0		173	0.00%
+	btreemap_v2_insert_blob_32_128	529998238	0.00%	0		28	0.00%
+	btreemap_v2_insert_blob_32_16	510178804	0.00%	0		11	0.00%
+	btreemap_v2_insert_blob_32_256	561097508	0.00%	0		49	0.00%
+	btreemap_v2_insert_blob_32_32	515356067	0.00%	0		13	0.00%
+	btreemap_v2_insert_blob_32_4	498526133	0.00%	0		8	0.00%
+	btreemap_v2_insert_blob_32_512	598012415	0.00%	0		91	0.00%
+	btreemap_v2_insert_blob_32_64	520261508	0.00%	0		18	0.00%
+	btreemap_v2_insert_blob_32_8	506047152	0.00%	0		9	0.00%
+	btreemap_v2_insert_blob_4_128	411190916	0.00%	0		13	0.00%
+	btreemap_v2_insert_blob_512_128	2856354766	0.00%	0		111	0.00%
+	btreemap_v2_insert_blob_64_128	778656834	0.00%	0		34	0.00%
+	btreemap_v2_insert_blob_8_128	463637152	0.00%	0		20	0.00%
+	btreemap_v2_insert_u64_blob8	422673065	0.00%	0		5	0.00%
+	btreemap_v2_insert_u64_u64	431142993	0.00%	0		6	0.00%
+	btreemap_v2_insert_u64_vec8	429735780	0.00%	0		21	0.00%
+	btreemap_v2_insert_vec8_u64	582161939	0.00%	0		16	0.00%
+	btreemap_v2_insert_vec_1024_128	3320218687	0.00%	0		193	0.00%
+	btreemap_v2_insert_vec_128_128	1097316458	0.00%	0		51	0.00%
+	btreemap_v2_insert_vec_16_128	704073865	0.00%	0		31	0.00%
+	btreemap_v2_insert_vec_256_128	1507394441	0.00%	0		71	0.00%
+	btreemap_v2_insert_vec_32_1024	1223025783	0.00%	0		171	0.00%
+	btreemap_v2_insert_vec_32_128	761860698	0.00%	0		33	0.00%
+	btreemap_v2_insert_vec_32_16	664111576	0.00%	0		20	0.00%
+	btreemap_v2_insert_vec_32_256	890884138	0.00%	0		54	0.00%
+	btreemap_v2_insert_vec_32_32	666104854	0.00%	0		20	0.00%
+	btreemap_v2_insert_vec_32_4	660982082	0.00%	0		20	0.00%
+	btreemap_v2_insert_vec_32_512	1009309654	0.00%	0		91	0.00%
+	btreemap_v2_insert_vec_32_64	691846737	0.00%	0		24	0.00%
+	btreemap_v2_insert_vec_32_8	660579111	0.00%	0		20	0.00%
+	btreemap_v2_insert_vec_4_128	608945447	0.00%	0		16	0.00%
+	btreemap_v2_insert_vec_512_128	2128531367	0.00%	0		112	0.00%
+	btreemap_v2_insert_vec_64_128	879671097	0.00%	0		41	0.00%
+	btreemap_v2_insert_vec_8_128	666730079	0.00%	0		23	0.00%
+	btreemap_v2_mem_manager_contains_blob512_u64	2716382295	0.00%	0		0	
+	btreemap_v2_mem_manager_contains_u64_blob512	309085018	0.00%	0		0	
+	btreemap_v2_mem_manager_contains_u64_u64	314061355	0.00%	0		0	
+	btreemap_v2_mem_manager_contains_u64_vec512	395977762	0.00%	0		0	
+	btreemap_v2_mem_manager_contains_vec512_u64	1773578767	0.00%	0		0	
+	btreemap_v2_mem_manager_get_blob512_u64	2761459393	0.00%	0		0	
+	btreemap_v2_mem_manager_get_u64_blob512	326380391	0.00%	0		0	
+	btreemap_v2_mem_manager_get_u64_u64	328140916	0.00%	0		0	
+	btreemap_v2_mem_manager_get_u64_vec512	423093906	0.00%	0		0	
+	btreemap_v2_mem_manager_get_vec512_u64	1811142474	0.00%	0		0	
+	btreemap_v2_mem_manager_insert_blob512_u64	2958972800	0.00%	0		0	
+	btreemap_v2_mem_manager_insert_u64_blob512	646615329	0.00%	0		0	
+	btreemap_v2_mem_manager_insert_u64_u64	560299851	0.00%	0		0	
+	btreemap_v2_mem_manager_insert_u64_vec512	898844460	0.00%	0		0	
+	btreemap_v2_mem_manager_insert_vec512_u64	2251012407	0.00%	0		0	
+	btreemap_v2_mem_manager_remove_blob512_u64	3844702018	0.00%	0		0	
+	btreemap_v2_mem_manager_remove_u64_blob512	946812832	0.00%	0		0	
+	btreemap_v2_mem_manager_remove_u64_u64	806835295	0.00%	0		0	
+	btreemap_v2_mem_manager_remove_u64_vec512	1283899492	0.00%	0		0	
+	btreemap_v2_mem_manager_remove_vec512_u64	3327399755	0.00%	0		0	
+	btreemap_v2_pop_first_blob8_u64	610097435	0.00%	0		0	
+	btreemap_v2_pop_first_blob_1024_128	9397216286	0.00%	0		0	
+	btreemap_v2_pop_first_blob_128_128	2007433379	0.00%	0		0	
+	btreemap_v2_pop_first_blob_16_128	758505635	0.00%	0		0	
+	btreemap_v2_pop_first_blob_256_128	3093241998	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_1024	1134488534	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_128	878776661	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_16	820290659	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_256	909475486	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_32	832679269	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_4	803396353	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_512	975136110	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_64	840995585	0.00%	0		0	
+	btreemap_v2_pop_first_blob_32_8	819129261	0.00%	0		0	
+	btreemap_v2_pop_first_blob_4_128	372375122	0.00%	0		0	
+	btreemap_v2_pop_first_blob_512_128	5170729534	0.00%	0		0	
+	btreemap_v2_pop_first_blob_64_128	1329714089	0.00%	0		0	
+	btreemap_v2_pop_first_blob_8_128	612208263	0.00%	0		0	
+	btreemap_v2_pop_first_u64_blob8	705892053	0.00%	0		0	
+	btreemap_v2_pop_first_u64_u64	719150807	0.00%	0		0	
+	btreemap_v2_pop_first_u64_vec8	710034544	0.00%	0		0	
+	btreemap_v2_pop_first_vec8_u64	783784225	0.00%	0		0	
+	btreemap_v2_pop_first_vec_1024_128	5768601227	0.00%	0		0	
+	btreemap_v2_pop_first_vec_128_128	1815908841	0.00%	0		0	
+	btreemap_v2_pop_first_vec_16_128	1025275233	0.00%	0		0	
+	btreemap_v2_pop_first_vec_256_128	2526957213	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_1024	1812672679	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_128	1205877175	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_16	1038665239	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_256	1328280204	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_32	1055171969	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_4	1036107253	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_512	1490507215	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_64	1090635398	0.00%	0		0	
+	btreemap_v2_pop_first_vec_32_8	1048510168	0.00%	0		0	
+	btreemap_v2_pop_first_vec_4_128	537971781	0.00%	0		0	
+	btreemap_v2_pop_first_vec_512_128	3605170755	0.00%	0		0	
+	btreemap_v2_pop_first_vec_64_128	1400023412	0.00%	0		0	
+	btreemap_v2_pop_first_vec_8_128	846583253	0.00%	0		0	
+	btreemap_v2_pop_last_blob8_u64	593267468	0.00%	0		0	
+	btreemap_v2_pop_last_blob_1024_128	9217874627	0.00%	0		0	
+	btreemap_v2_pop_last_blob_128_128	1959347279	0.00%	0		0	
+	btreemap_v2_pop_last_blob_16_128	739233011	0.00%	0		0	
+	btreemap_v2_pop_last_blob_256_128	3018533213	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_1024	1114768577	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_128	856410708	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_16	799923507	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_256	888911791	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_32	811998333	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_4	788882349	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_512	957263780	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_64	822799302	0.00%	0		0	
+	btreemap_v2_pop_last_blob_32_8	798965415	0.00%	0		0	
+	btreemap_v2_pop_last_blob_4_128	363906126	0.00%	0		0	
+	btreemap_v2_pop_last_blob_512_128	5052214736	0.00%	0		0	
+	btreemap_v2_pop_last_blob_64_128	1308620317	0.00%	0		0	
+	btreemap_v2_pop_last_blob_8_128	612185424	0.00%	0		0	
+	btreemap_v2_pop_last_u64_blob8	693662883	0.00%	0		0	
+	btreemap_v2_pop_last_u64_u64	705949750	0.00%	0		0	
+	btreemap_v2_pop_last_u64_vec8	696415691	0.00%	0		0	
+	btreemap_v2_pop_last_vec8_u64	764594107	0.00%	0		0	
+	btreemap_v2_pop_last_vec_1024_128	6018998629	0.00%	0		0	
+	btreemap_v2_pop_last_vec_128_128	1831437061	0.00%	0		0	
+	btreemap_v2_pop_last_vec_16_128	1013525971	0.00%	0		0	
+	btreemap_v2_pop_last_vec_256_128	2582856979	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_1024	1807678468	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_128	1204371315	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_16	1028791023	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_256	1325707543	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_32	1044763371	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_4	1033959258	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_512	1490497731	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_64	1085292901	0.00%	0		0	
+	btreemap_v2_pop_last_vec_32_8	1035755953	0.00%	0		0	
+	btreemap_v2_pop_last_vec_4_128	529153123	0.00%	0		0	
+	btreemap_v2_pop_last_vec_512_128	3726754094	0.00%	0		0	
+	btreemap_v2_pop_last_vec_64_128	1412106259	0.00%	0		0	
+	btreemap_v2_pop_last_vec_8_128	854240460	0.00%	0		0	
+	btreemap_v2_range_count_1k_0b	16863	0.00%	0		0	
+	btreemap_v2_range_count_1k_10kib	2433555	0.00%	0		0	
+	btreemap_v2_range_count_20_10mib	20572756	0.00%	0		0	
+	btreemap_v2_range_key_sum_1k_0b	17472	0.00%	0		0	
+	btreemap_v2_range_key_sum_1k_10kib	57248241	0.00%	0		0	
+	btreemap_v2_range_key_sum_20_10mib	1105826495	0.00%	0		0	
+	btreemap_v2_range_value_sum_1k_0b	17486	0.00%	0		0	
+	btreemap_v2_range_value_sum_1k_10kib	57260237	0.00%	0		0	
+	btreemap_v2_range_value_sum_20_10mib	1105826731	0.00%	0		0	
+	btreemap_v2_remove_10mib_values	5573675958	0.00%	0		657	0.00%
+	btreemap_v2_remove_blob8_u64	589204655	0.00%	0		0	
+	btreemap_v2_remove_blob_1024_128	6474679665	0.00%	0		0	
+	btreemap_v2_remove_blob_128_128	1466727057	0.00%	0		0	
+	btreemap_v2_remove_blob_16_128	680456789	0.00%	0		0	
+	btreemap_v2_remove_blob_256_128	2195090992	0.00%	0		0	
+	btreemap_v2_remove_blob_32_1024	967043546	0.00%	0		0	
+	btreemap_v2_remove_blob_32_128	732131285	0.00%	0		0	
+	btreemap_v2_remove_blob_32_16	687946321	0.00%	0		0	
+	btreemap_v2_remove_blob_32_256	767243066	0.00%	0		0	
+	btreemap_v2_remove_blob_32_32	696520229	0.00%	0		0	
+	btreemap_v2_remove_blob_32_4	680067993	0.00%	0		0	
+	btreemap_v2_remove_blob_32_512	838959445	0.00%	0		0	
+	btreemap_v2_remove_blob_32_64	720951953	0.00%	0		0	
+	btreemap_v2_remove_blob_32_8	679964928	0.00%	0		0	
+	btreemap_v2_remove_blob_4_128	455950575	0.00%	0		0	
+	btreemap_v2_remove_blob_512_128	3599722153	0.00%	0		0	
+	btreemap_v2_remove_blob_64_128	1020586460	0.00%	0		0	
+	btreemap_v2_remove_blob_8_128	608937116	0.00%	0		0	
+	btreemap_v2_remove_u64_blob8	598070676	0.00%	0		0	
+	btreemap_v2_remove_u64_u64	620231677	0.00%	0		0	
+	btreemap_v2_remove_u64_vec8	603988416	0.00%	0		0	
+	btreemap_v2_remove_vec8_u64	751143040	0.00%	0		0	
+	btreemap_v2_remove_vec_1024_128	4984095519	0.00%	0		0	
+	btreemap_v2_remove_vec_128_128	1452997160	0.00%	0		0	
+	btreemap_v2_remove_vec_16_128	907562996	0.00%	0		0	
+	btreemap_v2_remove_vec_256_128	2315915215	0.00%	0		0	
+	btreemap_v2_remove_vec_32_1024	1680348770	0.00%	0		0	
+	btreemap_v2_remove_vec_32_128	1011708017	0.00%	0		0	
+	btreemap_v2_remove_vec_32_16	834826918	0.00%	0		0	
+	btreemap_v2_remove_vec_32_256	1238341769	0.00%	0		0	
+	btreemap_v2_remove_vec_32_32	841693645	0.00%	0		0	
+	btreemap_v2_remove_vec_32_4	840170276	0.00%	0		0	
+	btreemap_v2_remove_vec_32_512	1401695456	0.00%	0		0	
+	btreemap_v2_remove_vec_32_64	924632537	0.00%	0		0	
+	btreemap_v2_remove_vec_32_8	833854541	0.00%	0		0	
+	btreemap_v2_remove_vec_4_128	647882487	0.00%	0		0	
+	btreemap_v2_remove_vec_512_128	3266943550	0.00%	0		0	
+	btreemap_v2_remove_vec_64_128	1179932505	0.00%	0		0	
+	btreemap_v2_remove_vec_8_128	822292826	0.00%	0		0	
+	btreemap_v2_scan_iter_1k_0b	1493608	0.00%	0		0	
+	btreemap_v2_scan_iter_1k_10kib	57070268	0.00%	0		0	
+	btreemap_v2_scan_iter_20_10mib	1103719780	0.00%	0		0	
+	btreemap_v2_scan_iter_rev_1k_0b	1495895	0.00%	0		0	
+	btreemap_v2_scan_iter_rev_1k_10kib	57048055	0.00%	0		0	
+	btreemap_v2_scan_iter_rev_20_10mib	1103719362	0.00%	0		0	
+	btreemap_v2_scan_keys_1k_0b	948235	0.00%	0		0	
+	btreemap_v2_scan_keys_1k_10kib	2361935	0.00%	0		0	
+	btreemap_v2_scan_keys_20_10mib	18465489	0.00%	0		0	
+	btreemap_v2_scan_keys_rev_1k_0b	965620	0.00%	0		0	
+	btreemap_v2_scan_keys_rev_1k_10kib	2357983	0.00%	0		0	
+	btreemap_v2_scan_keys_rev_20_10mib	18465824	0.00%	0		0	
+	btreemap_v2_scan_values_1k_0b	1491006	0.00%	0		0	
+	btreemap_v2_scan_values_1k_10kib	57067666	0.00%	0		0	
+	btreemap_v2_scan_values_20_10mib	1103719730	0.00%	0		0	
+	btreemap_v2_scan_values_rev_1k_0b	1493293	0.00%	0		0	
+	btreemap_v2_scan_values_rev_1k_10kib	57045453	0.00%	0		0	
+	btreemap_v2_scan_values_rev_20_10mib	1103719312	0.00%	0		0	
+	memory_manager_baseline	1176576907	0.00%	0		8000	0.00%
+	memory_manager_grow	346601964	0.00%	2	0.00%	32000	0.00%
+	memory_manager_overhead	1181961735	0.00%	0		8320	0.00%
+	vec_get_blob_128	19156662	0.00%	0		0	
+	vec_get_blob_16	6375946	0.00%	0		0	
+	vec_get_blob_32	7093505	0.00%	0		0	
+	vec_get_blob_4	4824327	0.00%	0		0	
+	vec_get_blob_4_mem_manager	7191677	0.00%	0		0	
+	vec_get_blob_64	11260944	0.00%	0		0	
+	vec_get_blob_64_mem_manager	13581092	0.00%	0		0	
+	vec_get_blob_8	5723201	0.00%	0		0	
+	vec_get_u64	5270306	0.00%	0		0	
+	vec_insert_blob_128	4151425	0.00%	0		19	0.00%
+	vec_insert_blob_16	3316228	0.00%	0		2	0.00%
+	vec_insert_blob_32	3435468	0.00%	0		5	0.00%
+	vec_insert_blob_4	3227469	0.00%	0		0	
+	vec_insert_blob_64	3675805	0.00%	0		9	0.00%
+	vec_insert_blob_8	3256890	0.00%	0		1	0.00%
+	vec_insert_u64	5869520	0.00%	0		1	0.00%
