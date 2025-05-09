@@ -295,7 +295,7 @@ This causes changes in one map to affect or corrupt the other.</p>
 We'll explore this solution in the next section.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="memory-manager"><a class="header" href="#memory-manager">Memory Manager</a></h1>
 <p>As mentioned in the previous section, each stable structure requires its own dedicated <code>Memory</code> instance.
-This is an intentional design decision that limits <a href="concepts/./design-principles.html">the blast radius</a> of potential bugs, ensuring that issues only affect the specific stable structure and its associated memory, not other stable structures.</p>
+This is an intentional design decision that limits <a href="concepts/../introduction/design-principles.html">the blast radius</a> of potential bugs, ensuring that issues only affect the specific stable structure and its associated memory, not other stable structures.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <p>The Memory Manager enables the creation of up to 255 virtual memories from a single underlying memory instance.
 When used with stable memory, this allows you to maintain up to 255 separate stable structures, each with its own isolated memory space.</p>
