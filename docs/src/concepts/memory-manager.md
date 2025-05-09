@@ -1,7 +1,7 @@
 # Memory Manager
 
 As mentioned in the previous section, each stable structure requires its own dedicated `Memory` instance.
-This is an intentional design decision that limits [the blast radius](./design-principles.md) of potential bugs, ensuring that issues only affect the specific stable structure and its associated memory, not other stable structures.
+This is an intentional design decision that limits [the blast radius](../introduction/design-principles.md) of potential bugs, ensuring that issues only affect the specific stable structure and its associated memory, not other stable structures.
 
 ## Overview
 
