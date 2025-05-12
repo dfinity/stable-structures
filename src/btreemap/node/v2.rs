@@ -114,8 +114,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         #[cfg(feature = "canbench")]
         let _p = canbench::profile("node_load_v2");
 
+        // #[cfg(feature = "canbench-rs")]
+        // let _p = crate::debug::InstructionCounter::new("load_v2");
+
         // Load the node, including any overflows, into a buffer.
-        let overflows = read_overflows(address, memory);
+        let overflows = {
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("read_overflows");
+            read_overflows(address, memory)
+        };
 
         let reader = NodeReader {
             address,
@@ -140,6 +147,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         offset += ENTRIES_OFFSET;
         let mut children = vec![];
         if node_type == NodeType::Internal {
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("read_children");
             // The number of children is equal to the number of entries + 1.
             children.reserve_exact(num_entries + 1);
             for _ in 0..num_entries + 1 {
@@ -152,32 +161,72 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load the keys.
         let mut keys_encoded_values = Vec::with_capacity(num_entries);
         let mut buf = vec![];
-        for _ in 0..num_entries {
-            // Load the key's size.
-            let key_size = if K::BOUND.is_fixed_size() {
-                // Key is fixed in size. The size of the key is always its max size.
-                K::BOUND.max_size()
-            } else {
-                // Key is not fixed in size. Read the size from memory.
-                let value = read_u32(&reader, offset);
-                offset += U32_SIZE;
-                value
-            };
+        {
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("read_keys");
 
-            // Load the key.
-            read_to_vec(&reader, offset, &mut buf, key_size as usize);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
-            offset += Bytes::from(key_size);
-            keys_encoded_values.push((key, Value::by_ref(Bytes::from(0usize))));
+            for _ in 0..num_entries {
+                // Load the key's size.
+                let key_size = if K::BOUND.is_fixed_size() {
+                    // Key is fixed in size. The size of the key is always its max size.
+                    K::BOUND.max_size()
+                } else {
+                    // Key is not fixed in size. Read the size from memory.
+                    let value = read_u32(&reader, offset);
+                    offset += U32_SIZE;
+                    value
+                };
+
+                // Load the key.
+                read_to_vec(&reader, offset, &mut buf, key_size as usize);
+                let key = K::from_bytes(Cow::Borrowed(&buf));
+                offset += Bytes::from(key_size);
+                keys_encoded_values.push((key, Value::by_ref(Bytes::from(0usize))));
+            }
         }
 
         // Load the values
-        for (_key, value) in keys_encoded_values.iter_mut() {
-            // Load the values lazily.
-            *value = Value::by_ref(Bytes::from(offset.get()));
-            let value_size = read_u32(&reader, offset) as usize;
-            offset += U32_SIZE + Bytes::from(value_size as u64);
+        {
+            #[cfg(feature = "canbench-rs")]
+            let _p = crate::debug::InstructionCounter::new("read_values");
+
+            for (_key, value) in keys_encoded_values.iter_mut() {
+                // Load the values lazily.
+                *value = Value::by_ref(Bytes::from(offset.get()));
+                let value_size = read_u32(&reader, offset) as usize;
+                offset += U32_SIZE + Bytes::from(value_size as u64);
+            }
         }
+
+        /*
+        $ canbench btreemap_get_u64_blob_8_v2 --show-canister-output
+
+        read_keys      :   221_987_821 ( 43.0 %), 94018
+        read_values    :   130_187_984 ( 25.2 %), 94018
+        read_children  :   113_994_776 ( 22.1 %), 72846
+        read_overflows :    50_249_184 (  9.7 %), 94018
+
+        $ canbench btreemap_get_blob_4_1024_v2 --show-canister-output
+
+        read_keys      :   247_653_437 ( 49.2 %), 78056
+        read_values    :   116_455_554 ( 23.1 %), 78056
+        read_children  :    98_024_327 ( 19.5 %), 58611
+        read_overflows :    41_560_306 (  8.3 %), 78056
+
+        $ canbench btreemap_get_blob_8_1024_v2 --show-canister-output
+
+        read_keys      :   293_619_121 ( 51.2 %), 91593
+        read_values    :   123_878_903 ( 21.6 %), 91593
+        read_children  :   107_642_317 ( 18.8 %), 71093
+        read_overflows :    48_610_398 (  8.5 %), 91593
+
+        $ canbench btreemap_get_blob_256_1024_v2 --show-canister-output
+
+        read_keys      : 2_590_429_735 ( 89.9 %), 94120
+        read_values    :   129_692_848 (  4.5 %), 94120
+        read_children  :   112_488_061 (  3.9 %), 72949
+        read_overflows :    50_042_554 (  1.7 %), 94120
+        */
 
         Self {
             address,
