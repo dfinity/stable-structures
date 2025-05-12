@@ -119,7 +119,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: canbench_results.csv
+          name: canbench_results_${{github.job}}.csv
           path: ${{ env.PROJECT_DIR }}/canbench_results.csv
 
       - name: Save PR number
