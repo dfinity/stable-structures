@@ -42,7 +42,7 @@ if grep -q "(regress\|(improved by \|(new)" "$CANBENCH_OUTPUT"; then
   # Results are outdated; fail the job.
   echo "EXIT_STATUS=1" >> "$GITHUB_ENV"
 else
-  UPDATED_MSG="**✅ \`$CANBENCH_RESULTS_FILE\` is up to date**";
+  UPDATED_MSG="✅ \`$CANBENCH_RESULTS_FILE\` is up to date";
 
   # Results are up to date; job succeeds.
   echo "EXIT_STATUS=0" >> "$GITHUB_ENV"
