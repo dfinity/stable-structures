@@ -66,17 +66,17 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
   popd
 
-  CSV_RESULTS_FILE_MSG="[$CANBENCH_CSV_RESULTS_FILE](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+  CSV_RESULTS_FILE_MSG="Go to the [Artifacts section of this workflow run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) to download \`$CANBENCH_CSV_RESULTS_FILE\`"
 fi
 
 # Append the update status and benchmark output to the comment.
 {
   echo "$UPDATED_MSG"
-  echo "$CSV_RESULTS_FILE_MSG"
   echo ""
   echo "\`\`\`"
   cat "$CANBENCH_OUTPUT"
   echo "\`\`\`"
+  echo "$CSV_RESULTS_FILE_MSG"
 } >> "$COMMENT_MESSAGE_PATH"
 
 # Output the comment to stdout.
