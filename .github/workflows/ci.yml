@@ -129,7 +129,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: canbench_results.csv
-          path: $PROJECT_DIR/canbench_results.csv
+          path: ${{ env.PROJECT_DIR }}/canbench_results.csv
 
       - name: Pass or fail
         run: |
