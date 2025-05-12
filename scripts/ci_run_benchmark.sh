@@ -66,7 +66,7 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
   popd
 
-  CSV_RESULTS_FILE_MSG="📦 \`$CANBENCH_CSV_RESULTS_FILE\` available in [artifacts](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
+  CSV_RESULTS_FILE_MSG="📦 \`canbench_results_$CANBENCH_JOB_NAME.csv\` available in [artifacts](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
 fi
 
 # Append the update status and benchmark output to the comment.
