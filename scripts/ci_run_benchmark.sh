@@ -24,7 +24,7 @@ CANBENCH_CSV_RESULTS_FILE="$CANISTER_PATH/canbench_results.csv"
 
 # Install canbench
 #cargo install canbench
-cargo install --git https://github.com/dfinity/canbench --branch maksym/summary-fix
+cargo install --git https://github.com/dfinity/canbench --branch maksym/summary-fix canbench-rs
 
 # Verify that the canbench results file exists.
 if [ ! -f "$CANBENCH_RESULTS_FILE" ]; then
