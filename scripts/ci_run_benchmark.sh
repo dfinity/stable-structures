@@ -72,11 +72,11 @@ fi
 # Append the update status and benchmark output to the comment.
 {
   echo "$UPDATED_MSG"
+  echo "$CSV_RESULTS_FILE_MSG"
   echo ""
   echo "\`\`\`"
   cat "$CANBENCH_OUTPUT"
   echo "\`\`\`"
-  echo "$CSV_RESULTS_FILE_MSG"
 } >> "$COMMENT_MESSAGE_PATH"
 
 # Output the comment to stdout.
