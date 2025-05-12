@@ -66,9 +66,7 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
   popd
 
-  CSV_RESULTS_FILE_MSG="[$CANBENCH_CSV_RESULTS_FILE]((${{
-      github.server_url
-    }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))";
+  CSV_RESULTS_FILE_MSG="[$CANBENCH_CSV_RESULTS_FILE](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
 fi
 
 # Append the update status and benchmark output to the comment.
