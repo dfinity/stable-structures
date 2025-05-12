@@ -1,631 +1,631 @@
 benches:
   btreemap_contains_key_blob_4_1024:
     total:
-      instructions: 166001914
+      instructions: 169469784
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_contains_key_blob_4_1024_v2:
     total:
-      instructions: 246601950
+      instructions: 252124363
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_128_1024:
     total:
-      instructions: 871377876
+      instructions: 875298120
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_128_1024_v2:
     total:
-      instructions: 952392232
+      instructions: 958389832
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_16_1024:
     total:
-      instructions: 246862999
+      instructions: 250615661
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_16_1024_v2:
     total:
-      instructions: 322886246
+      instructions: 328657057
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_256_1024:
     total:
-      instructions: 1438374032
+      instructions: 1442307499
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_256_1024_v2:
     total:
-      instructions: 1522510073
+      instructions: 1528534974
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_32_1024:
     total:
-      instructions: 280106753
+      instructions: 283943010
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_32_1024_v2:
     total:
-      instructions: 358059333
+      instructions: 363951678
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_4_1024:
     total:
-      instructions: 183878301
+      instructions: 187456091
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_4_1024_v2:
     total:
-      instructions: 268405509
+      instructions: 273997842
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_512_1024:
     total:
-      instructions: 2574022258
+      instructions: 2577959906
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_512_1024_v2:
     total:
-      instructions: 2652896326
+      instructions: 2658926517
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_512_1024_v2_mem_manager:
     total:
-      instructions: 2758935791
+      instructions: 2768739340
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_64_1024:
     total:
-      instructions: 522452995
+      instructions: 526354436
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_64_1024_v2:
     total:
-      instructions: 602470701
+      instructions: 608459881
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_8_1024:
     total:
-      instructions: 217400958
+      instructions: 220966298
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_8_1024_v2:
     total:
-      instructions: 299709230
+      instructions: 305230580
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_8_u64:
     total:
-      instructions: 201178258
+      instructions: 204694669
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_blob_8_u64_v2:
     total:
-      instructions: 298067608
+      instructions: 303670888
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_u64_blob_8:
     total:
-      instructions: 175651041
+      instructions: 179387819
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_u64_blob_8_v2:
     total:
-      instructions: 249967569
+      instructions: 255188677
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_u64_u64:
     total:
-      instructions: 176359016
+      instructions: 180094040
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_u64_u64_v2:
     total:
-      instructions: 256656270
+      instructions: 262029311
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_get_u64_u64_v2_mem_manager:
     total:
-      instructions: 336179948
+      instructions: 344368721
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_insert_10mib_values:
     total:
-      instructions: 5239421355
+      instructions: 5240175501
       heap_increase: 0
       stable_memory_increase: 3613
     scopes: {}
   btreemap_insert_blob_1024_128:
     total:
-      instructions: 5110664101
-      heap_increase: 0
+      instructions: 5114518490
+      heap_increase: 1
       stable_memory_increase: 262
     scopes: {}
   btreemap_insert_blob_1024_128_v2:
     total:
-      instructions: 5201936582
-      heap_increase: 0
+      instructions: 5212695902
+      heap_increase: 1
       stable_memory_increase: 196
     scopes: {}
   btreemap_insert_blob_1024_16:
     total:
-      instructions: 5113272660
-      heap_increase: 0
+      instructions: 5117120171
+      heap_increase: 1
       stable_memory_increase: 241
     scopes: {}
   btreemap_insert_blob_1024_16_v2:
     total:
-      instructions: 5200160649
-      heap_increase: 0
+      instructions: 5210937672
+      heap_increase: 1
       stable_memory_increase: 181
     scopes: {}
   btreemap_insert_blob_1024_256:
     total:
-      instructions: 5132006019
-      heap_increase: 0
+      instructions: 5135859787
+      heap_increase: 1
       stable_memory_increase: 292
     scopes: {}
   btreemap_insert_blob_1024_256_v2:
     total:
-      instructions: 5225716019
-      heap_increase: 0
+      instructions: 5236480487
+      heap_increase: 1
       stable_memory_increase: 219
     scopes: {}
   btreemap_insert_blob_1024_32:
     total:
-      instructions: 5096510160
-      heap_increase: 0
+      instructions: 5100411954
+      heap_increase: 1
       stable_memory_increase: 239
     scopes: {}
   btreemap_insert_blob_1024_32_v2:
     total:
-      instructions: 5194736210
-      heap_increase: 0
+      instructions: 5205560518
+      heap_increase: 1
       stable_memory_increase: 180
     scopes: {}
   btreemap_insert_blob_1024_4:
     total:
-      instructions: 5019310618
-      heap_increase: 0
+      instructions: 5023073437
+      heap_increase: 1
       stable_memory_increase: 235
     scopes: {}
   btreemap_insert_blob_1024_4_v2:
     total:
-      instructions: 5098222305
-      heap_increase: 0
+      instructions: 5108895347
+      heap_increase: 1
       stable_memory_increase: 176
     scopes: {}
   btreemap_insert_blob_1024_512:
     total:
-      instructions: 5206323531
-      heap_increase: 0
+      instructions: 5210207745
+      heap_increase: 1
       stable_memory_increase: 348
     scopes: {}
   btreemap_insert_blob_1024_512_v2:
     total:
-      instructions: 5305867254
-      heap_increase: 0
+      instructions: 5316669695
+      heap_increase: 1
       stable_memory_increase: 261
     scopes: {}
   btreemap_insert_blob_1024_512_v2_mem_manager:
     total:
-      instructions: 5474908000
+      instructions: 5488664384
       heap_increase: 0
       stable_memory_increase: 256
     scopes: {}
   btreemap_insert_blob_1024_64:
     total:
-      instructions: 5150175789
-      heap_increase: 0
+      instructions: 5154047029
+      heap_increase: 1
       stable_memory_increase: 250
     scopes: {}
   btreemap_insert_blob_1024_64_v2:
     total:
-      instructions: 5249105297
-      heap_increase: 0
+      instructions: 5259907332
+      heap_increase: 1
       stable_memory_increase: 188
     scopes: {}
   btreemap_insert_blob_1024_8:
     total:
-      instructions: 5085348900
-      heap_increase: 0
+      instructions: 5089192216
+      heap_increase: 1
       stable_memory_increase: 237
     scopes: {}
   btreemap_insert_blob_1024_8_v2:
     total:
-      instructions: 5187558037
-      heap_increase: 0
+      instructions: 5198319161
+      heap_increase: 1
       stable_memory_increase: 178
     scopes: {}
   btreemap_insert_blob_128_1024:
     total:
-      instructions: 1273227463
+      instructions: 1277081646
       heap_increase: 0
       stable_memory_increase: 260
     scopes: {}
   btreemap_insert_blob_128_1024_v2:
     total:
-      instructions: 1373313309
+      instructions: 1384052132
       heap_increase: 0
       stable_memory_increase: 195
     scopes: {}
   btreemap_insert_blob_16_1024:
     total:
-      instructions: 637805470
+      instructions: 641394478
       heap_increase: 0
       stable_memory_increase: 215
     scopes: {}
   btreemap_insert_blob_16_1024_v2:
     total:
-      instructions: 732455990
+      instructions: 742725467
       heap_increase: 0
       stable_memory_increase: 161
     scopes: {}
   btreemap_insert_blob_256_1024:
     total:
-      instructions: 1859840193
-      heap_increase: 0
+      instructions: 1863726835
+      heap_increase: 1
       stable_memory_increase: 292
     scopes: {}
   btreemap_insert_blob_256_1024_v2:
     total:
-      instructions: 1957855803
-      heap_increase: 0
+      instructions: 1968658931
+      heap_increase: 1
       stable_memory_increase: 219
     scopes: {}
   btreemap_insert_blob_32_1024:
     total:
-      instructions: 672870979
+      instructions: 676569191
       heap_increase: 0
       stable_memory_increase: 230
     scopes: {}
   btreemap_insert_blob_32_1024_v2:
     total:
-      instructions: 770164792
+      instructions: 780976814
       heap_increase: 0
       stable_memory_increase: 173
     scopes: {}
   btreemap_insert_blob_4_1024:
     total:
-      instructions: 497280451
+      instructions: 500576898
       heap_increase: 0
       stable_memory_increase: 123
     scopes: {}
   btreemap_insert_blob_4_1024_v2:
     total:
-      instructions: 593852839
+      instructions: 603454466
       heap_increase: 0
       stable_memory_increase: 92
     scopes: {}
   btreemap_insert_blob_512_1024:
     total:
-      instructions: 3010795691
-      heap_increase: 0
+      instructions: 3014648517
+      heap_increase: 1
       stable_memory_increase: 351
     scopes: {}
   btreemap_insert_blob_512_1024_v2:
     total:
-      instructions: 3104696455
-      heap_increase: 0
+      instructions: 3115455924
+      heap_increase: 1
       stable_memory_increase: 263
     scopes: {}
   btreemap_insert_blob_64_1024:
     total:
-      instructions: 919935850
+      instructions: 923800657
       heap_increase: 0
       stable_memory_increase: 245
     scopes: {}
   btreemap_insert_blob_64_1024_v2:
     total:
-      instructions: 1015903332
+      instructions: 1026634447
       heap_increase: 0
       stable_memory_increase: 183
     scopes: {}
   btreemap_insert_blob_8_1024:
     total:
-      instructions: 607806777
-      heap_increase: 0
+      instructions: 611450514
+      heap_increase: 1
       stable_memory_increase: 183
     scopes: {}
   btreemap_insert_blob_8_1024_v2:
     total:
-      instructions: 709530767
-      heap_increase: 0
+      instructions: 719684749
+      heap_increase: 1
       stable_memory_increase: 138
     scopes: {}
   btreemap_insert_blob_8_u64:
     total:
-      instructions: 330300136
+      instructions: 333931552
       heap_increase: 0
       stable_memory_increase: 6
     scopes: {}
   btreemap_insert_blob_8_u64_v2:
     total:
-      instructions: 441129700
+      instructions: 451450324
       heap_increase: 0
       stable_memory_increase: 4
     scopes: {}
   btreemap_insert_u64_blob_8:
     total:
-      instructions: 339919034
+      instructions: 343713037
       heap_increase: 0
       stable_memory_increase: 7
     scopes: {}
   btreemap_insert_u64_blob_8_v2:
     total:
-      instructions: 420318618
+      instructions: 429355209
       heap_increase: 0
       stable_memory_increase: 5
     scopes: {}
   btreemap_insert_u64_u64:
     total:
-      instructions: 345460000
+      instructions: 349264000
       heap_increase: 0
       stable_memory_increase: 7
     scopes: {}
   btreemap_insert_u64_u64_v2:
     total:
-      instructions: 428895247
+      instructions: 438127284
       heap_increase: 0
       stable_memory_increase: 6
     scopes: {}
   btreemap_insert_u64_u64_v2_mem_manager:
     total:
-      instructions: 558130823
+      instructions: 570710185
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_10mib_values:
     total:
-      instructions: 11407378
+      instructions: 11419695
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_count_10mib_values:
     total:
-      instructions: 477294
+      instructions: 480993
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_count_small_values:
     total:
-      instructions: 9442536
+      instructions: 9517457
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_rev_10mib_values:
     total:
-      instructions: 11404381
+      instructions: 11416698
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_rev_small_values:
     total:
-      instructions: 14975521
+      instructions: 15080442
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_iter_small_values:
     total:
-      instructions: 14978614
+      instructions: 15083535
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_keys_10mib_values:
     total:
-      instructions: 464952
+      instructions: 468649
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_keys_rev_10mib_values:
     total:
-      instructions: 464595
+      instructions: 468292
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_keys_rev_small_values:
     total:
-      instructions: 9673706
+      instructions: 9748627
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_keys_small_values:
     total:
-      instructions: 9526093
+      instructions: 9601014
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_read_every_third_value_from_range:
     total:
-      instructions: 84178476
+      instructions: 84983532
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_read_keys_from_range:
     total:
-      instructions: 84218480
+      instructions: 84863536
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_128_1024:
     total:
-      instructions: 1574675940
+      instructions: 1580086602
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_128_1024_v2:
     total:
-      instructions: 1717684218
+      instructions: 1734931099
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_16_1024:
     total:
-      instructions: 758136944
+      instructions: 763364778
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_16_1024_v2:
     total:
-      instructions: 895985762
+      instructions: 912195771
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_256_1024:
     total:
-      instructions: 2279163553
+      instructions: 2284530194
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_256_1024_v2:
     total:
-      instructions: 2417905594
+      instructions: 2434897741
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_32_1024:
     total:
-      instructions: 827599093
+      instructions: 832447089
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_32_1024_v2:
     total:
-      instructions: 966757633
+      instructions: 983491052
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_4_1024:
     total:
-      instructions: 486469240
+      instructions: 490334277
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_4_1024_v2:
     total:
-      instructions: 600093407
+      instructions: 611803324
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_512_1024:
     total:
-      instructions: 3748993388
+      instructions: 3754452723
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_512_1024_v2:
     total:
-      instructions: 3878241779
+      instructions: 3895673373
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_64_1024:
     total:
-      instructions: 1141008090
+      instructions: 1146402063
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_64_1024_v2:
     total:
-      instructions: 1280920638
+      instructions: 1297967972
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_8_1024:
     total:
-      instructions: 644735138
+      instructions: 649471665
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_8_1024_v2:
     total:
-      instructions: 776768069
+      instructions: 791177089
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_8_u64:
     total:
-      instructions: 435032682
+      instructions: 439940329
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_blob_8_u64_v2:
     total:
-      instructions: 584053097
+      instructions: 599505024
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_u64_blob_8:
     total:
-      instructions: 485748982
+      instructions: 491127110
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_u64_blob_8_v2:
     total:
-      instructions: 601012747
+      instructions: 615420377
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_u64_u64:
     total:
-      instructions: 498934285
+      instructions: 504386323
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_remove_u64_u64_v2:
     total:
-      instructions: 623495817
+      instructions: 638625466
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_values_10mib_values:
     total:
-      instructions: 11406858
+      instructions: 11419175
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_values_rev_10mib_values:
     total:
-      instructions: 11403861
+      instructions: 11416178
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_values_rev_small_values:
     total:
-      instructions: 14949517
+      instructions: 15054438
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_values_small_values:
     total:
-      instructions: 14952610
+      instructions: 15057531
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -637,13 +637,13 @@ benches:
     scopes: {}
   memory_manager_grow:
     total:
-      instructions: 346600495
+      instructions: 346600533
       heap_increase: 2
       stable_memory_increase: 32000
     scopes: {}
   memory_manager_overhead:
     total:
-      instructions: 1181961433
+      instructions: 1181960932
       heap_increase: 0
       stable_memory_increase: 8320
     scopes: {}
@@ -655,13 +655,13 @@ benches:
     scopes: {}
   vec_get_blob_16:
     total:
-      instructions: 6402226
+      instructions: 6452226
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_32:
     total:
-      instructions: 7121657
+      instructions: 7171657
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -691,7 +691,7 @@ benches:
     scopes: {}
   vec_get_blob_8:
     total:
-      instructions: 5673873
+      instructions: 5741541
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -739,7 +739,7 @@ benches:
     scopes: {}
   vec_insert_u64:
     total:
-      instructions: 5929433
+      instructions: 5939433
       heap_increase: 0
       stable_memory_increase: 1
     scopes: {}

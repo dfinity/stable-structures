@@ -157,6 +157,7 @@ impl<M: Memory> Allocator<M> {
     ///         ..   free_list_head      (allocated)      ↑       next
     ///                   |_______________________________↑         |____ NULL
     ///
+    #[allow(clippy::doc_overindented_list_items)]
     pub fn allocate(&mut self) -> Address {
         // Get the next available chunk.
         let chunk_addr = self.free_list_head;
