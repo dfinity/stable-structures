@@ -22,6 +22,12 @@ jobs:
       - id: set-benchmarks
         run: bash ./scripts/ci_download_canbench_artifacts.sh
 
+      - name: Upload canbench CSV results
+        uses: actions/upload-artifact@v4
+        with:
+          name: canbench_results
+          path: ./canbench_results.csv
+
   post-comment:
     runs-on: ubuntu-latest
     needs: [download-results]
@@ -35,4 +41,3 @@ jobs:
             ${{ matrix.benchmark.result }}
           comment-tag: ${{ matrix.benchmark.title }}
           pr-number: ${{ needs.download-results.outputs.pr_number }}
-

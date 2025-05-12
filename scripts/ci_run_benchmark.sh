@@ -20,6 +20,7 @@ CANBENCH_OUTPUT=/tmp/canbench_output.txt
 
 CANBENCH_RESULTS_FILE="$CANISTER_PATH/canbench_results.yml"
 MAIN_BRANCH_RESULTS_FILE="$MAIN_BRANCH_DIR/$CANBENCH_RESULTS_FILE"
+CANBENCH_CSV_RESULTS_FILE="$CANISTER_PATH/canbench_results.csv"
 
 # Install canbench
 cargo install canbench
@@ -63,11 +64,16 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   pushd "$CANISTER_PATH"
   canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
   popd
+
+  CSV_RESULTS_FILE_MSG="[$CANBENCH_CSV_RESULTS_FILE]((${{
+      github.server_url
+    }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))";
 fi
 
 # Append the update status and benchmark output to the comment.
 {
   echo "$UPDATED_MSG"
+  echo "$CSV_RESULTS_FILE_MSG"
   echo ""
   echo "\`\`\`"
   cat "$CANBENCH_OUTPUT"
