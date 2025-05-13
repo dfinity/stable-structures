@@ -61,7 +61,7 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
 
   # Run canbench to compare results with the main branch.
   pushd "$CANISTER_PATH"
-  canbench --less-verbose --show-summary > "$CANBENCH_OUTPUT"
+  canbench --less-verbose --hide-results --show-summary > "$CANBENCH_OUTPUT"
   popd
 
   # Append markers to individual benchmark results
