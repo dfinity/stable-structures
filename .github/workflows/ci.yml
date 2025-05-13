@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [ 1.84.0 ]
+        rust: [1.84.0]
 
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
         run: cargo test
         env:
           RUST_BACKTRACE: 1
-      
+
       - name: Build Fuzzers
         run: |
           cargo install cargo-fuzz
@@ -74,7 +74,7 @@ jobs:
           rm install-dfx.sh
           dfx cache install
           echo "$HOME/bin" >> $GITHUB_PATH
-        
+
       - name: Run test
         run: |
           bash examples/test.sh
