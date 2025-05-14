@@ -117,6 +117,11 @@ jobs:
           name: canbench_result_${{github.job}}
           path: /tmp/canbench_result_${{ github.job }}
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canbench_results_${{github.job}}_csv
+          path: /tmp/canbench_results_${{ github.job }}.csv
+
       - name: Save PR number
         run: |
           echo ${{ github.event.number }} > /tmp/pr_number
