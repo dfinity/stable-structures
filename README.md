@@ -11,6 +11,8 @@ A collection of scalable data structures for the [Internet Computer](https://int
 
 Stable structures are designed to use stable memory as the backing store, allowing them to grow to gigabytes in size without the need for `pre_upgrade`/`post_upgrade` hooks.
 
+You can read more about the library in the [Stable Structures Book](https://dfinity.github.io/stable-structures/)
+
 ## Background
 
 The conventional approach to canister state persistence is to serialize the entire state to stable memory in the `pre_upgrade` hook and decode it back in the `post_upgrade` hook.
@@ -18,7 +20,6 @@ This approach is easy to implement and works well for relatively small datasets.
 Unfortunately, it does not scale well and can render a canister non-upgradable.
 
 This library aims to simplify managing data structures directly in stable memory.
-For more information about the philosophy behind the library, see [Roman's tutorial on stable structures](https://mmapped.blog/posts/14-stable-structures.html).
 
 ## Available Data Structures
 
