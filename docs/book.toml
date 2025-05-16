@@ -1,0 +1,23 @@
+[book]
+title = "Stable Structures"
+description = "Documentation for the Stable Structures library"
+authors = ["DFINITY Foundation"]
+language = "en"
+multilingual = false
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/dfinity/stable-structures"
+additional-css = ["./mdbook-admonish.css"]
+
+[output.linkcheck]
+
+[preprocessor]
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "3.0.3" # do not edit: managed by `mdbook-admonish install`
+

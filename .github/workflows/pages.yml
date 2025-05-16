@@ -1,0 +1,58 @@
+name: Github Pages Book
+
+on:
+  # Only run this workflow when there are changes to the docs directory
+  pull_request:
+    paths:
+      - "docs/**"
+  push:
+    paths:
+      - "docs/**"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      MDBOOK_VERSION: 0.4.48
+      MDBOOK_ADMONISH_VERSION: 1.19.0
+      MDBOOK_LINKCHECK_VERSION: 0.7.7
+      RUST_VERSION: 1.84.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          rustup update ${RUST_VERSION} --no-self-update
+          rustup default ${RUST_VERSION}
+          rustup target add wasm32-unknown-unknown
+
+      - name: Install mdbook
+        run: |
+          cargo install mdbook --version ${MDBOOK_VERSION}
+          cargo install mdbook-admonish --version ${MDBOOK_ADMONISH_VERSION}
+          cargo install mdbook-linkcheck --version ${MDBOOK_LINKCHECK_VERSION}
+
+      - name: Build book
+        run: |
+          cd docs
+          mdbook-admonish install
+          mdbook build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/book
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v4
+        if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/book
