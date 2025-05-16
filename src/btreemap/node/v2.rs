@@ -112,7 +112,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         memory: &M,
     ) -> Self {
         #[cfg(feature = "canbench-rs")]
-        let _p = canbench::profile("node_load_v2");
+        let _p = canbench_rs::bench_scope("node_load_v2");
 
         // Load the node, including any overflows, into a buffer.
         let overflows = read_overflows(address, memory);
@@ -192,7 +192,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&mut self, allocator: &mut Allocator<M>) {
         #[cfg(feature = "canbench-rs")]
-        let _p = canbench::profile("node_save_v2");
+        let _p = canbench_rs::bench_scope("node_save_v2");
 
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
