@@ -190,7 +190,7 @@ impl<const N: usize> Storable for Blob<N> {
 }
 
 /// Byte‑vector for testing size N; otherwise just a Vec<u8>.
-#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct FixedVec<const N: usize>(Vec<u8>);
 
 impl<const N: usize> FixedVec<N> {
@@ -199,11 +199,22 @@ impl<const N: usize> FixedVec<N> {
     }
 
     pub fn from(slice: &[u8]) -> Self {
-        assert!(slice.len() <= N);
+        assert!(
+            slice.len() <= N,
+            "expected a slice with length <= {} bytes, but found {} bytes",
+            N,
+            slice.len()
+        );
         let mut vec = Vec::with_capacity(N);
         vec.extend_from_slice(slice);
         vec.resize(N, 0);
         FixedVec(vec)
+    }
+}
+
+impl<const N: usize> Default for FixedVec<N> {
+    fn default() -> Self {
+        FixedVec(vec![0; N])
     }
 }
 
