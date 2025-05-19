@@ -11,4 +11,3 @@ candid.workspace = true
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
 ic-stable-structures = { path = "../../../" }
-num_enum.workspace = true

@@ -66,7 +66,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         memory: &M,
     ) -> Self {
         #[cfg(feature = "canbench-rs")]
-        let _p = canbench_rs::bench_scope_id(ScopeId::NodeLoadV1);
+        let _p = canbench_rs::bench_scope_id(ScopeId::NodeLoadV1 as u16);
 
         // Load the entries.
         let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
@@ -120,7 +120,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     pub(super) fn save_v1<M: Memory>(&self, memory: &M) {
         #[cfg(feature = "canbench-rs")]
-        let _p = canbench_rs::bench_scope_id(ScopeId::NodeSaveV1);
+        let _p = canbench_rs::bench_scope_id(ScopeId::NodeSaveV1 as u16);
 
         match self.node_type {
             NodeType::Leaf => {

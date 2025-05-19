@@ -12,4 +12,3 @@ ic0 = "0.18"
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
 ic-stable-structures = { path = "../../../" }
-num_enum.workspace = true

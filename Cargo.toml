@@ -14,7 +14,6 @@ version = "0.6.8"
 [dependencies]
 ic_principal = { version = "0.1.1", default-features = false }
 canbench-rs = { workspace = true, optional = true }            # Optional to benchmark parts of the code.
-num_enum = "0.7.3"
 
 [dev-dependencies]
 candid.workspace = true
@@ -31,7 +30,7 @@ members = ["benchmarks"]
 
 [workspace.dependencies]
 #canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", branch = "maksym/scope-id-2" }
-canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", rev = "eee4a0fbf529e8fa47cab939edf927d70403afc8" }
+canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", rev = "5675fe2a0bc432682b27621b77aff6f1600a21c1" }
 candid = "0.10.3"
 ic-cdk = "0.12.1"
 ic-cdk-macros = "0.8.4"
