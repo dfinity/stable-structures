@@ -82,14 +82,14 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
 #[repr(u16)]
-enum CanbenchScopeId {
+enum ScopeId {
     NodeLoadV1 = 0,
     NodeSaveV1 = 1,
     NodeLoadV2 = 2,
     NodeSaveV2 = 3,
 }
 
-impl canbench_rs::ScopeId for CanbenchScopeId {
+impl canbench_rs::ScopeId for ScopeId {
     fn name_from_id(id: u16) -> Option<&'static str> {
         match id {
             0 => Some("node_load_v1"),
@@ -104,7 +104,7 @@ impl canbench_rs::ScopeId for CanbenchScopeId {
 #[inline(always)]
 fn setup_canbench() {
     #[cfg(feature = "canbench-rs")]
-    canbench_rs::set_bench_id_resolver::<CanbenchScopeId>();
+    canbench_rs::set_bench_id_resolver::<ScopeId>();
 }
 
 /// A B-Tree map implementation that stores its data into a designated memory.

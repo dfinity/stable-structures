@@ -73,7 +73,7 @@
 
 use super::*;
 use crate::btreemap::Allocator;
-use crate::btreemap::CanbenchScopeId;
+use crate::btreemap::ScopeId;
 use crate::{btreemap::node::io::NodeWriter, types::NULL};
 
 // Initial page
@@ -113,7 +113,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         memory: &M,
     ) -> Self {
         #[cfg(feature = "canbench-rs")]
-        let _p = canbench_rs::bench_scope_id(CanbenchScopeId::NodeLoadV2 as u16);
+        let _p = canbench_rs::bench_scope_id(ScopeId::NodeLoadV2 as u16);
 
         // Load the node, including any overflows, into a buffer.
         let overflows = read_overflows(address, memory);
@@ -193,7 +193,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     // Saves the node to memory.
     pub(super) fn save_v2<M: Memory>(&mut self, allocator: &mut Allocator<M>) {
         #[cfg(feature = "canbench-rs")]
-        let _p = canbench_rs::bench_scope_id(CanbenchScopeId::NodeSaveV2 as u16);
+        let _p = canbench_rs::bench_scope_id(ScopeId::NodeSaveV2 as u16);
 
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
