@@ -14,7 +14,7 @@ version = "0.6.8"
 [dependencies]
 ic_principal = { version = "0.1.1", default-features = false }
 canbench-rs = { workspace = true, optional = true }            # Optional to benchmark parts of the code.
-num_enum = { version = "0.7.3", optional = true }              # Optional to benchmark parts of the code.
+num_enum = "0.7.3"
 
 [dev-dependencies]
 candid.workspace = true
