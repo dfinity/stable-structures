@@ -199,7 +199,12 @@ impl<const N: usize> FixedVec<N> {
     }
 
     pub fn from(slice: &[u8]) -> Self {
-        assert!(slice.len() <= N);
+        assert!(
+            slice.len() <= N,
+            "expected a slice with length <= {} bytes, but found {} bytes",
+            N,
+            slice.len()
+        );
         let mut vec = Vec::with_capacity(N);
         vec.extend_from_slice(slice);
         vec.resize(N, 0);
