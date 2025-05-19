@@ -102,7 +102,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "canbench-rs"
 version = "0.1.14"
-source = "git+https://github.com/dfinity/canbench?rev=16f4ecb2d6284367d61dd6e9be33c8166ef350d7#16f4ecb2d6284367d61dd6e9be33c8166ef350d7"
+source = "git+https://github.com/dfinity/canbench?rev=f93b49ca015fcaccdd60b69b62f606fcbc2c73a9#f93b49ca015fcaccdd60b69b62f606fcbc2c73a9"
 dependencies = [
  "canbench-rs-macros",
  "candid",
@@ -114,7 +114,7 @@ dependencies = [
 [[package]]
 name = "canbench-rs-macros"
 version = "0.1.14"
-source = "git+https://github.com/dfinity/canbench?rev=16f4ecb2d6284367d61dd6e9be33c8166ef350d7#16f4ecb2d6284367d61dd6e9be33c8166ef350d7"
+source = "git+https://github.com/dfinity/canbench?rev=f93b49ca015fcaccdd60b69b62f606fcbc2c73a9#f93b49ca015fcaccdd60b69b62f606fcbc2c73a9"
 dependencies = [
  "proc-macro2",
  "quote",

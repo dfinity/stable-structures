@@ -30,7 +30,7 @@ members = ["benchmarks"]
 
 [workspace.dependencies]
 #canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", branch = "maksym/scope-id-2" }
-canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", rev = "16f4ecb2d6284367d61dd6e9be33c8166ef350d7" }
+canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", rev = "f93b49ca015fcaccdd60b69b62f606fcbc2c73a9" }
 candid = "0.10.3"
 ic-cdk = "0.12.1"
 ic-cdk-macros = "0.8.4"

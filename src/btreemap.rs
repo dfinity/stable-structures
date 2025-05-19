@@ -91,12 +91,14 @@ enum ScopeId {
     NodeSaveV2 = 3,
 }
 
+impl ScopeId {
+    fn id(self) -> u16 {
+        self as u16
+    }
+}
+
 #[cfg(feature = "canbench-rs")]
 impl canbench_rs::ScopeIdName for ScopeId {
-    fn id(&self) -> u16 {
-        *self as u16
-    }
-
     fn name_from_id(id: u16) -> Option<&'static str> {
         match id {
             0 => Some("NodeLoadV1"),
