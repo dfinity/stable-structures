@@ -63,8 +63,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_value_size: u32,
         memory: &M,
     ) -> Self {
-        #[cfg(feature = "canbench")]
-        let _p = canbench::profile("node_load_v1");
+        #[cfg(feature = "canbench-rs")]
+        let _p = canbench_rs::bench_scope("node_load_v1");
 
         // Load the entries.
         let mut keys_encoded_values = Vec::with_capacity(header.num_entries as usize);
@@ -117,8 +117,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     pub(super) fn save_v1<M: Memory>(&self, memory: &M) {
-        #[cfg(feature = "canbench")]
-        let _p = canbench::profile("node_save_v1");
+        #[cfg(feature = "canbench-rs")]
+        let _p = canbench_rs::bench_scope("node_save_v1");
 
         match self.node_type {
             NodeType::Leaf => {
