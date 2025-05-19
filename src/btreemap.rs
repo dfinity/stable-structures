@@ -101,6 +101,12 @@ impl canbench_rs::ScopeId for CanbenchScopeId {
     }
 }
 
+#[inline(always)]
+fn setup_canbench() {
+    #[cfg(feature = "canbench-rs")]
+    canbench_rs::set_bench_id_resolver::<CanbenchScopeId>();
+}
+
 /// A B-Tree map implementation that stores its data into a designated memory.
 ///
 /// # Memory Implementations
@@ -338,7 +344,7 @@ where
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
-        canbench_rs::set_bench_id_resolver::<CanbenchScopeId>();
+        setup_canbench();
 
         let page_size = match (K::BOUND, V::BOUND) {
             // The keys and values are both bounded.
@@ -386,7 +392,7 @@ where
     /// This is only exposed for testing and benchmarking.
     #[cfg(any(feature = "canbench-rs", test))]
     pub fn new_v1(memory: M) -> Self {
-        canbench_rs::set_bench_id_resolver::<CanbenchScopeId>();
+        setup_canbench();
 
         let max_key_size = K::BOUND.max_size();
         let max_value_size = V::BOUND.max_size();
