@@ -83,19 +83,12 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
 #[cfg(feature = "canbench-rs")]
 #[repr(u16)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, num_enum::IntoPrimitive)]
 enum ScopeId {
     NodeLoadV1 = 0,
     NodeSaveV1 = 1,
     NodeLoadV2 = 2,
     NodeSaveV2 = 3,
-}
-
-#[cfg(feature = "canbench-rs")]
-impl ScopeId {
-    fn id(self) -> u16 {
-        self as u16
-    }
 }
 
 #[cfg(feature = "canbench-rs")]
