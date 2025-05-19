@@ -73,6 +73,7 @@
 
 use super::*;
 use crate::btreemap::Allocator;
+#[cfg(feature = "canbench-rs")]
 use crate::btreemap::ScopeId;
 use crate::{btreemap::node::io::NodeWriter, types::NULL};
 

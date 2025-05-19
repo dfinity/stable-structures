@@ -40,9 +40,9 @@
 //! Child(k + 1) address    ↕ 8 bytes
 //! ----------------------------------------
 //! ```
-use crate::btreemap::ScopeId;
-
 use super::*;
+#[cfg(feature = "canbench-rs")]
+use crate::btreemap::ScopeId;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v1 node at the given address.
