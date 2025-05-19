@@ -81,6 +81,7 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
+#[cfg(feature = "canbench-rs")]
 #[repr(u16)]
 enum ScopeId {
     NodeLoadV1 = 0,
@@ -89,6 +90,7 @@ enum ScopeId {
     NodeSaveV2 = 3,
 }
 
+#[cfg(feature = "canbench-rs")]
 impl canbench_rs::ScopeId for ScopeId {
     fn name_from_id(id: u16) -> Option<&'static str> {
         match id {
