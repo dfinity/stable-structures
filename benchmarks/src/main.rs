@@ -1,4 +1,4 @@
-use ic_stable_structures::storable::{Blob, Storable};
+use ic_stable_structures::storable::{Blob, FixedVec, Storable};
 use tiny_rng::{Rand, Rng};
 
 mod btreemap;
@@ -19,6 +19,17 @@ impl<const K: usize> Random for Blob<K> {
                 .as_slice(),
         )
         .unwrap()
+    }
+}
+
+impl<const K: usize> Random for FixedVec<K> {
+    fn random(rng: &mut Rng) -> Self {
+        let size = rng.rand_u32() % Self::max_size();
+        let mut buf = Vec::with_capacity(size as usize);
+        for _ in 0..size {
+            buf.push(rng.rand_u8());
+        }
+        FixedVec::from(&buf)
     }
 }
 
