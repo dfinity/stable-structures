@@ -81,6 +81,26 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
+#[repr(u16)]
+enum CanbenchScopeId {
+    NodeLoadV1 = 0,
+    NodeSaveV1 = 1,
+    NodeLoadV2 = 2,
+    NodeSaveV2 = 3,
+}
+
+impl canbench_rs::ScopeId for CanbenchScopeId {
+    fn name_from_id(id: u16) -> Option<&'static str> {
+        match id {
+            0 => Some("node_load_v1"),
+            1 => Some("node_save_v1"),
+            2 => Some("node_load_v2"),
+            3 => Some("node_save_v2"),
+            _ => None,
+        }
+    }
+}
+
 /// A B-Tree map implementation that stores its data into a designated memory.
 ///
 /// # Memory Implementations
@@ -318,6 +338,8 @@ where
     ///
     /// See `Allocator` for more details on its own memory layout.
     pub fn new(memory: M) -> Self {
+        canbench_rs::set_bench_id_resolver::<CanbenchScopeId>();
+
         let page_size = match (K::BOUND, V::BOUND) {
             // The keys and values are both bounded.
             (
@@ -364,6 +386,8 @@ where
     /// This is only exposed for testing and benchmarking.
     #[cfg(any(feature = "canbench-rs", test))]
     pub fn new_v1(memory: M) -> Self {
+        canbench_rs::set_bench_id_resolver::<CanbenchScopeId>();
+
         let max_key_size = K::BOUND.max_size();
         let max_value_size = V::BOUND.max_size();
 
