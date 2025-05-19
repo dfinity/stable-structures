@@ -102,10 +102,11 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "canbench-rs"
 version = "0.1.14"
-source = "git+https://github.com/dfinity/canbench?branch=maksym%2Fscope-id-2#d40d425650c4263c7fd9fd95accad7bb8c5a0f22"
+source = "git+https://github.com/dfinity/canbench?rev=16f4ecb2d6284367d61dd6e9be33c8166ef350d7#16f4ecb2d6284367d61dd6e9be33c8166ef350d7"
 dependencies = [
  "canbench-rs-macros",
  "candid",
+ "heck",
  "ic-cdk 0.17.2",
  "serde",
 ]
@@ -113,7 +114,7 @@ dependencies = [
 [[package]]
 name = "canbench-rs-macros"
 version = "0.1.14"
-source = "git+https://github.com/dfinity/canbench?branch=maksym%2Fscope-id-2#d40d425650c4263c7fd9fd95accad7bb8c5a0f22"
+source = "git+https://github.com/dfinity/canbench?rev=16f4ecb2d6284367d61dd6e9be33c8166ef350d7#16f4ecb2d6284367d61dd6e9be33c8166ef350d7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -262,6 +263,12 @@ dependencies = [
  "libc",
  "wasi",
 ]
+
+[[package]]
+name = "heck"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hex"
