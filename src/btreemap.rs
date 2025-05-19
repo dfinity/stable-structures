@@ -91,6 +91,7 @@ enum ScopeId {
     NodeSaveV2 = 3,
 }
 
+#[cfg(feature = "canbench-rs")]
 impl ScopeId {
     fn id(self) -> u16 {
         self as u16
