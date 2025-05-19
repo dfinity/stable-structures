@@ -12,4 +12,4 @@ ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
 ic-stable-structures = { path = "../../../" }
 serde = "1.0.132"
-
+num_enum.workspace = true
