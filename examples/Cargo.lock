@@ -22,7 +22,6 @@ dependencies = [
  "ic-cdk",
  "ic-cdk-macros",
  "ic-stable-structures",
- "num_enum 0.7.3",
  "serde",
 ]
 
@@ -40,7 +39,6 @@ dependencies = [
  "ic-cdk",
  "ic-cdk-macros",
  "ic-stable-structures",
- "num_enum 0.7.3",
 ]
 
 [[package]]
@@ -98,7 +96,7 @@ dependencies = [
  "leb128",
  "num-bigint",
  "num-traits",
- "num_enum 0.6.1",
+ "num_enum",
  "paste",
  "pretty",
  "serde",
@@ -208,7 +206,6 @@ dependencies = [
  "ic-cdk",
  "ic-cdk-macros",
  "ic-stable-structures",
- "num_enum 0.7.3",
  "serde",
 ]
 
@@ -300,7 +297,6 @@ name = "ic-stable-structures"
 version = "0.6.8"
 dependencies = [
  "ic_principal",
- "num_enum 0.7.3",
 ]
 
 [[package]]
@@ -386,16 +382,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a015b430d3c108a207fd776d2e2196aaf8b1cf8cf93253e3a097ff3085076a1"
 dependencies = [
- "num_enum_derive 0.6.1",
-]
-
-[[package]]
-name = "num_enum"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e613fc340b2220f734a8595782c551f1250e969d87d3be1ae0579e8d4065179"
-dependencies = [
- "num_enum_derive 0.7.3",
+ "num_enum_derive",
 ]
 
 [[package]]
@@ -403,18 +390,6 @@ name = "num_enum_derive"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96667db765a921f7b295ffee8b60472b686a51d4f21c2ee4ffdb94c7013b65a6"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn 2.0.41",
-]
-
-[[package]]
-name = "num_enum_derive"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -482,7 +457,6 @@ dependencies = [
  "ic-cdk",
  "ic-cdk-macros",
  "ic-stable-structures",
- "num_enum 0.7.3",
  "serde",
 ]
 
@@ -596,7 +570,6 @@ dependencies = [
  "ic-cdk-macros",
  "ic-stable-structures",
  "ic0",
- "num_enum 0.7.3",
 ]
 
 [[package]]
@@ -677,7 +650,6 @@ dependencies = [
  "ic-cdk",
  "ic-cdk-macros",
  "ic-stable-structures",
- "num_enum 0.7.3",
 ]
 
 [[package]]
