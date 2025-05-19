@@ -102,19 +102,20 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "canbench-rs"
 version = "0.1.14"
-source = "git+https://github.com/dfinity/canbench?rev=e5632e2ffdde77a4b4690c1da767cd70a3eab835#e5632e2ffdde77a4b4690c1da767cd70a3eab835"
+source = "git+https://github.com/dfinity/canbench?rev=eee4a0fbf529e8fa47cab939edf927d70403afc8#eee4a0fbf529e8fa47cab939edf927d70403afc8"
 dependencies = [
  "canbench-rs-macros",
  "candid",
  "heck",
  "ic-cdk 0.17.2",
+ "num_enum",
  "serde",
 ]
 
 [[package]]
 name = "canbench-rs-macros"
 version = "0.1.14"
-source = "git+https://github.com/dfinity/canbench?rev=e5632e2ffdde77a4b4690c1da767cd70a3eab835#e5632e2ffdde77a4b4690c1da767cd70a3eab835"
+source = "git+https://github.com/dfinity/canbench?rev=eee4a0fbf529e8fa47cab939edf927d70403afc8#eee4a0fbf529e8fa47cab939edf927d70403afc8"
 dependencies = [
  "proc-macro2",
  "quote",
