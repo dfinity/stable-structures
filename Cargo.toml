@@ -29,7 +29,7 @@ test-strategy = "0.3.1"
 members = ["benchmarks"]
 
 [workspace.dependencies]
-canbench-rs = "0.1.14"
+canbench-rs = { version = "0.1.14", default-features = false }
 candid = "0.10.3"
 ic-cdk = "0.12.1"
 ic-cdk-macros = "0.8.4"
