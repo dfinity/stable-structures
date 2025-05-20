@@ -25,6 +25,9 @@ proptest = "1"
 tempfile = "3.3.0"
 test-strategy = "0.3.1"
 
+[features]
+bench_scope = [] # May add significant overhead.
+
 [workspace]
 members = ["benchmarks"]
 
