@@ -63,7 +63,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_value_size: u32,
         memory: &M,
     ) -> Self {
-        #[cfg(feature = "canbench-rs")]
+        #[cfg(feature = "bench_scope")]
         let _p = canbench_rs::bench_scope("node_load_v1");
 
         // Load the entries.
@@ -117,7 +117,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     pub(super) fn save_v1<M: Memory>(&self, memory: &M) {
-        #[cfg(feature = "canbench-rs")]
+        #[cfg(feature = "bench_scope")]
         let _p = canbench_rs::bench_scope("node_save_v1");
 
         match self.node_type {
