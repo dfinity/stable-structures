@@ -25,7 +25,9 @@ CANBENCH_RESULTS_CSV_FILE="/tmp/canbench_results_${CANBENCH_JOB_NAME}.csv"
 
 # Install canbench.
 #cargo install --version 0.1.14 canbench
-cargo install --git https://github.com/dfinity/canbench --rev 5675fe2a0bc432682b27621b77aff6f1600a21c1 canbench
+#cargo install --git https://github.com/dfinity/canbench --rev 5675fe2a0bc432682b27621b77aff6f1600a21c1 canbench
+cargo install --git https://github.com/dfinity/canbench --branch maksym/scope-id-2 canbench
+cargo update -p canbench
 
 # Verify that the canbench results file exists.
 if [ ! -f "$CANBENCH_RESULTS_FILE" ]; then

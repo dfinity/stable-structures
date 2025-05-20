@@ -29,8 +29,9 @@ test-strategy = "0.3.1"
 members = ["benchmarks"]
 
 [workspace.dependencies]
-#canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", branch = "maksym/scope-id-2" }
-canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", rev = "5675fe2a0bc432682b27621b77aff6f1600a21c1" }
+# run `cargo update -p canbench-rs` to update the dependency to the latest commit
+canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", branch = "maksym/scope-id-2" }
+#canbench-rs = { version = "0.1.14", git = "https://github.com/dfinity/canbench", rev = "5675fe2a0bc432682b27621b77aff6f1600a21c1" }
 candid = "0.10.3"
 ic-cdk = "0.12.1"
 ic-cdk-macros = "0.8.4"
