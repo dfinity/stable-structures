@@ -212,7 +212,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
-    /// Loads a key from stable memory at the given offset of this node.
+    /// Loads a key from stable memory at the given offset.
     fn load_key_from_memory<M: Memory>(&self, mut offset: Bytes, memory: &M) -> K {
         let reader = NodeReader {
             address: self.address,
@@ -221,38 +221,32 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory,
         };
 
-        // Retrieve the key's size.
-        let key_offset = Address::from(offset.get());
-        let key_size = match self.version {
+        let size = match self.version {
             Version::V1(_) => {
-                // In V1, the key's size is always stored in memory.
+                // V1: key size is always stored in memory.
+                let size = read_u32(&reader, Address::from(offset.get()));
                 offset += U32_SIZE;
-                read_u32(&reader, key_offset)
+                size
             }
             Version::V2(_) => {
-                // In V2, if the key is fixed-size, use the maximum bound;
-                // otherwise, read its size from memory.
+                // V2: use fixed size if available, otherwise read from memory.
                 if K::BOUND.is_fixed_size() {
                     K::BOUND.max_size()
                 } else {
+                    let size = read_u32(&reader, Address::from(offset.get()));
                     offset += U32_SIZE;
-                    read_u32(&reader, key_offset)
+                    size
                 }
             }
-        };
+        } as usize;
 
-        let mut bytes = vec![];
-        read_to_vec(
-            &reader,
-            Address::from((offset).get()),
-            &mut bytes,
-            key_size as usize,
-        );
+        let mut bytes = Vec::with_capacity(size);
+        read_to_vec(&reader, Address::from(offset.get()), &mut bytes, size);
 
         K::from_bytes(Cow::Borrowed(&bytes))
     }
 
-    /// Loads a value from stable memory at the given offset of this node.
+    /// Loads a value from stable memory at the given offset.
     fn load_value_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> Vec<u8> {
         let reader = NodeReader {
             address: self.address,
@@ -261,13 +255,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory,
         };
 
-        let value_size = read_u32(&reader, Address::from(offset.get())) as usize;
-        let mut bytes = vec![];
+        let size = read_u32(&reader, Address::from(offset.get())) as usize;
+        let mut bytes = Vec::with_capacity(size);
         read_to_vec(
             &reader,
             Address::from((offset + U32_SIZE).get()),
             &mut bytes,
-            value_size,
+            size,
         );
 
         bytes
