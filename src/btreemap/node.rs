@@ -200,6 +200,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.get_value(&self.keys_and_encoded_values[idx], memory)
     }
 
+    // TODO: add extract_key() here.
+
     /// Extracts the contents of value (by loading it first if it's not loaded yet).
     fn extract_value<M: Memory>(&self, value: LazyValue, memory: &M) -> Vec<u8> {
         value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
