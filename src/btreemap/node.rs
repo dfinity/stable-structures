@@ -39,6 +39,8 @@ pub enum NodeType {
 pub type Entry<K> = (K, Vec<u8>);
 pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 
+type LazyEntry<K> = (K, LazyValue);
+
 /// A node of a B-Tree.
 ///
 /// There are two versions of a `Node`:
@@ -52,7 +54,7 @@ pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
     // INVARIANT: the list is sorted by key.
-    keys_and_encoded_values: Vec<(K, Value)>,
+    keys_and_encoded_values: Vec<LazyEntry<K>>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
@@ -106,14 +108,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
         match self.node_type {
             NodeType::Leaf => {
-                let last_idx = self.keys_and_encoded_values.len() - 1;
+                let last_entry = self
+                    .keys_and_encoded_values
+                    .last()
+                    .expect("A node can never be empty");
                 (
-                    self.keys_and_encoded_values
-                        .last()
-                        .expect("A node can never be empty")
-                        .0
-                        .clone(),
-                    self.value(last_idx, memory).to_vec(),
+                    self.get_key(last_entry).clone(),
+                    self.get_value(last_entry, memory).to_vec(),
                 )
             }
             NodeType::Internal => {
@@ -164,29 +165,45 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ) -> Entry<K> {
         let (old_key, old_value) = core::mem::replace(
             &mut self.keys_and_encoded_values[idx],
-            (key, Value::by_value(value)),
+            (key, LazyValue::by_value(value)),
         );
         (old_key, self.extract_value(old_value, memory))
     }
 
     /// Returns a reference to the entry at the specified index.
+    #[inline(always)]
     pub fn entry<M: Memory>(&self, idx: usize, memory: &M) -> EntryRef<K> {
-        (
-            &self.keys_and_encoded_values[idx].0,
-            self.value(idx, memory),
-        )
+        (self.key(idx), self.value(idx, memory))
+    }
+
+    #[inline(always)]
+    fn get_key<'a>(&'a self, (k, _): &'a LazyEntry<K>) -> &'a K {
+        // TODO: implement lazy loading for keys.
+        k
+    }
+
+    /// Returns a reference to the cached value and loads it from memory if needed.
+    #[inline(always)]
+    fn get_value<'a, M: Memory>(&'a self, (_, v): &'a LazyEntry<K>, memory: &M) -> &'a [u8] {
+        v.get_or_load(|offset| self.load_value_from_memory(offset, memory))
+    }
+
+    /// Returns a reference to the key at the specified index.
+    #[inline(always)]
+    pub fn key(&self, idx: usize) -> &K {
+        self.get_key(&self.keys_and_encoded_values[idx])
     }
 
     /// Returns a reference to the encoded value at the specified index.
+    #[inline(always)]
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> &[u8] {
-        // Load and cache the value from the underlying memory if needed.
-        self.keys_and_encoded_values[idx]
-            .1
-            .get_or_load(|offset| self.load_value_from_memory(offset, memory))
+        self.get_value(&self.keys_and_encoded_values[idx], memory)
     }
 
+    // TODO: add extract_key() here.
+
     /// Extracts the contents of value (by loading it first if it's not loaded yet).
-    fn extract_value<M: Memory>(&self, value: Value, memory: &M) -> Vec<u8> {
+    fn extract_value<M: Memory>(&self, value: LazyValue, memory: &M) -> Vec<u8> {
         value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
@@ -199,13 +216,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory,
         };
 
-        let value_len = read_u32(&reader, Address::from(offset.get())) as usize;
+        let value_size = read_u32(&reader, Address::from(offset.get())) as usize;
         let mut bytes = vec![];
         read_to_vec(
             &reader,
             Address::from((offset + U32_SIZE).get()),
             &mut bytes,
-            value_len,
+            value_size,
         );
 
         bytes
@@ -213,11 +230,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     fn page_size(&self) -> PageSize {
         self.version.page_size()
-    }
-
-    /// Returns a reference to the key at the specified index.
-    pub fn key(&self, idx: usize) -> &K {
-        &self.keys_and_encoded_values[idx].0
     }
 
     /// Returns the child's address at the given index.
@@ -251,9 +263,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Inserts a new entry at the specified index.
-    pub fn insert_entry(&mut self, idx: usize, (key, encoded_value): Entry<K>) {
+    pub fn insert_entry(&mut self, idx: usize, (key, value): Entry<K>) {
         self.keys_and_encoded_values
-            .insert(idx, (key, Value::by_value(encoded_value)));
+            .insert(idx, (key, LazyValue::by_value(value)));
     }
 
     /// Returns the entry at the specified index while consuming this node.
@@ -270,9 +282,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Adds a new entry at the back of the node.
-    pub fn push_entry(&mut self, (key, encoded_value): Entry<K>) {
+    pub fn push_entry(&mut self, (key, value): Entry<K>) {
         self.keys_and_encoded_values
-            .push((key, Value::by_value(encoded_value)));
+            .push((key, LazyValue::by_value(value)));
     }
 
     /// Removes an entry from the back of the node.
@@ -282,12 +294,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
             return None;
         }
 
-        let (key, last_value) = self
+        let (key, value) = self
             .keys_and_encoded_values
             .pop()
             .expect("node must not be empty");
 
-        Some((key, self.extract_value(last_value, memory)))
+        Some((key, self.extract_value(value, memory)))
     }
 
     /// Merges the entries and children of the `source` node into self, along with the median entry.
@@ -364,18 +376,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     #[cfg(test)]
     pub fn entries<M: Memory>(&self, memory: &M) -> Vec<Entry<K>> {
-        self.keys_and_encoded_values
-            .iter()
-            .enumerate()
-            .map(|(idx, (key, _))| (key.clone(), self.value(idx, memory).to_vec()))
+        (0..self.keys_and_encoded_values.len())
+            .map(|i| (self.key(i).clone(), self.value(i, memory).to_vec()))
             .collect()
     }
 
     #[cfg(test)]
-    pub fn keys(&self) -> Vec<K> {
-        self.keys_and_encoded_values
-            .iter()
-            .map(|(key, _)| key.clone())
+    pub fn keys(&self) -> Vec<&K> {
+        (0..self.keys_and_encoded_values.len())
+            .map(|i| self.key(i))
             .collect()
     }
 
@@ -397,7 +406,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// while maintaining sorted order.
     pub fn search(&self, key: &K) -> Result<usize, usize> {
         self.keys_and_encoded_values
-            .binary_search_by_key(&key, |entry| &entry.0)
+            .binary_search_by_key(&key, |entry| self.get_key(entry))
     }
 
     /// Returns the maximum size a node can be if it has bounded keys and values.
@@ -463,54 +472,70 @@ impl NodeHeader {
     }
 }
 
-/// The value in a K/V pair.
+/// A lazily-loaded object, which can be either an immediate value or a deferred reference.
 #[derive(Debug)]
-enum Value {
-    /// The value's encoded bytes.
-    ByVal(Vec<u8>),
-
-    ByRef {
-        /// The value's offset in the node.
-        offset: Bytes,
-        /// The lazily loaded encoded bytes.
-        loaded_value: OnceCell<Vec<u8>>,
-    },
+enum LazyObject<T> {
+    ByVal(T),
+    ByRef { offset: Bytes, loaded: OnceCell<T> },
 }
 
-impl Value {
+impl<T> LazyObject<T> {
+    #[inline(always)]
+    pub fn by_value(value: T) -> Self {
+        LazyObject::ByVal(value)
+    }
+
+    #[inline(always)]
     pub fn by_ref(offset: Bytes) -> Self {
-        Self::ByRef {
+        LazyObject::ByRef {
             offset,
-            loaded_value: Default::default(),
+            loaded: OnceCell::new(),
         }
     }
 
-    pub fn by_value(value: Vec<u8>) -> Self {
-        Self::ByVal(value)
-    }
-
-    /// Returns a reference to the value if the value has been loaded or runs the given function to
-    /// load the value.
-    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Vec<u8>) -> &[u8] {
+    #[inline(always)]
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> T) -> &T {
         match self {
-            Value::ByVal(v) => &v[..],
-            Value::ByRef {
-                offset,
-                loaded_value: value,
-            } => value.get_or_init(|| load(*offset)),
+            LazyObject::ByVal(value) => value,
+            LazyObject::ByRef { offset, loaded } => loaded.get_or_init(|| load(*offset)),
         }
     }
 
-    /// Extracts the value while consuming self if the value has been loaded or runs the given
-    /// function to load the value.
-    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Vec<u8>) -> Vec<u8> {
+    #[inline(always)]
+    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> T) -> T {
         match self {
-            Value::ByVal(v) => v,
-            Value::ByRef {
-                offset,
-                loaded_value: value,
-            } => value.into_inner().unwrap_or_else(|| load(offset)),
+            LazyObject::ByVal(value) => value,
+            LazyObject::ByRef { offset, loaded } => {
+                loaded.into_inner().unwrap_or_else(|| load(offset))
+            }
         }
+    }
+}
+
+type Blob = Vec<u8>;
+
+#[derive(Debug)]
+struct LazyValue(LazyObject<Blob>);
+
+impl LazyValue {
+    #[inline(always)]
+    pub fn by_value(value: Blob) -> Self {
+        Self(LazyObject::by_value(value))
+    }
+
+    #[inline(always)]
+    pub fn by_ref(offset: Bytes) -> Self {
+        Self(LazyObject::by_ref(offset))
+    }
+
+    #[inline(always)]
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Blob) -> &Blob {
+        self.0.get_or_load(load)
+    }
+
+    #[inline(always)]
+    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Blob) -> Blob {
+        self.0.take_or_load(load)
     }
 }
 
