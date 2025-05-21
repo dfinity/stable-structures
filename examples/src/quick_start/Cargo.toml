@@ -12,4 +12,4 @@ ciborium = "0.2.1"
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
 ic-stable-structures = { path = "../../../" }
-serde = "1.0.132"
+serde.workspace = true
