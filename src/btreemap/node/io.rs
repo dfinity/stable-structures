@@ -220,6 +220,10 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         self.overflows
     }
 
+    pub fn memory(&self) -> &M {
+        self.allocator.memory()
+    }
+
     /// Writes `src` to the node at the provided `offset`.
     pub fn write(&mut self, offset: Address, src: &[u8]) {
         // Update the max offset.
