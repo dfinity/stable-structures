@@ -149,28 +149,38 @@ impl<K: Storable + Ord + Clone> Node<K> {
             }
         }
 
-        // Load the keys.
+        // Load the keys (eagerly if small).
+        const EAGER_LOAD_KEY_SIZE_THRESHOLD: u32 = 32;
         let mut keys_encoded_values = Vec::with_capacity(num_entries);
+        let mut buf = vec![];
+
         for _ in 0..num_entries {
             let key_offset = Bytes::from(offset.get());
 
-            // Advance offset by the key_size type size if applicable.
+            // Get key size.
             let key_size = if K::BOUND.is_fixed_size() {
-                // Key is fixed in size. The size of the key is always its max size.
                 K::BOUND.max_size()
             } else {
-                // Key is not fixed in size. Read the size from memory.
-                let key_size = read_u32(&reader, offset);
+                let size = read_u32(&reader, offset);
                 offset += U32_SIZE;
-                key_size
+                size
             };
-            // Advance offset by the size of the key.
-            offset += Bytes::from(key_size);
 
-            keys_encoded_values.push((
-                LazyKey::by_ref(key_offset),
-                LazyValue::by_ref(Bytes::from(0usize)),
-            ));
+            // Eager-load small keys, defer large ones.
+            let key = if key_size <= EAGER_LOAD_KEY_SIZE_THRESHOLD {
+                read_to_vec(
+                    &reader,
+                    Address::from(offset.get()),
+                    &mut buf,
+                    key_size as usize,
+                );
+                LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
+            } else {
+                LazyKey::by_ref(key_offset)
+            };
+
+            offset += Bytes::from(key_size);
+            keys_encoded_values.push((key, LazyValue::by_ref(Bytes::from(0_u64))));
         }
 
         // Load the values
