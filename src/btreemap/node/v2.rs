@@ -164,12 +164,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 offset += U32_SIZE;
                 key_size
             };
-            let key = LazyKey::by_ref(key_offset);
-
             // Advance offset by the size of the key.
             offset += Bytes::from(key_size);
 
-            keys_encoded_values.push((key, LazyValue::by_ref(Bytes::from(0usize))));
+            keys_encoded_values.push((
+                LazyKey::by_ref(key_offset),
+                LazyValue::by_ref(Bytes::from(0usize)),
+            ));
         }
 
         // Load the values
