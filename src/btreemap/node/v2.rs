@@ -151,8 +151,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the keys.
         let mut keys_encoded_values = Vec::with_capacity(num_entries);
-        //const LOAD_SIZE_THRESHOLD: u32 = 8;
-        //let mut buf = vec![];
         for _ in 0..num_entries {
             let key_offset = Bytes::from(offset.get());
 
@@ -163,16 +161,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
             } else {
                 // Key is not fixed in size. Read the size from memory.
                 let key_size = read_u32(&reader, offset);
-                //println!("ABC read key_size: {:?}", key_size);
                 offset += U32_SIZE;
                 key_size
             };
-            // let key = if key_size <= LOAD_SIZE_THRESHOLD {
-            //     read_to_vec(&reader, offset, &mut buf, key_size as usize);
-            //     LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
-            // } else {
-            //     LazyKey::by_ref(key_offset)
-            // };
             let key = LazyKey::by_ref(key_offset);
 
             // Advance offset by the size of the key.
@@ -186,12 +177,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             let value_offset = Bytes::from(offset.get());
             let value_size = read_u32(&reader, offset);
             offset += U32_SIZE;
-            // *value = if value_size <= LOAD_SIZE_THRESHOLD {
-            //     read_to_vec(&reader, offset, &mut buf, value_size as usize);
-            //     LazyValue::by_value(buf.to_vec())
-            // } else {
-            //     LazyValue::by_ref(value_offset)
-            // };
             *value = LazyValue::by_ref(value_offset);
             offset += Bytes::from(value_size as u64);
         }

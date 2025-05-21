@@ -108,13 +108,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
         match self.node_type {
             NodeType::Leaf => {
-                let entry = self
+                let last_entry = self
                     .keys_and_encoded_values
                     .last()
                     .expect("A node can never be empty");
                 (
-                    self.get_key(entry, memory).clone(),
-                    self.get_value(entry, memory).to_vec(),
+                    self.get_key(last_entry, memory).clone(),
+                    self.get_value(last_entry, memory).to_vec(),
                 )
             }
             NodeType::Internal => {
@@ -246,8 +246,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
             &mut bytes,
             key_size as usize,
         );
-        //println!("ABC load key_size: {key_size:?}");
-        //println!("ABC load key: {bytes:?}");
         let key = K::from_bytes(Cow::Borrowed(&bytes));
 
         key
@@ -312,12 +310,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn insert_entry(&mut self, idx: usize, (key, value): Entry<K>) {
         self.keys_and_encoded_values
             .insert(idx, (LazyKey::by_value(key), LazyValue::by_value(value)));
-        // let keys: Vec<_> = self
-        //     .keys_and_encoded_values
-        //     .iter()
-        //     .map(|(key, _)| format!("{key:?}"))
-        //     .collect();
-        //println!("ABC insert_entry: {:?}", keys);
     }
 
     /// Returns the entry at the specified index while consuming this node.
@@ -333,7 +325,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Removes the entry at the specified index.
     pub fn remove_entry<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
         let (key, value) = self.keys_and_encoded_values.remove(idx);
-        //println!("ABC remove_entry: {:?}", key);
         (
             self.extract_key(key, memory),
             self.extract_value(value, memory),
@@ -381,19 +372,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         median: Entry<K>,
         allocator: &mut Allocator<M>,
     ) {
-        // let self_keys: Vec<_> = self
-        //     .keys_and_encoded_values
-        //     .iter()
-        //     .map(|(k, _)| format!("{k:?}"))
-        //     .collect();
-
-        // let source_keys: Vec<_> = source
-        //     .keys_and_encoded_values
-        //     .iter()
-        //     .map(|(k, _)| format!("{k:?}\n"))
-        //     .collect();
-        //println!("ABC merge\n  self   : {self_keys:?}\n  source : {source_keys:?} \n");
-
         // Load all the entries from the source node first, as they will be moved out.
         for i in 0..source.entries_len() {
             let _e = source.entry(i, allocator.memory());
@@ -480,25 +458,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// returned, containing the index where a matching key could be inserted
     /// while maintaining sorted order.
     pub fn search<M: Memory>(&self, key: &K, memory: &M) -> Result<usize, usize> {
-        // let self_keys: Vec<_> = self
-        //     .keys_and_encoded_values
-        //     .iter()
-        //     .map(|(k, _)| format!("{k:?}"))
-        //     .collect();
-        // println!("\nABC search BEFORE: {self_keys:?}");
-
-        let result = self
-            .keys_and_encoded_values
-            .binary_search_by_key(&key, |entry| self.get_key(entry, memory));
-
-        // let self_keys: Vec<_> = self
-        //     .keys_and_encoded_values
-        //     .iter()
-        //     .map(|(k, _)| format!("{k:?}"))
-        //     .collect();
-        //println!("ABC search AFTER : {self_keys:?}");
-
-        result
+        self.keys_and_encoded_values
+            .binary_search_by_key(&key, |entry| self.get_key(entry, memory))
     }
 
     /// Returns the maximum size a node can be if it has bounded keys and values.
