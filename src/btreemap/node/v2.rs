@@ -198,12 +198,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
 
-        // Load all the entries.
-        // One pass is needed to load keys and values,
-        // but results aren't stored to avoid extra allocations.
+        // Load all the entries. One pass is required to load all entries;
+        // results are not stored to avoid unnecessary allocations.
         for i in 0..self.keys_and_encoded_values.len() {
-            self.key(i);
-            self.value(i, allocator.memory());
+            self.entry(i, allocator.memory());
         }
 
         // Initialize a NodeWriter. The NodeWriter takes care of allocating/deallocating

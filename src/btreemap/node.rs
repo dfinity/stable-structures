@@ -373,16 +373,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     #[cfg(test)]
-    pub fn keys(&self) -> Vec<&K> {
+    pub fn entries<M: Memory>(&self, memory: &M) -> Vec<Entry<K>> {
         (0..self.keys_and_encoded_values.len())
-            .map(|i| self.key(i))
+            .map(|i| (self.key(i).clone(), self.value(i, memory).to_vec()))
             .collect()
     }
 
     #[cfg(test)]
-    pub fn entries<M: Memory>(&self, memory: &M) -> Vec<Entry<K>> {
+    pub fn keys(&self) -> Vec<&K> {
         (0..self.keys_and_encoded_values.len())
-            .map(|i| (self.key(i).clone(), self.value(i, memory).to_vec()))
+            .map(|i| self.key(i))
             .collect()
     }
 
