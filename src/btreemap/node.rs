@@ -171,28 +171,31 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Returns a reference to the entry at the specified index.
+    #[inline(always)]
     pub fn entry<M: Memory>(&self, idx: usize, memory: &M) -> EntryRef<K> {
         (self.key(idx), self.value(idx, memory))
     }
 
-    #[inline]
+    #[inline(always)]
     fn get_key<'a>(&'a self, (k, _): &'a LazyEntry<K>) -> &'a K {
         // TODO: implement lazy loading for keys.
         k
     }
 
     /// Returns a reference to the cached value and loads it from memory if needed.
-    #[inline]
+    #[inline(always)]
     fn get_value<'a, M: Memory>(&'a self, (_, v): &'a LazyEntry<K>, memory: &M) -> &'a [u8] {
         v.get_or_load(|offset| self.load_value_from_memory(offset, memory))
     }
 
     /// Returns a reference to the key at the specified index.
+    #[inline(always)]
     pub fn key(&self, idx: usize) -> &K {
         self.get_key(&self.keys_and_encoded_values[idx])
     }
 
     /// Returns a reference to the encoded value at the specified index.
+    #[inline(always)]
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> &[u8] {
         self.get_value(&self.keys_and_encoded_values[idx], memory)
     }
@@ -474,25 +477,25 @@ struct LazyValue(LazyObject<Blob>);
 
 impl LazyValue {
     /// Create a lazy value with a memory offset.
-    #[inline]
+    #[inline(always)]
     pub fn by_ref(offset: Bytes) -> Self {
         Self(LazyObject::by_ref(offset))
     }
 
     /// Create a lazy value from a value.
-    #[inline]
+    #[inline(always)]
     pub fn by_value(value: Blob) -> Self {
         Self(LazyObject::by_value(value))
     }
 
     /// Returns a reference to the key, loading it if necessary.
-    #[inline]
+    #[inline(always)]
     pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Blob) -> &Blob {
         self.0.get_or_load(load)
     }
 
     /// Consumes self and returns the key, loading it if necessary.
-    #[inline]
+    #[inline(always)]
     pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Blob) -> Blob {
         self.0.take_or_load(load)
     }
@@ -515,6 +518,7 @@ enum LazyObject<T> {
 
 impl<T> LazyObject<T> {
     /// Create a lazy object with a memory offset.
+    #[inline(always)]
     pub fn by_ref(offset: Bytes) -> Self {
         Self::ByRef {
             offset,
@@ -523,6 +527,7 @@ impl<T> LazyObject<T> {
     }
 
     /// Create a lazy object from a value.
+    #[inline(always)]
     pub fn by_value(value: T) -> Self {
         Self::ByVal(value)
     }
