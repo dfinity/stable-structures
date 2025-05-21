@@ -470,84 +470,70 @@ impl NodeHeader {
     }
 }
 
+/// A lazily-loaded object, which can be either an immediate value or a deferred reference.
+#[derive(Debug)]
+enum LazyObject<T> {
+    ByVal(T),
+    ByRef { offset: Bytes, loaded: OnceCell<T> },
+}
+
+impl<T> LazyObject<T> {
+    #[inline(always)]
+    pub fn by_value(value: T) -> Self {
+        LazyObject::ByVal(value)
+    }
+
+    #[inline(always)]
+    pub fn by_ref(offset: Bytes) -> Self {
+        LazyObject::ByRef {
+            offset,
+            loaded: OnceCell::new(),
+        }
+    }
+
+    #[inline(always)]
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> T) -> &T {
+        match self {
+            LazyObject::ByVal(value) => value,
+            LazyObject::ByRef { offset, loaded } => loaded.get_or_init(|| load(*offset)),
+        }
+    }
+
+    #[inline(always)]
+    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> T) -> T {
+        match self {
+            LazyObject::ByVal(value) => value,
+            LazyObject::ByRef { offset, loaded } => {
+                loaded.into_inner().unwrap_or_else(|| load(offset))
+            }
+        }
+    }
+}
+
 type Blob = Vec<u8>;
 
 #[derive(Debug)]
 struct LazyValue(LazyObject<Blob>);
 
 impl LazyValue {
-    /// Create a lazy value with a memory offset.
-    #[inline(always)]
-    pub fn by_ref(offset: Bytes) -> Self {
-        Self(LazyObject::by_ref(offset))
-    }
-
-    /// Create a lazy value from a value.
     #[inline(always)]
     pub fn by_value(value: Blob) -> Self {
         Self(LazyObject::by_value(value))
     }
 
-    /// Returns a reference to the key, loading it if necessary.
+    #[inline(always)]
+    pub fn by_ref(offset: Bytes) -> Self {
+        Self(LazyObject::by_ref(offset))
+    }
+
     #[inline(always)]
     pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Blob) -> &Blob {
         self.0.get_or_load(load)
     }
 
-    /// Consumes self and returns the key, loading it if necessary.
     #[inline(always)]
     pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Blob) -> Blob {
         self.0.take_or_load(load)
-    }
-}
-
-/// A lazy-loaded object.
-#[derive(Debug)]
-enum LazyObject<T> {
-    /// Object stored by value.
-    ByVal(T),
-
-    /// Object stored by reference, loaded on demand.
-    ByRef {
-        /// Memory offset of the object.
-        offset: Bytes,
-        /// Cache for the lazily loaded object.
-        loaded: OnceCell<T>,
-    },
-}
-
-impl<T> LazyObject<T> {
-    /// Create a lazy object with a memory offset.
-    #[inline(always)]
-    pub fn by_ref(offset: Bytes) -> Self {
-        Self::ByRef {
-            offset,
-            loaded: Default::default(),
-        }
-    }
-
-    /// Create a lazy object from a value.
-    #[inline(always)]
-    pub fn by_value(value: T) -> Self {
-        Self::ByVal(value)
-    }
-
-    /// Get a reference to the object, loading it if necessary.
-    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> T) -> &T {
-        match self {
-            LazyObject::ByVal(v) => v,
-            LazyObject::ByRef { offset, loaded } => loaded.get_or_init(|| load(*offset)),
-        }
-    }
-
-    /// Consume self and return the object, loading it if necessary.
-    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> T) -> T {
-        match self {
-            LazyObject::ByVal(v) => v,
-            LazyObject::ByRef { offset, loaded } => {
-                loaded.into_inner().unwrap_or_else(|| load(offset))
-            }
-        }
     }
 }
 
