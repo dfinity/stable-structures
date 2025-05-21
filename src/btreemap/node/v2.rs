@@ -173,11 +173,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the values
         for (_key, value) in keys_encoded_values.iter_mut() {
-            let value_offset = Bytes::from(offset.get());
-            let value_size = read_u32(&reader, offset);
-            offset += U32_SIZE;
-            *value = LazyValue::by_ref(value_offset);
-            offset += Bytes::from(value_size as u64);
+            // Load the values lazily.
+            *value = LazyValue::by_ref(Bytes::from(offset.get()));
+            let value_size = read_u32(&reader, offset) as usize;
+            offset += U32_SIZE + Bytes::from(value_size as u64);
         }
 
         Self {
