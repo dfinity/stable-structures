@@ -373,9 +373,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         median: Entry<K>,
         allocator: &mut Allocator<M>,
     ) {
-        // Load all the values from the source node first, as they will be moved out.
+        // Load all the entries from the source node first, as they will be moved out.
         for i in 0..source.entries_len() {
-            source.value(i, allocator.memory());
+            source.entry(i, allocator.memory());
         }
 
         if source.key(0, allocator.memory()) > self.key(0, allocator.memory()) {
@@ -485,9 +485,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn split<M: Memory>(&mut self, sibling: &mut Node<K>, memory: &M) -> Entry<K> {
         debug_assert!(self.is_full());
 
-        // Load the values that will be moved out of the node and into the new sibling.
+        // Load the entries that will be moved out of the node and into the new sibling.
         for idx in B..self.entries_len() {
-            self.value(idx, memory);
+            self.entry(idx, memory);
         }
 
         // Move the entries and children above the median into the new sibling.
