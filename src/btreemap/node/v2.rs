@@ -198,7 +198,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
 
-        // Load all the entry. This is necessary so that we don't overwrite referenced
+        // Load all the entries. This is necessary so that we don't overwrite referenced
         // entry when writing the entries to the node.
         let entries: Vec<_> = (0..self.keys_and_encoded_values.len())
             .map(|i| self.entry(i, allocator.memory()))
