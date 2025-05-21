@@ -150,7 +150,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Load the keys (eagerly if small).
-        const EAGER_LOAD_KEY_SIZE_THRESHOLD: u32 = 32;
+        const EAGER_LOAD_KEY_SIZE_THRESHOLD: u32 = 16;
         let mut keys_encoded_values = Vec::with_capacity(num_entries);
         let mut buf = vec![];
 
