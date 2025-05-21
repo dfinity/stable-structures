@@ -151,23 +151,24 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the keys.
         let mut keys_encoded_values = Vec::with_capacity(num_entries);
-        let mut buf = vec![];
         for _ in 0..num_entries {
-            // Load the key's size.
+            let key_offset = Bytes::from(offset.get());
+
+            // Advance offset by the key_size type size if applicable.
             let key_size = if K::BOUND.is_fixed_size() {
                 // Key is fixed in size. The size of the key is always its max size.
                 K::BOUND.max_size()
             } else {
                 // Key is not fixed in size. Read the size from memory.
-                let value = read_u32(&reader, offset);
+                let key_size = read_u32(&reader, offset);
                 offset += U32_SIZE;
-                value
+                key_size
             };
+            let key = LazyKey::by_ref(key_offset);
 
-            // Load the key.
-            read_to_vec(&reader, offset, &mut buf, key_size as usize);
-            let key = K::from_bytes(Cow::Borrowed(&buf));
+            // Advance offset by the size of the key.
             offset += Bytes::from(key_size);
+
             keys_encoded_values.push((key, LazyValue::by_ref(Bytes::from(0usize))));
         }
 
@@ -240,7 +241,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Write the keys.
         for i in 0..self.keys_and_encoded_values.len() {
-            let key = self.key(i);
+            let key = self.key(i, writer.memory());
             let key_bytes = key.to_bytes_checked();
 
             // Write the size of the key if it isn't fixed in size.
