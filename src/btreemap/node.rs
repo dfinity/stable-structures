@@ -192,7 +192,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns a reference to the key at the specified index.
     #[inline(always)]
-    pub fn key<'a, M: Memory>(&self, idx: usize, memory: &M) -> &K {
+    pub fn key<M: Memory>(&self, idx: usize, memory: &M) -> &K {
         self.get_key(&self.keys_and_encoded_values[idx], memory)
     }
 
