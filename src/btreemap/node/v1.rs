@@ -136,7 +136,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         assert!(self
             .keys_and_encoded_values
             .windows(2)
-            .all(|e| e[0].0 < e[1].0));
+            .all(|arr| self.get_key(&arr[0]) < self.get_key(&arr[1])));
 
         let (max_key_size, max_value_size) = match self.version {
             Version::V1(DerivedPageSize {
@@ -167,9 +167,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the entries.
-        for (idx, (key, _)) in self.keys_and_encoded_values.iter().enumerate() {
+        for i in 0..self.keys_and_encoded_values.len() {
             // Write the size of the key.
-            let key_bytes = key.to_bytes_checked();
+            let key_bytes = self.key(i).to_bytes_checked();
             write_u32(memory, self.address + offset, key_bytes.len() as u32);
             offset += U32_SIZE;
 
@@ -178,7 +178,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += Bytes::from(max_key_size);
 
             // Write the size of the value.
-            let value = self.value(idx, memory);
+            let value = self.value(i, memory);
             write_u32(memory, self.address + offset, value.len() as u32);
             offset += U32_SIZE;
 

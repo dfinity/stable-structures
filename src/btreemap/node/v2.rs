@@ -173,10 +173,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the values
         for (_key, value) in keys_encoded_values.iter_mut() {
-            // Load the values lazily.
-            *value = LazyValue::by_ref(Bytes::from(offset.get()));
-            let value_size = read_u32(&reader, offset) as usize;
-            offset += U32_SIZE + Bytes::from(value_size as u64);
+            let value_offset = Bytes::from(offset.get());
+            let value_size = read_u32(&reader, offset);
+            offset += U32_SIZE;
+            *value = LazyValue::by_ref(value_offset);
+            offset += Bytes::from(value_size as u64);
         }
 
         Self {
@@ -197,11 +198,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
 
-        // Load all the values. This is necessary so that we don't overwrite referenced
-        // values when writing the entries to the node.
-        for i in 0..self.keys_and_encoded_values.len() {
-            self.value(i, allocator.memory());
-        }
+        // Load all the entry. This is necessary so that we don't overwrite referenced
+        // entry when writing the entries to the node.
+        let entries: Vec<_> = (0..self.keys_and_encoded_values.len())
+            .map(|i| self.entry(i, allocator.memory()))
+            .collect();
 
         // Initialize a NodeWriter. The NodeWriter takes care of allocating/deallocating
         // overflow pages as needed.
@@ -239,7 +240,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the keys.
-        for (key, _) in self.keys_and_encoded_values.iter() {
+        for (key, _) in &entries {
             let key_bytes = key.to_bytes_checked();
 
             // Write the size of the key if it isn't fixed in size.
@@ -254,9 +255,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the values.
-        for idx in 0..self.entries_len() {
+        for (_, value) in &entries {
             // Write the size of the value.
-            let value = self.value(idx, writer.memory());
             writer.write_u32(offset, value.len() as u32);
             offset += U32_SIZE;
 
