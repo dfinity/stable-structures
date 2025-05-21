@@ -3271,7 +3271,7 @@ mod test {
         // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.keys(), vec![vec![6; 10_000]]);
+        assert_eq!(root.keys(), vec![&[6; 10_000]]);
         assert_eq!(root.children_len(), 2);
 
         // Remove the element in the root.
@@ -3283,7 +3283,7 @@ mod test {
         // [0, 1, 2, 3, 4]     [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.keys(), vec![vec![5; 10_000]]);
+        assert_eq!(root.keys(), vec![&[5; 10_000]]);
         assert_eq!(root.children_len(), 2);
 
         // Remove the element in the root. This triggers the case where the root
@@ -3297,16 +3297,16 @@ mod test {
         assert_eq!(
             root.keys(),
             vec![
-                vec![0; 10_000],
-                vec![1; 10_000],
-                vec![2; 10_000],
-                vec![3; 10_000],
-                vec![4; 10_000],
-                vec![7; 10_000],
-                vec![8; 10_000],
-                vec![9; 10_000],
-                vec![10; 10_000],
-                vec![11; 10_000],
+                &[0; 10_000],
+                &[1; 10_000],
+                &[2; 10_000],
+                &[3; 10_000],
+                &[4; 10_000],
+                &[7; 10_000],
+                &[8; 10_000],
+                &[9; 10_000],
+                &[10; 10_000],
+                &[11; 10_000],
             ]
         );
 
