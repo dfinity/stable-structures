@@ -2,11 +2,12 @@ name: PR Slack Notification
 
 on:
   pull_request:
-    types: [review_requested]
+    types: [opened, ready_for_review]
 
 jobs:
   notify-slack:
     name: Notify Slack
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
