@@ -49,6 +49,7 @@ where
         }
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         match Self::BOUND {
             Bound::Bounded { max_size, .. } => {
@@ -294,6 +295,7 @@ where
         Cow::Owned(bytes)
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         let mut bytes_read_total = 0;
 
