@@ -1,98 +1,114 @@
 benches:
   vec_get_blob_128:
     total:
-      instructions: 19246658
+      calls: 1
+      instructions: 19246661
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_16:
     total:
-      instructions: 6405942
+      calls: 1
+      instructions: 6405945
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_32:
     total:
-      instructions: 7123501
+      calls: 1
+      instructions: 7123504
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_4:
     total:
-      instructions: 4824323
+      calls: 1
+      instructions: 4824326
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_4_mem_manager:
     total:
-      instructions: 7191673
+      calls: 1
+      instructions: 7191676
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_64:
     total:
-      instructions: 11310940
+      calls: 1
+      instructions: 11310943
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_64_mem_manager:
     total:
-      instructions: 13651088
+      calls: 1
+      instructions: 13651091
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_8:
     total:
-      instructions: 5723197
+      calls: 1
+      instructions: 5723200
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_u64:
     total:
-      instructions: 4790302
+      calls: 1
+      instructions: 4790305
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_insert_blob_128:
     total:
-      instructions: 4151421
+      calls: 1
+      instructions: 4151424
       heap_increase: 0
       stable_memory_increase: 19
     scopes: {}
   vec_insert_blob_16:
     total:
-      instructions: 3316224
+      calls: 1
+      instructions: 3316227
       heap_increase: 0
       stable_memory_increase: 2
     scopes: {}
   vec_insert_blob_32:
     total:
-      instructions: 3435464
+      calls: 1
+      instructions: 3435467
       heap_increase: 0
       stable_memory_increase: 5
     scopes: {}
   vec_insert_blob_4:
     total:
-      instructions: 3227465
+      calls: 1
+      instructions: 3227468
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_insert_blob_64:
     total:
-      instructions: 3675801
+      calls: 1
+      instructions: 3675804
       heap_increase: 0
       stable_memory_increase: 9
     scopes: {}
   vec_insert_blob_8:
     total:
-      instructions: 3256886
+      calls: 1
+      instructions: 3256889
       heap_increase: 0
       stable_memory_increase: 1
     scopes: {}
   vec_insert_u64:
     total:
-      instructions: 5869516
+      calls: 1
+      instructions: 5869519
       heap_increase: 0
       stable_memory_increase: 1
     scopes: {}
-version: 0.1.14
+version: 0.1.15
