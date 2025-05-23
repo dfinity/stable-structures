@@ -18,9 +18,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ matrix.build }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ matrix.build }}-cargo-
+            ${{ runner.os }}-cargo-
 
       - name: Install Rust
         run: |
@@ -29,6 +29,7 @@ jobs:
           rustup component add rustfmt
           rustup component add clippy
           rustup toolchain install nightly
+          cargo install canbench
 
       - name: Check Format
         run: cargo fmt --all -- --check
