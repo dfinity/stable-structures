@@ -14,3 +14,18 @@ ic-stable-structures = { path = "../", features = [] }
 maplit = "1.0.2"
 serde = "1.0"
 tiny-rng = "0.2.0"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "btreemap"
+path = "btreemap/src/main.rs"
+
+[[bin]]
+name = "vec"
+path = "vec/src/main.rs"
+
+[[bin]]
+name = "memory_manager"
+path = "memory_manager/src/main.rs"

@@ -1,4 +1,4 @@
-use crate::Random;
+use benchmarks::common::Random;
 use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::{
@@ -784,3 +784,5 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
             .count()
     })
 }
+
+fn main() {}

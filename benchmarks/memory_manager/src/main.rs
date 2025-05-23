@@ -72,3 +72,5 @@ pub fn memory_manager_grow() -> BenchResult {
         }
     })
 }
+
+fn main() {}

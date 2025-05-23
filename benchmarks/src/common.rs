@@ -1,11 +1,7 @@
 use ic_stable_structures::storable::{Blob, FixedVec, Storable};
 use tiny_rng::{Rand, Rng};
 
-mod btreemap;
-mod memory_manager;
-mod vec;
-
-trait Random {
+pub trait Random {
     fn random(rng: &mut Rng) -> Self;
 }
 
@@ -38,5 +34,3 @@ impl Random for u64 {
         rng.rand_u64()
     }
 }
-
-fn main() {}
