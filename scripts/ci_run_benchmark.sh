@@ -56,6 +56,9 @@ time=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 # Print output with correct formatting
 echo "# \`canbench\` 🏋 (dir: $CANISTER_PATH) $commit_hash $time" > "$COMMENT_MESSAGE_PATH"
 
+# Set default to avoid 'unbound variable' error
+CSV_RESULTS_FILE_MSG=""
+
 # Check for performance changes relative to the main branch.
 if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   # Replace the current results with the main branch results.
