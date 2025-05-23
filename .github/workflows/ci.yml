@@ -52,9 +52,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Cache Cargo
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -112,8 +110,7 @@ jobs:
           ref: main
           path: _canbench_main_branch
 
-      - name: Cache Cargo
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
