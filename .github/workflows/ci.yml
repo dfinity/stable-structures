@@ -82,8 +82,23 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     needs: build
+    strategy:
+      matrix:
+        name:
+          - btreemap
+          - memory-manager
+          - vec
+        include:
+          - name: btreemap
+            project_dir: ./benchmarks/btreemap
+          - name: memory-manager
+            project_dir: ./benchmarks/memory_manager
+          - name: vec
+            project_dir: ./benchmarks/vec
+
     env:
-      PROJECT_DIR: .
+      PROJECT_DIR: ${{ matrix.project_dir }}
+
     steps:
       - name: Checkout current PR
         uses: actions/checkout@v4
@@ -104,23 +119,33 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
+          rustup update ${{ matrix.rust || 'stable' }} --no-self-update
+          rustup default ${{ matrix.rust || 'stable' }}
           rustup target add wasm32-unknown-unknown
 
       - name: Benchmark
         run: |
-          bash ./scripts/ci_run_benchmark.sh $PROJECT_DIR ${{ github.job }}
+          bash ./scripts/ci_run_benchmark.sh $PROJECT_DIR ${{ matrix.name }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: canbench_result_${{github.job}}
-          path: /tmp/canbench_result_${{ github.job }}
+          name: canbench_result_${{ matrix.name }}
+          path: /tmp/canbench_result_${{ matrix.name }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: canbench_results_${{github.job}}_csv
-          path: /tmp/canbench_results_${{ github.job }}.csv
+          name: canbench_results_${{ matrix.name }}_csv
+          path: /tmp/canbench_results_${{ matrix.name }}.csv
+
+      - name: Pass or fail
+        run: |
+          bash ./scripts/ci_post_run_benchmark.sh
+
+  upload-pr-number:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Save PR number
         run: |
@@ -131,14 +156,13 @@ jobs:
           name: pr_number
           path: /tmp/pr_number
 
-      - name: Pass or fail
-        run: |
-          bash ./scripts/ci_post_run_benchmark.sh
-
   checks-pass:
     # Always run this job!
     if: always()
-    needs: [build, examples, benchmark]
+    needs:
+      - build
+      - examples
+      - benchmark
     runs-on: ubuntu-latest
     steps:
       - name: check build result

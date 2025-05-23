@@ -1,0 +1,20 @@
+benches:
+  memory_manager_baseline:
+    total:
+      instructions: 1176577076
+      heap_increase: 0
+      stable_memory_increase: 8000
+    scopes: {}
+  memory_manager_grow:
+    total:
+      instructions: 347433963
+      heap_increase: 2
+      stable_memory_increase: 32000
+    scopes: {}
+  memory_manager_overhead:
+    total:
+      instructions: 1181977502
+      heap_increase: 0
+      stable_memory_increase: 8320
+    scopes: {}
+version: 0.1.14
