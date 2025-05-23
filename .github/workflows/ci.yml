@@ -18,9 +18,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ matrix.build }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ matrix.build }}-cargo-
+            ${{ runner.os }}-cargo-
 
       - name: Install Rust
         run: |
@@ -51,13 +51,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Install Rust
         run: |
@@ -109,13 +113,16 @@ jobs:
           ref: main
           path: _canbench_main_branch
 
-      - uses: actions/cache@v4
+      - name: Cache Cargo
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-1
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Install Rust
         run: |
