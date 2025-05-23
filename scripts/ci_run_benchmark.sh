@@ -34,7 +34,7 @@ fi
 
 # Check if the canbench results file is up to date.
 pushd "$CANISTER_PATH"
-canbench --less-verbose --hide-results --show-summary > $CANBENCH_OUTPUT
+canbench --less-verbose --hide-results --show-summary --csv > $CANBENCH_OUTPUT
 if grep -q "(regress\|(improved by \|(new)" "$CANBENCH_OUTPUT"; then
   UPDATED_MSG="**❌ \`$CANBENCH_RESULTS_FILE\` is not up to date**
   If the performance change is expected, run \`canbench --persist [--csv]\` to update the benchmark results."
@@ -56,9 +56,6 @@ time=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 # Print output with correct formatting
 echo "# \`canbench\` 🏋 (dir: $CANISTER_PATH) $commit_hash $time" > "$COMMENT_MESSAGE_PATH"
 
-# Set default to avoid 'unbound variable' error
-CSV_RESULTS_FILE_MSG=""
-
 # Check for performance changes relative to the main branch.
 if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   # Replace the current results with the main branch results.
@@ -69,9 +66,9 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
   cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
   popd
-
-  CSV_RESULTS_FILE_MSG="📦 \`canbench_results_$CANBENCH_JOB_NAME.csv\` available in [artifacts](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
 fi
+
+CSV_RESULTS_FILE_MSG="📦 \`canbench_results_$CANBENCH_JOB_NAME.csv\` available in [artifacts](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
 
 # Append the update status and benchmark output to the comment.
 {
