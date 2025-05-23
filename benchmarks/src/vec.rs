@@ -126,6 +126,9 @@ fn vec_get<T: Storable + Random>(memory: impl Memory) -> BenchResult {
         svec.push(&T::random(&mut rng)).unwrap();
     }
 
+    // avoid cache miss later
+    svec.get(0).unwrap();
+
     bench_fn(|| {
         for i in 0..num_items {
             svec.get(i as u64).unwrap();
