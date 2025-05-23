@@ -238,7 +238,14 @@ jobs:
   checks-pass:
     # Always run this job!
     if: always()
-    needs: [build, examples, benchmark]
+    needs:
+      [
+        build,
+        examples,
+        benchmark-btreemap,
+        benchmark-memory-manager,
+        benchmark-vec,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: check build result
@@ -247,6 +254,12 @@ jobs:
       - name: check examples result
         if: ${{ needs.examples.result != 'success' }}
         run: exit 1
-      - name: check benchmark result
-        if: ${{ needs.benchmark.result != 'success' }}
+      - name: check benchmark-btreemap result
+        if: ${{ needs.benchmark-btreemap.result != 'success' }}
+        run: exit 1
+      - name: check benchmark-memory-manager result
+        if: ${{ needs.benchmark-memory-manager.result != 'success' }}
+        run: exit 1
+      - name: check benchmark-vec result
+        if: ${{ needs.benchmark-vec.result != 'success' }}
         run: exit 1
