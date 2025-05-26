@@ -786,10 +786,12 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
 }
 
 /*
-| status | name                  | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
-|--------|-----------------------|-------|---------|---------|-------|--------|-------|---------|
-|  new   | write_btreemap_1_elem |       |   1.49B |         | 4.83K |        | 1.67K |         |
-|  new   | write_stable_1_elem   |       | 418.92M |         | 1.60K |        | 1.67K |         |
+| status | name                                | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
+|--------|-------------------------------------|-------|---------|---------|-------|--------|-------|---------|
+|  new   | write_btreemap_1_elem               |       |   1.49B |         | 4.83K |        | 1.67K |         |
+|  new   | write_btreemap_1_elem::insert_entry |     1 |     684 |         |     0 |        |     0 |         |
+|  new   | write_btreemap_1_elem::node_save_v2 |     1 | 361.30M |         |    31 |        | 1.54K |         |
+|  new   | write_stable_1_elem                 |       | 418.92M |         | 1.60K |        | 1.67K |         |
 
 ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
 */
