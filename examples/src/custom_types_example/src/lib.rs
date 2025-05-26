@@ -29,7 +29,7 @@ impl Storable for UserProfile {
     }
 
     fn into_bytes(self) -> Vec<u8> {
-        self.to_bytes().into_owned()
+        Encode!(&self).unwrap()
     }
 
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
