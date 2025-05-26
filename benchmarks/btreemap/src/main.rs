@@ -786,14 +786,10 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
 }
 
 /*
-| status | name                    | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
-|--------|-------------------------|-------|---------|---------|-------|--------|-------|---------|
-|  new   | write_btreemap_1_elem   |       |   1.49B |         | 4.83K |        | 1.67K |         |
-|  new   | write_btreemap_1k_elems |       |   5.49B |         | 3.20K |        | 1.67K |         |
-|  new   | write_btreemap_1m_elems |       |  93.30B |         | 3.51K |        | 3.20K |         |
-|  new   | write_stable_1_elem     |       | 418.92M |         | 1.60K |        | 1.67K |         |
-|  new   | write_stable_1k_elems   |       | 977.14M |         | 3.20K |        | 1.67K |         |
-|  new   | write_stable_1m_elems   |       | 553.86M |         | 1.60K |        | 1.67K |         |
+| status | name                  | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
+|--------|-----------------------|-------|---------|---------|-------|--------|-------|---------|
+|  new   | write_btreemap_1_elem |       |   1.49B |         | 4.83K |        | 1.67K |         |
+|  new   | write_stable_1_elem   |       | 418.92M |         | 1.60K |        | 1.67K |         |
 
 ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
 */
@@ -820,45 +816,45 @@ fn write_stable_1_elem() {
     });
 }
 
-#[bench]
-fn write_stable_1k_elems() {
-    const N: usize = 1_000;
-    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(2));
-    let chunk_size = SIZE / N;
-    let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
-        .chunks(chunk_size)
-        .map(|c| c.to_vec())
-        .collect();
+// #[bench]
+// fn write_stable_1k_elems() {
+//     const N: usize = 1_000;
+//     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(2));
+//     let chunk_size = SIZE / N;
+//     let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
+//         .chunks(chunk_size)
+//         .map(|c| c.to_vec())
+//         .collect();
 
-    bench_fn(|| {
-        let required = page_align(SIZE);
-        if memory.size() < required {
-            memory.grow(required - memory.size());
-        }
-        for (i, chunk) in chunks.iter().enumerate() {
-            memory.write((i * chunk_size) as u64, chunk);
-        }
-    });
-}
+//     bench_fn(|| {
+//         let required = page_align(SIZE);
+//         if memory.size() < required {
+//             memory.grow(required - memory.size());
+//         }
+//         for (i, chunk) in chunks.iter().enumerate() {
+//             memory.write((i * chunk_size) as u64, chunk);
+//         }
+//     });
+// }
 
-#[bench]
-fn write_stable_1m_elems() {
-    const N: usize = 1_000_000;
-    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(3));
-    let chunk_size = SIZE / N;
-    let chunks: Vec<u8> = vec![VALUE; SIZE];
+// #[bench]
+// fn write_stable_1m_elems() {
+//     const N: usize = 1_000_000;
+//     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(3));
+//     let chunk_size = SIZE / N;
+//     let chunks: Vec<u8> = vec![VALUE; SIZE];
 
-    bench_fn(|| {
-        let required = page_align(SIZE);
-        if memory.size() < required {
-            memory.grow(required - memory.size());
-        }
-        for i in 0..N {
-            let offset = i * chunk_size;
-            memory.write(offset as u64, &chunks[offset..offset + chunk_size]);
-        }
-    });
-}
+//     bench_fn(|| {
+//         let required = page_align(SIZE);
+//         if memory.size() < required {
+//             memory.grow(required - memory.size());
+//         }
+//         for i in 0..N {
+//             let offset = i * chunk_size;
+//             memory.write(offset as u64, &chunks[offset..offset + chunk_size]);
+//         }
+//     });
+// }
 
 #[bench]
 fn write_btreemap_1_elem() {
@@ -871,40 +867,40 @@ fn write_btreemap_1_elem() {
     });
 }
 
-#[bench]
-fn write_btreemap_1k_elems() {
-    const N: usize = 1_000;
-    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(5));
-    let mut map = BTreeMap::init(memory);
-    let chunk_size = SIZE / N;
-    let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
-        .chunks(chunk_size)
-        .map(|c| c.to_vec())
-        .collect();
+// #[bench]
+// fn write_btreemap_1k_elems() {
+//     const N: usize = 1_000;
+//     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(5));
+//     let mut map = BTreeMap::init(memory);
+//     let chunk_size = SIZE / N;
+//     let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
+//         .chunks(chunk_size)
+//         .map(|c| c.to_vec())
+//         .collect();
 
-    bench_fn(|| {
-        for (i, chunk) in chunks.into_iter().enumerate() {
-            map.insert(i as u32, chunk);
-        }
-    });
-}
+//     bench_fn(|| {
+//         for (i, chunk) in chunks.into_iter().enumerate() {
+//             map.insert(i as u32, chunk);
+//         }
+//     });
+// }
 
-#[bench]
-fn write_btreemap_1m_elems() {
-    const N: usize = 1_000_000;
-    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(6));
-    let mut map = BTreeMap::init(memory);
-    let chunk_size = SIZE / N;
-    let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
-        .chunks(chunk_size)
-        .map(|c| c.to_vec())
-        .collect();
+// #[bench]
+// fn write_btreemap_1m_elems() {
+//     const N: usize = 1_000_000;
+//     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(6));
+//     let mut map = BTreeMap::init(memory);
+//     let chunk_size = SIZE / N;
+//     let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
+//         .chunks(chunk_size)
+//         .map(|c| c.to_vec())
+//         .collect();
 
-    bench_fn(|| {
-        for (i, chunk) in chunks.into_iter().enumerate() {
-            map.insert(i as u32, chunk);
-        }
-    });
-}
+//     bench_fn(|| {
+//         for (i, chunk) in chunks.into_iter().enumerate() {
+//             map.insert(i as u32, chunk);
+//         }
+//     });
+// }
 
 fn main() {}
