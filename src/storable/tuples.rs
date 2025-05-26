@@ -21,6 +21,9 @@ where
                 let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
                 let sizes_offset = a_max + b_max;
 
+                debug_assert!(a_bytes.len() <= a_max);
+                debug_assert!(b_bytes.len() <= b_max);
+
                 let mut bytes = vec![0; max_size as usize];
                 bytes[..a_bytes.len()].copy_from_slice(a_bytes.borrow());
                 bytes[a_max..a_max + b_bytes.len()].copy_from_slice(b_bytes.borrow());
