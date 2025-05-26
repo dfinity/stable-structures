@@ -123,7 +123,7 @@ fn encode_size(dst: &mut [u8], size: usize, bytes: usize) {
     }
 }
 
-fn encode_size_lengths(sizes: Vec<usize>) -> u8 {
+fn encode_size_lengths(sizes: &[usize]) -> u8 {
     assert!(sizes.len() <= 4);
 
     let mut size_lengths_byte: u8 = 0;
@@ -256,7 +256,7 @@ where
         let mut offset = 0;
 
         if sizes_overhead != 0 {
-            bytes[0] = encode_size_lengths(vec![a_size, b_size]);
+            bytes[0] = encode_size_lengths(&[a_size, b_size]);
             offset += 1;
         }
 
