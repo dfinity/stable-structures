@@ -495,16 +495,26 @@ where
         #[cfg(feature = "bench_scope")]
         let _p = canbench_rs::bench_scope("insert"); // May add significant overhead.
 
-        let value = value.to_bytes_checked().into_owned();
+        let value = {
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("insert_value"); // May add significant overhead.
+
+            //value.to_bytes_checked().into_owned()
+            value.into_bytes()
+        };
 
         let root = if self.root_addr == NULL {
-            // No root present. Allocate one.
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("insert_allocate_node"); // May add significant overhead.
+                                                                       // No root present. Allocate one.
             let node = self.allocate_node(NodeType::Leaf);
             self.root_addr = node.address();
             self.save_header();
             node
         } else {
-            // Load the root from memory.
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("insert_load_node"); // May add significant overhead.
+                                                                   // Load the root from memory.
             let mut root = self.load_node(self.root_addr);
 
             // Check if the key already exists in the root.
@@ -2986,6 +2996,10 @@ mod test {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
+        fn into_bytes(self) -> Vec<u8> {
+            vec![1, 2, 3, 4]
+        }
+
         fn from_bytes(_: Cow<[u8]>) -> Self {
             unimplemented!();
         }
@@ -3125,6 +3139,10 @@ mod test {
                 Cow::Owned(vec![1, 2, 3])
             }
 
+            fn into_bytes(self) -> Vec<u8> {
+                vec![1, 2, 3]
+            }
+
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
                 assert_eq!(bytes.to_vec(), vec![1, 2, 3]);
                 T
@@ -3142,6 +3160,10 @@ mod test {
         impl Storable for T2 {
             fn to_bytes(&self) -> Cow<[u8]> {
                 Cow::Owned(vec![1, 2, 3])
+            }
+
+            fn into_bytes(self) -> Vec<u8> {
+                vec![1, 2, 3]
             }
 
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
