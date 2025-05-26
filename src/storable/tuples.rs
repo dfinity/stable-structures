@@ -272,8 +272,10 @@ where
     /// Serializes the tuple (A, B, C) into bytes.
     ///
     /// Format:
-    /// - If A and B are fixed-size: `<a><b><c>`
-    /// - Otherwise: `<size_lengths><size_a?><a><size_b?><b><c>`
+    /// - If A and B are fixed-size:
+    ///     `<a_bytes> <b_bytes> <c_bytes>`
+    /// - Otherwise:
+    ///     `<size_lengths (1B)> <size_a (0-4B)> <a_bytes> <size_b(0-4B)> <b_bytes> <c_bytes>`
     fn to_bytes(&self) -> Cow<[u8]> {
         encode_triple::<A, B, C>(&self.0, &self.1, &self.2).into()
     }
@@ -345,25 +347,25 @@ where
     let b_bytes = b.to_bytes();
     let c_bytes = c.to_bytes();
 
-    let a_len = a_bytes.len();
-    let b_len = b_bytes.len();
-    let c_len = c_bytes.len();
+    let a_size = a_bytes.len();
+    let b_size = b_bytes.len();
+    let c_size = c_bytes.len();
 
-    let sizes_overhead = sizes_overhead::<A, B>(a_len, b_len);
-    let total_size = a_len + b_len + c_len + sizes_overhead;
+    let sizes_overhead = sizes_overhead::<A, B>(a_size, b_size);
+    let total_size = a_size + b_size + c_size + sizes_overhead;
 
-    let mut buf = vec![0u8; total_size];
+    let mut bytes = vec![0u8; total_size];
     let mut offset = 0;
 
     if sizes_overhead > 0 {
-        buf[0] = encode_size_lengths(vec![a_len, b_len]);
+        bytes[0] = encode_size_lengths(vec![a_size, b_size]);
         offset += 1;
     }
 
-    offset += encode_tuple_element::<A>(&mut buf[offset..], a_bytes.as_ref(), false);
-    offset += encode_tuple_element::<B>(&mut buf[offset..], b_bytes.as_ref(), false);
-    offset += encode_tuple_element::<C>(&mut buf[offset..], c_bytes.as_ref(), true);
+    offset += encode_tuple_element::<A>(&mut bytes[offset..], a_bytes.as_ref(), false);
+    offset += encode_tuple_element::<B>(&mut bytes[offset..], b_bytes.as_ref(), false);
+    offset += encode_tuple_element::<C>(&mut bytes[offset..], c_bytes.as_ref(), true);
 
     debug_assert_eq!(offset, total_size);
-    buf
+    bytes
 }
