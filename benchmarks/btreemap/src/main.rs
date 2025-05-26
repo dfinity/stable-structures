@@ -786,16 +786,14 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
 }
 
 /*
-| status | name                                        | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
-|--------|---------------------------------------------|-------|---------|---------|-------|--------|-------|---------|
-|  new   | write_btreemap_1_elem                       |       |   1.07B |         | 3.23K |        | 1.67K |         |
-|  new   | write_btreemap_1_elem::insert               |     1 | 780.74M |         | 1.63K |        | 1.54K |         |
-|  new   | write_btreemap_1_elem::insert_allocate_node |     1 |   1.48K |         |     0 |        |     0 |         |
-|  new   | write_btreemap_1_elem::insert_nonfull       |     1 | 361.30M |         |    31 |        | 1.54K |         |
-|  new   | write_btreemap_1_elem::insert_value         |     1 | 419.43M |         | 1.60K |        |     0 |         |
-|  new   | write_btreemap_1_elem::node_save_v2         |     1 | 361.30M |         |    31 |        | 1.54K |         |
-|  new   | write_btreemap_1_elem::to_bytes_checked     |     2 |     761 |         |     0 |        |     0 |         |
-|  new   | write_stable_1_elem                         |       | 418.92M |         | 1.60K |        | 1.67K |         |
+| status | name                    | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
+|--------|-------------------------|-------|---------|---------|-------|--------|-------|---------|
+|  new   | write_btreemap_1_elem   |       | 651.69M |         | 1.64K |        | 1.67K |         |
+|  new   | write_btreemap_1k_elems |       |   5.06B |         | 3.20K |        | 1.67K |         |
+|  new   | write_btreemap_1m_elems |       |  92.43B |         | 3.51K |        | 3.20K |         |
+|  new   | write_stable_1_elem     |       | 418.92M |         | 1.60K |        | 1.67K |         |
+|  new   | write_stable_1k_elems   |       | 977.14M |         | 3.20K |        | 1.67K |         |
+|  new   | write_stable_1m_elems   |       |   1.55B |         | 3.51K |        | 1.67K |         |
 
 ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
 */
@@ -808,64 +806,28 @@ fn page_align(bytes: usize) -> u64 {
     bytes.div_ceil(WASM_PAGE_SIZE_IN_BYTES) as u64
 }
 
-#[bench]
-fn write_stable_1_elem() {
-    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(1));
-    let buf = vec![VALUE; SIZE];
-
-    bench_fn(|| {
-        let required = page_align(SIZE);
-        if memory.size() < required {
-            memory.grow(required - memory.size());
-        }
-        memory.write(0, &buf);
-    });
+fn init_memory(id: u8) -> impl ic_stable_structures::Memory {
+    MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(id))
 }
 
-// #[bench]
-// fn write_stable_1k_elems() {
-//     const N: usize = 1_000;
-//     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(2));
-//     let chunk_size = SIZE / N;
-//     let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
-//         .chunks(chunk_size)
-//         .map(|c| c.to_vec())
-//         .collect();
+fn ensure_memory_size(memory: &impl ic_stable_structures::Memory, size: usize) {
+    let required = page_align(size);
+    if memory.size() < required {
+        memory.grow(required - memory.size());
+    }
+}
 
-//     bench_fn(|| {
-//         let required = page_align(SIZE);
-//         if memory.size() < required {
-//             memory.grow(required - memory.size());
-//         }
-//         for (i, chunk) in chunks.iter().enumerate() {
-//             memory.write((i * chunk_size) as u64, chunk);
-//         }
-//     });
-// }
-
-// #[bench]
-// fn write_stable_1m_elems() {
-//     const N: usize = 1_000_000;
-//     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(3));
-//     let chunk_size = SIZE / N;
-//     let chunks: Vec<u8> = vec![VALUE; SIZE];
-
-//     bench_fn(|| {
-//         let required = page_align(SIZE);
-//         if memory.size() < required {
-//             memory.grow(required - memory.size());
-//         }
-//         for i in 0..N {
-//             let offset = i * chunk_size;
-//             memory.write(offset as u64, &chunks[offset..offset + chunk_size]);
-//         }
-//     });
-// }
+fn chunk_data(n: usize) -> Vec<Vec<u8>> {
+    let chunk_size = SIZE / n;
+    vec![VALUE; SIZE]
+        .chunks(chunk_size)
+        .map(|c| c.to_vec())
+        .collect()
+}
 
 #[bench]
 fn write_btreemap_1_elem() {
-    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(4));
-    let mut map = BTreeMap::init(memory);
+    let mut map = BTreeMap::init(init_memory(4));
     let buf = vec![VALUE; SIZE];
 
     bench_fn(|| {
@@ -873,40 +835,59 @@ fn write_btreemap_1_elem() {
     });
 }
 
-// #[bench]
-// fn write_btreemap_1k_elems() {
-//     const N: usize = 1_000;
-//     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(5));
-//     let mut map = BTreeMap::init(memory);
-//     let chunk_size = SIZE / N;
-//     let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
-//         .chunks(chunk_size)
-//         .map(|c| c.to_vec())
-//         .collect();
+#[bench]
+fn write_btreemap_1k_elems() {
+    write_btreemap_chunks(5, 1_000);
+}
 
-//     bench_fn(|| {
-//         for (i, chunk) in chunks.into_iter().enumerate() {
-//             map.insert(i as u32, chunk);
-//         }
-//     });
-// }
+#[bench]
+fn write_btreemap_1m_elems() {
+    write_btreemap_chunks(6, 1_000_000);
+}
 
-// #[bench]
-// fn write_btreemap_1m_elems() {
-//     const N: usize = 1_000_000;
-//     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(6));
-//     let mut map = BTreeMap::init(memory);
-//     let chunk_size = SIZE / N;
-//     let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
-//         .chunks(chunk_size)
-//         .map(|c| c.to_vec())
-//         .collect();
+fn write_btreemap_chunks(mem_id: u8, n: usize) {
+    let mut map = BTreeMap::init(init_memory(mem_id));
+    let chunks = chunk_data(n);
 
-//     bench_fn(|| {
-//         for (i, chunk) in chunks.into_iter().enumerate() {
-//             map.insert(i as u32, chunk);
-//         }
-//     });
-// }
+    bench_fn(|| {
+        for (i, chunk) in chunks.into_iter().enumerate() {
+            map.insert(i as u32, chunk);
+        }
+    });
+}
+
+#[bench]
+fn write_stable_1_elem() {
+    let memory = init_memory(1);
+    let buf = vec![VALUE; SIZE];
+
+    bench_fn(|| {
+        ensure_memory_size(&memory, SIZE);
+        memory.write(0, &buf);
+    });
+}
+
+#[bench]
+fn write_stable_1k_elems() {
+    write_stable_chunks(2, 1_000);
+}
+
+#[bench]
+fn write_stable_1m_elems() {
+    write_stable_chunks(3, 1_000_000);
+}
+
+fn write_stable_chunks(mem_id: u8, n: usize) {
+    let memory = init_memory(mem_id);
+    let chunks = chunk_data(n);
+    let chunk_size = SIZE / n;
+
+    bench_fn(|| {
+        ensure_memory_size(&memory, SIZE);
+        for (i, chunk) in chunks.iter().enumerate() {
+            memory.write((i * chunk_size) as u64, chunk);
+        }
+    });
+}
 
 fn main() {}
