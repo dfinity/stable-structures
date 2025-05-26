@@ -56,13 +56,13 @@ pub trait Storable {
             if is_fixed_size {
                 assert_eq!(
                     actual, max_size as usize,
-                    "expected fixed-size element of {} bytes, found {} bytes",
+                    "expected a fixed-size element with length {} bytes, but found {} bytes",
                     max_size, actual
                 );
             } else {
                 assert!(
                     actual <= max_size as usize,
-                    "expected element of <= {} bytes, found {} bytes",
+                    "expected an element with length <= {} bytes, but found {} bytes",
                     max_size,
                     actual
                 );

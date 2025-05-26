@@ -178,6 +178,12 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 ///         Cow::Owned(bytes)
 ///     }
 ///
+///     fn into_bytes(self) -> Vec<u8> {
+///         let mut bytes = Vec::new();
+///         // TODO: Convert your struct to bytes...
+///         bytes
+///     }
+///
 ///     fn from_bytes(bytes: Cow<[u8]>) -> Self {
 ///         // TODO: Convert bytes back to your struct
 ///         let (id, name) = (0, "".to_string());
