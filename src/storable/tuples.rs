@@ -289,7 +289,6 @@ where
 
     #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let bytes = bytes.as_ref();
         let mut offset = 0;
 
         let mut size_lengths = [None, None];
