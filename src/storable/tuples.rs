@@ -25,8 +25,8 @@ where
                 debug_assert!(b_bytes.len() <= b_max);
 
                 let mut bytes = vec![0; max_size as usize];
-                bytes[..a_bytes.len()].copy_from_slice(a_bytes.borrow());
-                bytes[a_max..a_max + b_bytes.len()].copy_from_slice(b_bytes.borrow());
+                bytes[..a_bytes.len()].copy_from_slice(a_bytes.as_ref());
+                bytes[a_max..a_max + b_bytes.len()].copy_from_slice(b_bytes.as_ref());
 
                 encode_size_of_bound(
                     &mut bytes[sizes_offset..sizes_offset + a_size_len],
@@ -260,9 +260,9 @@ where
             offset += 1;
         }
 
-        offset += encode_tuple_element::<A>(&mut bytes[offset..], a_bytes.borrow(), false);
-        offset += encode_tuple_element::<B>(&mut bytes[offset..], b_bytes.borrow(), false);
-        offset += encode_tuple_element::<C>(&mut bytes[offset..], c_bytes.borrow(), true);
+        offset += encode_tuple_element::<A>(&mut bytes[offset..], a_bytes.as_ref(), false);
+        offset += encode_tuple_element::<B>(&mut bytes[offset..], b_bytes.as_ref(), false);
+        offset += encode_tuple_element::<C>(&mut bytes[offset..], c_bytes.as_ref(), true);
 
         debug_assert_eq!(offset, output_size);
         Cow::Owned(bytes)
