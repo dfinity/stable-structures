@@ -221,21 +221,53 @@ const fn sizes_overhead<A: Storable, B: Storable>(a_size: usize, b_size: usize) 
 }
 
 fn encode_size_lengths(sizes: Vec<usize>) -> u8 {
-    sizes.iter().fold(0, |acc, &size| {
-        (acc << 2) + (bytes_to_store_size(size) - 1) as u8
-    })
-}
+    assert!(sizes.len() <= 4);
 
-fn decode_size_lengths(mut encoded: u8, count: u8) -> Vec<u8> {
-    let mut sizes = vec![];
-    for _ in 0..count {
-        sizes.push((encoded & 3) + 1);
-        encoded >>= 2;
+    let mut size_lengths_byte: u8 = 0;
+
+    for size in sizes.iter() {
+        let size_length = bytes_to_store_size(*size);
+        // Number of bytes required to store the size of every
+        // element is represented with 2 bits.
+        size_lengths_byte <<= 2;
+        // `size_length` can take value in {1, 2, 4}, but to
+        // compress it into 2 bit we will decrement its value.
+        size_lengths_byte += (size_length - 1) as u8;
     }
-    sizes.reverse();
-    sizes
+
+    size_lengths_byte
 }
 
+fn decode_size_lengths(mut encoded_bytes_to_store: u8, number_of_encoded_lengths: u8) -> Vec<u8> {
+    assert!(number_of_encoded_lengths <= 4);
+
+    let mut bytes_to_store_sizes = vec![];
+
+    for _ in 0..number_of_encoded_lengths {
+        // The number of bytes required to store the size of every
+        // element is represented with 2 bits. Hence we use
+        // mask `11`, equivalent to 3 in the decimal system.
+        let mask: u8 = 3;
+        // The number of bytes required to store size can take value
+        // in {1, 2, 4}, but to compress it to 2-bit,
+        // when encoding we decreased the value, hence now we need
+        // to do inverse.
+        let bytes_to_store: u8 = (encoded_bytes_to_store & mask) + 1;
+        bytes_to_store_sizes.push(bytes_to_store);
+        encoded_bytes_to_store >>= 2;
+    }
+
+    // Because encoding and decoding are started on the same
+    // end of the byte, we need to reverse `bytes_to_store_sizes`
+    // to get sizes in order.
+    bytes_to_store_sizes.reverse();
+
+    bytes_to_store_sizes
+}
+
+// Encodes a serialized element `T` in a tuple.
+// The element is assumed to be at the beginning of `dst`.
+// Returns the number of bytes written to `dst`.
 fn encode_tuple_element<T: Storable>(dst: &mut [u8], bytes: &[u8], last: bool) -> usize {
     let mut written = 0;
     if !last && !T::BOUND.is_fixed_size() {
@@ -247,6 +279,12 @@ fn encode_tuple_element<T: Storable>(dst: &mut [u8], bytes: &[u8], last: bool) -
     written + bytes.len()
 }
 
+// Decodes an element `T` from a tuple.
+//
+// The element is assumed to be at the beginning of `src`.
+// The length of the size of the element should be provided if the element is *not* fixed in size.
+//
+// Returns the element `T` and the number of bytes read from `src`.
 fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: bool) -> (T, usize) {
     let mut read = 0;
     let size = if let Some(len) = size_len {
