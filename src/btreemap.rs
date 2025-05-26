@@ -495,13 +495,7 @@ where
         #[cfg(feature = "bench_scope")]
         let _p = canbench_rs::bench_scope("insert"); // May add significant overhead.
 
-        let value = {
-            #[cfg(feature = "bench_scope")]
-            let _p = canbench_rs::bench_scope("insert_value"); // May add significant overhead.
-
-            //value.to_bytes_checked().into_owned()
-            value.into_bytes()
-        };
+        let value = value.to_bytes_checked().into_owned();
 
         let root = if self.root_addr == NULL {
             #[cfg(feature = "bench_scope")]
@@ -2996,10 +2990,6 @@ mod test {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
-        fn into_bytes(self) -> Vec<u8> {
-            vec![1, 2, 3, 4]
-        }
-
         fn from_bytes(_: Cow<[u8]>) -> Self {
             unimplemented!();
         }
@@ -3139,10 +3129,6 @@ mod test {
                 Cow::Owned(vec![1, 2, 3])
             }
 
-            fn into_bytes(self) -> Vec<u8> {
-                vec![1, 2, 3]
-            }
-
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
                 assert_eq!(bytes.to_vec(), vec![1, 2, 3]);
                 T
@@ -3160,10 +3146,6 @@ mod test {
         impl Storable for T2 {
             fn to_bytes(&self) -> Cow<[u8]> {
                 Cow::Owned(vec![1, 2, 3])
-            }
-
-            fn into_bytes(self) -> Vec<u8> {
-                vec![1, 2, 3]
             }
 
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
