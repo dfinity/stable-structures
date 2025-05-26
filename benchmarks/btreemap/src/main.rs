@@ -786,17 +786,21 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
 }
 
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
+
 const SIZE: usize = 100 * 1024 * 1024; // 100MB
-const CHUNK: usize = 4 * 1024; // 4KiB
 const VALUE: u8 = 37;
 
+fn page_align(bytes: usize) -> u64 {
+    bytes.div_ceil(WASM_PAGE_SIZE_IN_BYTES) as u64
+}
+
 #[bench]
-fn stable_memory_write_100mb() {
+fn write_stable_1_elem() {
     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(1));
     let buf = vec![VALUE; SIZE];
 
     bench_fn(|| {
-        let required = SIZE.div_ceil(WASM_PAGE_SIZE_IN_BYTES) as u64;
+        let required = page_align(SIZE);
         if memory.size() < required {
             memory.grow(required - memory.size());
         }
@@ -805,24 +809,83 @@ fn stable_memory_write_100mb() {
 }
 
 #[bench]
-fn btreemap_write_100mb_single_chunk() {
+fn write_stable_1k_elems() {
+    const N: usize = 1_000;
     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(2));
-    let mut map = BTreeMap::init(memory);
-    let buf = vec![VALUE; SIZE];
+    let chunk_size = SIZE / N;
+    let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
+        .chunks(chunk_size)
+        .map(|c| c.to_vec())
+        .collect();
 
     bench_fn(|| {
-        map.insert(0_u32, buf);
+        let required = page_align(SIZE);
+        if memory.size() < required {
+            memory.grow(required - memory.size());
+        }
+        for (i, chunk) in chunks.iter().enumerate() {
+            memory.write((i * chunk_size) as u64, chunk);
+        }
     });
 }
 
 #[bench]
-fn btreemap_write_100mb_chunked() {
+fn write_stable_1m_elems() {
+    const N: usize = 1_000_000;
     let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(3));
-    let mut map = BTreeMap::init(memory);
+    let chunk_size = SIZE / N;
+    let chunks: Vec<u8> = vec![VALUE; SIZE];
 
+    bench_fn(|| {
+        let required = page_align(SIZE);
+        if memory.size() < required {
+            memory.grow(required - memory.size());
+        }
+        for i in 0..N {
+            let offset = i * chunk_size;
+            memory.write(offset as u64, &chunks[offset..offset + chunk_size]);
+        }
+    });
+}
+
+#[bench]
+fn write_btreemap_1_elem() {
+    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(4));
+    let mut map = BTreeMap::init(memory);
+    let buf = vec![VALUE; SIZE];
+
+    bench_fn(|| {
+        map.insert(0_u32, buf.clone());
+    });
+}
+
+#[bench]
+fn write_btreemap_1k_elems() {
+    const N: usize = 1_000;
+    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(5));
+    let mut map = BTreeMap::init(memory);
+    let chunk_size = SIZE / N;
     let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
-        .chunks(CHUNK)
-        .map(|chunk| chunk.to_vec())
+        .chunks(chunk_size)
+        .map(|c| c.to_vec())
+        .collect();
+
+    bench_fn(|| {
+        for (i, chunk) in chunks.into_iter().enumerate() {
+            map.insert(i as u32, chunk);
+        }
+    });
+}
+
+#[bench]
+fn write_btreemap_1m_elems() {
+    const N: usize = 1_000_000;
+    let memory = MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(6));
+    let mut map = BTreeMap::init(memory);
+    let chunk_size = SIZE / N;
+    let chunks: Vec<Vec<u8>> = vec![VALUE; SIZE]
+        .chunks(chunk_size)
+        .map(|c| c.to_vec())
         .collect();
 
     bench_fn(|| {
