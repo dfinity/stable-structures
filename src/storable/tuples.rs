@@ -19,19 +19,15 @@ where
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         match Self::BOUND {
             Bound::Bounded { max_size, .. } => {
-                let bytes = bytes.as_ref();
                 assert_eq!(bytes.len(), max_size as usize);
 
                 let a_bounds = bounds::<A>();
                 let b_bounds = bounds::<B>();
-
                 let a_max_size = a_bounds.max_size as usize;
                 let b_max_size = b_bounds.max_size as usize;
+                let sizes_offset = a_max_size + b_max_size;
                 let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
                 let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
-
-                let sizes_offset = a_max_size + b_max_size;
-
                 let a_len = decode_size_of_bound(
                     &bytes[sizes_offset..sizes_offset + a_size_len],
                     &a_bounds,
