@@ -25,9 +25,6 @@ pub trait Storable {
     /// Like `to_bytes`, but includes additional checks to ensure the element's serialized bytes
     /// are within the element's bounds.
     fn to_bytes_checked(&self) -> Cow<[u8]> {
-        #[cfg(feature = "bench_scope")]
-        let _p = canbench_rs::bench_scope("to_bytes_checked"); // May add significant overhead.
-
         let bytes = self.to_bytes();
         if let Bound::Bounded {
             max_size,

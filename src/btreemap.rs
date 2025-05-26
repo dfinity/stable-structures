@@ -498,17 +498,13 @@ where
         let value = value.to_bytes_checked().into_owned();
 
         let root = if self.root_addr == NULL {
-            #[cfg(feature = "bench_scope")]
-            let _p = canbench_rs::bench_scope("insert_allocate_node"); // May add significant overhead.
-                                                                       // No root present. Allocate one.
+            // No root present. Allocate one.
             let node = self.allocate_node(NodeType::Leaf);
             self.root_addr = node.address();
             self.save_header();
             node
         } else {
-            #[cfg(feature = "bench_scope")]
-            let _p = canbench_rs::bench_scope("insert_load_node"); // May add significant overhead.
-                                                                   // Load the root from memory.
+            // Load the root from memory.
             let mut root = self.load_node(self.root_addr);
 
             // Check if the key already exists in the root.
