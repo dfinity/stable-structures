@@ -96,6 +96,8 @@ jobs:
             project_dir: ./benchmarks/memory_manager
           - name: vec
             project_dir: ./benchmarks/vec
+          - name: compare
+            project_dir: ./benchmarks/compare
 
     env:
       PROJECT_DIR: ${{ matrix.project_dir }}
