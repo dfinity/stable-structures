@@ -786,18 +786,19 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
 }
 
 /*
-| status | name                                | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
-|--------|-------------------------------------|-------|---------|---------|-------|--------|-------|---------|
-|  new   | write_btreemap_1_elem               |       |   1.49B |         | 4.83K |        | 1.67K |         |
-|  new   | write_btreemap_1_elem::insert_entry |     1 |     684 |         |     0 |        |     0 |         |
-|  new   | write_btreemap_1_elem::node_save_v2 |     1 | 361.30M |         |    31 |        | 1.54K |         |
-|  new   | write_stable_1_elem                 |       | 418.92M |         | 1.60K |        | 1.67K |         |
+| status | name                                  | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
+|--------|---------------------------------------|-------|---------|---------|-------|--------|-------|---------|
+|  new   | write_btreemap_1_elem                 |       |   1.07B |         | 3.23K |        | 1.67K |         |
+|  new   | write_btreemap_1_elem::insert         |     1 | 780.74M |         | 1.63K |        | 1.54K |         |
+|  new   | write_btreemap_1_elem::insert_nonfull |     1 | 361.30M |         |    31 |        | 1.54K |         |
+|  new   | write_btreemap_1_elem::node_save_v2   |     1 | 361.30M |         |    31 |        | 1.54K |         |
+|  new   | write_stable_1_elem                   |       | 418.92M |         | 1.60K |        | 1.67K |         |
 
 ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
 */
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 
-const SIZE: usize = 100 * 1024 * 1024; // 100MB
+const SIZE: usize = 100 * 1024 * 1024;
 const VALUE: u8 = 37;
 
 fn page_align(bytes: usize) -> u64 {
@@ -865,7 +866,7 @@ fn write_btreemap_1_elem() {
     let buf = vec![VALUE; SIZE];
 
     bench_fn(|| {
-        map.insert(0_u32, buf.clone());
+        map.insert(0_u32, buf);
     });
 }
 
