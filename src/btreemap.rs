@@ -492,9 +492,6 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        #[cfg(feature = "bench_scope")]
-        let _p = canbench_rs::bench_scope("insert"); // May add significant overhead.
-
         let value = value.to_bytes_checked().into_owned();
 
         let root = if self.root_addr == NULL {
@@ -547,9 +544,6 @@ where
 
     /// Inserts an entry into a node that is *not full*.
     fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
-        #[cfg(feature = "bench_scope")]
-        let _p = canbench_rs::bench_scope("insert_nonfull"); // May add significant overhead.
-
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
 
