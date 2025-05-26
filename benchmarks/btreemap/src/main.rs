@@ -796,7 +796,7 @@ fn stable_memory_write_100mb() {
     let buf = vec![VALUE; SIZE];
 
     bench_fn(|| {
-        let required = ((SIZE + WASM_PAGE_SIZE_IN_BYTES - 1) / WASM_PAGE_SIZE_IN_BYTES) as u64;
+        let required = SIZE.div_ceil(WASM_PAGE_SIZE_IN_BYTES) as u64;
         if memory.size() < required {
             memory.grow(required - memory.size());
         }
