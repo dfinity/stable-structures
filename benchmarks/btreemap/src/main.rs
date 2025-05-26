@@ -784,4 +784,5 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
             .count()
     })
 }
+
 fn main() {}
