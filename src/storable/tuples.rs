@@ -120,106 +120,6 @@ fn encode_size(dst: &mut [u8], size: usize, bytes: usize) {
     }
 }
 
-impl<A, B, C> Storable for (A, B, C)
-where
-    A: Storable,
-    B: Storable,
-    C: Storable,
-{
-    // Tuple (A, B, C) serialization:
-    // If A and B have fixed size: <a_bytes> <b_bytes> <c_bytes>
-    // Otherwise: <size_lengths (1B)> <size_a (0-4B)> <a_bytes> <size_b(0-4B)> <b_bytes> <c_bytes>
-    fn to_bytes(&self) -> Cow<[u8]> {
-        let a_bytes = self.0.to_bytes();
-        let b_bytes = self.1.to_bytes();
-        let c_bytes = self.2.to_bytes();
-        let a_size = a_bytes.len();
-        let b_size = b_bytes.len();
-        let c_size = c_bytes.len();
-
-        let sizes_overhead = sizes_overhead::<A, B>(a_size, b_size);
-        let output_size = a_size + b_size + c_size + sizes_overhead;
-        let mut bytes = vec![0; output_size];
-        let mut offset = 0;
-
-        if sizes_overhead != 0 {
-            bytes[0] = encode_size_lengths(vec![a_size, b_size]);
-            offset += 1;
-        }
-
-        offset += encode_tuple_element::<A>(&mut bytes[offset..], a_bytes.borrow(), false);
-        offset += encode_tuple_element::<B>(&mut bytes[offset..], b_bytes.borrow(), false);
-        offset += encode_tuple_element::<C>(&mut bytes[offset..], c_bytes.borrow(), true);
-
-        debug_assert_eq!(offset, output_size);
-        Cow::Owned(bytes)
-    }
-
-    #[inline]
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let mut offset = 0;
-        let mut size_lengths = [None, None];
-
-        if !(A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size()) {
-            let lengths = decode_size_lengths(bytes[0], 2);
-            offset += 1;
-            if !A::BOUND.is_fixed_size() {
-                size_lengths[0] = Some(lengths[0]);
-            }
-            if !B::BOUND.is_fixed_size() {
-                size_lengths[1] = Some(lengths[1]);
-            }
-        }
-
-        let (a, read) = decode_tuple_element::<A>(&bytes[offset..], size_lengths[0], false);
-        offset += read;
-        let (b, read) = decode_tuple_element::<B>(&bytes[offset..], size_lengths[1], false);
-        offset += read;
-        let (c, read) = decode_tuple_element::<C>(&bytes[offset..], None, true);
-        offset += read;
-
-        debug_assert_eq!(offset, bytes.len());
-        (a, b, c)
-    }
-
-    const BOUND: Bound = match (A::BOUND, B::BOUND, C::BOUND) {
-        (Bound::Bounded { .. }, Bound::Bounded { .. }, Bound::Bounded { .. }) => {
-            let a_bounds = bounds::<A>();
-            let b_bounds = bounds::<B>();
-            let c_bounds = bounds::<C>();
-            let sizes_overhead =
-                sizes_overhead::<A, B>(a_bounds.max_size as usize, b_bounds.max_size as usize)
-                    as u32;
-            Bound::Bounded {
-                max_size: a_bounds.max_size
-                    + b_bounds.max_size
-                    + c_bounds.max_size
-                    + sizes_overhead,
-                is_fixed_size: a_bounds.is_fixed_size
-                    && b_bounds.is_fixed_size
-                    && c_bounds.is_fixed_size,
-            }
-        }
-        _ => Bound::Unbounded,
-    };
-}
-
-const fn sizes_overhead<A: Storable, B: Storable>(a_size: usize, b_size: usize) -> usize {
-    if A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size() {
-        0
-    } else {
-        1 + if !A::BOUND.is_fixed_size() {
-            bytes_to_store_size(a_size)
-        } else {
-            0
-        } + if !B::BOUND.is_fixed_size() {
-            bytes_to_store_size(b_size)
-        } else {
-            0
-        }
-    }
-}
-
 fn encode_size_lengths(sizes: Vec<usize>) -> u8 {
     assert!(sizes.len() <= 4);
 
@@ -305,4 +205,104 @@ fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: boo
         T::from_bytes(Cow::Borrowed(&src[read..read + size])),
         read + size,
     )
+}
+
+const fn sizes_overhead<A: Storable, B: Storable>(a_size: usize, b_size: usize) -> usize {
+    if A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size() {
+        0
+    } else {
+        1 + if !A::BOUND.is_fixed_size() {
+            bytes_to_store_size(a_size)
+        } else {
+            0
+        } + if !B::BOUND.is_fixed_size() {
+            bytes_to_store_size(b_size)
+        } else {
+            0
+        }
+    }
+}
+
+impl<A, B, C> Storable for (A, B, C)
+where
+    A: Storable,
+    B: Storable,
+    C: Storable,
+{
+    // Tuple (A, B, C) serialization:
+    // If A and B have fixed size: <a_bytes> <b_bytes> <c_bytes>
+    // Otherwise: <size_lengths (1B)> <size_a (0-4B)> <a_bytes> <size_b(0-4B)> <b_bytes> <c_bytes>
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let a_bytes = self.0.to_bytes();
+        let b_bytes = self.1.to_bytes();
+        let c_bytes = self.2.to_bytes();
+        let a_size = a_bytes.len();
+        let b_size = b_bytes.len();
+        let c_size = c_bytes.len();
+
+        let sizes_overhead = sizes_overhead::<A, B>(a_size, b_size);
+        let output_size = a_size + b_size + c_size + sizes_overhead;
+        let mut bytes = vec![0; output_size];
+        let mut offset = 0;
+
+        if sizes_overhead != 0 {
+            bytes[0] = encode_size_lengths(vec![a_size, b_size]);
+            offset += 1;
+        }
+
+        offset += encode_tuple_element::<A>(&mut bytes[offset..], a_bytes.borrow(), false);
+        offset += encode_tuple_element::<B>(&mut bytes[offset..], b_bytes.borrow(), false);
+        offset += encode_tuple_element::<C>(&mut bytes[offset..], c_bytes.borrow(), true);
+
+        debug_assert_eq!(offset, output_size);
+        Cow::Owned(bytes)
+    }
+
+    #[inline]
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        let mut offset = 0;
+        let mut size_lengths = [None, None];
+
+        if !(A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size()) {
+            let lengths = decode_size_lengths(bytes[0], 2);
+            offset += 1;
+            if !A::BOUND.is_fixed_size() {
+                size_lengths[0] = Some(lengths[0]);
+            }
+            if !B::BOUND.is_fixed_size() {
+                size_lengths[1] = Some(lengths[1]);
+            }
+        }
+
+        let (a, read) = decode_tuple_element::<A>(&bytes[offset..], size_lengths[0], false);
+        offset += read;
+        let (b, read) = decode_tuple_element::<B>(&bytes[offset..], size_lengths[1], false);
+        offset += read;
+        let (c, read) = decode_tuple_element::<C>(&bytes[offset..], None, true);
+        offset += read;
+
+        debug_assert_eq!(offset, bytes.len());
+        (a, b, c)
+    }
+
+    const BOUND: Bound = match (A::BOUND, B::BOUND, C::BOUND) {
+        (Bound::Bounded { .. }, Bound::Bounded { .. }, Bound::Bounded { .. }) => {
+            let a_bounds = bounds::<A>();
+            let b_bounds = bounds::<B>();
+            let c_bounds = bounds::<C>();
+            let sizes_overhead =
+                sizes_overhead::<A, B>(a_bounds.max_size as usize, b_bounds.max_size as usize)
+                    as u32;
+            Bound::Bounded {
+                max_size: a_bounds.max_size
+                    + b_bounds.max_size
+                    + c_bounds.max_size
+                    + sizes_overhead,
+                is_fixed_size: a_bounds.is_fixed_size
+                    && b_bounds.is_fixed_size
+                    && c_bounds.is_fixed_size,
+            }
+        }
+        _ => Bound::Unbounded,
+    };
 }
