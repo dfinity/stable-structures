@@ -235,8 +235,10 @@ where
     C: Storable,
 {
     // Tuple (A, B, C) serialization:
-    // If A and B have fixed size: <a_bytes> <b_bytes> <c_bytes>
-    // Otherwise: <size_lengths (1B)> <size_a (0-4B)> <a_bytes> <size_b(0-4B)> <b_bytes> <c_bytes>
+    // If A and B have fixed size:
+    //   <a_bytes> <b_bytes> <c_bytes>
+    // Otherwise:
+    //   <size_lengths (1B)> <size_a (0-4B)> <a_bytes> <size_b(0-4B)> <b_bytes> <c_bytes>
     fn to_bytes(&self) -> Cow<[u8]> {
         let a_bytes = self.0.to_bytes();
         let b_bytes = self.1.to_bytes();
