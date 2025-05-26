@@ -16,7 +16,9 @@ pub trait Storable {
     /// NOTE: `Cow` is used here to avoid unnecessary cloning.
     fn to_bytes(&self) -> Cow<[u8]>;
 
-    ///! TODO: add documentation.
+    /// Converts the element into an owned byte vector.
+    ///
+    /// This method consumes `self` and avoids cloning when possible.
     fn into_bytes(self) -> Vec<u8>;
 
     /// Converts bytes into an element.
