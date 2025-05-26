@@ -25,12 +25,12 @@ where
                 let a_bounds = bounds::<A>();
                 let b_bounds = bounds::<B>();
 
-                let a_max = a_bounds.max_size as usize;
-                let b_max = b_bounds.max_size as usize;
+                let a_max_size = a_bounds.max_size as usize;
+                let b_max_size = b_bounds.max_size as usize;
                 let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
                 let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
 
-                let sizes_offset = a_max + b_max;
+                let sizes_offset = a_max_size + b_max_size;
 
                 let a_len = decode_size_of_bound(
                     &bytes[sizes_offset..sizes_offset + a_size_len],
@@ -42,7 +42,7 @@ where
                 );
 
                 let a = A::from_bytes(Cow::Borrowed(&bytes[0..a_len]));
-                let b = B::from_bytes(Cow::Borrowed(&bytes[a_max..a_max + b_len]));
+                let b = B::from_bytes(Cow::Borrowed(&bytes[a_max_size..a_max_size + b_len]));
 
                 (a, b)
             }
