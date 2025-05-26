@@ -2980,6 +2980,10 @@ mod test {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
+        fn into_bytes(self) -> Vec<u8> {
+            self.to_bytes().into_owned()
+        }
+
         fn from_bytes(_: Cow<[u8]>) -> Self {
             unimplemented!();
         }
@@ -3116,7 +3120,11 @@ mod test {
         struct T;
         impl Storable for T {
             fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Owned(vec![1, 2, 3])
+                Cow::Borrowed(&[1, 2, 3])
+            }
+
+            fn into_bytes(self) -> Vec<u8> {
+                self.to_bytes().into_owned()
             }
 
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
@@ -3136,6 +3144,10 @@ mod test {
         impl Storable for T2 {
             fn to_bytes(&self) -> Cow<[u8]> {
                 Cow::Owned(vec![1, 2, 3])
+            }
+
+            fn into_bytes(self) -> Vec<u8> {
+                self.to_bytes().into_owned()
             }
 
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
