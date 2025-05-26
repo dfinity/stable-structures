@@ -492,7 +492,7 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let value = value.into_bytes();
+        let value = value.into_bytes_checked();
 
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.
@@ -1428,7 +1428,7 @@ mod test {
 
     /// Encodes an object into a byte vector.
     fn encode<T: Storable>(object: T) -> Vec<u8> {
-        object.into_bytes()
+        object.into_bytes_checked()
     }
 
     /// A helper method to succinctly create a blob.

@@ -11,7 +11,7 @@ mod tests;
 
 /// A trait with convenience methods for storing an element into a stable structure.
 pub trait Storable {
-    /// Converts an element into bytes.
+    /// Converts the element into a possibly borrowed byte slice.
     ///
     /// NOTE: `Cow` is used here to avoid unnecessary cloning.
     fn to_bytes(&self) -> Cow<[u8]>;
@@ -27,33 +27,47 @@ pub trait Storable {
     /// The size bounds of the type.
     const BOUND: Bound;
 
-    /// Like `to_bytes`, but includes additional checks to ensure the element's serialized bytes
-    /// are within the element's bounds.
+    /// Like `to_bytes`, but checks that bytes conform to declared bounds.
     fn to_bytes_checked(&self) -> Cow<[u8]> {
         let bytes = self.to_bytes();
+        Self::check_bounds(&bytes);
+        bytes
+    }
+
+    /// Like `to_bytes_checked`, but checks that bytes conform to declared bounds.
+    fn into_bytes_checked(self) -> Vec<u8>
+    where
+        Self: Sized,
+    {
+        let bytes = self.into_bytes();
+        Self::check_bounds(&bytes);
+        bytes
+    }
+
+    /// Validates that a byte slice fits within this type's declared bounds.
+    #[inline]
+    fn check_bounds(bytes: &[u8]) {
         if let Bound::Bounded {
             max_size,
             is_fixed_size,
         } = Self::BOUND
         {
+            let actual = bytes.len();
             if is_fixed_size {
                 assert_eq!(
-                    bytes.len(),
-                    max_size as usize,
-                    "expected a fixed-size element with length {} bytes, but found {} bytes",
-                    max_size,
-                    bytes.len()
+                    actual, max_size as usize,
+                    "expected fixed-size element of {} bytes, found {} bytes",
+                    max_size, actual
                 );
             } else {
                 assert!(
-                    bytes.len() <= max_size as usize,
-                    "expected an element with length <= {} bytes, but found {} bytes",
+                    actual <= max_size as usize,
+                    "expected element of <= {} bytes, found {} bytes",
                     max_size,
-                    bytes.len()
+                    actual
                 );
             }
         }
-        bytes
     }
 }
 
