@@ -786,14 +786,27 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
 }
 
 /*
+| status | name                     | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
+|--------|--------------------------|-------|---------|---------|-------|--------|-------|---------|
+|  new   | write_btreemap_100_elems |       |   4.72B |         | 3.22K |        | 1.67K |         |
+|  new   | write_btreemap_10k_elems |       |   6.61B |         | 3.20K |        | 1.67K |         |
+|  new   | write_btreemap_1_elems   |       |   1.49B |         | 3.23K |        | 1.67K |         |
+|  new   | write_btreemap_1m_elems  |       |  93.33B |         | 3.51K |        | 3.20K |         |
+|  new   | write_stable_100_elems   |       | 838.47M |         | 3.22K |        | 1.67K |         |
+|  new   | write_stable_10k_elems   |       | 984.59M |         | 3.20K |        | 1.67K |         |
+|  new   | write_stable_1_elem      |       | 838.35M |         | 3.20K |        | 1.67K |         |
+|  new   | write_stable_1m_elems    |       |   1.55B |         | 3.51K |        | 1.67K |         |
+
 | status | name                    | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
 |--------|-------------------------|-------|---------|---------|-------|--------|-------|---------|
-|  new   | write_btreemap_1_elem   |       | 651.69M |         | 1.64K |        | 1.67K |         |
-|  new   | write_btreemap_1k_elems |       |   5.06B |         | 3.20K |        | 1.67K |         |
-|  new   | write_btreemap_1m_elems |       |  92.43B |         | 3.51K |        | 3.20K |         |
-|  new   | write_stable_1_elem     |       | 418.92M |         | 1.60K |        | 1.67K |         |
-|  new   | write_stable_1k_elems   |       | 977.14M |         | 3.20K |        | 1.67K |         |
-|  new   | write_stable_1m_elems   |       |   1.55B |         | 3.51K |        | 1.67K |         |
+|  new   | read_btreemap_100_elems |       |   5.11B |         | 3.22K |        | 1.67K |         |
+|  new   | read_btreemap_10k_elems |       |   7.66B |         | 3.20K |        | 1.67K |         |
+|  new   | read_btreemap_1_elem    |       |   1.64B |         | 3.23K |        | 1.67K |         |
+|  new   | read_btreemap_1m_elems  |       | 137.12B |         | 3.51K |        | 3.20K |         |
+|  new   | read_stable_100_elems   |       | 946.86M |         | 3.22K |        | 1.67K |         |
+|  new   | read_stable_10k_elems   |       |   1.09B |         | 3.20K |        | 1.67K |         |
+|  new   | read_stable_1_elems     |       |   1.23B |         | 3.20K |        | 1.67K |         |
+|  new   | read_stable_1m_elems    |       |   1.78B |         | 3.51K |        | 1.67K |         |
 
 ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
 */
@@ -826,23 +839,18 @@ fn chunk_data(n: usize) -> Vec<Vec<u8>> {
 }
 
 #[bench]
-fn write_btreemap_1_elem() {
-    let mut map = BTreeMap::init(init_memory(4));
-    let buf = vec![VALUE; SIZE];
-
-    bench_fn(|| {
-        map.insert(0_u32, buf);
-    });
+fn write_btreemap_1_elems() {
+    write_btreemap_chunks(10, 1);
 }
 
 #[bench]
 fn write_btreemap_1k_elems() {
-    write_btreemap_chunks(5, 1_000);
+    write_btreemap_chunks(11, 1_000);
 }
 
 #[bench]
 fn write_btreemap_1m_elems() {
-    write_btreemap_chunks(6, 1_000_000);
+    write_btreemap_chunks(12, 1_000_000);
 }
 
 fn write_btreemap_chunks(mem_id: u8, n: usize) {
@@ -857,24 +865,43 @@ fn write_btreemap_chunks(mem_id: u8, n: usize) {
 }
 
 #[bench]
-fn write_stable_1_elem() {
-    let memory = init_memory(1);
-    let buf = vec![VALUE; SIZE];
+fn read_btreemap_1_elem() {
+    read_btreemap_chunks(20, 1);
+}
 
+#[bench]
+fn read_btreemap_1k_elems() {
+    read_btreemap_chunks(21, 1_000);
+}
+
+#[bench]
+fn read_btreemap_1m_elems() {
+    read_btreemap_chunks(22, 1_000_000);
+}
+
+fn read_btreemap_chunks(mem_id: u8, n: usize) {
+    write_btreemap_chunks(mem_id, n);
+    let map: BTreeMap<_, Vec<u8>, _> = BTreeMap::init(init_memory(mem_id));
     bench_fn(|| {
-        ensure_memory_size(&memory, SIZE);
-        memory.write(0, &buf);
+        for i in 0..n {
+            let _ = map.get(&(i as u32));
+        }
     });
 }
 
 #[bench]
+fn write_stable_1_elem() {
+    write_stable_chunks(30, 1);
+}
+
+#[bench]
 fn write_stable_1k_elems() {
-    write_stable_chunks(2, 1_000);
+    write_stable_chunks(31, 1_000);
 }
 
 #[bench]
 fn write_stable_1m_elems() {
-    write_stable_chunks(3, 1_000_000);
+    write_stable_chunks(32, 1_000_000);
 }
 
 fn write_stable_chunks(mem_id: u8, n: usize) {
@@ -886,6 +913,35 @@ fn write_stable_chunks(mem_id: u8, n: usize) {
         ensure_memory_size(&memory, SIZE);
         for (i, chunk) in chunks.iter().enumerate() {
             memory.write((i * chunk_size) as u64, chunk);
+        }
+    });
+}
+
+#[bench]
+fn read_stable_1_elems() {
+    read_stable_chunks(40, 1);
+}
+
+#[bench]
+fn read_stable_1k_elems() {
+    read_stable_chunks(41, 1_000);
+}
+
+#[bench]
+fn read_stable_1m_elems() {
+    read_stable_chunks(44, 1_000_000);
+}
+
+fn read_stable_chunks(mem_id: u8, n: usize) {
+    write_stable_chunks(mem_id, n);
+
+    let memory = init_memory(mem_id);
+    let chunk_size = SIZE / n;
+    let mut buf = vec![0u8; chunk_size];
+
+    bench_fn(|| {
+        for i in 0..n {
+            memory.read((i * chunk_size) as u64, &mut buf);
         }
     });
 }
