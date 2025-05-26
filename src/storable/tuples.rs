@@ -81,26 +81,24 @@ where
         }
     }
 
-    const BOUND: Bound = {
-        match (A::BOUND, B::BOUND) {
-            (Bound::Bounded { .. }, Bound::Bounded { .. }) => {
-                let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
+    const BOUND: Bound = match (A::BOUND, B::BOUND) {
+        (Bound::Bounded { .. }, Bound::Bounded { .. }) => {
+            let a_bounds = bounds::<A>();
+            let b_bounds = bounds::<B>();
 
-                let max_size = a_bounds.max_size
-                    + b_bounds.max_size
-                    + bytes_to_store_size_bounded(&a_bounds)
-                    + bytes_to_store_size_bounded(&b_bounds);
+            let max_size = a_bounds.max_size
+                + b_bounds.max_size
+                + bytes_to_store_size_bounded(&a_bounds)
+                + bytes_to_store_size_bounded(&b_bounds);
 
-                let is_fixed_size = a_bounds.is_fixed_size && b_bounds.is_fixed_size;
+            let is_fixed_size = a_bounds.is_fixed_size && b_bounds.is_fixed_size;
 
-                Bound::Bounded {
-                    max_size,
-                    is_fixed_size,
-                }
+            Bound::Bounded {
+                max_size,
+                is_fixed_size,
             }
-            _ => Bound::Unbounded,
         }
+        _ => Bound::Unbounded,
     };
 }
 
@@ -331,28 +329,26 @@ where
         (a, b, c)
     }
 
-    const BOUND: Bound = {
-        match (A::BOUND, B::BOUND, C::BOUND) {
-            (Bound::Bounded { .. }, Bound::Bounded { .. }, Bound::Bounded { .. }) => {
-                let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
-                let c_bounds = bounds::<C>();
+    const BOUND: Bound = match (A::BOUND, B::BOUND, C::BOUND) {
+        (Bound::Bounded { .. }, Bound::Bounded { .. }, Bound::Bounded { .. }) => {
+            let a_bounds = bounds::<A>();
+            let b_bounds = bounds::<B>();
+            let c_bounds = bounds::<C>();
 
-                let sizes_overhead =
-                    sizes_overhead::<A, B>(a_bounds.max_size as usize, b_bounds.max_size as usize)
-                        as u32;
+            let sizes_overhead =
+                sizes_overhead::<A, B>(a_bounds.max_size as usize, b_bounds.max_size as usize)
+                    as u32;
 
-                Bound::Bounded {
-                    max_size: a_bounds.max_size
-                        + b_bounds.max_size
-                        + c_bounds.max_size
-                        + sizes_overhead,
-                    is_fixed_size: a_bounds.is_fixed_size
-                        && b_bounds.is_fixed_size
-                        && c_bounds.is_fixed_size,
-                }
+            Bound::Bounded {
+                max_size: a_bounds.max_size
+                    + b_bounds.max_size
+                    + c_bounds.max_size
+                    + sizes_overhead,
+                is_fixed_size: a_bounds.is_fixed_size
+                    && b_bounds.is_fixed_size
+                    && c_bounds.is_fixed_size,
             }
-            _ => Bound::Unbounded,
         }
+        _ => Bound::Unbounded,
     };
 }
