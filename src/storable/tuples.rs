@@ -26,6 +26,7 @@ where
                 let a_max_size = a_bounds.max_size as usize;
                 let b_max_size = b_bounds.max_size as usize;
                 let sizes_offset = a_max_size + b_max_size;
+
                 let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
                 let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
                 let a_len = decode_size_of_bound(
@@ -75,7 +76,7 @@ where
 {
     match bound {
         Bound::Bounded { max_size, .. } => {
-            let mut buf = vec![0u8; max_size as usize];
+            let mut bytes = vec![0u8; max_size as usize];
 
             let a_bytes = a.to_bytes();
             let b_bytes = b.to_bytes();
@@ -83,34 +84,33 @@ where
             let a_bounds = bounds::<A>();
             let b_bounds = bounds::<B>();
 
-            let a_max = a_bounds.max_size as usize;
-            let b_max = b_bounds.max_size as usize;
+            let a_max_size = a_bounds.max_size as usize;
+            let b_max_size = b_bounds.max_size as usize;
+
+            debug_assert!(a_bytes.len() <= a_max_size);
+            debug_assert!(b_bytes.len() <= b_max_size);
+
+            bytes[..a_bytes.len()].copy_from_slice(&a_bytes);
+            bytes[a_max_size..a_max_size + b_bytes.len()].copy_from_slice(&b_bytes);
+
             let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
             let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
 
-            let sizes_offset = a_max + b_max;
-
-            // Copy A
-            debug_assert!(a_bytes.len() <= a_max);
-            buf[..a_bytes.len()].copy_from_slice(&a_bytes);
-
-            // Copy B
-            debug_assert!(b_bytes.len() <= b_max);
-            buf[a_max..a_max + b_bytes.len()].copy_from_slice(&b_bytes);
+            let sizes_offset = a_max_size + b_max_size;
 
             // Encode sizes
             encode_size_of_bound(
-                &mut buf[sizes_offset..sizes_offset + a_size_len],
+                &mut bytes[sizes_offset..sizes_offset + a_size_len],
                 a_bytes.len(),
                 &a_bounds,
             );
             encode_size_of_bound(
-                &mut buf[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
+                &mut bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
                 b_bytes.len(),
                 &b_bounds,
             );
 
-            buf
+            bytes
         }
         Bound::Unbounded => {
             todo!("Serializing tuples with unbounded types is not yet supported.")
