@@ -198,6 +198,7 @@ fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: boo
     {
         max_size as usize
     } else {
+        // This case should only happen for the last element.
         assert!(last);
         src.len()
     };
@@ -207,20 +208,24 @@ fn decode_tuple_element<T: Storable>(src: &[u8], size_len: Option<u8>, last: boo
     )
 }
 
+// Returns number of bytes required to store encoding of sizes for elements of type A and B.
 const fn sizes_overhead<A: Storable, B: Storable>(a_size: usize, b_size: usize) -> usize {
-    if A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size() {
-        0
-    } else {
-        1 + if !A::BOUND.is_fixed_size() {
-            bytes_to_store_size(a_size)
-        } else {
-            0
-        } + if !B::BOUND.is_fixed_size() {
-            bytes_to_store_size(b_size)
-        } else {
-            0
+    let mut sizes_overhead = 0;
+
+    if !(A::BOUND.is_fixed_size() && B::BOUND.is_fixed_size()) {
+        // 1B for size lengths encoding
+        sizes_overhead += 1;
+
+        if !A::BOUND.is_fixed_size() {
+            sizes_overhead += bytes_to_store_size(a_size);
+        }
+
+        if !B::BOUND.is_fixed_size() {
+            sizes_overhead += bytes_to_store_size(b_size);
         }
     }
+
+    sizes_overhead
 }
 
 impl<A, B, C> Storable for (A, B, C)
