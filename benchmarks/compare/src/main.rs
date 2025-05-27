@@ -28,6 +28,8 @@ fn chunk_data(n: usize) -> Vec<Vec<u8>> {
     (0..n).map(|_| vec![VALUE; chunk_size]).collect()
 }
 
+// Stable memory benchmarks
+
 fn write_chunks_stable(mem_id: u8, n: usize) {
     let memory = init_memory(mem_id);
     let chunks = chunk_data(n);
@@ -54,6 +56,8 @@ fn read_chunks_stable(mem_id: u8, n: usize) {
     });
 }
 
+// BTreeMap benchmarks
+
 fn write_chunks_btreemap(mem_id: u8, n: usize) {
     let mut map = BTreeMap::init(init_memory(mem_id));
     let chunks = chunk_data(n);
@@ -75,64 +79,35 @@ fn read_chunks_btreemap(mem_id: u8, n: usize) {
     });
 }
 
-#[bench]
-fn write_chunks_stable_1() {
-    write_chunks_stable(10, 1);
+// Macro to define a single benchmark function
+macro_rules! bench_case {
+    ($name:ident, $func:ident, $mem_id:expr, $n:expr) => {
+        #[bench]
+        fn $name() {
+            $func($mem_id, $n);
+        }
+    };
 }
 
-#[bench]
-fn write_chunks_stable_1k() {
-    write_chunks_stable(11, 1_000);
-}
+// Stable Memory benchmarks
+bench_case!(write_chunks_stable_1, write_chunks_stable, 10, 1);
+bench_case!(write_chunks_stable_1k, write_chunks_stable, 11, 1_000);
+bench_case!(write_chunks_stable_1m, write_chunks_stable, 12, 1_000_000);
+bench_case!(read_chunks_stable_1, read_chunks_stable, 20, 1);
+bench_case!(read_chunks_stable_1k, read_chunks_stable, 21, 1_000);
+bench_case!(read_chunks_stable_1m, read_chunks_stable, 22, 1_000_000);
 
-#[bench]
-fn write_chunks_stable_1m() {
-    write_chunks_stable(12, 1_000_000);
-}
-
-#[bench]
-fn read_chunks_stable_1() {
-    read_chunks_stable(20, 1);
-}
-
-#[bench]
-fn read_chunks_stable_1k() {
-    read_chunks_stable(21, 1_000);
-}
-
-#[bench]
-fn read_chunks_stable_1m() {
-    read_chunks_stable(22, 1_000_000);
-}
-
-#[bench]
-fn write_chunks_btreemap_1() {
-    write_chunks_btreemap(30, 1);
-}
-
-#[bench]
-fn write_chunks_btreemap_1k() {
-    write_chunks_btreemap(31, 1_000);
-}
-
-#[bench]
-fn write_chunks_btreemap_1m() {
-    write_chunks_btreemap(32, 1_000_000);
-}
-
-#[bench]
-fn read_chunks_btreemap_1() {
-    read_chunks_btreemap(40, 1);
-}
-
-#[bench]
-fn read_chunks_btreemap_1k() {
-    read_chunks_btreemap(41, 1_000);
-}
-
-#[bench]
-fn read_chunks_btreemap_1m() {
-    read_chunks_btreemap(42, 1_000_000);
-}
+// BTreeMap benchmarks
+bench_case!(write_chunks_btreemap_1, write_chunks_btreemap, 30, 1);
+bench_case!(write_chunks_btreemap_1k, write_chunks_btreemap, 31, 1_000);
+bench_case!(
+    write_chunks_btreemap_1m,
+    write_chunks_btreemap,
+    32,
+    1_000_000
+);
+bench_case!(read_chunks_btreemap_1, read_chunks_btreemap, 40, 1);
+bench_case!(read_chunks_btreemap_1k, read_chunks_btreemap, 41, 1_000);
+bench_case!(read_chunks_btreemap_1m, read_chunks_btreemap, 42, 1_000_000);
 
 fn main() {}
