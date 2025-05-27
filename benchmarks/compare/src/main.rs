@@ -5,7 +5,6 @@ use ic_stable_structures::{
     storable::BoundedVecN,
     BTreeMap, DefaultMemoryImpl, Memory, Vec as StableVec,
 };
-use std::convert::From;
 
 const TOTAL_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
 const K: usize = 1_000;

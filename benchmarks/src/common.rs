@@ -42,7 +42,6 @@ impl<const K: usize> Random for BoundedVecN<K> {
 }
 
 impl Random for u64 {
-    #[inline]
     fn random(rng: &mut Rng) -> Self {
         rng.rand_u64()
     }
