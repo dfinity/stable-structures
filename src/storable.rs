@@ -199,9 +199,11 @@ impl<const N: usize> UnboundedVec<N> {
         N as u32
     }
 
+    /// Returns a vector of length `N`, filled with the slice prefix and padded with zeros.
     pub fn from(slice: &[u8]) -> Self {
-        assert_eq!(slice.len(), N);
-        UnboundedVec(slice.to_vec())
+        let mut vec = slice[..slice.len().min(N)].to_vec();
+        vec.resize(N, 0);
+        Self(vec)
     }
 }
 
@@ -233,9 +235,11 @@ impl<const N: usize> BoundedVec<N> {
         N as u32
     }
 
+    /// Returns a vector of length `N`, filled with the slice prefix and padded with zeros.
     pub fn from(slice: &[u8]) -> Self {
-        assert_eq!(slice.len(), N);
-        BoundedVec(slice.to_vec())
+        let mut vec = slice[..slice.len().min(N)].to_vec();
+        vec.resize(N, 0);
+        Self(vec)
     }
 }
 

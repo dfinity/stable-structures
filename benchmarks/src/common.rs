@@ -25,7 +25,7 @@ impl<const K: usize> Random for UnboundedVec<K> {
         for _ in 0..size {
             buf.push(rng.rand_u8());
         }
-        UnboundedVec::from(&buf)
+        Self::from(&buf)
     }
 }
 
@@ -36,7 +36,7 @@ impl<const K: usize> Random for BoundedVec<K> {
         for _ in 0..size {
             buf.push(rng.rand_u8());
         }
-        BoundedVec::from(&buf)
+        Self::from(&buf)
     }
 }
 
