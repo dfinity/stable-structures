@@ -200,12 +200,6 @@ impl<const N: usize> UnboundedVecN<N> {
     }
 }
 
-impl<const N: usize> Default for UnboundedVecN<N> {
-    fn default() -> Self {
-        UnboundedVecN(vec![0; N])
-    }
-}
-
 impl<const N: usize> From<&[u8]> for UnboundedVecN<N> {
     /// Returns a vector of length `N`, filled with the slice prefix and padded with zeros.
     fn from(slice: &[u8]) -> Self {
@@ -213,6 +207,12 @@ impl<const N: usize> From<&[u8]> for UnboundedVecN<N> {
         vec.extend_from_slice(slice);
         vec.resize(N, 0);
         Self(vec)
+    }
+}
+
+impl<const N: usize> Default for UnboundedVecN<N> {
+    fn default() -> Self {
+        Self(vec![0; N])
     }
 }
 
@@ -239,12 +239,6 @@ impl<const N: usize> BoundedVecN<N> {
     }
 }
 
-impl<const N: usize> Default for BoundedVecN<N> {
-    fn default() -> Self {
-        BoundedVecN(vec![0; N])
-    }
-}
-
 impl<const N: usize> From<&[u8]> for BoundedVecN<N> {
     /// Returns a vector of length `N`, filled with the slice prefix and padded with zeros.
     fn from(slice: &[u8]) -> Self {
@@ -252,6 +246,12 @@ impl<const N: usize> From<&[u8]> for BoundedVecN<N> {
         vec.extend_from_slice(slice);
         vec.resize(N, 0);
         Self(vec)
+    }
+}
+
+impl<const N: usize> Default for BoundedVecN<N> {
+    fn default() -> Self {
+        Self(vec![0; N])
     }
 }
 
