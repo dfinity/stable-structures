@@ -27,7 +27,7 @@ const fn chunk_size<const N: usize>() -> usize {
 
 fn chunk_data(n: usize) -> Vec<Vec<u8>> {
     let chunk_size = TOTAL_SIZE / n;
-    vec![vec![37; chunk_size]; n]
+    (0..n).map(|_| vec![37; chunk_size]).collect()
 }
 
 // Stable Memory benchmarks
