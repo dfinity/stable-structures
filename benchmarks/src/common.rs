@@ -1,5 +1,4 @@
 use ic_stable_structures::storable::{Blob, BoundedVecN, Storable, UnboundedVecN};
-use std::convert::TryFrom;
 use tiny_rng::{Rand, Rng};
 
 pub trait Random {
