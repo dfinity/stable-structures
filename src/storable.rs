@@ -297,6 +297,11 @@ impl<const N: usize> Storable for BoundedVecN<N> {
     }
 
     #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self(bytes.into_owned())
     }
