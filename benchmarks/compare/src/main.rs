@@ -8,16 +8,12 @@ use ic_stable_structures::{
 const SIZE: usize = 100 * 1024 * 1024;
 const VALUE: u8 = 37;
 
-fn page_align(bytes: usize) -> u64 {
-    bytes.div_ceil(WASM_PAGE_SIZE_IN_BYTES) as u64
-}
-
 fn init_memory(id: u8) -> impl Memory {
     MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(id))
 }
 
 fn ensure_memory_size(memory: &impl Memory, size: usize) {
-    let required = page_align(size);
+    let required = size.div_ceil(WASM_PAGE_SIZE_IN_BYTES) as u64;
     if memory.size() < required {
         memory.grow(required - memory.size());
     }
