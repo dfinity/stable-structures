@@ -7,6 +7,8 @@ use ic_stable_structures::{
 
 const SIZE: usize = 100 * 1024 * 1024;
 const VALUE: u8 = 37;
+const K: usize = 1_000;
+const M: usize = 1_000_000;
 
 fn init_memory(id: u8) -> impl Memory {
     MemoryManager::init(DefaultMemoryImpl::default()).get(MemoryId::new(id))
@@ -87,23 +89,18 @@ macro_rules! bench_case {
 
 // Stable Memory benchmarks
 bench_case!(write_chunks_stable_1, write_chunks_stable, 10, 1);
-bench_case!(write_chunks_stable_1k, write_chunks_stable, 11, 1_000);
-bench_case!(write_chunks_stable_1m, write_chunks_stable, 12, 1_000_000);
+bench_case!(write_chunks_stable_1k, write_chunks_stable, 11, K);
+bench_case!(write_chunks_stable_1m, write_chunks_stable, 12, M);
 bench_case!(read_chunks_stable_1, read_chunks_stable, 20, 1);
-bench_case!(read_chunks_stable_1k, read_chunks_stable, 21, 1_000);
-bench_case!(read_chunks_stable_1m, read_chunks_stable, 22, 1_000_000);
+bench_case!(read_chunks_stable_1k, read_chunks_stable, 21, K);
+bench_case!(read_chunks_stable_1m, read_chunks_stable, 22, M);
 
 // BTreeMap benchmarks
 bench_case!(write_chunks_btreemap_1, write_chunks_btreemap, 30, 1);
-bench_case!(write_chunks_btreemap_1k, write_chunks_btreemap, 31, 1_000);
-bench_case!(
-    write_chunks_btreemap_1m,
-    write_chunks_btreemap,
-    32,
-    1_000_000
-);
+bench_case!(write_chunks_btreemap_1k, write_chunks_btreemap, 31, K);
+bench_case!(write_chunks_btreemap_1m, write_chunks_btreemap, 32, M);
 bench_case!(read_chunks_btreemap_1, read_chunks_btreemap, 40, 1);
-bench_case!(read_chunks_btreemap_1k, read_chunks_btreemap, 41, 1_000);
-bench_case!(read_chunks_btreemap_1m, read_chunks_btreemap, 42, 1_000_000);
+bench_case!(read_chunks_btreemap_1k, read_chunks_btreemap, 41, K);
+bench_case!(read_chunks_btreemap_1m, read_chunks_btreemap, 42, M);
 
 fn main() {}
