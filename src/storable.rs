@@ -223,7 +223,7 @@ impl<const N: usize> Storable for UnboundedVecN<N> {
 
     #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        UnboundedVecN(bytes.into_owned())
+        Self(bytes.into_owned())
     }
 
     const BOUND: Bound = Bound::Unbounded;
@@ -262,7 +262,7 @@ impl<const N: usize> Storable for BoundedVecN<N> {
 
     #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        BoundedVecN(bytes.into_owned())
+        Self(bytes.into_owned())
     }
 
     const BOUND: Bound = Bound::Bounded {
