@@ -1,4 +1,4 @@
-use ic_stable_structures::storable::{Blob, Storable, UnboundedVec};
+use ic_stable_structures::storable::{Blob, BoundedVec, Storable, UnboundedVec};
 use tiny_rng::{Rand, Rng};
 
 pub trait Random {
@@ -26,6 +26,17 @@ impl<const K: usize> Random for UnboundedVec<K> {
             buf.push(rng.rand_u8());
         }
         UnboundedVec::from(&buf)
+    }
+}
+
+impl<const K: usize> Random for BoundedVec<K> {
+    fn random(rng: &mut Rng) -> Self {
+        let size = rng.rand_u32() % Self::max_size();
+        let mut buf = Vec::with_capacity(size as usize);
+        for _ in 0..size {
+            buf.push(rng.rand_u8());
+        }
+        BoundedVec::from(&buf)
     }
 }
 
