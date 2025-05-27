@@ -15,18 +15,18 @@ where
                 let b_bytes = self.1.to_bytes();
                 let a_bounds = bounds::<A>();
                 let b_bounds = bounds::<B>();
-                let a_max = a_bounds.max_size as usize;
-                let b_max = b_bounds.max_size as usize;
+                let a_max_size = a_bounds.max_size as usize;
+                let b_max_size = b_bounds.max_size as usize;
                 let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
                 let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
-                let sizes_offset = a_max + b_max;
+                let sizes_offset = a_max_size + b_max_size;
 
-                debug_assert!(a_bytes.len() <= a_max);
-                debug_assert!(b_bytes.len() <= b_max);
+                debug_assert!(a_bytes.len() <= a_max_size);
+                debug_assert!(b_bytes.len() <= b_max_size);
 
                 let mut bytes = vec![0; max_size as usize];
                 bytes[..a_bytes.len()].copy_from_slice(a_bytes.as_ref());
-                bytes[a_max..a_max + b_bytes.len()].copy_from_slice(b_bytes.as_ref());
+                bytes[a_max_size..a_max_size + b_bytes.len()].copy_from_slice(b_bytes.as_ref());
 
                 encode_size_of_bound(
                     &mut bytes[sizes_offset..sizes_offset + a_size_len],
@@ -52,9 +52,9 @@ where
                 assert_eq!(bytes.len(), max_size as usize);
                 let a_bounds = bounds::<A>();
                 let b_bounds = bounds::<B>();
-                let a_max = a_bounds.max_size as usize;
-                let b_max = b_bounds.max_size as usize;
-                let sizes_offset = a_max + b_max;
+                let a_max_size = a_bounds.max_size as usize;
+                let b_max_size = b_bounds.max_size as usize;
+                let sizes_offset = a_max_size + b_max_size;
                 let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
                 let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
 
@@ -68,7 +68,7 @@ where
                 );
 
                 let a = A::from_bytes(Cow::Borrowed(&bytes[..a_len]));
-                let b = B::from_bytes(Cow::Borrowed(&bytes[a_max..a_max + b_len]));
+                let b = B::from_bytes(Cow::Borrowed(&bytes[a_max_size..a_max_size + b_len]));
                 (a, b)
             }
             _ => todo!("Deserializing tuples with unbounded types is not yet supported."),
@@ -115,11 +115,11 @@ fn decode_size(src: &[u8], size_len: usize) -> usize {
 }
 
 /// Encodes `size` at the beginning of `dst` of length `bytes_to_store_size` bytes.
-fn encode_size(dst: &mut [u8], size: usize, bytes: usize) {
+fn encode_size(dst: &mut [u8], size_len: usize, bytes: usize) {
     match bytes {
-        1 => dst[0] = size as u8,
-        2 => dst[..2].copy_from_slice(&(size as u16).to_be_bytes()),
-        _ => dst[..4].copy_from_slice(&(size as u32).to_be_bytes()),
+        1 => dst[0] = size_len as u8,
+        2 => dst[..2].copy_from_slice(&(size_len as u16).to_be_bytes()),
+        _ => dst[..4].copy_from_slice(&(size_len as u32).to_be_bytes()),
     }
 }
 
@@ -172,14 +172,14 @@ fn decode_size_lengths(mut encoded_bytes_to_store: u8, number_of_encoded_lengths
 // The element is assumed to be at the beginning of `dst`.
 // Returns the number of bytes written to `dst`.
 fn encode_tuple_element<T: Storable>(dst: &mut [u8], bytes: &[u8], last: bool) -> usize {
-    let mut written = 0;
+    let mut offset = 0;
     if !last && !T::BOUND.is_fixed_size() {
         let size_len = bytes_to_store_size(bytes.len());
-        encode_size(&mut dst[written..], bytes.len(), size_len);
-        written += size_len;
+        encode_size(&mut dst[offset..], bytes.len(), size_len);
+        offset += size_len;
     }
-    dst[written..written + bytes.len()].copy_from_slice(bytes);
-    written + bytes.len()
+    dst[offset..offset + bytes.len()].copy_from_slice(bytes);
+    offset + bytes.len()
 }
 
 // Decodes an element `T` from a tuple.
