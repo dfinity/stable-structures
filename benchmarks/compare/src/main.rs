@@ -5,6 +5,7 @@ use ic_stable_structures::{
     storable::BoundedVecN,
     BTreeMap, DefaultMemoryImpl, Memory, Vec as StableVec,
 };
+use std::convert::From;
 
 const TOTAL_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
 const K: usize = 1_000;
@@ -88,7 +89,7 @@ fn write_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
         StableVec::new(init_memory(mem_id)).expect("Vec::new failed");
     let chunks: Vec<_> = chunk_data(n)
         .iter()
-        .map(|chunk| BoundedVecN::from(chunk))
+        .map(|chunk| BoundedVecN::from(chunk.as_slice()))
         .collect();
 
     bench_fn(|| {

@@ -1,7 +1,7 @@
 use ic_principal::Principal;
 use std::borrow::{Borrow, Cow};
 use std::cmp::{Ordering, Reverse};
-use std::convert::{TryFrom, TryInto};
+use std::convert::{From, TryFrom, TryInto};
 use std::fmt;
 
 mod tuples;
@@ -198,18 +198,21 @@ impl<const N: usize> UnboundedVecN<N> {
     pub fn max_size() -> u32 {
         N as u32
     }
-
-    /// Returns a vector of length `N`, filled with the slice prefix and padded with zeros.
-    pub fn from(slice: &[u8]) -> Self {
-        let mut vec = slice[..slice.len().min(N)].to_vec();
-        vec.resize(N, 0);
-        Self(vec)
-    }
 }
 
 impl<const N: usize> Default for UnboundedVecN<N> {
     fn default() -> Self {
         UnboundedVecN(vec![0; N])
+    }
+}
+
+impl<const N: usize> From<&[u8]> for UnboundedVecN<N> {
+    /// Returns a vector of length `N`, filled with the slice prefix and padded with zeros.
+    fn from(slice: &[u8]) -> Self {
+        let mut vec = Vec::with_capacity(N);
+        vec.extend_from_slice(slice);
+        vec.resize(N, 0);
+        Self(vec)
     }
 }
 
@@ -234,18 +237,21 @@ impl<const N: usize> BoundedVecN<N> {
     pub fn max_size() -> u32 {
         N as u32
     }
-
-    /// Returns a vector of length `N`, filled with the slice prefix and padded with zeros.
-    pub fn from(slice: &[u8]) -> Self {
-        let mut vec = slice[..slice.len().min(N)].to_vec();
-        vec.resize(N, 0);
-        Self(vec)
-    }
 }
 
 impl<const N: usize> Default for BoundedVecN<N> {
     fn default() -> Self {
         BoundedVecN(vec![0; N])
+    }
+}
+
+impl<const N: usize> From<&[u8]> for BoundedVecN<N> {
+    /// Returns a vector of length `N`, filled with the slice prefix and padded with zeros.
+    fn from(slice: &[u8]) -> Self {
+        let mut vec = Vec::with_capacity(N);
+        vec.extend_from_slice(slice);
+        vec.resize(N, 0);
+        Self(vec)
     }
 }
 
