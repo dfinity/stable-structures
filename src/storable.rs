@@ -190,11 +190,11 @@ impl<const N: usize> Storable for Blob<N> {
     };
 }
 
-/// Byte‑vector for testing size N; otherwise just a Vec<u8>.
+/// Unbounded vector of bytes, always of length `N`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct FixedVec<const N: usize>(Vec<u8>);
+pub struct UnboundedVecN<const N: usize>(Vec<u8>);
 
-impl<const N: usize> FixedVec<N> {
+impl<const N: usize> UnboundedVecN<N> {
     pub fn max_size() -> u32 {
         N as u32
     }
@@ -209,24 +209,24 @@ impl<const N: usize> FixedVec<N> {
         let mut vec = Vec::with_capacity(N);
         vec.extend_from_slice(slice);
         vec.resize(N, 0);
-        FixedVec(vec)
+        Self(vec)
     }
 }
 
-impl<const N: usize> Default for FixedVec<N> {
+impl<const N: usize> Default for UnboundedVecN<N> {
     fn default() -> Self {
-        FixedVec(vec![0; N])
+        Self(vec![0; N])
     }
 }
 
-impl<const N: usize> Storable for FixedVec<N> {
+impl<const N: usize> Storable for UnboundedVecN<N> {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(self.0.clone())
     }
 
     #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        FixedVec(bytes.into_owned())
+        Self(bytes.into_owned())
     }
 
     const BOUND: Bound = Bound::Unbounded;
