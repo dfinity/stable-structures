@@ -5,7 +5,7 @@ use ic_stable_structures::{
     BTreeMap, DefaultMemoryImpl, Memory,
 };
 
-const SIZE: usize = 100 * 1024 * 1024;
+const TOTAL_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
 const K: usize = 1_000;
 const M: usize = 1_000_000;
 
@@ -21,7 +21,7 @@ fn ensure_memory_size(memory: &impl Memory, size: usize) {
 }
 
 fn chunk_data(n: usize) -> Vec<Vec<u8>> {
-    let chunk_size = SIZE / n;
+    let chunk_size = TOTAL_SIZE / n;
     (0..n).map(|_| vec![37; chunk_size]).collect()
 }
 
@@ -30,10 +30,10 @@ fn chunk_data(n: usize) -> Vec<Vec<u8>> {
 fn write_chunks_stable(mem_id: u8, n: usize) {
     let memory = init_memory(mem_id);
     let chunks = chunk_data(n);
-    let chunk_size = SIZE / n;
+    let chunk_size = TOTAL_SIZE / n;
 
     bench_fn(|| {
-        ensure_memory_size(&memory, SIZE);
+        ensure_memory_size(&memory, TOTAL_SIZE);
         for (i, chunk) in chunks.iter().enumerate() {
             memory.write((i * chunk_size) as u64, chunk);
         }
@@ -43,7 +43,7 @@ fn write_chunks_stable(mem_id: u8, n: usize) {
 fn read_chunks_stable(mem_id: u8, n: usize) {
     write_chunks_stable(mem_id, n);
     let memory = init_memory(mem_id);
-    let chunk_size = SIZE / n;
+    let chunk_size = TOTAL_SIZE / n;
     let mut buf = vec![0u8; chunk_size];
 
     bench_fn(|| {
