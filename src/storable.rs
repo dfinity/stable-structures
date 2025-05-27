@@ -190,7 +190,7 @@ impl<const N: usize> Storable for Blob<N> {
     };
 }
 
-/// Unbounded vector of bytes filled with up to `N` bytes.
+/// Unbounded vector of bytes with length exactly `N`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct UnboundedVec<const N: usize>(Vec<u8>);
 
@@ -226,7 +226,7 @@ impl<const N: usize> Storable for UnboundedVec<N> {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-/// Bounded vector of bytes filled with up to `N` bytes.
+/// Bounded vector of bytes with length exactly `N`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct BoundedVec<const N: usize>(Vec<u8>);
 
