@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Post to a Slack channel
-        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
+        uses: slackapi/slack-github-action@b0fa283ad8fea605de13dc3f449259339835fc52 # v2.1.0
         with:
           channel-id: eng-execution-mrs
           slack-message: ":github: `${{ github.repository }}` <${{ github.event.pull_request.html_url }}|${{ github.event.pull_request.title }}>"
