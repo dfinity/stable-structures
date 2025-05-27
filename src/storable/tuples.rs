@@ -256,7 +256,7 @@ where
         let mut offset = 0;
 
         if sizes_overhead != 0 {
-            bytes[0] = encode_size_lengths(&[a_size, b_size]);
+            bytes[offset] = encode_size_lengths(&[a_size, b_size]);
             offset += 1;
         }
 
