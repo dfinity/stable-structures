@@ -1,7 +1,7 @@
 use crate::storable::{
     bounds, bytes_to_store_size, bytes_to_store_size_bounded, Bound, Bounds, Storable,
 };
-use std::borrow::{Borrow, Cow};
+use std::borrow::Cow;
 
 impl<A, B> Storable for (A, B)
 where
