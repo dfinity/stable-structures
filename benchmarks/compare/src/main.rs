@@ -2,7 +2,8 @@ use canbench_rs::{bench, bench_fn};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
-    BTreeMap, DefaultMemoryImpl, Memory,
+    storable::BoundedVec,
+    BTreeMap, DefaultMemoryImpl, Memory, Vec as StableVec,
 };
 
 const TOTAL_SIZE: usize = 100 * 1024 * 1024; // 100 MiB
@@ -18,6 +19,10 @@ fn ensure_memory_size(memory: &impl Memory, size: usize) {
     if memory.size() < required {
         memory.grow(required - memory.size());
     }
+}
+
+const fn chunk_size<const N: usize>() -> usize {
+    TOTAL_SIZE / N
 }
 
 fn chunk_data(n: usize) -> Vec<Vec<u8>> {
@@ -76,12 +81,52 @@ fn read_chunks_btreemap(mem_id: u8, n: usize) {
     });
 }
 
+// StableVec benchmarks
+
+fn write_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
+    ic_cdk::println!("Chunk size: {}, chunks: {}", CHUNK_SIZE, n);
+    let vec: StableVec<BoundedVec<CHUNK_SIZE>, _> =
+        StableVec::new(init_memory(mem_id)).expect("Vec::new failed");
+    let chunks: Vec<_> = chunk_data(n)
+        .iter()
+        .map(|chunk| BoundedVec::from(chunk))
+        .collect();
+
+    bench_fn(|| {
+        for chunk in chunks {
+            vec.push(&chunk).expect("Vec::push failed");
+        }
+    });
+}
+
+fn read_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
+    write_chunks_vec::<CHUNK_SIZE>(mem_id, n);
+    let vec: StableVec<BoundedVec<CHUNK_SIZE>, _> =
+        StableVec::init(init_memory(mem_id)).expect("Vec::init failed");
+
+    bench_fn(|| {
+        for i in 0..n as u64 {
+            let _ = vec.get(i);
+        }
+    });
+}
+
 // Macro to define a single benchmark function
 macro_rules! bench_case {
     ($name:ident, $func:ident, $mem_id:expr, $n:expr) => {
         #[bench]
         fn $name() {
             $func($mem_id, $n);
+        }
+    };
+}
+
+macro_rules! bench_case_bounded {
+    ($name:ident, $func:ident, $mem_id:expr, $n:expr) => {
+        #[bench]
+        fn $name() {
+            const SIZE: usize = chunk_size::<$n>();
+            $func::<SIZE>($mem_id, $n);
         }
     };
 }
@@ -101,5 +146,13 @@ bench_case!(write_chunks_btreemap_1m, write_chunks_btreemap, 32, M);
 bench_case!(read_chunks_btreemap_1, read_chunks_btreemap, 40, 1);
 bench_case!(read_chunks_btreemap_1k, read_chunks_btreemap, 41, K);
 bench_case!(read_chunks_btreemap_1m, read_chunks_btreemap, 42, M);
+
+// StableVec benchmarks
+bench_case_bounded!(write_chunks_vec_1, write_chunks_vec, 50, 1);
+bench_case_bounded!(write_chunks_vec_1k, write_chunks_vec, 51, K);
+bench_case_bounded!(write_chunks_vec_1m, write_chunks_vec, 52, M);
+bench_case_bounded!(read_chunks_vec_1, read_chunks_vec, 60, 1);
+bench_case_bounded!(read_chunks_vec_1k, read_chunks_vec, 61, K);
+bench_case_bounded!(read_chunks_vec_1m, read_chunks_vec, 62, M);
 
 fn main() {}
