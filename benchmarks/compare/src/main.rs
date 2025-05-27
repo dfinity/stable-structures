@@ -2,7 +2,7 @@ use canbench_rs::{bench, bench_fn};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
-    storable::BoundedVec,
+    storable::BoundedVecN,
     BTreeMap, DefaultMemoryImpl, Memory, Vec as StableVec,
 };
 
@@ -84,11 +84,11 @@ fn read_chunks_btreemap(mem_id: u8, n: usize) {
 // StableVec benchmarks
 
 fn write_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
-    let vec: StableVec<BoundedVec<CHUNK_SIZE>, _> =
+    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> =
         StableVec::new(init_memory(mem_id)).expect("Vec::new failed");
     let chunks: Vec<_> = chunk_data(n)
         .iter()
-        .map(|chunk| BoundedVec::from(chunk))
+        .map(|chunk| BoundedVecN::from(chunk))
         .collect();
 
     bench_fn(|| {
@@ -100,7 +100,7 @@ fn write_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
 
 fn read_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
     write_chunks_vec::<CHUNK_SIZE>(mem_id, n);
-    let vec: StableVec<BoundedVec<CHUNK_SIZE>, _> =
+    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> =
         StableVec::init(init_memory(mem_id)).expect("Vec::init failed");
 
     bench_fn(|| {

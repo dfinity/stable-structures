@@ -2,7 +2,7 @@ use benchmarks::common::Random;
 use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::{
-    storable::{Blob, UnboundedVec},
+    storable::{Blob, UnboundedVecN},
     BTreeMap, DefaultMemoryImpl, Memory, Storable,
 };
 use std::ops::Bound;
@@ -20,15 +20,15 @@ type Blob512 = Blob<512>;
 type Blob1024 = Blob<1024>;
 
 // Unbounded types.
-type UnboundedVec4 = UnboundedVec<4>;
-type UnboundedVec8 = UnboundedVec<8>;
-type UnboundedVec16 = UnboundedVec<16>;
-type UnboundedVec32 = UnboundedVec<32>;
-type UnboundedVec64 = UnboundedVec<64>;
-type UnboundedVec128 = UnboundedVec<128>;
-type UnboundedVec256 = UnboundedVec<256>;
-type UnboundedVec512 = UnboundedVec<512>;
-type UnboundedVec1024 = UnboundedVec<1024>;
+type UnboundedVecN4 = UnboundedVecN<4>;
+type UnboundedVecN8 = UnboundedVecN<8>;
+type UnboundedVecN16 = UnboundedVecN<16>;
+type UnboundedVecN32 = UnboundedVecN<32>;
+type UnboundedVecN64 = UnboundedVecN<64>;
+type UnboundedVecN128 = UnboundedVecN<128>;
+type UnboundedVecN256 = UnboundedVecN<256>;
+type UnboundedVecN512 = UnboundedVecN<512>;
+type UnboundedVecN1024 = UnboundedVecN<1024>;
 
 #[allow(non_upper_case_globals)]
 const KiB: usize = 1024;
@@ -92,40 +92,40 @@ bench_tests! {
     btreemap_v2_insert_blob_32_1024, insert_helper_v2, Blob32, Blob1024;
 
     // vec K x 128
-    btreemap_v2_insert_vec_4_128,    insert_helper_v2,    UnboundedVec4, UnboundedVec128;
-    btreemap_v2_insert_vec_8_128,    insert_helper_v2,    UnboundedVec8, UnboundedVec128;
-    btreemap_v2_insert_vec_16_128,   insert_helper_v2,   UnboundedVec16, UnboundedVec128;
-    btreemap_v2_insert_vec_32_128,   insert_helper_v2,   UnboundedVec32, UnboundedVec128;
-    btreemap_v2_insert_vec_64_128,   insert_helper_v2,   UnboundedVec64, UnboundedVec128;
-    btreemap_v2_insert_vec_128_128,  insert_helper_v2,  UnboundedVec128, UnboundedVec128;
-    btreemap_v2_insert_vec_256_128,  insert_helper_v2,  UnboundedVec256, UnboundedVec128;
-    btreemap_v2_insert_vec_512_128,  insert_helper_v2,  UnboundedVec512, UnboundedVec128;
-    btreemap_v2_insert_vec_1024_128, insert_helper_v2, UnboundedVec1024, UnboundedVec128;
+    btreemap_v2_insert_vec_4_128,    insert_helper_v2,    UnboundedVecN4, UnboundedVecN128;
+    btreemap_v2_insert_vec_8_128,    insert_helper_v2,    UnboundedVecN8, UnboundedVecN128;
+    btreemap_v2_insert_vec_16_128,   insert_helper_v2,   UnboundedVecN16, UnboundedVecN128;
+    btreemap_v2_insert_vec_32_128,   insert_helper_v2,   UnboundedVecN32, UnboundedVecN128;
+    btreemap_v2_insert_vec_64_128,   insert_helper_v2,   UnboundedVecN64, UnboundedVecN128;
+    btreemap_v2_insert_vec_128_128,  insert_helper_v2,  UnboundedVecN128, UnboundedVecN128;
+    btreemap_v2_insert_vec_256_128,  insert_helper_v2,  UnboundedVecN256, UnboundedVecN128;
+    btreemap_v2_insert_vec_512_128,  insert_helper_v2,  UnboundedVecN512, UnboundedVecN128;
+    btreemap_v2_insert_vec_1024_128, insert_helper_v2, UnboundedVecN1024, UnboundedVecN128;
 
     // vec 32 x V
-    btreemap_v2_insert_vec_32_4,    insert_helper_v2, UnboundedVec32,    UnboundedVec4;
-    btreemap_v2_insert_vec_32_8,    insert_helper_v2, UnboundedVec32,    UnboundedVec8;
-    btreemap_v2_insert_vec_32_16,   insert_helper_v2, UnboundedVec32,   UnboundedVec16;
-    btreemap_v2_insert_vec_32_32,   insert_helper_v2, UnboundedVec32,   UnboundedVec32;
-    btreemap_v2_insert_vec_32_64,   insert_helper_v2, UnboundedVec32,   UnboundedVec64;
-    //btreemap_v2_insert_vec_32_128,  insert_helper_v2, UnboundedVec32,  UnboundedVec128;  // Skip repeated.
-    btreemap_v2_insert_vec_32_256,  insert_helper_v2, UnboundedVec32,  UnboundedVec256;
-    btreemap_v2_insert_vec_32_512,  insert_helper_v2, UnboundedVec32,  UnboundedVec512;
-    btreemap_v2_insert_vec_32_1024, insert_helper_v2, UnboundedVec32, UnboundedVec1024;
+    btreemap_v2_insert_vec_32_4,    insert_helper_v2, UnboundedVecN32,    UnboundedVecN4;
+    btreemap_v2_insert_vec_32_8,    insert_helper_v2, UnboundedVecN32,    UnboundedVecN8;
+    btreemap_v2_insert_vec_32_16,   insert_helper_v2, UnboundedVecN32,   UnboundedVecN16;
+    btreemap_v2_insert_vec_32_32,   insert_helper_v2, UnboundedVecN32,   UnboundedVecN32;
+    btreemap_v2_insert_vec_32_64,   insert_helper_v2, UnboundedVecN32,   UnboundedVecN64;
+    //btreemap_v2_insert_vec_32_128,  insert_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
+    btreemap_v2_insert_vec_32_256,  insert_helper_v2, UnboundedVecN32,  UnboundedVecN256;
+    btreemap_v2_insert_vec_32_512,  insert_helper_v2, UnboundedVecN32,  UnboundedVecN512;
+    btreemap_v2_insert_vec_32_1024, insert_helper_v2, UnboundedVecN32, UnboundedVecN1024;
 
     // u64 / blob8 / vec8
     btreemap_v2_insert_u64_u64,        insert_helper_v2,           u64,           u64;
     btreemap_v2_insert_u64_blob8,      insert_helper_v2,           u64,         Blob8;
     btreemap_v2_insert_blob8_u64,      insert_helper_v2,         Blob8,           u64;
-    btreemap_v2_insert_u64_vec8,       insert_helper_v2,           u64, UnboundedVec8;
-    btreemap_v2_insert_vec8_u64,       insert_helper_v2, UnboundedVec8,           u64;
+    btreemap_v2_insert_u64_vec8,       insert_helper_v2,           u64, UnboundedVecN8;
+    btreemap_v2_insert_vec8_u64,       insert_helper_v2, UnboundedVecN8,           u64;
 
     // memory manager u64 / blob512 / vec512
     btreemap_v2_mem_manager_insert_u64_u64,      insert_helper_v2_mem_manager,             u64,             u64;
     btreemap_v2_mem_manager_insert_u64_blob512,  insert_helper_v2_mem_manager,             u64,         Blob512;
     btreemap_v2_mem_manager_insert_blob512_u64,  insert_helper_v2_mem_manager,         Blob512,             u64;
-    btreemap_v2_mem_manager_insert_u64_vec512,   insert_helper_v2_mem_manager,             u64, UnboundedVec512;
-    btreemap_v2_mem_manager_insert_vec512_u64,   insert_helper_v2_mem_manager, UnboundedVec512,             u64;
+    btreemap_v2_mem_manager_insert_u64_vec512,   insert_helper_v2_mem_manager,             u64, UnboundedVecN512;
+    btreemap_v2_mem_manager_insert_vec512_u64,   insert_helper_v2_mem_manager, UnboundedVecN512,             u64;
 }
 
 fn insert_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
@@ -192,40 +192,40 @@ bench_tests! {
     btreemap_v2_remove_blob_32_1024, remove_helper_v2, Blob32, Blob1024;
 
     // vec K x 128
-    btreemap_v2_remove_vec_4_128,    remove_helper_v2,    UnboundedVec4, UnboundedVec128;
-    btreemap_v2_remove_vec_8_128,    remove_helper_v2,    UnboundedVec8, UnboundedVec128;
-    btreemap_v2_remove_vec_16_128,   remove_helper_v2,   UnboundedVec16, UnboundedVec128;
-    btreemap_v2_remove_vec_32_128,   remove_helper_v2,   UnboundedVec32, UnboundedVec128;
-    btreemap_v2_remove_vec_64_128,   remove_helper_v2,   UnboundedVec64, UnboundedVec128;
-    btreemap_v2_remove_vec_128_128,  remove_helper_v2,  UnboundedVec128, UnboundedVec128;
-    btreemap_v2_remove_vec_256_128,  remove_helper_v2,  UnboundedVec256, UnboundedVec128;
-    btreemap_v2_remove_vec_512_128,  remove_helper_v2,  UnboundedVec512, UnboundedVec128;
-    btreemap_v2_remove_vec_1024_128, remove_helper_v2, UnboundedVec1024, UnboundedVec128;
+    btreemap_v2_remove_vec_4_128,    remove_helper_v2,    UnboundedVecN4, UnboundedVecN128;
+    btreemap_v2_remove_vec_8_128,    remove_helper_v2,    UnboundedVecN8, UnboundedVecN128;
+    btreemap_v2_remove_vec_16_128,   remove_helper_v2,   UnboundedVecN16, UnboundedVecN128;
+    btreemap_v2_remove_vec_32_128,   remove_helper_v2,   UnboundedVecN32, UnboundedVecN128;
+    btreemap_v2_remove_vec_64_128,   remove_helper_v2,   UnboundedVecN64, UnboundedVecN128;
+    btreemap_v2_remove_vec_128_128,  remove_helper_v2,  UnboundedVecN128, UnboundedVecN128;
+    btreemap_v2_remove_vec_256_128,  remove_helper_v2,  UnboundedVecN256, UnboundedVecN128;
+    btreemap_v2_remove_vec_512_128,  remove_helper_v2,  UnboundedVecN512, UnboundedVecN128;
+    btreemap_v2_remove_vec_1024_128, remove_helper_v2, UnboundedVecN1024, UnboundedVecN128;
 
     // vec 32 x V
-    btreemap_v2_remove_vec_32_4,    remove_helper_v2, UnboundedVec32,    UnboundedVec4;
-    btreemap_v2_remove_vec_32_8,    remove_helper_v2, UnboundedVec32,    UnboundedVec8;
-    btreemap_v2_remove_vec_32_16,   remove_helper_v2, UnboundedVec32,   UnboundedVec16;
-    btreemap_v2_remove_vec_32_32,   remove_helper_v2, UnboundedVec32,   UnboundedVec32;
-    btreemap_v2_remove_vec_32_64,   remove_helper_v2, UnboundedVec32,   UnboundedVec64;
-    //btreemap_v2_remove_vec_32_128,  remove_helper_v2, UnboundedVec32,  UnboundedVec128;  // Skip repeated.
-    btreemap_v2_remove_vec_32_256,  remove_helper_v2, UnboundedVec32,  UnboundedVec256;
-    btreemap_v2_remove_vec_32_512,  remove_helper_v2, UnboundedVec32,  UnboundedVec512;
-    btreemap_v2_remove_vec_32_1024, remove_helper_v2, UnboundedVec32, UnboundedVec1024;
+    btreemap_v2_remove_vec_32_4,    remove_helper_v2, UnboundedVecN32,    UnboundedVecN4;
+    btreemap_v2_remove_vec_32_8,    remove_helper_v2, UnboundedVecN32,    UnboundedVecN8;
+    btreemap_v2_remove_vec_32_16,   remove_helper_v2, UnboundedVecN32,   UnboundedVecN16;
+    btreemap_v2_remove_vec_32_32,   remove_helper_v2, UnboundedVecN32,   UnboundedVecN32;
+    btreemap_v2_remove_vec_32_64,   remove_helper_v2, UnboundedVecN32,   UnboundedVecN64;
+    //btreemap_v2_remove_vec_32_128,  remove_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
+    btreemap_v2_remove_vec_32_256,  remove_helper_v2, UnboundedVecN32,  UnboundedVecN256;
+    btreemap_v2_remove_vec_32_512,  remove_helper_v2, UnboundedVecN32,  UnboundedVecN512;
+    btreemap_v2_remove_vec_32_1024, remove_helper_v2, UnboundedVecN32, UnboundedVecN1024;
 
     // u64 / blob8 / vec8
     btreemap_v2_remove_u64_u64,        remove_helper_v2,           u64,           u64;
     btreemap_v2_remove_u64_blob8,      remove_helper_v2,           u64,         Blob8;
     btreemap_v2_remove_blob8_u64,      remove_helper_v2,         Blob8,           u64;
-    btreemap_v2_remove_u64_vec8,       remove_helper_v2,           u64, UnboundedVec8;
-    btreemap_v2_remove_vec8_u64,       remove_helper_v2, UnboundedVec8,           u64;
+    btreemap_v2_remove_u64_vec8,       remove_helper_v2,           u64, UnboundedVecN8;
+    btreemap_v2_remove_vec8_u64,       remove_helper_v2, UnboundedVecN8,           u64;
 
     // memory manager u64 / blob512 / vec512
     btreemap_v2_mem_manager_remove_u64_u64,      remove_helper_v2_mem_manager,             u64,             u64;
     btreemap_v2_mem_manager_remove_u64_blob512,  remove_helper_v2_mem_manager,             u64,         Blob512;
     btreemap_v2_mem_manager_remove_blob512_u64,  remove_helper_v2_mem_manager,         Blob512,             u64;
-    btreemap_v2_mem_manager_remove_u64_vec512,   remove_helper_v2_mem_manager,             u64, UnboundedVec512;
-    btreemap_v2_mem_manager_remove_vec512_u64,   remove_helper_v2_mem_manager, UnboundedVec512,             u64;
+    btreemap_v2_mem_manager_remove_u64_vec512,   remove_helper_v2_mem_manager,             u64, UnboundedVecN512;
+    btreemap_v2_mem_manager_remove_vec512_u64,   remove_helper_v2_mem_manager, UnboundedVecN512,             u64;
 }
 
 fn remove_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
@@ -299,40 +299,40 @@ bench_tests! {
     btreemap_v2_get_blob_32_1024, get_helper_v2, Blob32, Blob1024;
 
     // vec K x 128
-    btreemap_v2_get_vec_4_128,    get_helper_v2,    UnboundedVec4, UnboundedVec128;
-    btreemap_v2_get_vec_8_128,    get_helper_v2,    UnboundedVec8, UnboundedVec128;
-    btreemap_v2_get_vec_16_128,   get_helper_v2,   UnboundedVec16, UnboundedVec128;
-    btreemap_v2_get_vec_32_128,   get_helper_v2,   UnboundedVec32, UnboundedVec128;
-    btreemap_v2_get_vec_64_128,   get_helper_v2,   UnboundedVec64, UnboundedVec128;
-    btreemap_v2_get_vec_128_128,  get_helper_v2,  UnboundedVec128, UnboundedVec128;
-    btreemap_v2_get_vec_256_128,  get_helper_v2,  UnboundedVec256, UnboundedVec128;
-    btreemap_v2_get_vec_512_128,  get_helper_v2,  UnboundedVec512, UnboundedVec128;
-    btreemap_v2_get_vec_1024_128, get_helper_v2, UnboundedVec1024, UnboundedVec128;
+    btreemap_v2_get_vec_4_128,    get_helper_v2,    UnboundedVecN4, UnboundedVecN128;
+    btreemap_v2_get_vec_8_128,    get_helper_v2,    UnboundedVecN8, UnboundedVecN128;
+    btreemap_v2_get_vec_16_128,   get_helper_v2,   UnboundedVecN16, UnboundedVecN128;
+    btreemap_v2_get_vec_32_128,   get_helper_v2,   UnboundedVecN32, UnboundedVecN128;
+    btreemap_v2_get_vec_64_128,   get_helper_v2,   UnboundedVecN64, UnboundedVecN128;
+    btreemap_v2_get_vec_128_128,  get_helper_v2,  UnboundedVecN128, UnboundedVecN128;
+    btreemap_v2_get_vec_256_128,  get_helper_v2,  UnboundedVecN256, UnboundedVecN128;
+    btreemap_v2_get_vec_512_128,  get_helper_v2,  UnboundedVecN512, UnboundedVecN128;
+    btreemap_v2_get_vec_1024_128, get_helper_v2, UnboundedVecN1024, UnboundedVecN128;
 
     // vec 32 x V
-    btreemap_v2_get_vec_32_4,    get_helper_v2, UnboundedVec32,    UnboundedVec4;
-    btreemap_v2_get_vec_32_8,    get_helper_v2, UnboundedVec32,    UnboundedVec8;
-    btreemap_v2_get_vec_32_16,   get_helper_v2, UnboundedVec32,   UnboundedVec16;
-    btreemap_v2_get_vec_32_32,   get_helper_v2, UnboundedVec32,   UnboundedVec32;
-    btreemap_v2_get_vec_32_64,   get_helper_v2, UnboundedVec32,   UnboundedVec64;
-    //btreemap_v2_get_vec_32_128,  get_helper_v2, UnboundedVec32,  UnboundedVec128;  // Skip repeated.
-    btreemap_v2_get_vec_32_256,  get_helper_v2, UnboundedVec32,  UnboundedVec256;
-    btreemap_v2_get_vec_32_512,  get_helper_v2, UnboundedVec32,  UnboundedVec512;
-    btreemap_v2_get_vec_32_1024, get_helper_v2, UnboundedVec32, UnboundedVec1024;
+    btreemap_v2_get_vec_32_4,    get_helper_v2, UnboundedVecN32,    UnboundedVecN4;
+    btreemap_v2_get_vec_32_8,    get_helper_v2, UnboundedVecN32,    UnboundedVecN8;
+    btreemap_v2_get_vec_32_16,   get_helper_v2, UnboundedVecN32,   UnboundedVecN16;
+    btreemap_v2_get_vec_32_32,   get_helper_v2, UnboundedVecN32,   UnboundedVecN32;
+    btreemap_v2_get_vec_32_64,   get_helper_v2, UnboundedVecN32,   UnboundedVecN64;
+    //btreemap_v2_get_vec_32_128,  get_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
+    btreemap_v2_get_vec_32_256,  get_helper_v2, UnboundedVecN32,  UnboundedVecN256;
+    btreemap_v2_get_vec_32_512,  get_helper_v2, UnboundedVecN32,  UnboundedVecN512;
+    btreemap_v2_get_vec_32_1024, get_helper_v2, UnboundedVecN32, UnboundedVecN1024;
 
     // u64 / blob8 / vec8
     btreemap_v2_get_u64_u64,        get_helper_v2,           u64,           u64;
     btreemap_v2_get_u64_blob8,      get_helper_v2,           u64,         Blob8;
     btreemap_v2_get_blob8_u64,      get_helper_v2,         Blob8,           u64;
-    btreemap_v2_get_u64_vec8,       get_helper_v2,           u64, UnboundedVec8;
-    btreemap_v2_get_vec8_u64,       get_helper_v2, UnboundedVec8,           u64;
+    btreemap_v2_get_u64_vec8,       get_helper_v2,           u64, UnboundedVecN8;
+    btreemap_v2_get_vec8_u64,       get_helper_v2, UnboundedVecN8,           u64;
 
     // memory manager u64 / blob512 / vec512
     btreemap_v2_mem_manager_get_u64_u64,      get_helper_v2_mem_manager,             u64,             u64;
     btreemap_v2_mem_manager_get_u64_blob512,  get_helper_v2_mem_manager,             u64,         Blob512;
     btreemap_v2_mem_manager_get_blob512_u64,  get_helper_v2_mem_manager,         Blob512,             u64;
-    btreemap_v2_mem_manager_get_u64_vec512,   get_helper_v2_mem_manager,             u64, UnboundedVec512;
-    btreemap_v2_mem_manager_get_vec512_u64,   get_helper_v2_mem_manager, UnboundedVec512,             u64;
+    btreemap_v2_mem_manager_get_u64_vec512,   get_helper_v2_mem_manager,             u64, UnboundedVecN512;
+    btreemap_v2_mem_manager_get_vec512_u64,   get_helper_v2_mem_manager, UnboundedVecN512,             u64;
 }
 
 fn get_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
@@ -406,40 +406,40 @@ bench_tests! {
     btreemap_v2_contains_blob_32_1024, contains_helper_v2, Blob32, Blob1024;
 
     // vec K x 128
-    btreemap_v2_contains_vec_4_128,    contains_helper_v2,    UnboundedVec4, UnboundedVec128;
-    btreemap_v2_contains_vec_8_128,    contains_helper_v2,    UnboundedVec8, UnboundedVec128;
-    btreemap_v2_contains_vec_16_128,   contains_helper_v2,   UnboundedVec16, UnboundedVec128;
-    btreemap_v2_contains_vec_32_128,   contains_helper_v2,   UnboundedVec32, UnboundedVec128;
-    btreemap_v2_contains_vec_64_128,   contains_helper_v2,   UnboundedVec64, UnboundedVec128;
-    btreemap_v2_contains_vec_128_128,  contains_helper_v2,  UnboundedVec128, UnboundedVec128;
-    btreemap_v2_contains_vec_256_128,  contains_helper_v2,  UnboundedVec256, UnboundedVec128;
-    btreemap_v2_contains_vec_512_128,  contains_helper_v2,  UnboundedVec512, UnboundedVec128;
-    btreemap_v2_contains_vec_1024_128, contains_helper_v2, UnboundedVec1024, UnboundedVec128;
+    btreemap_v2_contains_vec_4_128,    contains_helper_v2,    UnboundedVecN4, UnboundedVecN128;
+    btreemap_v2_contains_vec_8_128,    contains_helper_v2,    UnboundedVecN8, UnboundedVecN128;
+    btreemap_v2_contains_vec_16_128,   contains_helper_v2,   UnboundedVecN16, UnboundedVecN128;
+    btreemap_v2_contains_vec_32_128,   contains_helper_v2,   UnboundedVecN32, UnboundedVecN128;
+    btreemap_v2_contains_vec_64_128,   contains_helper_v2,   UnboundedVecN64, UnboundedVecN128;
+    btreemap_v2_contains_vec_128_128,  contains_helper_v2,  UnboundedVecN128, UnboundedVecN128;
+    btreemap_v2_contains_vec_256_128,  contains_helper_v2,  UnboundedVecN256, UnboundedVecN128;
+    btreemap_v2_contains_vec_512_128,  contains_helper_v2,  UnboundedVecN512, UnboundedVecN128;
+    btreemap_v2_contains_vec_1024_128, contains_helper_v2, UnboundedVecN1024, UnboundedVecN128;
 
     // vec 32 x V
-    btreemap_v2_contains_vec_32_4,    contains_helper_v2, UnboundedVec32,    UnboundedVec4;
-    btreemap_v2_contains_vec_32_8,    contains_helper_v2, UnboundedVec32,    UnboundedVec8;
-    btreemap_v2_contains_vec_32_16,   contains_helper_v2, UnboundedVec32,   UnboundedVec16;
-    btreemap_v2_contains_vec_32_32,   contains_helper_v2, UnboundedVec32,   UnboundedVec32;
-    btreemap_v2_contains_vec_32_64,   contains_helper_v2, UnboundedVec32,   UnboundedVec64;
-    //btreemap_v2_contains_vec_32_128,  contains_helper_v2, UnboundedVec32,  UnboundedVec128;  // Skip repeated.
-    btreemap_v2_contains_vec_32_256,  contains_helper_v2, UnboundedVec32,  UnboundedVec256;
-    btreemap_v2_contains_vec_32_512,  contains_helper_v2, UnboundedVec32,  UnboundedVec512;
-    btreemap_v2_contains_vec_32_1024, contains_helper_v2, UnboundedVec32, UnboundedVec1024;
+    btreemap_v2_contains_vec_32_4,    contains_helper_v2, UnboundedVecN32,    UnboundedVecN4;
+    btreemap_v2_contains_vec_32_8,    contains_helper_v2, UnboundedVecN32,    UnboundedVecN8;
+    btreemap_v2_contains_vec_32_16,   contains_helper_v2, UnboundedVecN32,   UnboundedVecN16;
+    btreemap_v2_contains_vec_32_32,   contains_helper_v2, UnboundedVecN32,   UnboundedVecN32;
+    btreemap_v2_contains_vec_32_64,   contains_helper_v2, UnboundedVecN32,   UnboundedVecN64;
+    //btreemap_v2_contains_vec_32_128,  contains_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
+    btreemap_v2_contains_vec_32_256,  contains_helper_v2, UnboundedVecN32,  UnboundedVecN256;
+    btreemap_v2_contains_vec_32_512,  contains_helper_v2, UnboundedVecN32,  UnboundedVecN512;
+    btreemap_v2_contains_vec_32_1024, contains_helper_v2, UnboundedVecN32, UnboundedVecN1024;
 
     // u64 / blob8 / vec8
     btreemap_v2_contains_u64_u64,        contains_helper_v2,           u64,           u64;
     btreemap_v2_contains_u64_blob8,      contains_helper_v2,           u64,         Blob8;
     btreemap_v2_contains_blob8_u64,      contains_helper_v2,         Blob8,           u64;
-    btreemap_v2_contains_u64_vec8,       contains_helper_v2,           u64, UnboundedVec8;
-    btreemap_v2_contains_vec8_u64,       contains_helper_v2, UnboundedVec8,           u64;
+    btreemap_v2_contains_u64_vec8,       contains_helper_v2,           u64, UnboundedVecN8;
+    btreemap_v2_contains_vec8_u64,       contains_helper_v2, UnboundedVecN8,           u64;
 
     // memory manager u64 / blob512 / vec512
     btreemap_v2_mem_manager_contains_u64_u64,      contains_helper_v2_mem_manager,             u64,             u64;
     btreemap_v2_mem_manager_contains_u64_blob512,  contains_helper_v2_mem_manager,             u64,         Blob512;
     btreemap_v2_mem_manager_contains_blob512_u64,  contains_helper_v2_mem_manager,         Blob512,             u64;
-    btreemap_v2_mem_manager_contains_u64_vec512,   contains_helper_v2_mem_manager,             u64, UnboundedVec512;
-    btreemap_v2_mem_manager_contains_vec512_u64,   contains_helper_v2_mem_manager, UnboundedVec512,             u64;
+    btreemap_v2_mem_manager_contains_u64_vec512,   contains_helper_v2_mem_manager,             u64, UnboundedVecN512;
+    btreemap_v2_mem_manager_contains_vec512_u64,   contains_helper_v2_mem_manager, UnboundedVecN512,             u64;
 }
 
 fn contains_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
@@ -535,33 +535,33 @@ bench_tests! {
     btreemap_v2_pop_first_blob_32_1024, pop_first_helper_v2, Blob32, Blob1024;
 
     // vec K x 128
-    btreemap_v2_pop_first_vec_4_128,    pop_first_helper_v2,    UnboundedVec4, UnboundedVec128;
-    btreemap_v2_pop_first_vec_8_128,    pop_first_helper_v2,    UnboundedVec8, UnboundedVec128;
-    btreemap_v2_pop_first_vec_16_128,   pop_first_helper_v2,   UnboundedVec16, UnboundedVec128;
-    btreemap_v2_pop_first_vec_32_128,   pop_first_helper_v2,   UnboundedVec32, UnboundedVec128;
-    btreemap_v2_pop_first_vec_64_128,   pop_first_helper_v2,   UnboundedVec64, UnboundedVec128;
-    btreemap_v2_pop_first_vec_128_128,  pop_first_helper_v2,  UnboundedVec128, UnboundedVec128;
-    btreemap_v2_pop_first_vec_256_128,  pop_first_helper_v2,  UnboundedVec256, UnboundedVec128;
-    btreemap_v2_pop_first_vec_512_128,  pop_first_helper_v2,  UnboundedVec512, UnboundedVec128;
-    btreemap_v2_pop_first_vec_1024_128, pop_first_helper_v2, UnboundedVec1024, UnboundedVec128;
+    btreemap_v2_pop_first_vec_4_128,    pop_first_helper_v2,    UnboundedVecN4, UnboundedVecN128;
+    btreemap_v2_pop_first_vec_8_128,    pop_first_helper_v2,    UnboundedVecN8, UnboundedVecN128;
+    btreemap_v2_pop_first_vec_16_128,   pop_first_helper_v2,   UnboundedVecN16, UnboundedVecN128;
+    btreemap_v2_pop_first_vec_32_128,   pop_first_helper_v2,   UnboundedVecN32, UnboundedVecN128;
+    btreemap_v2_pop_first_vec_64_128,   pop_first_helper_v2,   UnboundedVecN64, UnboundedVecN128;
+    btreemap_v2_pop_first_vec_128_128,  pop_first_helper_v2,  UnboundedVecN128, UnboundedVecN128;
+    btreemap_v2_pop_first_vec_256_128,  pop_first_helper_v2,  UnboundedVecN256, UnboundedVecN128;
+    btreemap_v2_pop_first_vec_512_128,  pop_first_helper_v2,  UnboundedVecN512, UnboundedVecN128;
+    btreemap_v2_pop_first_vec_1024_128, pop_first_helper_v2, UnboundedVecN1024, UnboundedVecN128;
 
     // vec 32 x V
-    btreemap_v2_pop_first_vec_32_4,    pop_first_helper_v2, UnboundedVec32,    UnboundedVec4;
-    btreemap_v2_pop_first_vec_32_8,    pop_first_helper_v2, UnboundedVec32,    UnboundedVec8;
-    btreemap_v2_pop_first_vec_32_16,   pop_first_helper_v2, UnboundedVec32,   UnboundedVec16;
-    btreemap_v2_pop_first_vec_32_32,   pop_first_helper_v2, UnboundedVec32,   UnboundedVec32;
-    btreemap_v2_pop_first_vec_32_64,   pop_first_helper_v2, UnboundedVec32,   UnboundedVec64;
-    //btreemap_v2_pop_first_vec_32_128,  pop_first_helper_v2, UnboundedVec32,  UnboundedVec128;  // Skip repeated.
-    btreemap_v2_pop_first_vec_32_256,  pop_first_helper_v2, UnboundedVec32,  UnboundedVec256;
-    btreemap_v2_pop_first_vec_32_512,  pop_first_helper_v2, UnboundedVec32,  UnboundedVec512;
-    btreemap_v2_pop_first_vec_32_1024, pop_first_helper_v2, UnboundedVec32, UnboundedVec1024;
+    btreemap_v2_pop_first_vec_32_4,    pop_first_helper_v2, UnboundedVecN32,    UnboundedVecN4;
+    btreemap_v2_pop_first_vec_32_8,    pop_first_helper_v2, UnboundedVecN32,    UnboundedVecN8;
+    btreemap_v2_pop_first_vec_32_16,   pop_first_helper_v2, UnboundedVecN32,   UnboundedVecN16;
+    btreemap_v2_pop_first_vec_32_32,   pop_first_helper_v2, UnboundedVecN32,   UnboundedVecN32;
+    btreemap_v2_pop_first_vec_32_64,   pop_first_helper_v2, UnboundedVecN32,   UnboundedVecN64;
+    //btreemap_v2_pop_first_vec_32_128,  pop_first_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
+    btreemap_v2_pop_first_vec_32_256,  pop_first_helper_v2, UnboundedVecN32,  UnboundedVecN256;
+    btreemap_v2_pop_first_vec_32_512,  pop_first_helper_v2, UnboundedVecN32,  UnboundedVecN512;
+    btreemap_v2_pop_first_vec_32_1024, pop_first_helper_v2, UnboundedVecN32, UnboundedVecN1024;
 
     // u64 / blob8 / vec8
     btreemap_v2_pop_first_u64_u64,        pop_first_helper_v2,           u64,           u64;
     btreemap_v2_pop_first_u64_blob8,      pop_first_helper_v2,           u64,         Blob8;
     btreemap_v2_pop_first_blob8_u64,      pop_first_helper_v2,         Blob8,           u64;
-    btreemap_v2_pop_first_u64_vec8,       pop_first_helper_v2,           u64, UnboundedVec8;
-    btreemap_v2_pop_first_vec8_u64,       pop_first_helper_v2, UnboundedVec8,           u64;
+    btreemap_v2_pop_first_u64_vec8,       pop_first_helper_v2,           u64, UnboundedVecN8;
+    btreemap_v2_pop_first_vec8_u64,       pop_first_helper_v2, UnboundedVecN8,           u64;
 }
 
 // Last
@@ -589,33 +589,33 @@ bench_tests! {
     btreemap_v2_pop_last_blob_32_1024, pop_last_helper_v2, Blob32, Blob1024;
 
     // vec K x 128
-    btreemap_v2_pop_last_vec_4_128,    pop_last_helper_v2,    UnboundedVec4, UnboundedVec128;
-    btreemap_v2_pop_last_vec_8_128,    pop_last_helper_v2,    UnboundedVec8, UnboundedVec128;
-    btreemap_v2_pop_last_vec_16_128,   pop_last_helper_v2,   UnboundedVec16, UnboundedVec128;
-    btreemap_v2_pop_last_vec_32_128,   pop_last_helper_v2,   UnboundedVec32, UnboundedVec128;
-    btreemap_v2_pop_last_vec_64_128,   pop_last_helper_v2,   UnboundedVec64, UnboundedVec128;
-    btreemap_v2_pop_last_vec_128_128,  pop_last_helper_v2,  UnboundedVec128, UnboundedVec128;
-    btreemap_v2_pop_last_vec_256_128,  pop_last_helper_v2,  UnboundedVec256, UnboundedVec128;
-    btreemap_v2_pop_last_vec_512_128,  pop_last_helper_v2,  UnboundedVec512, UnboundedVec128;
-    btreemap_v2_pop_last_vec_1024_128, pop_last_helper_v2, UnboundedVec1024, UnboundedVec128;
+    btreemap_v2_pop_last_vec_4_128,    pop_last_helper_v2,    UnboundedVecN4, UnboundedVecN128;
+    btreemap_v2_pop_last_vec_8_128,    pop_last_helper_v2,    UnboundedVecN8, UnboundedVecN128;
+    btreemap_v2_pop_last_vec_16_128,   pop_last_helper_v2,   UnboundedVecN16, UnboundedVecN128;
+    btreemap_v2_pop_last_vec_32_128,   pop_last_helper_v2,   UnboundedVecN32, UnboundedVecN128;
+    btreemap_v2_pop_last_vec_64_128,   pop_last_helper_v2,   UnboundedVecN64, UnboundedVecN128;
+    btreemap_v2_pop_last_vec_128_128,  pop_last_helper_v2,  UnboundedVecN128, UnboundedVecN128;
+    btreemap_v2_pop_last_vec_256_128,  pop_last_helper_v2,  UnboundedVecN256, UnboundedVecN128;
+    btreemap_v2_pop_last_vec_512_128,  pop_last_helper_v2,  UnboundedVecN512, UnboundedVecN128;
+    btreemap_v2_pop_last_vec_1024_128, pop_last_helper_v2, UnboundedVecN1024, UnboundedVecN128;
 
     // vec 32 x V
-    btreemap_v2_pop_last_vec_32_4,    pop_last_helper_v2, UnboundedVec32,    UnboundedVec4;
-    btreemap_v2_pop_last_vec_32_8,    pop_last_helper_v2, UnboundedVec32,    UnboundedVec8;
-    btreemap_v2_pop_last_vec_32_16,   pop_last_helper_v2, UnboundedVec32,   UnboundedVec16;
-    btreemap_v2_pop_last_vec_32_32,   pop_last_helper_v2, UnboundedVec32,   UnboundedVec32;
-    btreemap_v2_pop_last_vec_32_64,   pop_last_helper_v2, UnboundedVec32,   UnboundedVec64;
-    //btreemap_v2_pop_last_vec_32_128,  pop_last_helper_v2, UnboundedVec32,  UnboundedVec128;  // Skip repeated.
-    btreemap_v2_pop_last_vec_32_256,  pop_last_helper_v2, UnboundedVec32,  UnboundedVec256;
-    btreemap_v2_pop_last_vec_32_512,  pop_last_helper_v2, UnboundedVec32,  UnboundedVec512;
-    btreemap_v2_pop_last_vec_32_1024, pop_last_helper_v2, UnboundedVec32, UnboundedVec1024;
+    btreemap_v2_pop_last_vec_32_4,    pop_last_helper_v2, UnboundedVecN32,    UnboundedVecN4;
+    btreemap_v2_pop_last_vec_32_8,    pop_last_helper_v2, UnboundedVecN32,    UnboundedVecN8;
+    btreemap_v2_pop_last_vec_32_16,   pop_last_helper_v2, UnboundedVecN32,   UnboundedVecN16;
+    btreemap_v2_pop_last_vec_32_32,   pop_last_helper_v2, UnboundedVecN32,   UnboundedVecN32;
+    btreemap_v2_pop_last_vec_32_64,   pop_last_helper_v2, UnboundedVecN32,   UnboundedVecN64;
+    //btreemap_v2_pop_last_vec_32_128,  pop_last_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
+    btreemap_v2_pop_last_vec_32_256,  pop_last_helper_v2, UnboundedVecN32,  UnboundedVecN256;
+    btreemap_v2_pop_last_vec_32_512,  pop_last_helper_v2, UnboundedVecN32,  UnboundedVecN512;
+    btreemap_v2_pop_last_vec_32_1024, pop_last_helper_v2, UnboundedVecN32, UnboundedVecN1024;
 
     // u64 / blob8 / vec8
     btreemap_v2_pop_last_u64_u64,        pop_last_helper_v2,           u64,           u64;
     btreemap_v2_pop_last_u64_blob8,      pop_last_helper_v2,           u64,         Blob8;
     btreemap_v2_pop_last_blob8_u64,      pop_last_helper_v2,         Blob8,           u64;
-    btreemap_v2_pop_last_u64_vec8,       pop_last_helper_v2,           u64, UnboundedVec8;
-    btreemap_v2_pop_last_vec8_u64,       pop_last_helper_v2, UnboundedVec8,           u64;
+    btreemap_v2_pop_last_u64_vec8,       pop_last_helper_v2,           u64, UnboundedVecN8;
+    btreemap_v2_pop_last_vec8_u64,       pop_last_helper_v2, UnboundedVecN8,           u64;
 }
 
 fn pop_first_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {

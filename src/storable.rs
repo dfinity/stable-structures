@@ -190,11 +190,11 @@ impl<const N: usize> Storable for Blob<N> {
     };
 }
 
-/// Unbounded vector of bytes with length exactly `N`.
+/// Unbounded vector of bytes, always of length `N`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct UnboundedVec<const N: usize>(Vec<u8>);
+pub struct UnboundedVecN<const N: usize>(Vec<u8>);
 
-impl<const N: usize> UnboundedVec<N> {
+impl<const N: usize> UnboundedVecN<N> {
     pub fn max_size() -> u32 {
         N as u32
     }
@@ -207,30 +207,30 @@ impl<const N: usize> UnboundedVec<N> {
     }
 }
 
-impl<const N: usize> Default for UnboundedVec<N> {
+impl<const N: usize> Default for UnboundedVecN<N> {
     fn default() -> Self {
-        UnboundedVec(vec![0; N])
+        UnboundedVecN(vec![0; N])
     }
 }
 
-impl<const N: usize> Storable for UnboundedVec<N> {
+impl<const N: usize> Storable for UnboundedVecN<N> {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(self.0.clone())
     }
 
     #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        UnboundedVec(bytes.into_owned())
+        UnboundedVecN(bytes.into_owned())
     }
 
     const BOUND: Bound = Bound::Unbounded;
 }
 
-/// Bounded vector of bytes with length exactly `N`.
+/// Bounded vector of bytes, always of length `N`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct BoundedVec<const N: usize>(Vec<u8>);
+pub struct BoundedVecN<const N: usize>(Vec<u8>);
 
-impl<const N: usize> BoundedVec<N> {
+impl<const N: usize> BoundedVecN<N> {
     pub fn max_size() -> u32 {
         N as u32
     }
@@ -243,20 +243,20 @@ impl<const N: usize> BoundedVec<N> {
     }
 }
 
-impl<const N: usize> Default for BoundedVec<N> {
+impl<const N: usize> Default for BoundedVecN<N> {
     fn default() -> Self {
-        BoundedVec(vec![0; N])
+        BoundedVecN(vec![0; N])
     }
 }
 
-impl<const N: usize> Storable for BoundedVec<N> {
+impl<const N: usize> Storable for BoundedVecN<N> {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(self.0.clone())
     }
 
     #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        BoundedVec(bytes.into_owned())
+        BoundedVecN(bytes.into_owned())
     }
 
     const BOUND: Bound = Bound::Bounded {
