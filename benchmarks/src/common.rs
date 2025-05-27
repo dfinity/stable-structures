@@ -1,5 +1,5 @@
 use ic_stable_structures::storable::{Blob, BoundedVecN, Storable, UnboundedVecN};
-use std::convert::{From, TryFrom};
+use std::convert::TryFrom;
 use tiny_rng::{Rand, Rng};
 
 pub trait Random {
@@ -26,7 +26,7 @@ impl<const K: usize> Random for BoundedVecN<K> {
         for _ in 0..size {
             buf.push(rng.rand_u8());
         }
-        Self::from(buf)
+        Self::from(&buf)
     }
 }
 
@@ -37,7 +37,7 @@ impl<const K: usize> Random for UnboundedVecN<K> {
         for _ in 0..size {
             buf.push(rng.rand_u8());
         }
-        Self::from(buf)
+        Self::from(&buf)
     }
 }
 

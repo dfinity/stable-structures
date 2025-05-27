@@ -44,21 +44,21 @@ benches:
   read_chunks_vec_1:
     total:
       calls: 1
-      instructions: 943855461
+      instructions: 1363286685
       heap_increase: 3202
       stable_memory_increase: 1665
     scopes: {}
   read_chunks_vec_1k:
     total:
       calls: 1
-      instructions: 1088702000
+      instructions: 1508997783
       heap_increase: 1602
       stable_memory_increase: 1665
     scopes: {}
   read_chunks_vec_1m:
     total:
       calls: 1
-      instructions: 3932728146
+      instructions: 4697397902
       heap_increase: 1892
       stable_memory_increase: 1665
     scopes: {}
@@ -107,21 +107,21 @@ benches:
   write_chunks_vec_1:
     total:
       calls: 1
-      instructions: 838359902
+      instructions: 1257791126
       heap_increase: 3202
       stable_memory_increase: 1665
     scopes: {}
   write_chunks_vec_1k:
     total:
       calls: 1
-      instructions: 982239703
+      instructions: 1402535486
       heap_increase: 1602
       stable_memory_increase: 1665
     scopes: {}
   write_chunks_vec_1m:
     total:
       calls: 1
-      instructions: 2923186403
+      instructions: 3687856159
       heap_increase: 1892
       stable_memory_increase: 1665
     scopes: {}
