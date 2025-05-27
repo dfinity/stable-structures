@@ -6,7 +6,6 @@ use ic_stable_structures::{
 };
 
 const SIZE: usize = 100 * 1024 * 1024;
-const VALUE: u8 = 37;
 const K: usize = 1_000;
 const M: usize = 1_000_000;
 
@@ -23,7 +22,7 @@ fn ensure_memory_size(memory: &impl Memory, size: usize) {
 
 fn chunk_data(n: usize) -> Vec<Vec<u8>> {
     let chunk_size = SIZE / n;
-    (0..n).map(|_| vec![VALUE; chunk_size]).collect()
+    (0..n).map(|_| vec![37; chunk_size]).collect()
 }
 
 // Stable memory benchmarks
