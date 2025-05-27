@@ -86,10 +86,7 @@ fn read_chunks_btreemap(mem_id: u8, n: usize) {
 fn write_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
     let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> =
         StableVec::new(init_memory(mem_id)).expect("Vec::new failed");
-    let chunks: Vec<_> = chunk_data(n)
-        .into_iter()
-        .map(|chunk| BoundedVecN::from(&chunk))
-        .collect();
+    let chunks: Vec<_> = chunk_data(n).iter().map(|v| BoundedVecN::from(v)).collect();
 
     bench_fn(|| {
         for chunk in &chunks {
