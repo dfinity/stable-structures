@@ -29,3 +29,7 @@ path = "memory_manager/src/main.rs"
 [[bin]]
 name = "vec"
 path = "vec/src/main.rs"
+
+[[bin]]
+name = "compare"
+path = "compare/src/main.rs"
