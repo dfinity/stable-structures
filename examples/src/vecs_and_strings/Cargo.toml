@@ -8,6 +8,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 candid.workspace = true
-ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
+ic-cdk.workspace = true
 ic-stable-structures = { path = "../../../" }
