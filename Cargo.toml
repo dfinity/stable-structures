@@ -12,18 +12,18 @@ repository = "https://github.com/dfinity/stable-structures"
 version = "0.6.8"
 
 [dependencies]
-ic_principal = { version = "0.1.1", default-features = false }
-canbench-rs = { workspace = true, optional = true }            # Optional to benchmark parts of the code.
+canbench-rs = { workspace = true, optional = true }           # Optional to benchmark parts of the code.
+ic_principal = { workspace = true, default-features = false }
 
 [dev-dependencies]
 candid.workspace = true
-hex = "0.4.3"
-ic-cdk.workspace = true
+hex.workspace = true
 ic-cdk-macros.workspace = true
-maplit = "1.0.2"
-proptest = "1"
-tempfile = "3.3.0"
-test-strategy = "0.3.1"
+ic-cdk.workspace = true
+maplit.workspace = true
+proptest.workspace = true
+tempfile.workspace = true
+test-strategy.workspace = true
 
 [features]
 bench_scope = ["dep:canbench-rs"] # May add significant overhead.
@@ -33,6 +33,14 @@ members = ["benchmarks"]
 
 [workspace.dependencies]
 canbench-rs = "0.1.15"
-candid = "0.10.3"
+candid = "0.10.14"
+hex = "0.4.3"
+ic_principal = "0.1.1"
 ic-cdk = "0.12.1"
 ic-cdk-macros = "0.8.4"
+maplit = "1.0.2"
+proptest = "1"
+serde = "1.0.132"
+tempfile = "3.3.0"
+test-strategy = "0.3.1"
+tiny-rng = "0.2.0"
