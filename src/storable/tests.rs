@@ -139,6 +139,10 @@ fn to_bytes_checked_element_too_long_panics() {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
+        fn into_bytes(self) -> Vec<u8> {
+            self.to_bytes().into_owned()
+        }
+
         fn from_bytes(_: Cow<[u8]>) -> Self {
             unimplemented!();
         }
@@ -160,6 +164,10 @@ fn to_bytes_checked_unbounded_element_no_panic() {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
+        fn into_bytes(self) -> Vec<u8> {
+            self.to_bytes().into_owned()
+        }
+
         fn from_bytes(_: Cow<[u8]>) -> Self {
             unimplemented!();
         }
@@ -176,6 +184,10 @@ fn to_bytes_checked_element_correct_size_no_panic() {
     impl Storable for X {
         fn to_bytes(&self) -> Cow<[u8]> {
             Cow::Borrowed(&[1, 2, 3, 4])
+        }
+
+        fn into_bytes(self) -> Vec<u8> {
+            self.to_bytes().into_owned()
         }
 
         fn from_bytes(_: Cow<[u8]>) -> Self {
@@ -200,6 +212,10 @@ fn to_bytes_checked_fixed_element_wrong_size_panics() {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
+        fn into_bytes(self) -> Vec<u8> {
+            self.to_bytes().into_owned()
+        }
+
         fn from_bytes(_: Cow<[u8]>) -> Self {
             unimplemented!();
         }
@@ -219,6 +235,10 @@ fn to_bytes_checked_fixed_element_correct_size_no_panic() {
     impl Storable for X {
         fn to_bytes(&self) -> Cow<[u8]> {
             Cow::Borrowed(&[1, 2, 3, 4, 5])
+        }
+
+        fn into_bytes(self) -> Vec<u8> {
+            self.to_bytes().into_owned()
         }
 
         fn from_bytes(_: Cow<[u8]>) -> Self {

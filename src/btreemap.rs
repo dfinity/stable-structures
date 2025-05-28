@@ -178,6 +178,12 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 ///         Cow::Owned(bytes)
 ///     }
 ///
+///     fn into_bytes(self) -> Vec<u8> {
+///         let mut bytes = Vec::new();
+///         // TODO: Convert your struct to bytes...
+///         bytes
+///     }
+///
 ///     fn from_bytes(bytes: Cow<[u8]>) -> Self {
 ///         // TODO: Convert bytes back to your struct
 ///         let (id, name) = (0, "".to_string());
@@ -492,7 +498,7 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let value = value.to_bytes_checked().into_owned();
+        let value = value.into_bytes_checked();
 
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.
@@ -1428,7 +1434,7 @@ mod test {
 
     /// Encodes an object into a byte vector.
     fn encode<T: Storable>(object: T) -> Vec<u8> {
-        object.to_bytes_checked().into_owned()
+        object.into_bytes_checked()
     }
 
     /// A helper method to succinctly create a blob.
@@ -2980,6 +2986,10 @@ mod test {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
+        fn into_bytes(self) -> Vec<u8> {
+            self.to_bytes().into_owned()
+        }
+
         fn from_bytes(_: Cow<[u8]>) -> Self {
             unimplemented!();
         }
@@ -3116,7 +3126,11 @@ mod test {
         struct T;
         impl Storable for T {
             fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Owned(vec![1, 2, 3])
+                Cow::Borrowed(&[1, 2, 3])
+            }
+
+            fn into_bytes(self) -> Vec<u8> {
+                self.to_bytes().into_owned()
             }
 
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
@@ -3136,6 +3150,10 @@ mod test {
         impl Storable for T2 {
             fn to_bytes(&self) -> Cow<[u8]> {
                 Cow::Owned(vec![1, 2, 3])
+            }
+
+            fn into_bytes(self) -> Vec<u8> {
+                self.to_bytes().into_owned()
             }
 
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
