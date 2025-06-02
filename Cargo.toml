@@ -32,7 +32,8 @@ bench_scope = ["dep:canbench-rs"] # May add significant overhead.
 members = ["benchmarks"]
 
 [workspace.dependencies]
-canbench-rs = "0.1.15"
+#canbench-rs = "0.1.15"
+canbench-rs = { version = "0.1.15", git = "https://github.com/dfinity/canbench" }
 candid = "0.10.14"
 hex = "0.4.3"
 ic_principal = "0.1.1"
