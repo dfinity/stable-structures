@@ -1274,6 +1274,7 @@ where
         node.save(self.allocator_mut());
     }
 
+    /// Replaces the value at `idx` in the node, saves the node, and returns the old value.
     fn update_value(&mut self, node: &mut Node<K>, idx: usize, new_value: Vec<u8>) -> Vec<u8> {
         let old_value = node.swap_value(idx, new_value, self.memory());
         self.save_node(node);
