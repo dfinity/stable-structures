@@ -150,6 +150,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 offset += Address::size();
                 children.push(child);
             }
+
+            // let total_children = num_entries + 1;
+            // children.reserve_exact(total_children);
+            // let u64s = read_u64_vec(&reader, offset, total_children);
+            // children.extend(u64s.into_iter().map(Address::from));
+            // offset += Address::size() * Bytes::from(total_children as u64);
         }
 
         // Load the keys (eagerly if small).
@@ -266,6 +272,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
             writer.write_u64(offset, child.get());
             offset += Address::size();
         }
+        // writer.write_u64_vec(
+        //     offset,
+        //     &self.children.iter().map(|c| c.get()).collect::<Vec<_>>(),
+        // );
+        // offset += Address::size() * Bytes::from(self.children.len() as u64);
 
         {
             #[cfg(feature = "bench_scope")]
