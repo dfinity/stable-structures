@@ -547,8 +547,8 @@ where
 
     /// Inserts an entry into a node that is *not full*.
     fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
-        #[cfg(feature = "bench_scope")]
-        let _p = canbench_rs::bench_scope("insert_nonfull"); // May add significant overhead.
+        // #[cfg(feature = "bench_scope")]
+        // let _p = canbench_rs::bench_scope("insert_nonfull"); // May add significant overhead.
 
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
@@ -632,6 +632,9 @@ where
     /// ```
     ///
     fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
+        // #[cfg(feature = "bench_scope")]
+        // let _p = canbench_rs::bench_scope("split_child"); // May add significant overhead.
+
         // The node must not be full.
         assert!(!node.is_full());
 
