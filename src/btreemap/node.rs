@@ -54,7 +54,7 @@ pub struct Node<K: Storable + Ord + Clone> {
     address: Address,
     // List of tuples consisting of a key and the encoded value.
     // INVARIANT: the list is sorted by key.
-    keys_and_encoded_values: Vec<LazyEntry<K>>,
+    entries: Vec<LazyEntry<K>>,
     // For the key at position I, children[I] points to the left
     // child of this key and children[I + 1] points to the right child.
     children: Vec<Address>,
@@ -108,10 +108,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
         match self.node_type {
             NodeType::Leaf => {
-                let last_entry = self
-                    .keys_and_encoded_values
-                    .last()
-                    .expect("A node can never be empty");
+                let last_entry = self.entries.last().expect("A node can never be empty");
                 (
                     self.get_key(last_entry, memory).clone(),
                     self.get_value(last_entry, memory).to_vec(),
@@ -153,15 +150,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns true if the node cannot store anymore entries, false otherwise.
     pub fn is_full(&self) -> bool {
-        self.keys_and_encoded_values.len() >= CAPACITY
+        self.entries.len() >= CAPACITY
     }
 
     /// Replaces the value at `idx` and returns the old one.
     pub fn swap_value<M: Memory>(&mut self, idx: usize, new: Vec<u8>, memory: &M) -> Vec<u8> {
-        let old = core::mem::replace(
-            &mut self.keys_and_encoded_values[idx].1,
-            LazyValue::by_value(new),
-        );
+        let old = core::mem::replace(&mut self.entries[idx].1, LazyValue::by_value(new));
         self.extract_value(old, memory)
     }
 
@@ -173,7 +167,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         memory: &M,
     ) -> Entry<K> {
         let (old_key, old_value) = core::mem::replace(
-            &mut self.keys_and_encoded_values[idx],
+            &mut self.entries[idx],
             (LazyKey::by_value(key), LazyValue::by_value(value)),
         );
         (
@@ -202,13 +196,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Returns a reference to the key at the specified index.
     #[inline(always)]
     pub fn key<M: Memory>(&self, idx: usize, memory: &M) -> &K {
-        self.get_key(&self.keys_and_encoded_values[idx], memory)
+        self.get_key(&self.entries[idx], memory)
     }
 
     /// Returns a reference to the encoded value at the specified index.
     #[inline(always)]
     pub fn value<M: Memory>(&self, idx: usize, memory: &M) -> &[u8] {
-        self.get_value(&self.keys_and_encoded_values[idx], memory)
+        self.get_value(&self.entries[idx], memory)
     }
 
     /// Extracts the contents of key (by loading it first if it's not loaded yet).
@@ -312,14 +306,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Inserts a new entry at the specified index.
     pub fn insert_entry(&mut self, idx: usize, (key, value): Entry<K>) {
-        self.keys_and_encoded_values
+        self.entries
             .insert(idx, (LazyKey::by_value(key), LazyValue::by_value(value)));
     }
 
     /// Returns the entry at the specified index while consuming this node.
     pub fn into_entry<M: Memory>(mut self, idx: usize, memory: &M) -> Entry<K> {
-        let keys_and_encoded_values = core::mem::take(&mut self.keys_and_encoded_values);
-        let (key, value) = keys_and_encoded_values.into_iter().nth(idx).unwrap();
+        let entries = core::mem::take(&mut self.entries);
+        let (key, value) = entries.into_iter().nth(idx).unwrap();
         (
             self.extract_key(key, memory),
             self.extract_value(value, memory),
@@ -328,7 +322,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Removes the entry at the specified index.
     pub fn remove_entry<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
-        let (key, value) = self.keys_and_encoded_values.remove(idx);
+        let (key, value) = self.entries.remove(idx);
         (
             self.extract_key(key, memory),
             self.extract_value(value, memory),
@@ -337,7 +331,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Adds a new entry at the back of the node.
     pub fn push_entry(&mut self, (key, value): Entry<K>) {
-        self.keys_and_encoded_values
+        self.entries
             .push((LazyKey::by_value(key), LazyValue::by_value(value)));
     }
 
@@ -348,10 +342,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             return None;
         }
 
-        let (key, value) = self
-            .keys_and_encoded_values
-            .pop()
-            .expect("node must not be empty");
+        let (key, value) = self.entries.pop().expect("node must not be empty");
 
         Some((
             self.extract_key(key, memory),
@@ -391,7 +382,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             Self::append(&mut source, self, median, allocator.memory());
 
             // Move the entries and children into self.
-            self.keys_and_encoded_values = core::mem::take(&mut source.keys_and_encoded_values);
+            self.entries = core::mem::take(&mut source.entries);
             self.children = core::mem::take(&mut source.children);
         }
 
@@ -420,27 +411,26 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         a.push_entry(median);
 
-        a.keys_and_encoded_values
-            .append(&mut b.keys_and_encoded_values);
+        a.entries.append(&mut b.entries);
 
         // Move the children (if any exist).
         a.children.append(&mut b.children);
 
         // Assert postconditions.
-        assert_eq!(b.keys_and_encoded_values.len(), 0);
+        assert_eq!(b.entries.len(), 0);
         assert_eq!(b.children.len(), 0);
     }
 
     #[cfg(test)]
     pub fn entries<M: Memory>(&self, memory: &M) -> Vec<Entry<K>> {
-        (0..self.keys_and_encoded_values.len())
+        (0..self.entries.len())
             .map(|i| (self.key(i, memory).clone(), self.value(i, memory).to_vec()))
             .collect()
     }
 
     #[cfg(test)]
     pub fn keys<M: Memory>(&self, memory: &M) -> Vec<&K> {
-        (0..self.keys_and_encoded_values.len())
+        (0..self.entries.len())
             .map(|i| self.key(i, memory))
             .collect()
     }
@@ -452,7 +442,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns the number of entries in the node.
     pub fn entries_len(&self) -> usize {
-        self.keys_and_encoded_values.len()
+        self.entries.len()
     }
 
     /// Searches for the key in the node's entries.
@@ -462,7 +452,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// returned, containing the index where a matching key could be inserted
     /// while maintaining sorted order.
     pub fn search<M: Memory>(&self, key: &K, memory: &M) -> Result<usize, usize> {
-        self.keys_and_encoded_values
+        self.entries
             .binary_search_by_key(&key, |entry| self.get_key(entry, memory))
     }
 
@@ -475,7 +465,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns true if the node is at the minimum required size, false otherwise.
     pub fn at_minimum(&self) -> bool {
-        self.keys_and_encoded_values.len() < B
+        self.entries.len() < B
     }
 
     /// Returns true if an entry can be removed without having to merge it into another node
@@ -494,7 +484,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Move the entries and children above the median into the new sibling.
-        sibling.keys_and_encoded_values = self.keys_and_encoded_values.split_off(B);
+        sibling.entries = self.entries.split_off(B);
         if self.node_type == NodeType::Internal {
             sibling.children = self.children.split_off(B);
         }
