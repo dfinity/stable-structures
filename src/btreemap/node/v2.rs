@@ -144,18 +144,19 @@ impl<K: Storable + Ord + Clone> Node<K> {
             let _p = canbench_rs::bench_scope("node_load_v2_children"); // May add significant overhead.
 
             // The number of children is equal to the number of entries + 1.
-            children.reserve_exact(num_entries + 1);
-            for _ in 0..num_entries + 1 {
-                let child = Address::from(read_u64(&reader, offset));
-                offset += Address::size();
-                children.push(child);
-            }
+            // children.reserve_exact(num_entries + 1);
+            // for _ in 0..num_entries + 1 {
+            //     let child = Address::from(read_u64(&reader, offset));
+            //     offset += Address::size();
+            //     children.push(child);
+            // }
 
-            // let total_children = num_entries + 1;
-            // children.reserve_exact(total_children);
-            // let u64s = read_u64_vec(&reader, offset, total_children);
-            // children.extend(u64s.into_iter().map(Address::from));
-            // offset += Address::size() * Bytes::from(total_children as u64);
+            let total_children = num_entries + 1;
+            children = read_u64_vec(&reader, offset, total_children)
+                .into_iter()
+                .map(Address::from)
+                .collect();
+            offset += Address::size() * Bytes::from(total_children as u64);
         }
 
         // Load the keys (eagerly if small).
