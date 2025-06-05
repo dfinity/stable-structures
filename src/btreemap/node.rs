@@ -172,9 +172,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
         (key, value): Entry<K>,
         memory: &M,
     ) -> Entry<K> {
-        // #[cfg(feature = "bench_scope")]
-        // let _p = canbench_rs::bench_scope("swap_entry"); // May add significant overhead.
-
         let (old_key, old_value) = core::mem::replace(
             &mut self.keys_and_encoded_values[idx],
             (LazyKey::by_value(key), LazyValue::by_value(value)),
@@ -465,9 +462,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// returned, containing the index where a matching key could be inserted
     /// while maintaining sorted order.
     pub fn search<M: Memory>(&self, key: &K, memory: &M) -> Result<usize, usize> {
-        // #[cfg(feature = "bench_scope")]
-        // let _p = canbench_rs::bench_scope("search"); // May add significant overhead.
-
         self.keys_and_encoded_values
             .binary_search_by_key(&key, |entry| self.get_key(entry, memory))
     }
