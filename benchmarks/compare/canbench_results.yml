@@ -3,92 +3,26 @@ benches:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 1219211020
+      instructions: 1219162271
       heap_increase: 3233
       stable_memory_increase: 1665
-    scopes:
-      node_load_v2:
-        start_instructions: 0
-        calls: 1
-        instructions: 18193641
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_keys:
-        start_instructions: 0
-        calls: 1
-        instructions: 953
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_values:
-        start_instructions: 0
-        calls: 1
-        instructions: 638
-        heap_increase: 0
-        stable_memory_increase: 0
+    scopes: {}
   read_chunks_btreemap_1k:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 5525096947
-      heap_increase: 1606
+      instructions: 5414899705
+      heap_increase: 1604
       stable_memory_increase: 1665
-    scopes:
-      node_load_v2:
-        start_instructions: 0
-        calls: 3806
-        instructions: 393683288
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_children:
-        start_instructions: 0
-        calls: 2971
-        instructions: 5385452
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_keys:
-        start_instructions: 0
-        calls: 3806
-        instructions: 7390486
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_values:
-        start_instructions: 0
-        calls: 3806
-        instructions: 8941646
-        heap_increase: 0
-        stable_memory_increase: 0
+    scopes: {}
   read_chunks_btreemap_1m:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 298895577900
-      heap_increase: 42863
+      instructions: 133641869551
+      heap_increase: 1892
       stable_memory_increase: 3201
-    scopes:
-      node_load_v2:
-        start_instructions: 0
-        calls: 7800012
-        instructions: 88268773160
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_children:
-        start_instructions: 0
-        calls: 6966677
-        instructions: 12091496391
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_keys:
-        start_instructions: 0
-        calls: 7800012
-        instructions: 15072186082
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_values:
-        start_instructions: 0
-        calls: 7800012
-        instructions: 11242964094
-        heap_increase: 0
-        stable_memory_increase: 0
+    scopes: {}
   read_chunks_stable_1:
     total:
       start_instructions: 17235
@@ -141,164 +75,26 @@ benches:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 1069832141
+      instructions: 1069802821
       heap_increase: 3233
       stable_memory_increase: 1665
-    scopes:
-      insert:
-        start_instructions: 0
-        calls: 1
-        instructions: 781353807
-        heap_increase: 1632
-        stable_memory_increase: 1536
-      node_save_v2:
-        start_instructions: 0
-        calls: 1
-        instructions: 361917969
-        heap_increase: 31
-        stable_memory_increase: 1536
-      node_save_v2_keys:
-        start_instructions: 0
-        calls: 1
-        instructions: 988
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_save_v2_preload:
-        start_instructions: 0
-        calls: 1
-        instructions: 419
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_save_v2_values:
-        start_instructions: 0
-        calls: 1
-        instructions: 361911033
-        heap_increase: 31
-        stable_memory_increase: 1536
+    scopes: {}
   write_chunks_btreemap_1k:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 4986997152
-      heap_increase: 1606
+      instructions: 4914910816
+      heap_increase: 1604
       stable_memory_increase: 1665
-    scopes:
-      insert:
-        start_instructions: 0
-        calls: 1000
-        instructions: 4690789008
-        heap_increase: 6
-        stable_memory_increase: 1536
-      node_load_v2:
-        start_instructions: 0
-        calls: 3868
-        instructions: 536919993
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_children:
-        start_instructions: 0
-        calls: 2539
-        instructions: 5221412
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_keys:
-        start_instructions: 0
-        calls: 3868
-        instructions: 9679206
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_values:
-        start_instructions: 0
-        calls: 3868
-        instructions: 12084334
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_save_v2:
-        start_instructions: 0
-        calls: 1582
-        instructions: 3562192802
-        heap_increase: 4
-        stable_memory_increase: 1536
-      node_save_v2_keys:
-        start_instructions: 0
-        calls: 1582
-        instructions: 7925896
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_save_v2_preload:
-        start_instructions: 0
-        calls: 1582
-        instructions: 1293052823
-        heap_increase: 4
-        stable_memory_increase: 0
-      node_save_v2_values:
-        start_instructions: 0
-        calls: 1582
-        instructions: 2103983593
-        heap_increase: 0
-        stable_memory_increase: 1536
+    scopes: {}
   write_chunks_btreemap_1m:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 185123236723
-      heap_increase: 42863
+      instructions: 89875477354
+      heap_increase: 1892
       stable_memory_increase: 3201
-    scopes:
-      insert:
-        start_instructions: 0
-        calls: 1000000
-        instructions: 173028062117
-        heap_increase: 31065
-        stable_memory_increase: 3072
-      node_load_v2:
-        start_instructions: 0
-        calls: 7728110
-        instructions: 102535863220
-        heap_increase: 30737
-        stable_memory_increase: 0
-      node_load_v2_children:
-        start_instructions: 0
-        calls: 6394781
-        instructions: 13940598859
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_keys:
-        start_instructions: 0
-        calls: 7728110
-        instructions: 20083873931
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_load_v2_values:
-        start_instructions: 0
-        calls: 7728110
-        instructions: 15372493490
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_save_v2:
-        start_instructions: 0
-        calls: 1599964
-        instructions: 42877765831
-        heap_increase: 214
-        stable_memory_increase: 384
-      node_save_v2_keys:
-        start_instructions: 0
-        calls: 1599964
-        instructions: 8171886346
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_save_v2_preload:
-        start_instructions: 0
-        calls: 1599964
-        instructions: 8340186694
-        heap_increase: 0
-        stable_memory_increase: 0
-      node_save_v2_values:
-        start_instructions: 0
-        calls: 1599964
-        instructions: 9771367318
-        heap_increase: 0
-        stable_memory_increase: 384
+    scopes: {}
   write_chunks_stable_1:
     total:
       start_instructions: 17235
@@ -347,4 +143,4 @@ benches:
       heap_increase: 3784
       stable_memory_increase: 1665
     scopes: {}
-version: 0.1.15
+version: 0.1.16
