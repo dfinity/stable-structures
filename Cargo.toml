@@ -12,8 +12,8 @@ repository = "https://github.com/dfinity/stable-structures"
 version = "0.6.8"
 
 [dependencies]
-canbench-rs = { workspace = true, optional = true }           # Optional to benchmark parts of the code.
-ic_principal = { workspace = true, default-features = false }
+canbench-rs = { workspace = true, optional = true } # Optional to benchmark parts of the code.
+ic_principal.workspace = true
 
 [dev-dependencies]
 candid.workspace = true
@@ -35,7 +35,7 @@ members = ["benchmarks"]
 canbench-rs = "0.1.15"
 candid = "0.10.14"
 hex = "0.4.3"
-ic_principal = "0.1.1"
+ic_principal = { version = "0.1.1", default-features = false }
 ic-cdk = "0.12.1"
 ic-cdk-macros = "0.8.4"
 maplit = "1.0.2"
