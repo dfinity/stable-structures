@@ -512,10 +512,10 @@ where
 
             // Check if the key already exists in the root.
             if let Ok(idx) = root.search(&key, self.memory()) {
-                // The key exists. Overwrite it and return the previous value.
-                let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                self.save_node(&mut root);
-                return Some(V::from_bytes(Cow::Owned(previous_value)));
+                // Key found, replace its value and return the old one.
+                return Some(V::from_bytes(Cow::Owned(
+                    self.update_value(&mut root, idx, value),
+                )));
             }
 
             // If the root is full, we need to introduce a new node as the root.
@@ -556,12 +556,8 @@ where
         // Look for the key in the node.
         match node.search(&key, self.memory()) {
             Ok(idx) => {
-                // The key is already in the node.
-                // Overwrite it and return the previous value.
-                let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
-
-                self.save_node(&mut node);
-                Some(previous_value)
+                // Key found, replace its value and return the old one.
+                Some(self.update_value(&mut node, idx, value))
             }
             Err(idx) => {
                 // The key isn't in the node. `idx` is where that key should be inserted.
@@ -588,11 +584,8 @@ where
                         if child.is_full() {
                             // Check if the key already exists in the child.
                             if let Ok(idx) = child.search(&key, self.memory()) {
-                                // The key exists. Overwrite it and return the previous value.
-                                let (_, previous_value) =
-                                    child.swap_entry(idx, (key, value), self.memory());
-                                self.save_node(&mut child);
-                                return Some(previous_value);
+                                // Key found, replace its value and return the old one.
+                                return Some(self.update_value(&mut child, idx, value));
                             }
 
                             // The child is full. Split the child.
@@ -1285,6 +1278,13 @@ where
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
         node.save(self.allocator_mut());
+    }
+
+    /// Replaces the value at `idx` in the node, saves the node, and returns the old value.
+    fn update_value(&mut self, node: &mut Node<K>, idx: usize, new_value: Vec<u8>) -> Vec<u8> {
+        let old_value = node.swap_value(idx, new_value, self.memory());
+        self.save_node(node);
+        old_value
     }
 
     /// Saves the map to memory.
