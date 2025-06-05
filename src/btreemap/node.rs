@@ -156,6 +156,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.keys_and_encoded_values.len() >= CAPACITY
     }
 
+    /// Replaces the value at `idx` and returns the old one.
+    pub fn swap_value<M: Memory>(&mut self, idx: usize, new: Vec<u8>, memory: &M) -> Vec<u8> {
+        let old = core::mem::replace(
+            &mut self.keys_and_encoded_values[idx].1,
+            LazyValue::by_value(new),
+        );
+        self.extract_value(old, memory)
+    }
+
     /// Swaps the entry at index `idx` with the given entry, returning the old entry.
     pub fn swap_entry<M: Memory>(
         &mut self,
