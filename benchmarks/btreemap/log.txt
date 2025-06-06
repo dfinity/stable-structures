@@ -1,0 +1,83 @@
+---------------------------------------------------
+
+Summary:
+  instructions:
+    status:   Both regressions and improvements detected! 🔴🟢
+    counts:   [total 285 | regressed 50 | improved 138 | new 0 | unchanged 97]
+    change:   [max +898.90M | p75 +4.12M | median -8.60M | p25 -99.99M | min -1.78B]
+    change %: [max +26.10% | p75 +0.89% | median -1.62% | p25 -9.80% | min -88.46%]
+
+  heap_increase:
+    status:   No significant changes detected 👍
+    counts:   [total 285 | regressed 0 | improved 0 | new 0 | unchanged 285]
+    change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
+    change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
+
+  stable_memory_increase:
+    status:   No significant changes detected 👍
+    counts:   [total 285 | regressed 0 | improved 0 | new 0 | unchanged 285]
+    change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
+    change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
+
+---------------------------------------------------
+
+Only significant changes:
+| status | name                                        | calls |     ins |  ins Δ% | HI |  HI Δ% | SMI |  SMI Δ% |
+|--------|---------------------------------------------|-------|---------|---------|----|--------|-----|---------|
+|   +    | btreemap_v2_scan_keys_1k_0b                 |       |   1.19M | +26.10% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_scan_keys_rev_1k_0b             |       |   1.19M | +23.83% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_remove_blob_1024_128            |       |   7.38B | +13.87% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_remove_blob_512_128             |       |   4.09B | +13.32% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_mem_manager_remove_blob512_u64  |       |   4.35B | +12.87% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_remove_blob_256_128             |       |   2.44B | +10.73% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_remove_blob_128_128             |       |   1.61B |  +9.15% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_scan_keys_1k_10kib              |       |   2.60M |  +8.74% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_scan_keys_rev_1k_10kib          |       |   2.58M |  +8.02% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_insert_blob_1024_128            |       |   5.50B |  +7.70% |  0 |  0.00% | 196 |   0.00% |
+|   +    | btreemap_v2_range_count_1k_10kib            |       |   2.65M |  +7.17% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_insert_blob_512_128             |       |   3.05B |  +6.62% |  0 |  0.00% | 111 |   0.00% |
+|   +    | btreemap_v2_insert_blob_256_128             |       |   1.80B |  +6.49% |  0 |  0.00% |  67 |   0.00% |
+|   +    | btreemap_v2_mem_manager_insert_blob512_u64  |       |   3.15B |  +6.23% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_remove_vec_32_64                |       | 981.82M |  +5.57% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_remove_vec_32_16                |       | 885.75M |  +5.37% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_insert_blob_128_128             |       |   1.19B |  +4.61% |  0 |  0.00% |  46 |   0.00% |
+|   +    | btreemap_v2_remove_blob_32_4                |       | 712.64M |  +3.92% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_insert_blob_32_64               |       | 543.10M |  +3.85% |  0 |  0.00% |  18 |   0.00% |
+|   +    | btreemap_v2_remove_blob_32_64               |       | 754.17M |  +3.80% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_remove_blob_32_8                |       | 712.28M |  +3.79% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_remove_vec_32_32                |       | 879.00M |  +3.76% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_insert_blob_32_32               |       | 536.93M |  +3.76% |  0 |  0.00% |  13 |   0.00% |
+|   +    | btreemap_v2_get_vec_16_128                  |       | 456.73M |  +3.75% |  0 |  0.00% |   0 |   0.00% |
+|   +    | btreemap_v2_insert_blob_32_128              |       | 551.94M |  +3.64% |  0 |  0.00% |  28 |   0.00% |
+|  ...   | ... 138 rows omitted ...                    |       |         |         |    |        |     |         |
+|   -    | btreemap_v2_insert_vec_1024_128             |       |   2.74B | -17.73% |  0 |  0.00% | 193 |   0.00% |
+|   -    | btreemap_v2_pop_last_vec_128_128            |       |   1.51B | -17.83% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_get_vec_128_128                 |       | 583.90M | -17.86% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_contains_vec_32_256             |       | 441.72M | -18.18% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_contains_vec_128_128            |       | 574.28M | -19.21% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_pop_last_vec_256_128            |       |   2.07B | -20.26% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_pop_first_vec_256_128           |       |   2.00B | -20.98% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_pop_first_blob_64_128           |       |   1.05B | -21.20% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_pop_last_blob_64_128            |       |   1.02B | -22.31% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_pop_last_vec_512_128            |       |   2.79B | -25.16% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_pop_first_vec_512_128           |       |   2.69B | -25.37% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_get_vec_256_128                 |       | 912.19M | -26.05% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_contains_vec_256_128            |       | 902.32M | -26.85% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_get_blob_64_128                 |       | 436.96M | -27.39% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_mem_manager_get_vec512_u64      |       |   1.27B | -29.06% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_pop_last_vec_1024_128           |       |   4.24B | -29.61% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_pop_first_vec_1024_128          |       |   4.02B | -30.36% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_get_vec_512_128                 |       |   1.26B | -30.86% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_contains_blob_64_128            |       | 414.36M | -31.15% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_mem_manager_contains_vec512_u64 |       |   1.23B | -31.34% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_contains_vec_512_128            |       |   1.25B | -31.42% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_get_vec_1024_128                |       |   1.84B | -37.00% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_contains_vec_1024_128           |       |   1.82B | -37.58% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_get_10mib_values                |       | 388.59M | -68.47% |  0 |  0.00% |   0 |   0.00% |
+|   -    | btreemap_v2_contains_10mib_values           |       | 142.21M | -88.46% |  0 |  0.00% |   0 |   0.00% |
+
+ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
+
+---------------------------------------------------
+CSV results saved to canbench_results.csv
+Successfully persisted results to canbench_results.yml
