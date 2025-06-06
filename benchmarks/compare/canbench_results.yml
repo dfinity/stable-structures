@@ -1,31 +1,31 @@
 benches:
   read_chunks_btreemap_1:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
-      instructions: 1219162271
+      instructions: 1638593694
       heap_increase: 3233
       stable_memory_increase: 1665
     scopes: {}
   read_chunks_btreemap_1k:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
-      instructions: 5414899705
+      instructions: 5836022846
       heap_increase: 1604
       stable_memory_increase: 1665
     scopes: {}
   read_chunks_btreemap_1m:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
-      instructions: 133641869551
+      instructions: 137543259411
       heap_increase: 1892
       stable_memory_increase: 3201
     scopes: {}
   read_chunks_stable_1:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
       instructions: 812767320
       heap_increase: 1601
@@ -33,7 +33,7 @@ benches:
     scopes: {}
   read_chunks_stable_1k:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
       instructions: 525926659
       heap_increase: 1600
@@ -41,7 +41,7 @@ benches:
     scopes: {}
   read_chunks_stable_1m:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
       instructions: 1307625793
       heap_increase: 1892
@@ -49,7 +49,7 @@ benches:
     scopes: {}
   read_chunks_vec_1:
     total:
-      start_instructions: 17233
+      start_instructions: 17255
       calls: 1
       instructions: 1363286422
       heap_increase: 3202
@@ -57,7 +57,7 @@ benches:
     scopes: {}
   read_chunks_vec_1k:
     total:
-      start_instructions: 17233
+      start_instructions: 17255
       calls: 1
       instructions: 1378474868
       heap_increase: 3200
@@ -65,7 +65,7 @@ benches:
     scopes: {}
   read_chunks_vec_1m:
     total:
-      start_instructions: 17233
+      start_instructions: 17255
       calls: 1
       instructions: 4721968951
       heap_increase: 3784
@@ -73,31 +73,31 @@ benches:
     scopes: {}
   write_chunks_btreemap_1:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
-      instructions: 1069802821
+      instructions: 1069803181
       heap_increase: 3233
       stable_memory_increase: 1665
     scopes: {}
   write_chunks_btreemap_1k:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
-      instructions: 4914910816
+      instructions: 4915529540
       heap_increase: 1604
       stable_memory_increase: 1665
     scopes: {}
   write_chunks_btreemap_1m:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
-      instructions: 89875477354
+      instructions: 92125995103
       heap_increase: 1892
       stable_memory_increase: 3201
     scopes: {}
   write_chunks_stable_1:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
       instructions: 418914513
       heap_increase: 1601
@@ -105,7 +105,7 @@ benches:
     scopes: {}
   write_chunks_stable_1k:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
       instructions: 420017255
       heap_increase: 1600
@@ -113,7 +113,7 @@ benches:
     scopes: {}
   write_chunks_stable_1m:
     total:
-      start_instructions: 17235
+      start_instructions: 17257
       calls: 1
       instructions: 1076987536
       heap_increase: 1892
@@ -121,7 +121,7 @@ benches:
     scopes: {}
   write_chunks_vec_1:
     total:
-      start_instructions: 17234
+      start_instructions: 17256
       calls: 1
       instructions: 1257790961
       heap_increase: 3202
@@ -129,7 +129,7 @@ benches:
     scopes: {}
   write_chunks_vec_1k:
     total:
-      start_instructions: 17234
+      start_instructions: 17256
       calls: 1
       instructions: 1272012669
       heap_increase: 3200
@@ -137,7 +137,7 @@ benches:
     scopes: {}
   write_chunks_vec_1m:
     total:
-      start_instructions: 17234
+      start_instructions: 17256
       calls: 1
       instructions: 3712427306
       heap_increase: 3784
