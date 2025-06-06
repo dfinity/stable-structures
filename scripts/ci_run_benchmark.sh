@@ -34,7 +34,8 @@ fi
 
 # Check if the canbench results file is up to date.
 pushd "$CANISTER_PATH"
-canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
+# (!) Do not use `--hide-results` here, as it breaks the up-to-date check.
+canbench --less-verbose --show-summary --csv > "$CANBENCH_OUTPUT"
 cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
 if grep -q "(regress\|(improved by \|(new)" "$CANBENCH_OUTPUT"; then
   UPDATED_MSG="**❌ \`$CANBENCH_RESULTS_FILE\` is not up to date**
