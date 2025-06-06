@@ -70,17 +70,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut entries = Vec::with_capacity(header.num_entries as usize);
         let mut offset = NodeHeader::size();
         for _ in 0..header.num_entries {
-            let key_offset = offset;
-            let size = read_u32(memory, address + key_offset);
-            offset += U32_SIZE;
-            let key = LazyKey::by_ref(key_offset, size);
-            offset += Bytes::from(max_key_size);
+            let size = read_u32(memory, address + offset);
+            let key = LazyKey::by_ref(offset, size);
+            offset += U32_SIZE + Bytes::from(max_key_size);
 
-            let value_offset = offset;
-            let size = read_u32(memory, address + value_offset);
-            offset += U32_SIZE;
-            let value = LazyValue::by_ref(value_offset, size);
-            offset += Bytes::from(max_value_size);
+            let size = read_u32(memory, address + offset);
+            let value = LazyValue::by_ref(offset, size);
+            offset += U32_SIZE + Bytes::from(max_value_size);
 
             entries.push((key, value));
         }
