@@ -1,4 +1,4 @@
-use benchmarks::common::Random;
+use benchmarks::random::Random;
 use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::{
