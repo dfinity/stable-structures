@@ -34,6 +34,11 @@ impl<const N: usize> Storable for UnboundedVecN<N> {
     }
 
     #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self(bytes.into_owned())
     }
@@ -73,6 +78,11 @@ impl<const N: usize> Default for BoundedVecN<N> {
 impl<const N: usize> Storable for BoundedVecN<N> {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(self.0.clone())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.0
     }
 
     #[inline]

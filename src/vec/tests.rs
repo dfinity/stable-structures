@@ -15,6 +15,10 @@ impl<const N: u32> Storable for UnfixedU64<N> {
         self.0.to_bytes()
     }
 
+    fn into_bytes(self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert!(bytes.len() == 8);
         Self(u64::from_bytes(bytes))
@@ -257,6 +261,10 @@ struct BuggyStruct(Vec<u8>);
 impl crate::Storable for BuggyStruct {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(&self.0)
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_bytes().into_owned()
     }
 
     fn from_bytes(_: Cow<[u8]>) -> Self {

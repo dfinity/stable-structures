@@ -9,7 +9,7 @@ benches:
     scopes: {}
   vec_get_blob_16:
     total:
-      start_instructions: 14114259
+      start_instructions: 14184259
       calls: 1
       instructions: 6405948
       heap_increase: 0
@@ -17,7 +17,7 @@ benches:
     scopes: {}
   vec_get_blob_32:
     total:
-      start_instructions: 21791904
+      start_instructions: 21861904
       calls: 1
       instructions: 7123507
       heap_increase: 0
@@ -57,7 +57,7 @@ benches:
     scopes: {}
   vec_get_blob_8:
     total:
-      start_instructions: 9762299
+      start_instructions: 9802299
       calls: 1
       instructions: 5723203
       heap_increase: 0
@@ -65,7 +65,7 @@ benches:
     scopes: {}
   vec_get_u64:
     total:
-      start_instructions: 6137778
+      start_instructions: 5627778
       calls: 1
       instructions: 4790308
       heap_increase: 0
@@ -81,7 +81,7 @@ benches:
     scopes: {}
   vec_insert_blob_16:
     total:
-      start_instructions: 11268996
+      start_instructions: 11338996
       calls: 1
       instructions: 3316230
       heap_increase: 0
@@ -89,7 +89,7 @@ benches:
     scopes: {}
   vec_insert_blob_32:
     total:
-      start_instructions: 19047401
+      start_instructions: 19117401
       calls: 1
       instructions: 3435470
       heap_increase: 0
@@ -113,7 +113,7 @@ benches:
     scopes: {}
   vec_insert_blob_8:
     total:
-      start_instructions: 6896374
+      start_instructions: 6936374
       calls: 1
       instructions: 3256892
       heap_increase: 0
@@ -123,7 +123,7 @@ benches:
     total:
       start_instructions: 509221
       calls: 1
-      instructions: 5869522
+      instructions: 5359522
       heap_increase: 0
       stable_memory_increase: 1
     scopes: {}
