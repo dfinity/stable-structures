@@ -216,7 +216,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a key from stable memory at the given offset.
-    fn load_key_from_memory<M: Memory>(&self, mut offset: Bytes, size0: u32, memory: &M) -> K {
+    fn load_key_from_memory<M: Memory>(
+        &self,
+        mut offset: Bytes,
+        loaded_size: u32,
+        memory: &M,
+    ) -> K {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -227,25 +232,19 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let size = match self.version {
             Version::V1(_) => {
                 // V1: key size is always stored in memory.
-                let size = read_u32(&reader, Address::from(offset.get()));
                 offset += U32_SIZE;
-                size
+                loaded_size
             }
             Version::V2(_) => {
-                // V2: use fixed size if available, otherwise read from memory.
+                // V2: use fixed size if available, otherwise the one loaded from memory.
                 if K::BOUND.is_fixed_size() {
                     K::BOUND.max_size()
                 } else {
-                    let size = read_u32(&reader, Address::from(offset.get()));
                     offset += U32_SIZE;
-                    size
+                    loaded_size
                 }
             }
         } as usize;
-
-        // if size != size0 as usize {
-        //     panic!("Key size mismatch: expected {size}, got {size0}");
-        // }
 
         let mut bytes = Vec::with_capacity(size);
         read_to_vec(&reader, Address::from(offset.get()), &mut bytes, size);
@@ -254,7 +253,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a value from stable memory at the given offset.
-    fn load_value_from_memory<M: Memory>(&self, offset: Bytes, size0: u32, memory: &M) -> Vec<u8> {
+    fn load_value_from_memory<M: Memory>(
+        &self,
+        offset: Bytes,
+        loaded_size: u32,
+        memory: &M,
+    ) -> Vec<u8> {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -262,12 +266,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory,
         };
 
-        let size = read_u32(&reader, Address::from(offset.get())) as usize;
-
-        // if size != size0 as usize {
-        //     panic!("Value size mismatch: expected {size}, got {size0}");
-        // }
-
+        let size = loaded_size as usize;
         let mut bytes = Vec::with_capacity(size);
         read_to_vec(
             &reader,
