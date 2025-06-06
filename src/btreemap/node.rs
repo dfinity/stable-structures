@@ -230,12 +230,10 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 size
             }
             Version::V2(_) => {
-                if K::BOUND.is_fixed_size() {
-                    K::BOUND.max_size()
-                } else {
+                if !K::BOUND.is_fixed_size() {
                     offset += U32_SIZE;
-                    size
                 }
+                size
             }
         } as usize;
 
