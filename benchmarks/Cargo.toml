@@ -11,6 +11,7 @@ candid.workspace = true
 ic-cdk-macros.workspace = true
 ic-cdk.workspace = true
 ic-stable-structures = { path = "../", features = [] }
+#ic-stable-structures = { path = "../", features = ["bench_scope"] }
 maplit.workspace = true
 serde.workspace = true
 tiny-rng.workspace = true
