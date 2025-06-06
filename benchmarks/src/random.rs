@@ -1,4 +1,5 @@
-use ic_stable_structures::storable::{Blob, BoundedVecN, Storable, UnboundedVecN};
+use crate::vec::{BoundedVecN, UnboundedVecN};
+use ic_stable_structures::storable::{Blob, Storable};
 use tiny_rng::{Rand, Rng};
 
 pub trait Random {
