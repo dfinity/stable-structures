@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 143a30deae19afb7894c008752af9b12ac71c4c15c5b6d69bc97e0a1daa7992b # shrinks to input = _MigratingV1NodesToV2Args { node_data: NodeV1Data { max_key_size: 85, max_value_size: 597, entries: {[239, 8, 5, 239, 181, 211, 96, 11, 5, 133, 14, 92, 246, 241, 106, 202, 223, 180, 21, 217, 8, 11, 14, 171, 130, 89, 66, 135, 242, 138, 10, 15, 230, 113, 97, 87, 159, 164, 192, 19, 140, 22, 166, 216, 130, 71, 127, 31, 143, 114, 187, 13, 238]: [102, 105, 133, 166, 219, 181, 233, 107, 83, 185, 203, 127, 15, 241, 250, 168, 184, 141, 75, 224, 72, 147, 25, 10, 127, 79, 110, 156, 143, 152, 1, 10, 207, 193, 236, 191, 236, 218, 16, 24, 128, 135, 210, 182, 167, 227, 235, 14, 155, 129, 211, 152, 208, 51, 182, 46]}, node_type: Internal } }
+cc ce89f992ce66488d54d12fcc4327effe8fe0b225d5562c9b6b7a00e80cca5615 # shrinks to input = _SavingAndLoadingV1PreservesDataArgs { node_data: NodeV1Data { max_key_size: 961, max_value_size: 703, entries: {[]: [195, 0, 17, 77, 102, 121, 65, 164, 230, 228, 105, 201, 11, 181, 97, 235, 236, 212, 112, 65, 155, 57, 198, 22, 225, 227, 188, 76, 81, 25, 162, 144, 71, 72, 221, 86, 15, 86, 149, 154, 125, 142, 88, 118, 220, 122, 47, 158, 7, 139, 125, 169, 84, 11, 102, 75, 157, 134, 123, 166, 228, 87, 193, 26, 247, 95, 188, 247, 152, 236, 46, 243, 241, 101, 135, 173, 249, 95, 245, 151, 86, 71, 22, 205, 247, 113]}, node_type: Leaf } }
