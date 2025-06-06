@@ -3,7 +3,7 @@ benches:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 1222164318
+      instructions: 1222164385
       heap_increase: 3233
       stable_memory_increase: 1665
     scopes: {}
@@ -11,7 +11,7 @@ benches:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 5422413681
+      instructions: 5422715344
       heap_increase: 1604
       stable_memory_increase: 1665
     scopes: {}
@@ -19,7 +19,7 @@ benches:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 133706869415
+      instructions: 134635899996
       heap_increase: 1892
       stable_memory_increase: 3201
     scopes: {}
@@ -75,7 +75,7 @@ benches:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 1072804832
+      instructions: 1072804865
       heap_increase: 3233
       stable_memory_increase: 1665
     scopes: {}
@@ -83,7 +83,7 @@ benches:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 4922424756
+      instructions: 4922635433
       heap_increase: 1604
       stable_memory_increase: 1665
     scopes: {}
@@ -91,7 +91,7 @@ benches:
     total:
       start_instructions: 17235
       calls: 1
-      instructions: 89940477182
+      instructions: 90689822199
       heap_increase: 1892
       stable_memory_increase: 3201
     scopes: {}

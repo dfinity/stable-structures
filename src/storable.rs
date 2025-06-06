@@ -195,9 +195,7 @@ impl<const N: usize> Storable for Blob<N> {
 pub struct UnboundedVecN<const N: usize>(Vec<u8>);
 
 impl<const N: usize> UnboundedVecN<N> {
-    pub fn max_size() -> u32 {
-        N as u32
-    }
+    pub const MAX_SIZE: u32 = N as u32;
 
     pub fn from(slice: &[u8]) -> Self {
         assert!(
@@ -237,9 +235,7 @@ impl<const N: usize> Storable for UnboundedVecN<N> {
 pub struct BoundedVecN<const N: usize>(Vec<u8>);
 
 impl<const N: usize> BoundedVecN<N> {
-    pub fn max_size() -> u32 {
-        N as u32
-    }
+    pub const MAX_SIZE: u32 = N as u32;
 
     pub fn from(slice: &[u8]) -> Self {
         assert!(

@@ -1,4 +1,4 @@
-use benchmarks::common::BoundedVecN;
+use benchmarks::vec::BoundedVecN;
 use canbench_rs::{bench, bench_fn};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::{

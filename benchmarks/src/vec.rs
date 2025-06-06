@@ -1,60 +1,12 @@
-use ic_stable_structures::storable::{Blob, Bound, Storable};
+use ic_stable_structures::storable::{Bound, Storable};
 use std::borrow::Cow;
-use tiny_rng::{Rand, Rng};
-
-pub trait Random {
-    fn random(rng: &mut Rng) -> Self;
-}
-
-impl<const K: usize> Random for Blob<K> {
-    fn random(rng: &mut Rng) -> Self {
-        let size = rng.rand_u32() % Blob::<K>::BOUND.max_size();
-        Blob::try_from(
-            rng.iter(Rand::rand_u8)
-                .take(size as usize)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .unwrap()
-    }
-}
-
-impl<const K: usize> Random for UnboundedVecN<K> {
-    fn random(rng: &mut Rng) -> Self {
-        let size = rng.rand_u32() % Self::max_size();
-        let mut buf = Vec::with_capacity(size as usize);
-        for _ in 0..size {
-            buf.push(rng.rand_u8());
-        }
-        Self::from(&buf)
-    }
-}
-
-impl<const K: usize> Random for BoundedVecN<K> {
-    fn random(rng: &mut Rng) -> Self {
-        let size = rng.rand_u32() % Self::max_size();
-        let mut buf = Vec::with_capacity(size as usize);
-        for _ in 0..size {
-            buf.push(rng.rand_u8());
-        }
-        Self::from(&buf)
-    }
-}
-
-impl Random for u64 {
-    fn random(rng: &mut Rng) -> Self {
-        rng.rand_u64()
-    }
-}
 
 /// Unbounded vector of bytes, always of length `N`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct UnboundedVecN<const N: usize>(Vec<u8>);
 
 impl<const N: usize> UnboundedVecN<N> {
-    pub fn max_size() -> u32 {
-        N as u32
-    }
+    pub const MAX_SIZE: u32 = N as u32;
 
     pub fn from(slice: &[u8]) -> Self {
         assert!(
