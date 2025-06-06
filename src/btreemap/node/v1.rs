@@ -72,12 +72,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
         for _ in 0..header.num_entries {
             let key_offset = offset;
             offset += U32_SIZE;
-            let key = LazyKey::by_ref(key_offset);
+            let key = LazyKey::by_ref(key_offset, max_key_size);
             offset += Bytes::from(max_key_size);
 
             let value_offset = offset;
             offset += U32_SIZE;
-            let value = LazyValue::by_ref(value_offset);
+            let value = LazyValue::by_ref(value_offset, max_value_size);
             offset += Bytes::from(max_value_size);
 
             entries.push((key, value));

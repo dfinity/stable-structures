@@ -184,13 +184,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     #[inline(always)]
     fn get_key<'a, M: Memory>(&'a self, (k, _): &'a LazyEntry<K>, memory: &M) -> &'a K {
-        k.get_or_load(|offset| self.load_key_from_memory(offset, memory))
+        k.get_or_load(|offset, size| self.load_key_from_memory(offset, size, memory))
     }
 
     /// Returns a reference to the cached value and loads it from memory if needed.
     #[inline(always)]
     fn get_value<'a, M: Memory>(&'a self, (_, v): &'a LazyEntry<K>, memory: &M) -> &'a [u8] {
-        v.get_or_load(|offset| self.load_value_from_memory(offset, memory))
+        v.get_or_load(|offset, size| self.load_value_from_memory(offset, size, memory))
     }
 
     /// Returns a reference to the key at the specified index.
@@ -207,16 +207,16 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Extracts the contents of key (by loading it first if it's not loaded yet).
     fn extract_key<M: Memory>(&self, key: LazyKey<K>, memory: &M) -> K {
-        key.take_or_load(|offset| self.load_key_from_memory(offset, memory))
+        key.take_or_load(|offset, size| self.load_key_from_memory(offset, size, memory))
     }
 
     /// Extracts the contents of value (by loading it first if it's not loaded yet).
     fn extract_value<M: Memory>(&self, value: LazyValue, memory: &M) -> Vec<u8> {
-        value.take_or_load(|offset| self.load_value_from_memory(offset, memory))
+        value.take_or_load(|offset, size| self.load_value_from_memory(offset, size, memory))
     }
 
     /// Loads a key from stable memory at the given offset.
-    fn load_key_from_memory<M: Memory>(&self, mut offset: Bytes, memory: &M) -> K {
+    fn load_key_from_memory<M: Memory>(&self, mut offset: Bytes, size: u32, memory: &M) -> K {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -224,24 +224,35 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory,
         };
 
-        let size = match self.version {
+        // let size = match self.version {
+        //     Version::V1(_) => {
+        //         // V1: key size is always stored in memory.
+        //         let size = read_u32(&reader, Address::from(offset.get()));
+        //         offset += U32_SIZE;
+        //         size
+        //     }
+        //     Version::V2(_) => {
+        //         // V2: use fixed size if available, otherwise read from memory.
+        //         if K::BOUND.is_fixed_size() {
+        //             K::BOUND.max_size()
+        //         } else {
+        //             let size = read_u32(&reader, Address::from(offset.get()));
+        //             offset += U32_SIZE;
+        //             size
+        //         }
+        //     }
+        // } as usize;
+        let size = size as usize;
+        match self.version {
             Version::V1(_) => {
-                // V1: key size is always stored in memory.
-                let size = read_u32(&reader, Address::from(offset.get()));
                 offset += U32_SIZE;
-                size
             }
             Version::V2(_) => {
-                // V2: use fixed size if available, otherwise read from memory.
-                if K::BOUND.is_fixed_size() {
-                    K::BOUND.max_size()
-                } else {
-                    let size = read_u32(&reader, Address::from(offset.get()));
+                if !K::BOUND.is_fixed_size() {
                     offset += U32_SIZE;
-                    size
                 }
             }
-        } as usize;
+        };
 
         let mut bytes = Vec::with_capacity(size);
         read_to_vec(&reader, Address::from(offset.get()), &mut bytes, size);
@@ -250,7 +261,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Loads a value from stable memory at the given offset.
-    fn load_value_from_memory<M: Memory>(&self, offset: Bytes, memory: &M) -> Vec<u8> {
+    fn load_value_from_memory<M: Memory>(&self, offset: Bytes, size: u32, memory: &M) -> Vec<u8> {
         let reader = NodeReader {
             address: self.address,
             overflows: &self.overflows,
@@ -258,7 +269,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
             memory,
         };
 
-        let size = read_u32(&reader, Address::from(offset.get())) as usize;
+        //let size = read_u32(&reader, Address::from(offset.get())) as usize;
+        let size = size as usize;
         let mut bytes = Vec::with_capacity(size);
         read_to_vec(
             &reader,
@@ -523,7 +535,11 @@ impl NodeHeader {
 #[derive(Debug)]
 enum LazyObject<T> {
     ByVal(T),
-    ByRef { offset: Bytes, loaded: OnceCell<T> },
+    ByRef {
+        offset: Bytes,
+        size: u32,
+        loaded: OnceCell<T>,
+    },
 }
 
 impl<T> LazyObject<T> {
@@ -533,28 +549,35 @@ impl<T> LazyObject<T> {
     }
 
     #[inline(always)]
-    pub fn by_ref(offset: Bytes) -> Self {
+    pub fn by_ref(offset: Bytes, size: u32) -> Self {
         LazyObject::ByRef {
             offset,
+            size,
             loaded: OnceCell::new(),
         }
     }
 
     #[inline(always)]
-    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> T) -> &T {
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes, u32) -> T) -> &T {
         match self {
             LazyObject::ByVal(value) => value,
-            LazyObject::ByRef { offset, loaded } => loaded.get_or_init(|| load(*offset)),
+            LazyObject::ByRef {
+                offset,
+                size,
+                loaded,
+            } => loaded.get_or_init(|| load(*offset, *size)),
         }
     }
 
     #[inline(always)]
-    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> T) -> T {
+    pub fn take_or_load(self, load: impl FnOnce(Bytes, u32) -> T) -> T {
         match self {
             LazyObject::ByVal(value) => value,
-            LazyObject::ByRef { offset, loaded } => {
-                loaded.into_inner().unwrap_or_else(|| load(offset))
-            }
+            LazyObject::ByRef {
+                offset,
+                size,
+                loaded,
+            } => loaded.into_inner().unwrap_or_else(|| load(offset, size)),
         }
     }
 }
@@ -571,17 +594,17 @@ impl LazyValue {
     }
 
     #[inline(always)]
-    pub fn by_ref(offset: Bytes) -> Self {
-        Self(LazyObject::by_ref(offset))
+    pub fn by_ref(offset: Bytes, size: u32) -> Self {
+        Self(LazyObject::by_ref(offset, size))
     }
 
     #[inline(always)]
-    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> Blob) -> &Blob {
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes, u32) -> Blob) -> &Blob {
         self.0.get_or_load(load)
     }
 
     #[inline(always)]
-    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> Blob) -> Blob {
+    pub fn take_or_load(self, load: impl FnOnce(Bytes, u32) -> Blob) -> Blob {
         self.0.take_or_load(load)
     }
 }
@@ -596,17 +619,17 @@ impl<K> LazyKey<K> {
     }
 
     #[inline(always)]
-    pub fn by_ref(offset: Bytes) -> Self {
-        Self(LazyObject::by_ref(offset))
+    pub fn by_ref(offset: Bytes, size: u32) -> Self {
+        Self(LazyObject::by_ref(offset, size))
     }
 
     #[inline(always)]
-    pub fn get_or_load(&self, load: impl FnOnce(Bytes) -> K) -> &K {
+    pub fn get_or_load(&self, load: impl FnOnce(Bytes, u32) -> K) -> &K {
         self.0.get_or_load(load)
     }
 
     #[inline(always)]
-    pub fn take_or_load(self, load: impl FnOnce(Bytes) -> K) -> K {
+    pub fn take_or_load(self, load: impl FnOnce(Bytes, u32) -> K) -> K {
         self.0.take_or_load(load)
     }
 }
