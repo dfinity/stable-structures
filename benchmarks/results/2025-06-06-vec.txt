@@ -1,0 +1,33 @@
+---------------------------------------------------
+
+Summary:
+  instructions:
+    status:   Improvements detected! 🟢
+    counts:   [total 16 | regressed 0 | improved 1 | new 0 | unchanged 15]
+    change:   [max +102.33K | p75 +20.00K | median 0 | p25 0 | min -480.00K]
+    change %: [max +1.82% | p75 +0.31% | median 0.00% | p25 0.00% | min -9.11%]
+
+  heap_increase:
+    status:   No significant changes detected 👍
+    counts:   [total 16 | regressed 0 | improved 0 | new 0 | unchanged 16]
+    change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
+    change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
+
+  stable_memory_increase:
+    status:   No significant changes detected 👍
+    counts:   [total 16 | regressed 0 | improved 0 | new 0 | unchanged 16]
+    change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
+    change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
+
+---------------------------------------------------
+
+Only significant changes:
+| status | name        | calls |   ins |  ins Δ% | HI |  HI Δ% | SMI |  SMI Δ% |
+|--------|-------------|-------|-------|---------|----|--------|-----|---------|
+|   -    | vec_get_u64 |       | 4.79M |  -9.11% |  0 |  0.00% |   0 |   0.00% |
+
+ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
+
+---------------------------------------------------
+CSV results saved to canbench_results.csv
+Successfully persisted results to canbench_results.yml

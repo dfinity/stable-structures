@@ -10,8 +10,8 @@ canbench-rs.workspace = true
 candid.workspace = true
 ic-cdk-macros.workspace = true
 ic-cdk.workspace = true
-#ic-stable-structures = { path = "../", features = [] }
-ic-stable-structures = { version = "0.6.7", features = [] }
+ic-stable-structures = { path = "../", features = [] }
+#ic-stable-structures = { version = "0.6.7", features = [] }
 maplit.workspace = true
 serde.workspace = true
 tiny-rng.workspace = true

@@ -1,0 +1,36 @@
+---------------------------------------------------
+
+Summary:
+  instructions:
+    status:   Improvements detected! 🟢
+    counts:   [total 18 | regressed 0 | improved 4 | new 0 | unchanged 14]
+    change:   [max +6.90M | p75 0 | median 0 | p25 0 | min -3.84B]
+    change %: [max +0.28% | p75 0.00% | median 0.00% | p25 0.00% | min -25.41%]
+
+  heap_increase:
+    status:   No significant changes detected 👍
+    counts:   [total 18 | regressed 0 | improved 0 | new 0 | unchanged 18]
+    change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
+    change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
+
+  stable_memory_increase:
+    status:   No significant changes detected 👍
+    counts:   [total 18 | regressed 0 | improved 0 | new 0 | unchanged 18]
+    change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
+    change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
+
+---------------------------------------------------
+
+Only significant changes:
+| status | name                     | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
+|--------|--------------------------|-------|---------|---------|-------|--------|-------|---------|
+|   -    | write_chunks_btreemap_1m |       |  89.94B |  -2.37% | 1.89K |  0.00% | 3.20K |   0.00% |
+|   -    | read_chunks_btreemap_1m  |       | 133.71B |  -2.79% | 1.89K |  0.00% | 3.20K |   0.00% |
+|   -    | read_chunks_btreemap_1k  |       |   5.42B |  -7.09% | 1.60K |  0.00% | 1.67K |   0.00% |
+|   -    | read_chunks_btreemap_1   |       |   1.22B | -25.41% | 3.23K |  0.00% | 1.67K |   0.00% |
+
+ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
+
+---------------------------------------------------
+CSV results saved to canbench_results.csv
+Successfully persisted results to canbench_results.yml
