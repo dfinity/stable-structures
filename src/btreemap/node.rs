@@ -242,17 +242,20 @@ impl<K: Storable + Ord + Clone> Node<K> {
         //         }
         //     }
         // } as usize;
-        let size = size as usize;
-        match self.version {
+        let size = match self.version {
             Version::V1(_) => {
                 offset += U32_SIZE;
+                size
             }
             Version::V2(_) => {
-                if !K::BOUND.is_fixed_size() {
+                if K::BOUND.is_fixed_size() {
+                    K::BOUND.max_size()
+                } else {
                     offset += U32_SIZE;
+                    size
                 }
             }
-        };
+        } as usize;
 
         let mut bytes = Vec::with_capacity(size);
         read_to_vec(&reader, Address::from(offset.get()), &mut bytes, size);
