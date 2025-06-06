@@ -1,10 +1,7 @@
-use benchmarks::common::Random;
+use benchmarks::common::{Random, UnboundedVecN};
 use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
-use ic_stable_structures::{
-    storable::{Blob, UnboundedVecN},
-    BTreeMap, DefaultMemoryImpl, Memory, Storable,
-};
+use ic_stable_structures::{storable::Blob, BTreeMap, DefaultMemoryImpl, Memory, Storable};
 use std::ops::Bound;
 use tiny_rng::{Rand, Rng};
 

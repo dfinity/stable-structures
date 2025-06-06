@@ -1,8 +1,8 @@
+use benchmarks::common::BoundedVecN;
 use canbench_rs::{bench, bench_fn};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
-    storable::BoundedVecN,
     BTreeMap, DefaultMemoryImpl, Memory, Vec as StableVec,
 };
 
