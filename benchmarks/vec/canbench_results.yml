@@ -3,7 +3,7 @@ benches:
     total:
       start_instructions: 66837503
       calls: 1
-      instructions: 19246664
+      instructions: 19246664000
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
