@@ -1,7 +1,6 @@
 benches:
   memory_manager_baseline:
     total:
-      start_instructions: 288376380
       calls: 1
       instructions: 1176577076
       heap_increase: 0
@@ -9,18 +8,16 @@ benches:
     scopes: {}
   memory_manager_grow:
     total:
-      start_instructions: 94164
       calls: 1
-      instructions: 347433969
+      instructions: 347433978
       heap_increase: 2
       stable_memory_increase: 32000
     scopes: {}
   memory_manager_overhead:
     total:
-      start_instructions: 288453362
       calls: 1
       instructions: 1181977502
       heap_increase: 0
       stable_memory_increase: 8320
     scopes: {}
-version: 0.1.16
+version: 0.1.17
