@@ -86,6 +86,7 @@ jobs:
       matrix:
         name:
           - btreemap
+          - btreeset
           - memory-manager
           - vec
           - compare
