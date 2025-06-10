@@ -3,7 +3,6 @@ use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::storable::Blob;
 use ic_stable_structures::{btreeset::BTreeSet, DefaultMemoryImpl, Storable};
 
-// Define type alias for Blob<8>.
 type Blob8 = Blob<8>;
 type Blob16 = Blob<16>;
 type Blob32 = Blob<32>;
