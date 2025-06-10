@@ -6,11 +6,30 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-canbench-rs = "0.1.13"
+canbench-rs.workspace = true
 candid.workspace = true
-ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
-ic-stable-structures = { path = "../", features = ["canbench-rs"] }
-maplit = "1.0.2"
-serde = "1.0"
-tiny-rng = "0.2.0"
+ic-cdk.workspace = true
+ic-stable-structures = { path = "../", features = [] }
+maplit.workspace = true
+serde.workspace = true
+tiny-rng.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "btreemap"
+path = "btreemap/src/main.rs"
+
+[[bin]]
+name = "memory_manager"
+path = "memory_manager/src/main.rs"
+
+[[bin]]
+name = "vec"
+path = "vec/src/main.rs"
+
+[[bin]]
+name = "compare"
+path = "compare/src/main.rs"

@@ -285,8 +285,8 @@ where
 
     /// Initializes a v1 `BTreeMap`.
     ///
-    /// This is exposed only in testing and benchmarking.
-    #[cfg(any(feature = "canbench-rs", test))]
+    /// This is exposed only in testing.
+    #[cfg(test)]
     pub fn init_v1(memory: M) -> Self {
         if memory.size() == 0 {
             // Memory is empty. Create a new map.
@@ -361,8 +361,8 @@ where
 
     /// Create a v1 instance of the BTree.
     ///
-    /// This is only exposed for testing and benchmarking.
-    #[cfg(any(feature = "canbench-rs", test))]
+    /// This is only exposed for testing.
+    #[cfg(test)]
     pub fn new_v1(memory: M) -> Self {
         let max_key_size = K::BOUND.max_size();
         let max_value_size = V::BOUND.max_size();
@@ -505,11 +505,11 @@ where
             let mut root = self.load_node(self.root_addr);
 
             // Check if the key already exists in the root.
-            if let Ok(idx) = root.search(&key) {
-                // The key exists. Overwrite it and return the previous value.
-                let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                self.save_node(&mut root);
-                return Some(V::from_bytes(Cow::Owned(previous_value)));
+            if let Ok(idx) = root.search(&key, self.memory()) {
+                // Key found, replace its value and return the old one.
+                return Some(V::from_bytes(Cow::Owned(
+                    self.update_value(&mut root, idx, value),
+                )));
             }
 
             // If the root is full, we need to introduce a new node as the root.
@@ -548,14 +548,10 @@ where
         assert!(!node.is_full());
 
         // Look for the key in the node.
-        match node.search(&key) {
+        match node.search(&key, self.memory()) {
             Ok(idx) => {
-                // The key is already in the node.
-                // Overwrite it and return the previous value.
-                let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
-
-                self.save_node(&mut node);
-                Some(previous_value)
+                // Key found, replace its value and return the old one.
+                Some(self.update_value(&mut node, idx, value))
             }
             Err(idx) => {
                 // The key isn't in the node. `idx` is where that key should be inserted.
@@ -581,12 +577,9 @@ where
 
                         if child.is_full() {
                             // Check if the key already exists in the child.
-                            if let Ok(idx) = child.search(&key) {
-                                // The key exists. Overwrite it and return the previous value.
-                                let (_, previous_value) =
-                                    child.swap_entry(idx, (key, value), self.memory());
-                                self.save_node(&mut child);
-                                return Some(previous_value);
+                            if let Ok(idx) = child.search(&key, self.memory()) {
+                                // Key found, replace its value and return the old one.
+                                return Some(self.update_value(&mut child, idx, value));
                             }
 
                             // The child is full. Split the child.
@@ -594,7 +587,7 @@ where
 
                             // The children have now changed. Search again for
                             // the child where we need to store the entry in.
-                            let idx = node.search(&key).unwrap_or_else(|idx| idx);
+                            let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
                             child = self.load_node(node.child(idx));
                         }
 
@@ -674,7 +667,7 @@ where
     {
         let node = self.load_node(node_addr);
         // Look for the key in the current node.
-        match node.search(key) {
+        match node.search(key, self.memory()) {
             Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
@@ -791,7 +784,7 @@ where
 
         match node.node_type() {
             NodeType::Leaf => {
-                match node.search(key) {
+                match node.search(key, self.memory()) {
                     Ok(idx) => {
                         // Case 1: The node is a leaf node and the key exists in it.
                         // This is the simplest case. The key is removed from the leaf.
@@ -818,7 +811,7 @@ where
                 }
             }
             NodeType::Internal => {
-                match node.search(key) {
+                match node.search(key, self.memory()) {
                     Ok(idx) => {
                         // Case 2: The node is an internal node and the key exists in it.
 
@@ -1281,6 +1274,13 @@ where
         node.save(self.allocator_mut());
     }
 
+    /// Replaces the value at `idx` in the node, saves the node, and returns the old value.
+    fn update_value(&mut self, node: &mut Node<K>, idx: usize, new_value: Vec<u8>) -> Vec<u8> {
+        let old_value = node.swap_value(idx, new_value, self.memory());
+        self.save_node(node);
+        old_value
+    }
+
     /// Saves the map to memory.
     fn save_header(&self) {
         let header = BTreeHeader {
@@ -1622,7 +1622,7 @@ mod test {
             assert!(right_child.is_full());
             let median_index = right_child.entries_len() / 2;
             let median_key = key(12);
-            assert_eq!(right_child.key(median_index), &median_key);
+            assert_eq!(right_child.key(median_index, btree.memory()), &median_key);
 
             // Overwrite the value of the median key.
             assert_eq!(btree.insert(median_key.clone(), value(123)), Some(value(0)));
@@ -3271,7 +3271,7 @@ mod test {
         // [0, 1, 2, 3, 4, 5]     [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.keys(), vec![vec![6; 10_000]]);
+        assert_eq!(root.keys(btree.memory()), vec![&[6; 10_000]]);
         assert_eq!(root.children_len(), 2);
 
         // Remove the element in the root.
@@ -3283,7 +3283,7 @@ mod test {
         // [0, 1, 2, 3, 4]     [7, 8, 9, 10, 11]
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Internal);
-        assert_eq!(root.keys(), vec![vec![5; 10_000]]);
+        assert_eq!(root.keys(btree.memory()), vec![&[5; 10_000]]);
         assert_eq!(root.children_len(), 2);
 
         // Remove the element in the root. This triggers the case where the root
@@ -3295,18 +3295,18 @@ mod test {
         let root = btree.load_node(btree.root_addr);
         assert_eq!(root.node_type(), NodeType::Leaf);
         assert_eq!(
-            root.keys(),
+            root.keys(btree.memory()),
             vec![
-                vec![0; 10_000],
-                vec![1; 10_000],
-                vec![2; 10_000],
-                vec![3; 10_000],
-                vec![4; 10_000],
-                vec![7; 10_000],
-                vec![8; 10_000],
-                vec![9; 10_000],
-                vec![10; 10_000],
-                vec![11; 10_000],
+                &[0; 10_000],
+                &[1; 10_000],
+                &[2; 10_000],
+                &[3; 10_000],
+                &[4; 10_000],
+                &[7; 10_000],
+                &[8; 10_000],
+                &[9; 10_000],
+                &[10; 10_000],
+                &[11; 10_000],
             ]
         );
 

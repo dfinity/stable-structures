@@ -179,8 +179,92 @@ impl<const N: usize> Storable for Blob<N> {
         Cow::Borrowed(self.as_slice())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::try_from(bytes.borrow()).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Bounded {
+        max_size: N as u32,
+        is_fixed_size: false,
+    };
+}
+
+/// Unbounded vector of bytes, always of length `N`.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct UnboundedVecN<const N: usize>(Vec<u8>);
+
+impl<const N: usize> UnboundedVecN<N> {
+    pub const MAX_SIZE: u32 = N as u32;
+
+    pub fn from(slice: &[u8]) -> Self {
+        assert!(
+            slice.len() <= N,
+            "expected a slice with length <= {} bytes, but found {} bytes",
+            N,
+            slice.len()
+        );
+        let mut vec = Vec::with_capacity(N);
+        vec.extend_from_slice(slice);
+        vec.resize(N, 0);
+        Self(vec)
+    }
+}
+
+impl<const N: usize> Default for UnboundedVecN<N> {
+    fn default() -> Self {
+        Self(vec![0; N])
+    }
+}
+
+impl<const N: usize> Storable for UnboundedVecN<N> {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(self.0.clone())
+    }
+
+    #[inline]
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self(bytes.into_owned())
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+/// Bounded vector of bytes, always of length `N`.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct BoundedVecN<const N: usize>(Vec<u8>);
+
+impl<const N: usize> BoundedVecN<N> {
+    pub const MAX_SIZE: u32 = N as u32;
+
+    pub fn from(slice: &[u8]) -> Self {
+        assert!(
+            slice.len() <= N,
+            "expected a slice with length <= {} bytes, but found {} bytes",
+            N,
+            slice.len()
+        );
+        let mut vec = Vec::with_capacity(N);
+        vec.extend_from_slice(slice);
+        vec.resize(N, 0);
+        Self(vec)
+    }
+}
+
+impl<const N: usize> Default for BoundedVecN<N> {
+    fn default() -> Self {
+        Self(vec![0; N])
+    }
+}
+
+impl<const N: usize> Storable for BoundedVecN<N> {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(self.0.clone())
+    }
+
+    #[inline]
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Self(bytes.into_owned())
     }
 
     const BOUND: Bound = Bound::Bounded {
@@ -206,6 +290,7 @@ impl Storable for () {
         Cow::Borrowed(&[])
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert!(bytes.is_empty());
     }
@@ -223,8 +308,9 @@ impl Storable for Vec<u8> {
         Cow::Borrowed(self)
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        bytes.to_vec()
+        bytes.into_owned()
     }
 
     const BOUND: Bound = Bound::Unbounded;
@@ -235,8 +321,9 @@ impl Storable for String {
         Cow::Borrowed(self.as_bytes())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        String::from_utf8(bytes.to_vec()).unwrap()
+        String::from_utf8(bytes.into_owned()).unwrap()
     }
 
     const BOUND: Bound = Bound::Unbounded;
@@ -247,6 +334,7 @@ impl Storable for u128 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
@@ -262,6 +350,7 @@ impl Storable for u64 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
@@ -277,6 +366,7 @@ impl Storable for f64 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
@@ -292,6 +382,7 @@ impl Storable for u32 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
@@ -307,6 +398,7 @@ impl Storable for f32 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
@@ -322,6 +414,7 @@ impl Storable for u16 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
@@ -337,6 +430,7 @@ impl Storable for u8 {
         Cow::Owned(self.to_be_bytes().to_vec())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_be_bytes(bytes.as_ref().try_into().unwrap())
     }
@@ -353,6 +447,7 @@ impl Storable for bool {
         Cow::Owned(num.to_be_bytes().to_vec())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert_eq!(bytes.len(), 1);
         match bytes[0] {
@@ -373,6 +468,7 @@ impl<const N: usize> Storable for [u8; N] {
         Cow::Borrowed(&self[..])
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         assert_eq!(bytes.len(), N);
         let mut arr = [0; N];
@@ -391,6 +487,7 @@ impl<T: Storable> Storable for Reverse<T> {
         self.0.to_bytes()
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self(T::from_bytes(bytes))
     }
@@ -410,6 +507,7 @@ impl<T: Storable> Storable for Option<T> {
         }
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         match bytes.split_last() {
             Some((last, rest)) => match last {
@@ -443,6 +541,7 @@ impl Storable for Principal {
         Cow::Borrowed(self.as_slice())
     }
 
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self::from_slice(&bytes)
     }

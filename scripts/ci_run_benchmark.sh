@@ -24,7 +24,7 @@ MAIN_BRANCH_RESULTS_FILE="$MAIN_BRANCH_DIR/$CANBENCH_RESULTS_FILE"
 CANBENCH_RESULTS_CSV_FILE="/tmp/canbench_results_${CANBENCH_JOB_NAME}.csv"
 
 # Install canbench.
-cargo install --version 0.1.13 canbench
+cargo install --version 0.1.16 --locked canbench
 
 # Verify that the canbench results file exists.
 if [ ! -f "$CANBENCH_RESULTS_FILE" ]; then
@@ -34,7 +34,9 @@ fi
 
 # Check if the canbench results file is up to date.
 pushd "$CANISTER_PATH"
-canbench --less-verbose > $CANBENCH_OUTPUT
+# (!) Do not use `--hide-results` here, as it breaks the up-to-date check.
+canbench --less-verbose --show-summary --csv > "$CANBENCH_OUTPUT"
+cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
 if grep -q "(regress\|(improved by \|(new)" "$CANBENCH_OUTPUT"; then
   UPDATED_MSG="**❌ \`$CANBENCH_RESULTS_FILE\` is not up to date**
   If the performance change is expected, run \`canbench --persist [--csv]\` to update the benchmark results."
@@ -66,9 +68,9 @@ if [ -f "$MAIN_BRANCH_RESULTS_FILE" ]; then
   canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
   cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
   popd
-
-  CSV_RESULTS_FILE_MSG="📦 \`canbench_results_$CANBENCH_JOB_NAME.csv\` available in [artifacts](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
 fi
+
+CSV_RESULTS_FILE_MSG="📦 \`canbench_results_$CANBENCH_JOB_NAME.csv\` available in [artifacts](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"
 
 # Append the update status and benchmark output to the comment.
 {
