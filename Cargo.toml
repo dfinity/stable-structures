@@ -32,7 +32,7 @@ bench_scope = ["dep:canbench-rs"] # May add significant overhead.
 members = ["benchmarks"]
 
 [workspace.dependencies]
-canbench-rs = "0.1.16"
+canbench-rs = "0.1.17"
 candid = "0.10.14"
 hex = "0.4.3"
 ic_principal = { version = "0.1.1", default-features = false }
