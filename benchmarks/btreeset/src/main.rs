@@ -234,6 +234,17 @@ bench_tests! {
     btreeset_range_blob_256, range_helper, Blob256;
     btreeset_range_blob_512, range_helper, Blob512;
     btreeset_range_blob_1024, range_helper, Blob1024;
+
+    btreeset_iter_u32, iter_helper, u32;
+    btreeset_iter_u64, iter_helper, u64;
+    btreeset_iter_blob_8, iter_helper, Blob8;
+    btreeset_iter_blob_16, iter_helper, Blob16;
+    btreeset_iter_blob_32, iter_helper, Blob32;
+    btreeset_iter_blob_64, iter_helper, Blob64;
+    btreeset_iter_blob_128, iter_helper, Blob128;
+    btreeset_iter_blob_256, iter_helper, Blob256;
+    btreeset_iter_blob_512, iter_helper, Blob512;
+    btreeset_iter_blob_1024, iter_helper, Blob1024;
 }
 
 // Add benchmarks for set operations with additional key types.
