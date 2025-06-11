@@ -107,7 +107,7 @@ benches:
   vec_insert_u64:
     total:
       calls: 1
-      instructions: 5869531
+      instructions: 5359531
       heap_increase: 0
       stable_memory_increase: 1
     scopes: {}
