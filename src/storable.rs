@@ -11,10 +11,15 @@ mod tests;
 
 /// A trait with convenience methods for storing an element into a stable structure.
 pub trait Storable {
-    /// Converts an element into bytes.
+    /// Converts the element into a possibly borrowed byte slice.
     ///
     /// NOTE: `Cow` is used here to avoid unnecessary cloning.
     fn to_bytes(&self) -> Cow<[u8]>;
+
+    /// Converts the element into an owned byte vector.
+    ///
+    /// This method consumes `self` and avoids cloning when possible.
+    fn into_bytes(self) -> Vec<u8>;
 
     /// Converts bytes into an element.
     fn from_bytes(bytes: Cow<[u8]>) -> Self;
@@ -22,33 +27,47 @@ pub trait Storable {
     /// The size bounds of the type.
     const BOUND: Bound;
 
-    /// Like `to_bytes`, but includes additional checks to ensure the element's serialized bytes
-    /// are within the element's bounds.
+    /// Like `to_bytes`, but checks that bytes conform to declared bounds.
     fn to_bytes_checked(&self) -> Cow<[u8]> {
         let bytes = self.to_bytes();
+        Self::check_bounds(&bytes);
+        bytes
+    }
+
+    /// Like `into_bytes`, but checks that bytes conform to declared bounds.
+    fn into_bytes_checked(self) -> Vec<u8>
+    where
+        Self: Sized,
+    {
+        let bytes = self.into_bytes();
+        Self::check_bounds(&bytes);
+        bytes
+    }
+
+    /// Validates that a byte slice fits within this type's declared bounds.
+    #[inline]
+    fn check_bounds(bytes: &[u8]) {
         if let Bound::Bounded {
             max_size,
             is_fixed_size,
         } = Self::BOUND
         {
+            let actual = bytes.len();
             if is_fixed_size {
                 assert_eq!(
-                    bytes.len(),
-                    max_size as usize,
+                    actual, max_size as usize,
                     "expected a fixed-size element with length {} bytes, but found {} bytes",
-                    max_size,
-                    bytes.len()
+                    max_size, actual
                 );
             } else {
                 assert!(
-                    bytes.len() <= max_size as usize,
+                    actual <= max_size as usize,
                     "expected an element with length <= {} bytes, but found {} bytes",
                     max_size,
-                    bytes.len()
+                    actual
                 );
             }
         }
-        bytes
     }
 }
 
@@ -175,8 +194,14 @@ impl<const N: usize> fmt::Debug for Blob<N> {
 }
 
 impl<const N: usize> Storable for Blob<N> {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_slice())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.as_slice().to_vec()
     }
 
     #[inline]
@@ -223,6 +248,11 @@ impl<const N: usize> Storable for UnboundedVecN<N> {
     }
 
     #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self(bytes.into_owned())
     }
@@ -263,6 +293,11 @@ impl<const N: usize> Storable for BoundedVecN<N> {
     }
 
     #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
+
+    #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Self(bytes.into_owned())
     }
@@ -286,8 +321,14 @@ impl<const N: usize> Storable for BoundedVecN<N> {
 // in case of a detected error is preferable and safer.
 
 impl Storable for () {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(&[])
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        Vec::new()
     }
 
     #[inline]
@@ -304,8 +345,14 @@ impl Storable for () {
 }
 
 impl Storable for Vec<u8> {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self)
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self
     }
 
     #[inline]
@@ -317,8 +364,14 @@ impl Storable for Vec<u8> {
 }
 
 impl Storable for String {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_bytes())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.into_bytes()
     }
 
     #[inline]
@@ -330,8 +383,14 @@ impl Storable for String {
 }
 
 impl Storable for u128 {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(self.to_be_bytes().to_vec())
+        Cow::Owned(self.into_bytes())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_be_bytes().to_vec()
     }
 
     #[inline]
@@ -346,8 +405,14 @@ impl Storable for u128 {
 }
 
 impl Storable for u64 {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(self.to_be_bytes().to_vec())
+        Cow::Owned(self.into_bytes())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_be_bytes().to_vec()
     }
 
     #[inline]
@@ -362,8 +427,14 @@ impl Storable for u64 {
 }
 
 impl Storable for f64 {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(self.to_be_bytes().to_vec())
+        Cow::Owned(self.into_bytes())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_be_bytes().to_vec()
     }
 
     #[inline]
@@ -378,8 +449,14 @@ impl Storable for f64 {
 }
 
 impl Storable for u32 {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(self.to_be_bytes().to_vec())
+        Cow::Owned(self.into_bytes())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_be_bytes().to_vec()
     }
 
     #[inline]
@@ -394,8 +471,14 @@ impl Storable for u32 {
 }
 
 impl Storable for f32 {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(self.to_be_bytes().to_vec())
+        Cow::Owned(self.into_bytes())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_be_bytes().to_vec()
     }
 
     #[inline]
@@ -410,8 +493,14 @@ impl Storable for f32 {
 }
 
 impl Storable for u16 {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(self.to_be_bytes().to_vec())
+        Cow::Owned(self.into_bytes())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_be_bytes().to_vec()
     }
 
     #[inline]
@@ -426,8 +515,14 @@ impl Storable for u16 {
 }
 
 impl Storable for u8 {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(self.to_be_bytes().to_vec())
+        Cow::Owned(self.into_bytes())
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_be_bytes().to_vec()
     }
 
     #[inline]
@@ -443,8 +538,11 @@ impl Storable for u8 {
 
 impl Storable for bool {
     fn to_bytes(&self) -> Cow<[u8]> {
-        let num: u8 = if *self { 1 } else { 0 };
-        Cow::Owned(num.to_be_bytes().to_vec())
+        Cow::Owned(if *self { 1_u8 } else { 0_u8 }.to_be_bytes().to_vec())
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        if self { 1_u8 } else { 0_u8 }.to_be_bytes().to_vec()
     }
 
     #[inline]
@@ -464,8 +562,14 @@ impl Storable for bool {
 }
 
 impl<const N: usize> Storable for [u8; N] {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(&self[..])
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_vec()
     }
 
     #[inline]
@@ -483,8 +587,14 @@ impl<const N: usize> Storable for [u8; N] {
 }
 
 impl<T: Storable> Storable for Reverse<T> {
+    #[inline]
     fn to_bytes(&self) -> Cow<[u8]> {
         self.0.to_bytes()
+    }
+
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.0.into_bytes()
     }
 
     #[inline]
@@ -504,6 +614,17 @@ impl<T: Storable> Storable for Option<T> {
                 Cow::Owned(bytes)
             }
             None => Cow::Borrowed(&[0]),
+        }
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        match self {
+            Some(t) => {
+                let mut bytes = t.into_bytes();
+                bytes.push(1);
+                bytes
+            }
+            None => vec![0],
         }
     }
 
@@ -539,6 +660,10 @@ impl<T: Storable> Storable for Option<T> {
 impl Storable for Principal {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Borrowed(self.as_slice())
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        self.as_slice().to_vec()
     }
 
     #[inline]
