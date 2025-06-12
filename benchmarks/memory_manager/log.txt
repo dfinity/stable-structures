@@ -1,20 +1,44 @@
 ---------------------------------------------------
 
+Benchmark: memory_manager_baseline
+  total:
+    instructions: 1.18 B (no change)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 8000 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: memory_manager_overhead
+  total:
+    instructions: 1.18 B (no change)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 8320 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: memory_manager_grow
+  total:
+    instructions: 347.43 M (no change)
+    heap_increase: 2 pages (no change)
+    stable_memory_increase: 32.00 K pages (no change)
+
+---------------------------------------------------
+
 Summary:
   instructions:
-    status:   No significant changes detected 👍
+    status:   No significant changes 👍
     counts:   [total 3 | regressed 0 | improved 0 | new 0 | unchanged 3]
     change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
     change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
 
   heap_increase:
-    status:   No significant changes detected 👍
+    status:   No significant changes 👍
     counts:   [total 3 | regressed 0 | improved 0 | new 0 | unchanged 3]
     change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
     change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
 
   stable_memory_increase:
-    status:   No significant changes detected 👍
+    status:   No significant changes 👍
     counts:   [total 3 | regressed 0 | improved 0 | new 0 | unchanged 3]
     change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
     change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]

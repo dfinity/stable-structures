@@ -1,20 +1,2300 @@
 ---------------------------------------------------
 
+Benchmark: btreemap_v2_insert_blob_4_128
+  total:
+    instructions: 416.77 M (0.80%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 13 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_8_128
+  total:
+    instructions: 468.15 M (0.41%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 20 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_16_128
+  total:
+    instructions: 495.69 M (-0.49%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 24 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_128
+  total:
+    instructions: 551.94 M (regressed by 3.64%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 28 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_64_128
+  total:
+    instructions: 670.23 M (improved by 14.18%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 34 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_128_128
+  total:
+    instructions: 1.19 B (regressed by 4.61%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 46 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_256_128
+  total:
+    instructions: 1.80 B (regressed by 6.49%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 67 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_512_128
+  total:
+    instructions: 3.05 B (regressed by 6.62%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 111 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_1024_128
+  total:
+    instructions: 5.50 B (regressed by 7.70%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 196 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_4
+  total:
+    instructions: 517.26 M (regressed by 3.44%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 8 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_8
+  total:
+    instructions: 525.59 M (regressed by 3.63%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 9 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_16
+  total:
+    instructions: 526.88 M (regressed by 2.92%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 11 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_32
+  total:
+    instructions: 536.93 M (regressed by 3.76%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 13 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_64
+  total:
+    instructions: 543.10 M (regressed by 3.85%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 18 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_256
+  total:
+    instructions: 580.54 M (regressed by 2.97%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 49 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_512
+  total:
+    instructions: 619.39 M (regressed by 3.06%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 91 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob_32_1024
+  total:
+    instructions: 711.85 M (regressed by 3.08%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 173 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_4_128
+  total:
+    instructions: 619.76 M (1.31%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 16 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_8_128
+  total:
+    instructions: 680.10 M (1.55%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 23 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_16_128
+  total:
+    instructions: 723.41 M (regressed by 2.34%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 31 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_128
+  total:
+    instructions: 768.26 M (0.37%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 33 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_64_128
+  total:
+    instructions: 855.97 M (improved by 3.22%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 41 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_128_128
+  total:
+    instructions: 1.01 B (improved by 7.79%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 51 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_256_128
+  total:
+    instructions: 1.40 B (improved by 7.52%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 71 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_512_128
+  total:
+    instructions: 1.85 B (improved by 13.16%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 112 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_1024_128
+  total:
+    instructions: 2.74 B (improved by 17.73%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 193 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_4
+  total:
+    instructions: 673.50 M (1.51%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 20 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_8
+  total:
+    instructions: 672.53 M (1.40%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 20 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_16
+  total:
+    instructions: 677.66 M (1.68%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 20 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_32
+  total:
+    instructions: 673.50 M (0.62%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 20 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_64
+  total:
+    instructions: 706.18 M (1.54%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 24 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_256
+  total:
+    instructions: 884.42 M (-1.17%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 54 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_512
+  total:
+    instructions: 998.46 M (-1.52%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 91 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec_32_1024
+  total:
+    instructions: 1.22 B (-0.52%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 171 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_u64_u64
+  total:
+    instructions: 427.78 M (-1.50%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 6 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_u64_blob8
+  total:
+    instructions: 419.63 M (-1.36%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 5 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_blob8_u64
+  total:
+    instructions: 445.55 M (0.31%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 4 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_u64_vec8
+  total:
+    instructions: 427.00 M (-1.31%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 21 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_vec8_u64
+  total:
+    instructions: 600.79 M (regressed by 2.71%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 16 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_insert_u64_u64
+  total:
+    instructions: 547.56 M (improved by 2.50%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_insert_u64_blob512
+  total:
+    instructions: 634.31 M (improved by 2.08%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_insert_blob512_u64
+  total:
+    instructions: 3.15 B (regressed by 6.23%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_insert_u64_vec512
+  total:
+    instructions: 875.57 M (improved by 2.86%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_insert_vec512_u64
+  total:
+    instructions: 1.96 B (improved by 12.40%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_insert_10mib_values
+  total:
+    instructions: 5.26 B (-0.07%) (change within noise threshold)
+    heap_increase: 322 pages (no change)
+    stable_memory_increase: 3613 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_4_128
+  total:
+    instructions: 464.43 M (1.11%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_8_128
+  total:
+    instructions: 614.72 M (0.20%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_16_128
+  total:
+    instructions: 680.21 M (-0.89%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_128
+  total:
+    instructions: 762.96 M (regressed by 3.45%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_64_128
+  total:
+    instructions: 925.86 M (improved by 9.80%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_128_128
+  total:
+    instructions: 1.61 B (regressed by 9.15%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_256_128
+  total:
+    instructions: 2.44 B (regressed by 10.73%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_512_128
+  total:
+    instructions: 4.09 B (regressed by 13.32%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_1024_128
+  total:
+    instructions: 7.38 B (regressed by 13.87%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_4
+  total:
+    instructions: 712.64 M (regressed by 3.92%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_8
+  total:
+    instructions: 712.28 M (regressed by 3.79%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_16
+  total:
+    instructions: 716.73 M (regressed by 3.34%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_32
+  total:
+    instructions: 727.48 M (regressed by 3.58%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_64
+  total:
+    instructions: 754.17 M (regressed by 3.80%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_256
+  total:
+    instructions: 799.33 M (regressed by 3.49%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_512
+  total:
+    instructions: 872.04 M (regressed by 3.27%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob_32_1024
+  total:
+    instructions: 998.59 M (regressed by 2.71%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_4_128
+  total:
+    instructions: 668.64 M (regressed by 2.31%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_8_128
+  total:
+    instructions: 831.17 M (0.67%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_16_128
+  total:
+    instructions: 926.96 M (1.41%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_128
+  total:
+    instructions: 1.04 B (regressed by 2.12%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_64_128
+  total:
+    instructions: 1.19 B (0.45%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_128_128
+  total:
+    instructions: 1.42 B (improved by 2.76%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_256_128
+  total:
+    instructions: 2.22 B (improved by 4.53%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_512_128
+  total:
+    instructions: 3.05 B (improved by 6.89%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_1024_128
+  total:
+    instructions: 4.44 B (improved by 11.75%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_4
+  total:
+    instructions: 875.84 M (regressed by 3.56%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_8
+  total:
+    instructions: 869.70 M (regressed by 3.62%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_16
+  total:
+    instructions: 885.75 M (regressed by 5.37%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_32
+  total:
+    instructions: 879.00 M (regressed by 3.76%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_64
+  total:
+    instructions: 981.82 M (regressed by 5.57%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_256
+  total:
+    instructions: 1.24 B (0.68%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_512
+  total:
+    instructions: 1.40 B (0.06%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec_32_1024
+  total:
+    instructions: 1.69 B (0.56%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_u64_u64
+  total:
+    instructions: 612.37 M (-1.94%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_u64_blob8
+  total:
+    instructions: 591.29 M (-1.90%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_blob8_u64
+  total:
+    instructions: 596.92 M (0.69%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_u64_vec8
+  total:
+    instructions: 596.86 M (-1.94%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_vec8_u64
+  total:
+    instructions: 768.23 M (1.64%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_remove_u64_u64
+  total:
+    instructions: 783.43 M (improved by 3.18%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_remove_u64_blob512
+  total:
+    instructions: 927.13 M (improved by 2.32%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_remove_blob512_u64
+  total:
+    instructions: 4.35 B (regressed by 12.87%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_remove_u64_vec512
+  total:
+    instructions: 1.25 B (improved by 3.23%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_remove_vec512_u64
+  total:
+    instructions: 3.08 B (improved by 7.23%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_remove_10mib_values
+  total:
+    instructions: 4.75 B (improved by 15.07%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 657 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_4_128
+  total:
+    instructions: 264.26 M (regressed by 2.75%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_8_128
+  total:
+    instructions: 287.80 M (regressed by 2.18%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_16_128
+  total:
+    instructions: 314.41 M (-0.94%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_128
+  total:
+    instructions: 349.14 M (0.93%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_64_128
+  total:
+    instructions: 436.96 M (improved by 27.39%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_128_128
+  total:
+    instructions: 866.44 M (improved by 8.53%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_256_128
+  total:
+    instructions: 1.36 B (improved by 9.45%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_512_128
+  total:
+    instructions: 2.37 B (improved by 11.01%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_1024_128
+  total:
+    instructions: 4.43 B (improved by 10.67%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_4
+  total:
+    instructions: 340.41 M (-0.90%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_8
+  total:
+    instructions: 343.07 M (-0.66%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_16
+  total:
+    instructions: 338.38 M (improved by 2.48%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_32
+  total:
+    instructions: 350.10 M (0.34%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_64
+  total:
+    instructions: 346.80 M (-0.10%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_256
+  total:
+    instructions: 348.74 M (-0.82%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_512
+  total:
+    instructions: 347.64 M (-0.38%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob_32_1024
+  total:
+    instructions: 354.11 M (0.09%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_4_128
+  total:
+    instructions: 421.11 M (regressed by 3.48%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_8_128
+  total:
+    instructions: 410.40 M (regressed by 3.00%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_16_128
+  total:
+    instructions: 456.73 M (regressed by 3.75%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_128
+  total:
+    instructions: 437.33 M (improved by 12.32%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_64_128
+  total:
+    instructions: 514.95 M (improved by 15.05%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_128_128
+  total:
+    instructions: 583.90 M (improved by 17.86%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_256_128
+  total:
+    instructions: 912.19 M (improved by 26.05%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_512_128
+  total:
+    instructions: 1.26 B (improved by 30.86%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_1024_128
+  total:
+    instructions: 1.84 B (improved by 37.00%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_4
+  total:
+    instructions: 374.92 M (improved by 9.59%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_8
+  total:
+    instructions: 367.11 M (improved by 11.47%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_16
+  total:
+    instructions: 381.66 M (improved by 8.37%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_32
+  total:
+    instructions: 370.07 M (improved by 11.17%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_64
+  total:
+    instructions: 414.39 M (improved by 12.18%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_256
+  total:
+    instructions: 457.03 M (improved by 15.35%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_512
+  total:
+    instructions: 480.05 M (improved by 14.13%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec_32_1024
+  total:
+    instructions: 552.83 M (improved by 8.98%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_u64_u64
+  total:
+    instructions: 243.86 M (improved by 2.12%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_u64_blob8
+  total:
+    instructions: 237.24 M (improved by 3.25%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_blob8_u64
+  total:
+    instructions: 305.72 M (regressed by 2.86%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_u64_vec8
+  total:
+    instructions: 237.99 M (improved by 3.24%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_vec8_u64
+  total:
+    instructions: 388.75 M (regressed by 3.27%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_get_u64_u64
+  total:
+    instructions: 320.42 M (improved by 2.76%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_get_u64_blob512
+  total:
+    instructions: 320.42 M (improved by 2.19%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_get_blob512_u64
+  total:
+    instructions: 2.46 B (improved by 10.91%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_get_u64_vec512
+  total:
+    instructions: 416.74 M (-1.05%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_get_vec512_u64
+  total:
+    instructions: 1.27 B (improved by 29.06%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_get_10mib_values
+  total:
+    instructions: 388.59 M (improved by 68.47%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_4_128
+  total:
+    instructions: 253.35 M (-1.49%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_8_128
+  total:
+    instructions: 275.82 M (improved by 2.08%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_16_128
+  total:
+    instructions: 301.68 M (improved by 4.95%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_128
+  total:
+    instructions: 335.86 M (improved by 2.91%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_64_128
+  total:
+    instructions: 414.36 M (improved by 31.15%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_128_128
+  total:
+    instructions: 833.91 M (improved by 11.96%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_256_128
+  total:
+    instructions: 1.32 B (improved by 12.46%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_512_128
+  total:
+    instructions: 2.29 B (improved by 13.88%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_1024_128
+  total:
+    instructions: 4.29 B (improved by 13.46%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_4
+  total:
+    instructions: 332.34 M (improved by 3.25%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_8
+  total:
+    instructions: 334.58 M (improved by 3.12%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_16
+  total:
+    instructions: 328.81 M (improved by 5.24%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_32
+  total:
+    instructions: 339.85 M (improved by 2.60%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_64
+  total:
+    instructions: 334.86 M (improved by 3.54%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_256
+  total:
+    instructions: 334.43 M (improved by 4.88%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_512
+  total:
+    instructions: 331.70 M (improved by 4.95%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob_32_1024
+  total:
+    instructions: 335.47 M (improved by 5.18%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_4_128
+  total:
+    instructions: 413.00 M (1.49%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_8_128
+  total:
+    instructions: 402.31 M (0.97%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_16_128
+  total:
+    instructions: 448.38 M (1.85%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_128
+  total:
+    instructions: 428.71 M (improved by 14.05%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_64_128
+  total:
+    instructions: 506.20 M (improved by 16.49%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_128_128
+  total:
+    instructions: 574.28 M (improved by 19.21%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_256_128
+  total:
+    instructions: 902.32 M (improved by 26.85%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_512_128
+  total:
+    instructions: 1.25 B (improved by 31.42%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_1024_128
+  total:
+    instructions: 1.82 B (improved by 37.58%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_4
+  total:
+    instructions: 368.45 M (improved by 11.15%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_8
+  total:
+    instructions: 360.60 M (improved by 13.04%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_16
+  total:
+    instructions: 375.07 M (improved by 9.95%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_32
+  total:
+    instructions: 363.35 M (improved by 12.78%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_64
+  total:
+    instructions: 407.45 M (improved by 13.65%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_256
+  total:
+    instructions: 441.72 M (improved by 18.18%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_512
+  total:
+    instructions: 460.61 M (improved by 17.61%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec_32_1024
+  total:
+    instructions: 514.20 M (improved by 15.34%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_u64_u64
+  total:
+    instructions: 233.05 M (improved by 6.44%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_u64_blob8
+  total:
+    instructions: 227.93 M (improved by 7.02%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_blob8_u64
+  total:
+    instructions: 284.73 M (improved by 4.21%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_u64_vec8
+  total:
+    instructions: 227.93 M (improved by 7.31%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_vec8_u64
+  total:
+    instructions: 380.70 M (1.13%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_contains_u64_u64
+  total:
+    instructions: 309.49 M (improved by 6.08%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_contains_u64_blob512
+  total:
+    instructions: 304.79 M (improved by 6.96%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_contains_blob512_u64
+  total:
+    instructions: 2.38 B (improved by 13.98%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_contains_u64_vec512
+  total:
+    instructions: 393.00 M (improved by 6.69%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_mem_manager_contains_vec512_u64
+  total:
+    instructions: 1.23 B (improved by 31.34%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_contains_10mib_values
+  total:
+    instructions: 142.21 M (improved by 88.46%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_4_128
+  total:
+    instructions: 381.50 M (1.80%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_8_128
+  total:
+    instructions: 621.63 M (0.99%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_16_128
+  total:
+    instructions: 759.92 M (-0.30%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_128
+  total:
+    instructions: 881.42 M (-0.02%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_64_128
+  total:
+    instructions: 1.05 B (improved by 21.20%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_128_128
+  total:
+    instructions: 1.85 B (improved by 8.23%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_256_128
+  total:
+    instructions: 2.78 B (improved by 10.17%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_512_128
+  total:
+    instructions: 4.63 B (improved by 10.52%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_1024_128
+  total:
+    instructions: 8.41 B (improved by 10.59%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_4
+  total:
+    instructions: 799.10 M (-1.01%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_8
+  total:
+    instructions: 817.72 M (-0.72%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_16
+  total:
+    instructions: 816.20 M (-1.07%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_32
+  total:
+    instructions: 830.06 M (-0.80%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_64
+  total:
+    instructions: 839.45 M (-0.52%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_256
+  total:
+    instructions: 909.76 M (-0.32%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_512
+  total:
+    instructions: 974.15 M (-0.44%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob_32_1024
+  total:
+    instructions: 1.14 B (-0.04%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_4_128
+  total:
+    instructions: 548.66 M (1.56%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_8_128
+  total:
+    instructions: 862.89 M (1.55%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_16_128
+  total:
+    instructions: 1.04 B (1.17%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_128
+  total:
+    instructions: 1.10 B (improved by 8.82%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_64_128
+  total:
+    instructions: 1.24 B (improved by 11.77%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_128_128
+  total:
+    instructions: 1.50 B (improved by 17.50%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_256_128
+  total:
+    instructions: 2.00 B (improved by 20.98%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_512_128
+  total:
+    instructions: 2.69 B (improved by 25.37%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_1024_128
+  total:
+    instructions: 4.02 B (improved by 30.36%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_4
+  total:
+    instructions: 940.98 M (improved by 9.77%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_8
+  total:
+    instructions: 951.91 M (improved by 9.76%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_16
+  total:
+    instructions: 952.54 M (improved by 8.75%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_32
+  total:
+    instructions: 948.69 M (improved by 10.51%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_64
+  total:
+    instructions: 990.00 M (improved by 9.56%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_256
+  total:
+    instructions: 1.22 B (improved by 8.24%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_512
+  total:
+    instructions: 1.37 B (improved by 8.31%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec_32_1024
+  total:
+    instructions: 1.69 B (improved by 7.40%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_u64_u64
+  total:
+    instructions: 711.28 M (-1.45%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_u64_blob8
+  total:
+    instructions: 699.80 M (-1.38%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_blob8_u64
+  total:
+    instructions: 617.55 M (0.80%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_u64_vec8
+  total:
+    instructions: 702.35 M (-1.62%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_first_vec8_u64
+  total:
+    instructions: 799.66 M (1.73%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_4_128
+  total:
+    instructions: 367.47 M (0.29%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_8_128
+  total:
+    instructions: 615.78 M (0.07%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_16_128
+  total:
+    instructions: 733.63 M (-1.32%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_128
+  total:
+    instructions: 846.62 M (-1.51%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_64_128
+  total:
+    instructions: 1.02 B (improved by 22.31%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_128_128
+  total:
+    instructions: 1.78 B (improved by 9.51%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_256_128
+  total:
+    instructions: 2.69 B (improved by 11.10%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_512_128
+  total:
+    instructions: 4.46 B (improved by 11.75%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_1024_128
+  total:
+    instructions: 8.07 B (improved by 12.47%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_4
+  total:
+    instructions: 776.95 M (improved by 2.02%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_8
+  total:
+    instructions: 790.95 M (-1.51%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_16
+  total:
+    instructions: 789.99 M (-1.73%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_32
+  total:
+    instructions: 798.91 M (improved by 2.08%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_64
+  total:
+    instructions: 813.85 M (-1.44%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_256
+  total:
+    instructions: 878.91 M (-1.45%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_512
+  total:
+    instructions: 948.84 M (-1.20%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob_32_1024
+  total:
+    instructions: 1.10 B (-1.46%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_4_128
+  total:
+    instructions: 534.27 M (0.55%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_8_128
+  total:
+    instructions: 862.57 M (0.61%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_16_128
+  total:
+    instructions: 1.02 B (0.45%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_128
+  total:
+    instructions: 1.08 B (improved by 10.84%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_64_128
+  total:
+    instructions: 1.23 B (improved by 13.44%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_128_128
+  total:
+    instructions: 1.51 B (improved by 17.83%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_256_128
+  total:
+    instructions: 2.07 B (improved by 20.26%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_512_128
+  total:
+    instructions: 2.79 B (improved by 25.16%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_1024_128
+  total:
+    instructions: 4.24 B (improved by 29.61%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_4
+  total:
+    instructions: 921.40 M (improved by 11.51%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_8
+  total:
+    instructions: 925.01 M (improved by 11.32%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_16
+  total:
+    instructions: 925.17 M (improved by 10.42%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_32
+  total:
+    instructions: 925.76 M (improved by 11.71%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_64
+  total:
+    instructions: 968.55 M (improved by 11.09%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_256
+  total:
+    instructions: 1.20 B (improved by 9.89%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_512
+  total:
+    instructions: 1.36 B (improved by 9.37%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec_32_1024
+  total:
+    instructions: 1.66 B (improved by 8.56%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_u64_u64
+  total:
+    instructions: 689.26 M (improved by 2.79%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_u64_blob8
+  total:
+    instructions: 678.34 M (improved by 2.71%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_blob8_u64
+  total:
+    instructions: 595.85 M (-0.15%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_u64_vec8
+  total:
+    instructions: 680.73 M (improved by 2.79%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_pop_last_vec8_u64
+  total:
+    instructions: 774.01 M (0.86%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_iter_1k_0b
+  total:
+    instructions: 1.46 M (improved by 2.50%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_iter_rev_1k_0b
+  total:
+    instructions: 1.46 M (improved by 2.60%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_keys_1k_0b
+  total:
+    instructions: 1.19 M (regressed by 26.10%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_keys_rev_1k_0b
+  total:
+    instructions: 1.19 M (regressed by 23.83%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_values_1k_0b
+  total:
+    instructions: 1.43 M (improved by 3.85%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_values_rev_1k_0b
+  total:
+    instructions: 1.44 M (improved by 3.91%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_iter_1k_10kib
+  total:
+    instructions: 56.82 M (-0.50%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_iter_rev_1k_10kib
+  total:
+    instructions: 56.80 M (-0.50%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_keys_1k_10kib
+  total:
+    instructions: 2.60 M (regressed by 8.74%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_keys_rev_1k_10kib
+  total:
+    instructions: 2.58 M (regressed by 8.02%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_values_1k_10kib
+  total:
+    instructions: 56.80 M (-0.53%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_values_rev_1k_10kib
+  total:
+    instructions: 56.77 M (-0.53%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_iter_20_10mib
+  total:
+    instructions: 1.10 B (-0.06%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_iter_rev_20_10mib
+  total:
+    instructions: 1.10 B (-0.06%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_keys_20_10mib
+  total:
+    instructions: 18.47 M (improved by 3.23%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_keys_rev_20_10mib
+  total:
+    instructions: 18.47 M (improved by 3.23%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_values_20_10mib
+  total:
+    instructions: 1.10 B (-0.06%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_scan_values_rev_20_10mib
+  total:
+    instructions: 1.10 B (-0.06%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_key_sum_1k_0b
+  total:
+    instructions: 17.57 K (0.89%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_key_sum_1k_10kib
+  total:
+    instructions: 57.02 M (-0.48%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_key_sum_20_10mib
+  total:
+    instructions: 1.11 B (-0.06%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_value_sum_1k_0b
+  total:
+    instructions: 17.58 K (0.89%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_value_sum_1k_10kib
+  total:
+    instructions: 57.03 M (-0.48%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_value_sum_20_10mib
+  total:
+    instructions: 1.11 B (-0.06%) (change within noise threshold)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_count_1k_0b
+  total:
+    instructions: 17.32 K (regressed by 2.61%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_count_1k_10kib
+  total:
+    instructions: 2.65 M (regressed by 7.17%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: btreemap_v2_range_count_20_10mib
+  total:
+    instructions: 20.58 M (improved by 2.91%)
+    heap_increase: 0 pages (no change)
+    stable_memory_increase: 0 pages (no change)
+
+---------------------------------------------------
+
 Summary:
   instructions:
-    status:   Both regressions and improvements detected! 🔴🟢
+    status:   Regressions and improvements 🔴🟢
     counts:   [total 285 | regressed 50 | improved 138 | new 0 | unchanged 97]
     change:   [max +898.90M | p75 +4.12M | median -8.60M | p25 -99.99M | min -1.78B]
     change %: [max +26.10% | p75 +0.89% | median -1.62% | p25 -9.80% | min -88.46%]
 
   heap_increase:
-    status:   No significant changes detected 👍
+    status:   No significant changes 👍
     counts:   [total 285 | regressed 0 | improved 0 | new 0 | unchanged 285]
     change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
     change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
 
   stable_memory_increase:
-    status:   No significant changes detected 👍
+    status:   No significant changes 👍
     counts:   [total 285 | regressed 0 | improved 0 | new 0 | unchanged 285]
     change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
     change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]

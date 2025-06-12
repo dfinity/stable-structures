@@ -28,7 +28,7 @@ dependencies = [
  "candid",
  "ic-cdk 0.12.3",
  "ic-cdk-macros 0.8.4",
- "ic-stable-structures 0.6.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ic-stable-structures",
  "maplit",
  "serde",
  "tiny-rng",
@@ -353,15 +353,6 @@ dependencies = [
  "proptest",
  "tempfile",
  "test-strategy",
-]
-
-[[package]]
-name = "ic-stable-structures"
-version = "0.6.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0f5684f577e0146738cd11afed789109c4f51ba963c75823c48c1501dc53278"
-dependencies = [
- "ic_principal",
 ]
 
 [[package]]
