@@ -114,8 +114,8 @@ Dependencies:
 
 ```toml
 [dependencies]
-ic-cdk = "0.6.8"
-ic-cdk-macros = "0.6.8"
+ic-cdk = "0.18.3"
+ic-cdk-macros = "0.18.3"
 ic-stable-structures = "0.5.6"
 ```
 

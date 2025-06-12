@@ -56,7 +56,7 @@ fn execute_task(scheduled_at: u64, now: u64) {
 fn reschedule() {
     if let Some(task_time) = TASKS.with(|t| t.borrow().peek()) {
         unsafe {
-            ic0::global_timer_set(task_time as i64);
+            ic0::global_timer_set(task_time as u64);
         }
     }
 }
