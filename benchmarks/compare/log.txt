@@ -50,7 +50,7 @@ Benchmark: read_chunks_stable_1m
 
 Benchmark: write_chunks_btreemap_1
   total:
-    instructions: 1.07 B (0.28%) (change within noise threshold)
+    instructions: 1.07 B (-0.00%) (change within noise threshold)
     heap_increase: 3233 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -58,7 +58,7 @@ Benchmark: write_chunks_btreemap_1
 
 Benchmark: write_chunks_btreemap_1k
   total:
-    instructions: 4.92 B (0.14%) (change within noise threshold)
+    instructions: 4.92 B (-0.01%) (change within noise threshold)
     heap_increase: 1604 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -66,7 +66,7 @@ Benchmark: write_chunks_btreemap_1k
 
 Benchmark: write_chunks_btreemap_1m
   total:
-    instructions: 90.64 B (-1.61%) (change within noise threshold)
+    instructions: 90.65 B (-1.54%) (change within noise threshold)
     heap_increase: 1892 pages (no change)
     stable_memory_increase: 3201 pages (no change)
 
@@ -74,7 +74,7 @@ Benchmark: write_chunks_btreemap_1m
 
 Benchmark: read_chunks_btreemap_1
   total:
-    instructions: 1.22 B (improved by 25.41%)
+    instructions: 1.22 B (improved by 25.60%)
     heap_increase: 3233 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -82,7 +82,7 @@ Benchmark: read_chunks_btreemap_1
 
 Benchmark: read_chunks_btreemap_1k
   total:
-    instructions: 5.42 B (improved by 7.08%)
+    instructions: 5.42 B (improved by 7.21%)
     heap_increase: 1604 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -90,7 +90,7 @@ Benchmark: read_chunks_btreemap_1k
 
 Benchmark: read_chunks_btreemap_1m
   total:
-    instructions: 134.58 B (improved by 2.15%)
+    instructions: 134.60 B (improved by 2.10%)
     heap_increase: 1892 pages (no change)
     stable_memory_increase: 3201 pages (no change)
 
@@ -98,7 +98,7 @@ Benchmark: read_chunks_btreemap_1m
 
 Benchmark: write_chunks_vec_1
   total:
-    instructions: 1.26 B (no change)
+    instructions: 1.26 B (-0.00%) (change within noise threshold)
     heap_increase: 3202 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -106,7 +106,7 @@ Benchmark: write_chunks_vec_1
 
 Benchmark: write_chunks_vec_1k
   total:
-    instructions: 1.27 B (no change)
+    instructions: 1.27 B (-0.00%) (change within noise threshold)
     heap_increase: 3200 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -114,7 +114,7 @@ Benchmark: write_chunks_vec_1k
 
 Benchmark: write_chunks_vec_1m
   total:
-    instructions: 3.71 B (no change)
+    instructions: 3.71 B (-0.00%) (change within noise threshold)
     heap_increase: 3784 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -122,7 +122,7 @@ Benchmark: write_chunks_vec_1m
 
 Benchmark: read_chunks_vec_1
   total:
-    instructions: 1.36 B (no change)
+    instructions: 1.36 B (0.00%) (change within noise threshold)
     heap_increase: 3202 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -130,7 +130,7 @@ Benchmark: read_chunks_vec_1
 
 Benchmark: read_chunks_vec_1k
   total:
-    instructions: 1.38 B (no change)
+    instructions: 1.38 B (0.00%) (change within noise threshold)
     heap_increase: 3200 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -138,7 +138,7 @@ Benchmark: read_chunks_vec_1k
 
 Benchmark: read_chunks_vec_1m
   total:
-    instructions: 4.72 B (no change)
+    instructions: 4.72 B (0.00%) (change within noise threshold)
     heap_increase: 3784 pages (no change)
     stable_memory_increase: 1665 pages (no change)
 
@@ -148,8 +148,8 @@ Summary:
   instructions:
     status:   Improvements detected 🟢
     counts:   [total 18 | regressed 0 | improved 3 | new 0 | unchanged 15]
-    change:   [max +7.05M | p75 0 | median 0 | p25 0 | min -2.96B]
-    change %: [max +0.28% | p75 0.00% | median 0.00% | p25 0.00% | min -25.41%]
+    change:   [max +11 | p75 0 | median -2 | p25 -245.41K | min -2.89B]
+    change %: [max 0.00% | p75 0.00% | median -0.00% | p25 -0.00% | min -25.60%]
 
   heap_increase:
     status:   No significant changes 👍
@@ -168,9 +168,9 @@ Summary:
 Only significant changes:
 | status | name                    | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
 |--------|-------------------------|-------|---------|---------|-------|--------|-------|---------|
-|   -    | read_chunks_btreemap_1m |       | 134.58B |  -2.15% | 1.89K |  0.00% | 3.20K |   0.00% |
-|   -    | read_chunks_btreemap_1k |       |   5.42B |  -7.08% | 1.60K |  0.00% | 1.67K |   0.00% |
-|   -    | read_chunks_btreemap_1  |       |   1.22B | -25.41% | 3.23K |  0.00% | 1.67K |   0.00% |
+|   -    | read_chunks_btreemap_1m |       | 134.60B |  -2.10% | 1.89K |  0.00% | 3.20K |   0.00% |
+|   -    | read_chunks_btreemap_1k |       |   5.42B |  -7.21% | 1.60K |  0.00% | 1.67K |   0.00% |
+|   -    | read_chunks_btreemap_1  |       |   1.22B | -25.60% | 3.23K |  0.00% | 1.67K |   0.00% |
 
 ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
 
