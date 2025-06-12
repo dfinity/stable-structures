@@ -9,28 +9,28 @@ benches:
   vec_get_blob_16:
     total:
       calls: 1
-      instructions: 6405945
+      instructions: 6345945
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_32:
     total:
       calls: 1
-      instructions: 7123504
+      instructions: 7063504
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_4:
     total:
       calls: 1
-      instructions: 4824326
+      instructions: 4804326
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_4_mem_manager:
     total:
       calls: 1
-      instructions: 7191676
+      instructions: 7171676
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -51,14 +51,14 @@ benches:
   vec_get_blob_8:
     total:
       calls: 1
-      instructions: 5723200
+      instructions: 5620868
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_u64:
     total:
       calls: 1
-      instructions: 4790305
+      instructions: 5270305
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
