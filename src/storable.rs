@@ -34,7 +34,7 @@ pub trait Storable {
         bytes
     }
 
-    /// Like `to_bytes_checked`, but checks that bytes conform to declared bounds.
+    /// Like `into_bytes`, but checks that bytes conform to declared bounds.
     fn into_bytes_checked(self) -> Vec<u8>
     where
         Self: Sized,
