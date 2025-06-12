@@ -1,0 +1,4 @@
+status,name,scope_calls,scope_calls Δ,scope_calls Δ%,instructions,instructions Δ,instructions Δ%,heap_increase,heap_increase Δ,heap_increase Δ%,stable_memory_increase,stable_memory_increase Δ,stable_memory_increase Δ%
+,memory_manager_baseline,,,,1176577076,0,0.00%,0,0,0.00%,8000,0,0.00%
+,memory_manager_grow,,,,347433966,0,0.00%,2,0,0.00%,32000,0,0.00%
+,memory_manager_overhead,,,,1181977502,0,0.00%,0,0,0.00%,8320,0,0.00%

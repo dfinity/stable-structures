@@ -1,0 +1,19 @@
+status,name,scope_calls,scope_calls Δ,scope_calls Δ%,instructions,instructions Δ,instructions Δ%,heap_increase,heap_increase Δ,heap_increase Δ%,stable_memory_increase,stable_memory_increase Δ,stable_memory_increase Δ%
+,read_chunks_btreemap_1,,,,1219162510,-419430992,-25.60%,3233,0,0.00%,1665,0,0.00%
+,read_chunks_btreemap_1k,,,,5415231039,-420740558,-7.21%,1604,0,0.00%,1665,0,0.00%
+,read_chunks_btreemap_1m,,,,134599901409,-2892357609,-2.10%,1892,0,0.00%,3201,0,0.00%
+,read_chunks_stable_1,,,,812767304,0,0.00%,1601,0,0.00%,1665,0,0.00%
+,read_chunks_stable_1k,,,,525926643,0,0.00%,1600,0,0.00%,1665,0,0.00%
+,read_chunks_stable_1m,,,,1307625777,0,0.00%,1892,0,0.00%,1665,0,0.00%
+,read_chunks_vec_1,,,,1363286421,11,0.00%,3202,0,0.00%,1665,0,0.00%
+,read_chunks_vec_1k,,,,1378474867,11,0.00%,3200,0,0.00%,1665,0,0.00%
+,read_chunks_vec_1m,,,,4721968950,11,0.00%,3784,0,0.00%,1665,0,0.00%
+,write_chunks_btreemap_1,,,,1069802998,-33,-0.00%,3233,0,0.00%,1665,0,0.00%
+,write_chunks_btreemap_1k,,,,4915151136,-327197,-0.01%,1604,0,0.00%,1665,0,0.00%
+,write_chunks_btreemap_1m,,,,90653823620,-1421171132,-1.54%,1892,0,0.00%,3201,0,0.00%
+,write_chunks_stable_1,,,,418914504,0,0.00%,1601,0,0.00%,1665,0,0.00%
+,write_chunks_stable_1k,,,,420017246,0,0.00%,1600,0,0.00%,1665,0,0.00%
+,write_chunks_stable_1m,,,,1076987527,0,0.00%,1892,0,0.00%,1665,0,0.00%
+,write_chunks_vec_1,,,,1257790953,-3,-0.00%,3202,0,0.00%,1665,0,0.00%
+,write_chunks_vec_1k,,,,1272012661,-3,-0.00%,3200,0,0.00%,1665,0,0.00%
+,write_chunks_vec_1m,,,,3712427298,-3,-0.00%,3784,0,0.00%,1665,0,0.00%

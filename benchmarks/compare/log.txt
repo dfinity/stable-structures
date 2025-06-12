@@ -1,0 +1,179 @@
+---------------------------------------------------
+
+Benchmark: write_chunks_stable_1
+  total:
+    instructions: 418.91 M (no change)
+    heap_increase: 1601 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: write_chunks_stable_1k
+  total:
+    instructions: 420.02 M (no change)
+    heap_increase: 1600 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: write_chunks_stable_1m
+  total:
+    instructions: 1.08 B (no change)
+    heap_increase: 1892 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_stable_1
+  total:
+    instructions: 812.77 M (no change)
+    heap_increase: 1601 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_stable_1k
+  total:
+    instructions: 525.93 M (no change)
+    heap_increase: 1600 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_stable_1m
+  total:
+    instructions: 1.31 B (no change)
+    heap_increase: 1892 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: write_chunks_btreemap_1
+  total:
+    instructions: 1.07 B (-0.00%) (change within noise threshold)
+    heap_increase: 3233 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: write_chunks_btreemap_1k
+  total:
+    instructions: 4.92 B (-0.01%) (change within noise threshold)
+    heap_increase: 1604 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: write_chunks_btreemap_1m
+  total:
+    instructions: 90.65 B (-1.54%) (change within noise threshold)
+    heap_increase: 1892 pages (no change)
+    stable_memory_increase: 3201 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_btreemap_1
+  total:
+    instructions: 1.22 B (improved by 25.60%)
+    heap_increase: 3233 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_btreemap_1k
+  total:
+    instructions: 5.42 B (improved by 7.21%)
+    heap_increase: 1604 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_btreemap_1m
+  total:
+    instructions: 134.60 B (improved by 2.10%)
+    heap_increase: 1892 pages (no change)
+    stable_memory_increase: 3201 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: write_chunks_vec_1
+  total:
+    instructions: 1.26 B (-0.00%) (change within noise threshold)
+    heap_increase: 3202 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: write_chunks_vec_1k
+  total:
+    instructions: 1.27 B (-0.00%) (change within noise threshold)
+    heap_increase: 3200 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: write_chunks_vec_1m
+  total:
+    instructions: 3.71 B (-0.00%) (change within noise threshold)
+    heap_increase: 3784 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_vec_1
+  total:
+    instructions: 1.36 B (0.00%) (change within noise threshold)
+    heap_increase: 3202 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_vec_1k
+  total:
+    instructions: 1.38 B (0.00%) (change within noise threshold)
+    heap_increase: 3200 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Benchmark: read_chunks_vec_1m
+  total:
+    instructions: 4.72 B (0.00%) (change within noise threshold)
+    heap_increase: 3784 pages (no change)
+    stable_memory_increase: 1665 pages (no change)
+
+---------------------------------------------------
+
+Summary:
+  instructions:
+    status:   Improvements detected 🟢
+    counts:   [total 18 | regressed 0 | improved 3 | new 0 | unchanged 15]
+    change:   [max +11 | p75 0 | median -2 | p25 -245.41K | min -2.89B]
+    change %: [max 0.00% | p75 0.00% | median -0.00% | p25 -0.00% | min -25.60%]
+
+  heap_increase:
+    status:   No significant changes 👍
+    counts:   [total 18 | regressed 0 | improved 0 | new 0 | unchanged 18]
+    change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
+    change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
+
+  stable_memory_increase:
+    status:   No significant changes 👍
+    counts:   [total 18 | regressed 0 | improved 0 | new 0 | unchanged 18]
+    change:   [max 0 | p75 0 | median 0 | p25 0 | min 0]
+    change %: [max 0.00% | p75 0.00% | median 0.00% | p25 0.00% | min 0.00%]
+
+---------------------------------------------------
+
+Only significant changes:
+| status | name                    | calls |     ins |  ins Δ% |    HI |  HI Δ% |   SMI |  SMI Δ% |
+|--------|-------------------------|-------|---------|---------|-------|--------|-------|---------|
+|   -    | read_chunks_btreemap_1m |       | 134.60B |  -2.10% | 1.89K |  0.00% | 3.20K |   0.00% |
+|   -    | read_chunks_btreemap_1k |       |   5.42B |  -7.21% | 1.60K |  0.00% | 1.67K |   0.00% |
+|   -    | read_chunks_btreemap_1  |       |   1.22B | -25.60% | 3.23K |  0.00% | 1.67K |   0.00% |
+
+ins = instructions, HI = heap_increase, SMI = stable_memory_increase, Δ% = percent change
+
+---------------------------------------------------
+CSV results saved to canbench_results.csv
+Successfully persisted results to canbench_results.yml
