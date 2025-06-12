@@ -345,6 +345,11 @@ impl Storable for Asset {
         Cow::Owned(bytes)
     }
 
+    fn into_bytes(self) -&gt; Vec&lt;u8&gt; {
+        let mut bytes = vec![];
+        ciborium::ser::into_writer(&amp;self, &amp;mut bytes).unwrap()
+    }
+
     fn from_bytes(bytes: std::borrow::Cow&lt;[u8]&gt;) -&gt; Self {
         ciborium::de::from_reader(&amp;*bytes).expect("deserialization must succeed.")
     }
