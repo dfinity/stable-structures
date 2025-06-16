@@ -1369,9 +1369,8 @@ mod test {
 
         // Insert keys and values.
         for i in 0..n {
-            let v = i.to_string();
-            stable.insert(i, v.clone());
-            std.insert(i, v);
+            stable.insert(i, format!("{i}"));
+            std.insert(i, format!("{i}"));
         }
 
         // Get and contains.
