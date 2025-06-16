@@ -1201,6 +1201,10 @@ where
     }
 
     /// **Deprecated**: use [`iter_from_below`] instead.
+    ///
+    /// This method is renamed for clarity. The name `iter_upper_bound` was misleading,
+    /// as it actually starts iterating from the largest element *below* the given bound,
+    /// not up to it. Use [`iter_from_below`] for a clearer, more accurate name.
     #[deprecated(note = "use `iter_from_below` instead")]
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
         self.iter_from_below(bound)
