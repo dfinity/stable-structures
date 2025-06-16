@@ -1,8 +1,8 @@
+use benchmarks::vec::BoundedVecN;
 use canbench_rs::{bench, bench_fn};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
-    storable::BoundedVecN,
     BTreeMap, DefaultMemoryImpl, Memory, Vec as StableVec,
 };
 
@@ -15,7 +15,7 @@ fn init_memory(id: u8) -> impl Memory {
 }
 
 fn ensure_memory_size(memory: &impl Memory, size: usize) {
-    let required = size.div_ceil(WASM_PAGE_SIZE_IN_BYTES) as u64;
+    let required = size.div_ceil(WASM_PAGE_SIZE_IN_BYTES as usize) as u64;
     if memory.size() < required {
         memory.grow(required - memory.size());
     }

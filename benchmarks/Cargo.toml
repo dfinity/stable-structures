@@ -34,3 +34,7 @@ path = "vec/src/main.rs"
 [[bin]]
 name = "compare"
 path = "compare/src/main.rs"
+
+[[bin]]
+name = "btreeset"
+path = "btreeset/src/main.rs"

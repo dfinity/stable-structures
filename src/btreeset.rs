@@ -112,6 +112,10 @@ where
 ///         Cow::Owned(self.id.to_le_bytes().to_vec())
 ///     }
 ///
+///     fn into_bytes(self) -> Vec<u8> {
+///         self.id.to_le_bytes().to_vec()
+///     }
+///
 ///     fn from_bytes(bytes: Cow<[u8]>) -> Self {
 ///         let id = u64::from_le_bytes(bytes.as_ref().try_into().unwrap());
 ///         CustomType { id }

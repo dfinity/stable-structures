@@ -190,11 +190,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
                     );
                     LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
                 } else {
-                    LazyKey::by_ref(key_offset)
+                    LazyKey::by_ref(key_offset, key_size)
                 };
 
                 offset += Bytes::from(key_size);
-                entries.push((key, LazyValue::by_ref(Bytes::from(0_u64))));
+                entries.push((key, LazyValue::by_ref(Bytes::from(0_u64), 0)));
             }
         }
 
@@ -202,10 +202,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         {
             #[cfg(feature = "bench_scope")]
             let _p = canbench_rs::bench_scope("node_load_v2_values"); // May add significant overhead.
+                                                                      // Load the values
             for (_key, value) in entries.iter_mut() {
                 // Load the values lazily.
-                *value = LazyValue::by_ref(Bytes::from(offset.get()));
-                let value_size = read_u32(&reader, offset) as usize;
+                let value_size = read_u32(&reader, offset);
+                *value = LazyValue::by_ref(Bytes::from(offset.get()), value_size);
                 offset += U32_SIZE + Bytes::from(value_size as u64);
             }
         }
