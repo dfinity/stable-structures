@@ -67,7 +67,6 @@ fn set_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
     });
 }
 
-
 // Given an operation, executes it on the given stable btreeset and standard btreeset, verifying
 // that the result of the operation is equal in both btrees.
 fn execute_operation<M: Memory>(
