@@ -1190,8 +1190,8 @@ where
 
     /// Returns an iterator starting just before the given key.
     ///
-    /// It finds the largest key strictly less than `bound` and starts iteration from there.
-    /// Useful for stepping back one element and iterating forward, when `range(bound..)` would skip it.
+    /// Finds the largest key strictly less than `bound` and starts from it.
+    /// Useful when `range(bound..)` skips the previous element.
     ///
     /// Returns an empty iterator if no smaller key exists.
     pub fn iter_from_prev_key(&self, bound: &K) -> Iter<K, V, M> {
@@ -1204,11 +1204,12 @@ where
 
     /// **Deprecated**: use [`iter_from_prev_key`] instead.
     ///
-    /// The name `iter_upper_bound` was misleading, it suggested an inclusive upper bound,
-    /// but the method actually starts from the *largest key strictly less than* the given bound.
+    /// The name `iter_upper_bound` was misleading — it suggested an inclusive
+    /// upper bound. In reality, it starts from the largest key strictly less
+    /// than the given bound.
     ///
-    /// The new name [`iter_from_prev_key`] clearly reflects this behavior,
-    /// making the code easier to understand.
+    /// The new name, [`iter_from_prev_key`], better reflects this behavior and
+    /// improves code clarity.
     #[deprecated(note = "use `iter_from_prev_key` instead")]
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
         self.iter_from_prev_key(bound)
