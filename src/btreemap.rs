@@ -1361,40 +1361,38 @@ mod test {
     }
 
     #[test]
-    fn btreemap_api_conformance() {
+    fn api_conformance() {
         let mem = make_memory();
         let mut stable = BTreeMap::new(mem);
         let mut std = std::collections::BTreeMap::new();
+        let n = 10_u32;
 
         // Insert.
-        let (key, value) = (1_u32, "one".to_string());
-        stable.insert(key, value.clone());
-        std.insert(key, value.clone());
+        for i in 0..n {
+            stable.insert(i, format!("{i}"));
+            std.insert(i, format!("{i}"));
+        }
 
         // Get.
         // Note: stable returns by value, std returns by reference.
-        assert_eq!(stable.get(&key), std.get(&key).cloned());
+        assert_eq!(stable.get(&1), std.get(&1).cloned());
 
         // Contains key.
-        assert_eq!(stable.contains_key(&key), std.contains_key(&key));
+        assert_eq!(stable.contains_key(&1), std.contains_key(&1));
 
         // Remove.
-        assert_eq!(stable.remove(&key), std.remove(&key));
+        assert_eq!(stable.remove(&1), std.remove(&1));
 
         // Length.
         // Note: stable returns u64, std returns usize.
         assert_eq!(stable.len(), std.len() as u64);
 
-        // Is empty.
-        assert_eq!(stable.is_empty(), std.is_empty());
-
         // Clear
-        let (key, value) = (2_u32, "two".to_string());
-        stable.insert(key, value.clone());
-        std.insert(key, value.clone());
         stable.clear_new(); // Note: clear_new is the new method.
         std.clear();
         assert_eq!(stable.len(), std.len() as u64);
+
+        // Is empty.
         assert_eq!(stable.is_empty(), std.is_empty());
     }
 
