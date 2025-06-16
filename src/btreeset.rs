@@ -510,11 +510,13 @@ where
         Iter::new(self.map.range(key_range))
     }
 
-    /// Returns an iterator pointing to the first element strictly below the given bound.
-    /// Returns an empty iterator if there are no keys strictly below the given bound.
+    /// Returns an iterator starting from the largest element strictly less than the given bound.
+    /// The iterator includes that element and continues forward.
+    ///
+    /// Returns an empty iterator if there are no elements strictly below the given bound.
     ///
     /// # Complexity
-    /// O(log n) for creating the iterator, where n is the number of elements in the set.
+    /// O(log n) to find the start point, where n is the number of elements.
     ///
     /// # Example
     ///
@@ -528,11 +530,11 @@ where
     /// set.insert(2);
     /// set.insert(3);
     ///
-    /// let upper_bound: Option<u64> = set.iter_upper_bound(&3).next();
-    /// assert_eq!(upper_bound, Some(2));
+    /// let mut iter = set.iter_from_below(&3);
+    /// assert_eq!(iter.next(), Some(2));
     /// ```
-    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, M> {
-        Iter::new(self.map.iter_upper_bound(bound))
+    pub fn iter_from_below(&self, bound: &K) -> Iter<K, M> {
+        Iter::new(self.map.iter_from_below(bound))
     }
 
     /// Returns an iterator over the union of this set and another.
@@ -1111,24 +1113,24 @@ mod test {
     }
 
     #[test]
-    fn test_iter_upper_bound() {
+    fn test_iter_from_below() {
         let mem = make_memory();
         let mut btreeset = BTreeSet::new(mem);
 
         for i in 0u32..100 {
             btreeset.insert(i);
 
-            // Test that `iter_upper_bound` returns the largest element strictly below the bound.
+            // Test that `iter_from_below` returns the largest element strictly below the bound.
             for j in 1u32..=i {
                 assert_eq!(
-                    btreeset.iter_upper_bound(&(j + 1)).next(),
+                    btreeset.iter_from_below(&(j + 1)).next(),
                     Some(j),
                     "failed to get an upper bound for {}",
                     j + 1
                 );
             }
             assert_eq!(
-                btreeset.iter_upper_bound(&0).next(),
+                btreeset.iter_from_below(&0).next(),
                 None,
                 "0 must not have an upper bound"
             );
@@ -1235,7 +1237,7 @@ mod test {
     }
 
     #[test]
-    fn test_iter_upper_bound_large_set() {
+    fn test_iter_from_below_large_set() {
         let mem = make_memory();
         let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
 
@@ -1243,9 +1245,9 @@ mod test {
             btreeset.insert(i);
         }
 
-        assert_eq!(btreeset.iter_upper_bound(&500).next(), Some(499));
-        assert_eq!(btreeset.iter_upper_bound(&0).next(), None);
-        assert_eq!(btreeset.iter_upper_bound(&1000).next(), Some(999));
+        assert_eq!(btreeset.iter_from_below(&500).next(), Some(499));
+        assert_eq!(btreeset.iter_from_below(&0).next(), None);
+        assert_eq!(btreeset.iter_from_below(&1000).next(), Some(999));
     }
 
     #[test]
@@ -1305,11 +1307,11 @@ mod test {
     }
 
     #[test]
-    fn test_iter_upper_bound_empty() {
+    fn test_iter_from_below_empty() {
         let mem = make_memory();
         let btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
 
-        assert_eq!(btreeset.iter_upper_bound(&42u32).next(), None);
+        assert_eq!(btreeset.iter_from_below(&42u32).next(), None);
     }
 
     #[test]
@@ -1415,7 +1417,7 @@ mod test {
     }
 
     #[test]
-    fn test_iter_upper_bound_edge_cases() {
+    fn test_iter_from_below_edge_cases() {
         let mem = make_memory();
         let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
 
@@ -1423,9 +1425,9 @@ mod test {
             btreeset.insert(i);
         }
 
-        assert_eq!(btreeset.iter_upper_bound(&1).next(), None); // No element strictly below 1
-        assert_eq!(btreeset.iter_upper_bound(&5).next(), Some(4)); // Largest element below 5
-        assert_eq!(btreeset.iter_upper_bound(&11).next(), Some(10)); // Largest element below 11
+        assert_eq!(btreeset.iter_from_below(&1).next(), None); // No element strictly below 1
+        assert_eq!(btreeset.iter_from_below(&5).next(), Some(4)); // Largest element below 5
+        assert_eq!(btreeset.iter_from_below(&11).next(), Some(10)); // Largest element below 11
     }
 
     #[test]

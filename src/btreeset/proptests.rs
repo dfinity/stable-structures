@@ -68,12 +68,12 @@ fn set_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
 }
 
 #[proptest]
-fn set_upper_bound_iter(#[strategy(pvec(0u64..u64::MAX - 1, 10..100))] keys: Vec<u64>) {
+fn set_iter_from_below(#[strategy(pvec(0u64..u64::MAX - 1, 10..100))] keys: Vec<u64>) {
     crate::btreeset::test::run_btree_test(|mut set| {
         for k in keys.iter() {
             set.insert(*k);
 
-            prop_assert_eq!(Some(*k), set.iter_upper_bound(&(k + 1)).next());
+            prop_assert_eq!(Some(*k), set.iter_from_below(&(k + 1)).next());
         }
 
         Ok(())

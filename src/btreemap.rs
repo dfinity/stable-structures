@@ -1188,14 +1188,24 @@ where
         self.range_internal(key_range).into()
     }
 
-    /// Returns an iterator pointing to the first element below the given bound.
-    /// Returns an empty iterator if there are no keys below the given bound.
-    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
-        if let Some((start_key, _)) = self.range(..bound).next_back() {
-            IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
-        } else {
-            IterInternal::null(self).into()
+    /// Returns an iterator starting from the largest key strictly less than the given bound.
+    /// The iterator includes that key and continues forward.
+    ///
+    /// Returns an empty iterator if no such key exists.
+    pub fn iter_from_below(&self, bound: &K) -> Iter<K, V, M> {
+        match self.range(..bound).next_back() {
+            Some((start_key, _)) => {
+                IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded))
+                    .into()
+            }
+            None => IterInternal::null(self).into(),
         }
+    }
+
+    /// **Deprecated**: use [`iter_from_below`] instead.
+    #[deprecated(note = "use `iter_from_below` instead")]
+    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
+        self.iter_from_below(bound)
     }
 
     /// Returns an iterator over the keys of the map.
@@ -1418,6 +1428,49 @@ mod test {
         let stable_last = stable.last_key_value();
         let std_last = std.last_key_value().map(|(k, v)| (*k, v.clone()));
         assert_eq!(stable_last, std_last);
+
+        // Pop first and last.
+        let stable_pop_first = stable.pop_first();
+        let std_pop_first = std.pop_first();
+        assert_eq!(stable_pop_first, std_pop_first);
+
+        let stable_pop_last = stable.pop_last();
+        let std_pop_last = std.pop_last();
+        assert_eq!(stable_pop_last, std_pop_last);
+
+        // Range.
+        let range_start = 3;
+        let range_end = 7;
+
+        let stable_range: Vec<_> = stable.range(range_start..range_end).collect();
+        let std_range: Vec<_> = std
+            .range(range_start..range_end)
+            .map(|(k, v)| (*k, v.clone()))
+            .collect();
+        assert_eq!(stable_range, std_range);
+
+        // keys_range
+        let stable_keys_range: Vec<_> = stable.keys_range(range_start..range_end).collect();
+        let std_keys_range: Vec<_> = std.range(range_start..range_end).map(|(k, _)| *k).collect();
+        assert_eq!(stable_keys_range, std_keys_range);
+
+        // values_range
+        let stable_values_range: Vec<_> = stable.values_range(range_start..range_end).collect();
+        let std_values_range: Vec<_> = std
+            .range(range_start..range_end)
+            .map(|(_, v)| v.clone())
+            .collect();
+        assert_eq!(stable_values_range, std_values_range);
+
+        // iter_from_below
+        let bound = 5;
+        let stable_result: Vec<_> = stable.iter_from_below(&bound).collect();
+        let std_result: Vec<_> = if let Some((start, _)) = std.range(..bound).next_back() {
+            std.range(start..).map(|(k, v)| (*k, v.clone())).collect()
+        } else {
+            Vec::new()
+        };
+        assert_eq!(stable_result, std_result);
     }
 
     #[test]
@@ -3015,28 +3068,28 @@ mod test {
     }
     btree_test!(test_bruteforce_range_search, bruteforce_range_search);
 
-    fn test_iter_upper_bound<K: TestKey, V: TestValue>() {
+    fn test_iter_from_below<K: TestKey, V: TestValue>() {
         let (key, value) = (K::build, V::build);
         run_btree_test(|mut btree| {
             for j in 0..100 {
                 btree.insert(key(j), value(j));
                 for i in 0..=j {
                     assert_eq!(
-                        btree.iter_upper_bound(&key(i + 1)).next(),
+                        btree.iter_from_below(&key(i + 1)).next(),
                         Some((key(i), value(i))),
                         "failed to get an upper bound for key({})",
                         i + 1
                     );
                 }
                 assert_eq!(
-                    btree.iter_upper_bound(&key(0)).next(),
+                    btree.iter_from_below(&key(0)).next(),
                     None,
                     "key(0) must not have an upper bound"
                 );
             }
         });
     }
-    btree_test!(test_test_iter_upper_bound, test_iter_upper_bound);
+    btree_test!(test_test_iter_from_below, test_iter_from_below);
 
     // A buggy implementation of storable where the max_size is smaller than the serialized size.
     #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
