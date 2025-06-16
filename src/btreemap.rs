@@ -1204,9 +1204,11 @@ where
 
     /// **Deprecated**: use [`iter_from_prev_key`] instead.
     ///
-    /// This method is renamed for clarity. The name `iter_upper_bound` was misleading,
-    /// as it actually starts iterating from the largest element *below* the given bound,
-    /// not up to it. Use [`iter_from_prev_key`] for a clearer, more accurate name.
+    /// The name `iter_upper_bound` was misleading, it suggested an inclusive upper bound,
+    /// but the method actually starts from the *largest key strictly less than* the given bound.
+    ///
+    /// The new name [`iter_from_prev_key`] clearly reflects this behavior,
+    /// making the code easier to understand.
     #[deprecated(note = "use `iter_from_prev_key` instead")]
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
         self.iter_from_prev_key(bound)
