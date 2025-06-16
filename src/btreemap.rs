@@ -1361,6 +1361,44 @@ mod test {
     }
 
     #[test]
+    fn btreemap_api_conformance() {
+        let mem = make_memory();
+        let mut stable = BTreeMap::new(mem);
+        let mut std = std::collections::BTreeMap::new();
+
+        // Insert.
+        let (key, value) = (1_u32, "one".to_string());
+        stable.insert(key, value.clone());
+        std.insert(key, value.clone());
+
+        // Get.
+        // Note: stable returns by value, std returns by reference.
+        assert_eq!(stable.get(&key), std.get(&key).cloned());
+
+        // Contains key.
+        assert_eq!(stable.contains_key(&key), std.contains_key(&key));
+
+        // Remove.
+        assert_eq!(stable.remove(&key), std.remove(&key));
+
+        // Length.
+        // Note: stable returns u64, std returns usize.
+        assert_eq!(stable.len(), std.len() as u64);
+
+        // Is empty.
+        assert_eq!(stable.is_empty(), std.is_empty());
+
+        // Clear
+        let (key, value) = (2_u32, "two".to_string());
+        stable.insert(key, value.clone());
+        std.insert(key, value.clone());
+        stable.clear_new(); // Note: clear_new is the new method.
+        std.clear();
+        assert_eq!(stable.len(), std.len() as u64);
+        assert_eq!(stable.is_empty(), std.is_empty());
+    }
+
+    #[test]
     fn test_monotonic_buffer() {
         let cases: &[(u32, [u8; 4])] = &[
             (1, [0, 0, 0, 1]),
