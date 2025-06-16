@@ -1367,33 +1367,58 @@ mod test {
         let mut std = std::collections::BTreeMap::new();
         let n = 10_u32;
 
-        // Insert.
+        // Insert keys and values.
         for i in 0..n {
-            stable.insert(i, format!("{i}"));
-            std.insert(i, format!("{i}"));
+            let v = i.to_string();
+            stable.insert(i, v.clone());
+            std.insert(i, v);
         }
 
-        // Get.
-        // Note: stable returns by value, std returns by reference.
+        // Get and contains.
         assert_eq!(stable.get(&1), std.get(&1).cloned());
-
-        // Contains key.
         assert_eq!(stable.contains_key(&1), std.contains_key(&1));
 
         // Remove.
         assert_eq!(stable.remove(&1), std.remove(&1));
 
-        // Length.
-        // Note: stable returns u64, std returns usize.
+        // Length and is_empty.
         assert_eq!(stable.len(), std.len() as u64);
+        assert_eq!(stable.is_empty(), std.is_empty());
 
-        // Clear
-        stable.clear_new(); // Note: clear_new is the new method.
+        // Clear.
+        stable.clear_new(); // Custom method for stable
         std.clear();
         assert_eq!(stable.len(), std.len() as u64);
-
-        // Is empty.
         assert_eq!(stable.is_empty(), std.is_empty());
+
+        // Re-insert to test iteration-related methods.
+        for i in 0..n {
+            let v = i.to_string();
+            stable.insert(i, v.clone());
+            std.insert(i, v);
+        }
+
+        // Iterators.
+        let stable_items: Vec<_> = stable.iter().collect();
+        let std_items: Vec<_> = std.iter().map(|(k, v)| (*k, v.clone())).collect();
+        assert_eq!(stable_items, std_items);
+
+        let stable_keys: Vec<_> = stable.keys().collect();
+        let std_keys: Vec<_> = std.keys().copied().collect();
+        assert_eq!(stable_keys, std_keys);
+
+        let stable_values: Vec<_> = stable.values().collect();
+        let std_values: Vec<_> = std.values().cloned().collect();
+        assert_eq!(stable_values, std_values);
+
+        // First and last.
+        let stable_first = stable.first_key_value();
+        let std_first = std.first_key_value().map(|(k, v)| (*k, v.clone()));
+        assert_eq!(stable_first, std_first);
+
+        let stable_last = stable.last_key_value();
+        let std_last = std.last_key_value().map(|(k, v)| (*k, v.clone()));
+        assert_eq!(stable_last, std_last);
     }
 
     #[test]
