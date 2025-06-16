@@ -1188,10 +1188,12 @@ where
         self.range_internal(key_range).into()
     }
 
-    /// Returns an iterator starting from the largest key strictly less than the given bound.
-    /// The iterator includes that key and continues forward.
+    /// Returns an iterator starting just before the given key.
     ///
-    /// Returns an empty iterator if no such key exists.
+    /// It finds the largest key strictly less than `bound` and starts iteration from there.
+    /// Useful for stepping back one element and iterating forward, when `range(bound..)` would skip it.
+    ///
+    /// Returns an empty iterator if no smaller key exists.
     pub fn iter_from_prev_key(&self, bound: &K) -> Iter<K, V, M> {
         if let Some((start_key, _)) = self.range(..bound).next_back() {
             IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
