@@ -141,12 +141,12 @@ fn map_min_max(#[strategy(pvec(any::<u64>(), 10..100))] keys: Vec<u64>) {
 }
 
 #[proptest]
-fn map_iter_from_below(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: Vec<u64>) {
+fn map_iter_from_prev_key(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: Vec<u64>) {
     run_btree_test(|mut map| {
         for k in keys.iter() {
             map.insert(*k, ());
 
-            prop_assert_eq!(Some((*k, ())), map.iter_from_below(&(k + 1)).next());
+            prop_assert_eq!(Some((*k, ())), map.iter_from_prev_key(&(k + 1)).next());
         }
 
         Ok(())

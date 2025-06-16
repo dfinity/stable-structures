@@ -1192,7 +1192,7 @@ where
     /// The iterator includes that key and continues forward.
     ///
     /// Returns an empty iterator if no such key exists.
-    pub fn iter_from_below(&self, bound: &K) -> Iter<K, V, M> {
+    pub fn iter_from_prev_key(&self, bound: &K) -> Iter<K, V, M> {
         if let Some((start_key, _)) = self.range(..bound).next_back() {
             IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
         } else {
@@ -1200,14 +1200,14 @@ where
         }
     }
 
-    /// **Deprecated**: use [`iter_from_below`] instead.
+    /// **Deprecated**: use [`iter_from_prev_key`] instead.
     ///
     /// This method is renamed for clarity. The name `iter_upper_bound` was misleading,
     /// as it actually starts iterating from the largest element *below* the given bound,
-    /// not up to it. Use [`iter_from_below`] for a clearer, more accurate name.
-    #[deprecated(note = "use `iter_from_below` instead")]
+    /// not up to it. Use [`iter_from_prev_key`] for a clearer, more accurate name.
+    #[deprecated(note = "use `iter_from_prev_key` instead")]
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
-        self.iter_from_below(bound)
+        self.iter_from_prev_key(bound)
     }
 
     /// Returns an iterator over the keys of the map.
@@ -1473,13 +1473,13 @@ mod test {
             .collect();
         assert_eq!(stable_values_range, std_values_range);
 
-        // iter_from_below
-        // Note: stable.iter_from_below(bound) is a custom method.
+        // iter_from_prev_key
+        // Note: stable.iter_from_prev_key(bound) is a custom method.
         // It starts from the largest key strictly less than `bound`, and continues forward.
         // To simulate in std: use .range(..bound).next_back() to get the largest < bound,
         // then iterate from that key forward using .range(start..).
         let bound = 5;
-        let stable_result: Vec<_> = stable.iter_from_below(&bound).collect();
+        let stable_result: Vec<_> = stable.iter_from_prev_key(&bound).collect();
         let std_result: Vec<_> = if let Some((start, _)) = std.range(..bound).next_back() {
             std.range(start..).map(|(k, v)| (*k, v.clone())).collect()
         } else {
@@ -3083,28 +3083,28 @@ mod test {
     }
     btree_test!(test_bruteforce_range_search, bruteforce_range_search);
 
-    fn test_iter_from_below<K: TestKey, V: TestValue>() {
+    fn test_iter_from_prev_key<K: TestKey, V: TestValue>() {
         let (key, value) = (K::build, V::build);
         run_btree_test(|mut btree| {
             for j in 0..100 {
                 btree.insert(key(j), value(j));
                 for i in 0..=j {
                     assert_eq!(
-                        btree.iter_from_below(&key(i + 1)).next(),
+                        btree.iter_from_prev_key(&key(i + 1)).next(),
                         Some((key(i), value(i))),
                         "failed to get an upper bound for key({})",
                         i + 1
                     );
                 }
                 assert_eq!(
-                    btree.iter_from_below(&key(0)).next(),
+                    btree.iter_from_prev_key(&key(0)).next(),
                     None,
                     "key(0) must not have an upper bound"
                 );
             }
         });
     }
-    btree_test!(test_test_iter_from_below, test_iter_from_below);
+    btree_test!(test_test_iter_from_prev_key, test_iter_from_prev_key);
 
     // A buggy implementation of storable where the max_size is smaller than the serialized size.
     #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]

@@ -510,33 +510,6 @@ where
         Iter::new(self.map.range(key_range))
     }
 
-    /// Returns an iterator starting from the largest element strictly less than the given bound.
-    /// The iterator includes that element and continues forward.
-    ///
-    /// Returns an empty iterator if there are no elements strictly below the given bound.
-    ///
-    /// # Complexity
-    /// O(log n) to find the start point, where n is the number of elements.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
-    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
-    ///
-    /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
-    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
-    /// set.insert(1);
-    /// set.insert(2);
-    /// set.insert(3);
-    ///
-    /// let mut iter = set.iter_from_below(&3);
-    /// assert_eq!(iter.next(), Some(2));
-    /// ```
-    pub fn iter_from_below(&self, bound: &K) -> Iter<K, M> {
-        Iter::new(self.map.iter_from_below(bound))
-    }
-
     /// Returns an iterator over the union of this set and another.
     ///
     /// The union of two sets is a set containing all elements that are in either set.
@@ -1113,31 +1086,6 @@ mod test {
     }
 
     #[test]
-    fn test_iter_from_below() {
-        let mem = make_memory();
-        let mut btreeset = BTreeSet::new(mem);
-
-        for i in 0u32..100 {
-            btreeset.insert(i);
-
-            // Test that `iter_from_below` returns the largest element strictly below the bound.
-            for j in 1u32..=i {
-                assert_eq!(
-                    btreeset.iter_from_below(&(j + 1)).next(),
-                    Some(j),
-                    "failed to get an upper bound for {}",
-                    j + 1
-                );
-            }
-            assert_eq!(
-                btreeset.iter_from_below(&0).next(),
-                None,
-                "0 must not have an upper bound"
-            );
-        }
-    }
-
-    #[test]
     fn test_iter() {
         let mem = make_memory();
         let mut btreeset = BTreeSet::new(mem);
@@ -1237,20 +1185,6 @@ mod test {
     }
 
     #[test]
-    fn test_iter_from_below_large_set() {
-        let mem = make_memory();
-        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
-
-        for i in 0u32..1000 {
-            btreeset.insert(i);
-        }
-
-        assert_eq!(btreeset.iter_from_below(&500).next(), Some(499));
-        assert_eq!(btreeset.iter_from_below(&0).next(), None);
-        assert_eq!(btreeset.iter_from_below(&1000).next(), Some(999));
-    }
-
-    #[test]
     fn test_range_large_set() {
         let mem = make_memory();
         let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
@@ -1304,14 +1238,6 @@ mod test {
 
         assert_eq!(btreeset.pop_first(), None);
         assert_eq!(btreeset.pop_last(), None);
-    }
-
-    #[test]
-    fn test_iter_from_below_empty() {
-        let mem = make_memory();
-        let btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
-
-        assert_eq!(btreeset.iter_from_below(&42u32).next(), None);
     }
 
     #[test]
@@ -1414,20 +1340,6 @@ mod test {
         }
 
         assert!(btreeset.is_empty());
-    }
-
-    #[test]
-    fn test_iter_from_below_edge_cases() {
-        let mem = make_memory();
-        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
-
-        for i in 1..=10 {
-            btreeset.insert(i);
-        }
-
-        assert_eq!(btreeset.iter_from_below(&1).next(), None); // No element strictly below 1
-        assert_eq!(btreeset.iter_from_below(&5).next(), Some(4)); // Largest element below 5
-        assert_eq!(btreeset.iter_from_below(&11).next(), Some(10)); // Largest element below 11
     }
 
     #[test]
