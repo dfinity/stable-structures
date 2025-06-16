@@ -1193,12 +1193,10 @@ where
     ///
     /// Returns an empty iterator if no such key exists.
     pub fn iter_from_below(&self, bound: &K) -> Iter<K, V, M> {
-        match self.range(..bound).next_back() {
-            Some((start_key, _)) => {
-                IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded))
-                    .into()
-            }
-            None => IterInternal::null(self).into(),
+        if let Some((start_key, _)) = self.range(..bound).next_back() {
+            IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
+        } else {
+            IterInternal::null(self).into()
         }
     }
 
