@@ -891,6 +891,57 @@ mod test {
     }
 
     #[test]
+    fn api_conformance() {
+        let mem = make_memory();
+        let mut stable = BTreeSet::new(mem);
+        let mut std = std::collections::BTreeSet::new();
+        let n = 10_u32;
+
+        // Insert elements.
+        for i in 0..n {
+            assert_eq!(stable.insert(i), std.insert(i));
+        }
+
+        // Contains.
+        for i in 0..n {
+            assert_eq!(stable.contains(&i), std.contains(&i));
+        }
+
+        // Length and is_empty.
+        // Note: stable.len() returns u64, std.len() returns usize.
+        assert_eq!(stable.len(), std.len() as u64);
+        assert_eq!(stable.is_empty(), std.is_empty());
+
+        // Iteration.
+        // Note: stable.iter() yields T, std.iter() yields &T.
+        let stable_items: Vec<_> = stable.iter().collect();
+        let std_items: Vec<_> = std.iter().copied().collect();
+        assert_eq!(stable_items, std_items);
+
+        // First and last elements.
+        // Note: stable.first()/last() returns Option<T>, std.first()/last() returns Option<&T>.
+        assert_eq!(stable.first(), std.first().copied());
+        assert_eq!(stable.last(), std.last().copied());
+
+        // Range.
+        let range_start = 3;
+        let range_end = 7;
+        let stable_range: Vec<_> = stable.range(range_start..range_end).collect();
+        let std_range: Vec<_> = std.range(range_start..range_end).copied().collect();
+        assert_eq!(stable_range, std_range);
+
+        // Remove elements.
+        for i in 0..n {
+            assert_eq!(stable.remove(&i), std.remove(&i));
+        }
+
+        // Should be empty after removals.
+        assert_eq!(stable.len(), std.len() as u64);
+        assert!(stable.is_empty());
+        assert!(std.is_empty());
+    }
+
+    #[test]
     fn test_union_with_duplicates() {
         let mem1 = make_memory();
         let mem2 = make_memory();
