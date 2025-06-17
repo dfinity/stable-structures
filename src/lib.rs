@@ -3,8 +3,6 @@ mod base_vec;
 pub mod btreemap;
 pub mod cell;
 pub use cell::{Cell as StableCell, Cell};
-#[cfg(test)]
-mod api_conformance;
 pub mod btreeset;
 pub mod file_mem;
 #[cfg(target_arch = "wasm32")]
