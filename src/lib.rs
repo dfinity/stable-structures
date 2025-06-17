@@ -3,12 +3,13 @@ mod base_vec;
 pub mod btreemap;
 pub mod cell;
 pub use cell::{Cell as StableCell, Cell};
+#[cfg(test)]
+mod api_conformance;
+pub mod btreeset;
 pub mod file_mem;
 #[cfg(target_arch = "wasm32")]
 mod ic0_memory; // Memory API for canisters.
 pub mod log;
-pub use log::{Log as StableLog, Log};
-pub mod btreeset;
 pub mod memory_manager;
 pub mod min_heap;
 pub mod reader;
@@ -17,20 +18,22 @@ pub mod storable;
 mod tests;
 mod types;
 pub mod vec;
-pub use min_heap::{MinHeap, MinHeap as StableMinHeap};
-pub use vec::{Vec as StableVec, Vec};
 pub mod vec_mem;
 pub mod writer;
+
 pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
 pub use btreeset::{BTreeSet, BTreeSet as StableBTreeSet};
 pub use file_mem::FileMemory;
 #[cfg(target_arch = "wasm32")]
 pub use ic0_memory::Ic0StableMemory;
+pub use log::{Log as StableLog, Log};
+pub use min_heap::{MinHeap, MinHeap as StableMinHeap};
 use std::error;
 use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
 pub use storable::Storable;
 use types::Address;
+pub use vec::{Vec as StableVec, Vec};
 pub use vec_mem::VectorMemory;
 
 #[cfg(target_arch = "wasm32")]
