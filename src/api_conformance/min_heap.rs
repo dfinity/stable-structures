@@ -25,15 +25,6 @@ fn api_conformance() {
     // Note: stable.peek() returns Option<T>, std.peek() returns Option<&Reverse<T>>.
     assert_eq!(stable.peek(), std.peek().map(|r| r.0));
 
-    // TODO: add Copy trait to iter.
-    // // Iteration (unordered for heap).
-    // // Note: both yield &T, need to sort to compare content.
-    // let mut stable_items: Vec<_> = stable.iter().copied().collect();
-    // let mut std_items: Vec<_> = std.iter().map(|r| r.0).collect();
-    // stable_items.sort();
-    // std_items.sort();
-    // assert_eq!(stable_items, std_items);
-
     // Pop all elements, should match in ascending order.
     let mut stable_popped = Vec::new();
     let mut std_popped = Vec::new();

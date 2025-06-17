@@ -38,13 +38,6 @@ fn api_conformance() {
         assert_eq!(stable.get(i as u64), Some(std[i as usize]));
     }
 
-    // TODO: add Copy trait to iter.
-    // // Iteration.
-    // // Note: stable.iter() yields &T, std.iter() yields &T.
-    // let stable_items: Vec<_> = stable.iter().copied().collect();
-    // let std_items: Vec<_> = std.iter().copied().collect();
-    // assert_eq!(stable_items, std_items);
-
     // Pop elements.
     // Note: stable.pop() and std.pop() both return Option<T>.
     for _ in 0..n {
