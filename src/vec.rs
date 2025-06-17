@@ -98,3 +98,61 @@ impl<T: Storable + fmt::Debug, M: Memory> fmt::Debug for Vec<T, M> {
         self.0.fmt(fmt)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// Creates a new shared memory instance.
+    fn make_memory() -> Rc<RefCell<std::vec::Vec<u8>>> {
+        Rc::new(RefCell::new(std::vec::Vec::new()))
+    }
+
+    #[test]
+    fn api_conformance() {
+        let mem = make_memory();
+        let stable = Vec::new(mem).unwrap();
+        let mut std = std::vec::Vec::new();
+
+        let n = 10_u32;
+
+        // Push elements.
+        for i in 0..n {
+            stable.push(&i).expect("stable.push failed");
+            std.push(i);
+        }
+
+        // Length and emptiness.
+        assert_eq!(stable.len(), std.len() as u64);
+        assert_eq!(stable.is_empty(), std.is_empty());
+
+        // Get by index.
+        for i in 0..n {
+            assert_eq!(stable.get(i as u64), Some(std[i as usize]));
+        }
+
+        // Set by index (stable.set is &mut self, std Vec uses indexing).
+        for i in 0..n {
+            let value = i * 10;
+            stable.set(i as u64, &value);
+            std[i as usize] = value;
+        }
+
+        // Confirm updated values.
+        for i in 0..n {
+            assert_eq!(stable.get(i as u64), Some(std[i as usize]));
+        }
+
+        // Pop elements.
+        for _ in 0..n {
+            assert_eq!(stable.pop(), std.pop());
+        }
+
+        // After popping everything, both should be empty.
+        assert_eq!(stable.len(), 0);
+        assert!(stable.is_empty());
+        assert!(std.is_empty());
+    }
+}
