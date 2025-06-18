@@ -140,13 +140,23 @@ impl<K: Storable + Ord + Clone> Node<K> {
         offset += ENTRIES_OFFSET;
         let mut children = vec![];
         if node_type == NodeType::Internal {
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("node_load_v2_children"); // May add significant overhead.
+
             // The number of children is equal to the number of entries + 1.
-            children.reserve_exact(num_entries + 1);
-            for _ in 0..num_entries + 1 {
-                let child = Address::from(read_u64(&reader, offset));
-                offset += Address::size();
-                children.push(child);
-            }
+            // children.reserve_exact(num_entries + 1);
+            // for _ in 0..num_entries + 1 {
+            //     let child = Address::from(read_u64(&reader, offset));
+            //     offset += Address::size();
+            //     children.push(child);
+            // }
+
+            let total_children = num_entries + 1;
+            children = read_u64_vec(&reader, offset, total_children)
+                .into_iter()
+                .map(Address::from)
+                .collect();
+            offset += Address::size() * Bytes::from(total_children as u64);
         }
 
         // Load the keys (eagerly if small).
@@ -154,41 +164,51 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let mut entries = Vec::with_capacity(num_entries);
         let mut buf = vec![];
 
-        for _ in 0..num_entries {
-            let key_offset = Bytes::from(offset.get());
+        {
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("node_load_v2_keys"); // May add significant overhead.
 
-            // Get key size.
-            let key_size = if K::BOUND.is_fixed_size() {
-                K::BOUND.max_size()
-            } else {
-                let size = read_u32(&reader, offset);
-                offset += U32_SIZE;
-                size
-            };
+            for _ in 0..num_entries {
+                let key_offset = Bytes::from(offset.get());
 
-            // Eager-load small keys, defer large ones.
-            let key = if key_size <= EAGER_LOAD_KEY_SIZE_THRESHOLD {
-                read_to_vec(
-                    &reader,
-                    Address::from(offset.get()),
-                    &mut buf,
-                    key_size as usize,
-                );
-                LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
-            } else {
-                LazyKey::by_ref(key_offset, key_size)
-            };
+                // Get key size.
+                let key_size = if K::BOUND.is_fixed_size() {
+                    K::BOUND.max_size()
+                } else {
+                    let size = read_u32(&reader, offset);
+                    offset += U32_SIZE;
+                    size
+                };
 
-            offset += Bytes::from(key_size);
-            entries.push((key, LazyValue::by_ref(Bytes::from(0_u64), 0)));
+                // Eager-load small keys, defer large ones.
+                let key = if key_size <= EAGER_LOAD_KEY_SIZE_THRESHOLD {
+                    read_to_vec(
+                        &reader,
+                        Address::from(offset.get()),
+                        &mut buf,
+                        key_size as usize,
+                    );
+                    LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
+                } else {
+                    LazyKey::by_ref(key_offset, key_size)
+                };
+
+                offset += Bytes::from(key_size);
+                entries.push((key, LazyValue::by_ref(Bytes::from(0_u64), 0)));
+            }
         }
 
         // Load the values
-        for (_key, value) in entries.iter_mut() {
-            // Load the values lazily.
-            let value_size = read_u32(&reader, offset);
-            *value = LazyValue::by_ref(Bytes::from(offset.get()), value_size);
-            offset += U32_SIZE + Bytes::from(value_size as u64);
+        {
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("node_load_v2_values"); // May add significant overhead.
+                                                                      // Load the values
+            for (_key, value) in entries.iter_mut() {
+                // Load the values lazily.
+                let value_size = read_u32(&reader, offset);
+                *value = LazyValue::by_ref(Bytes::from(offset.get()), value_size);
+                offset += U32_SIZE + Bytes::from(value_size as u64);
+            }
         }
 
         Self {
@@ -209,10 +229,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         let page_size = self.version.page_size().get();
         assert!(page_size >= MINIMUM_PAGE_SIZE);
 
-        // Load all the entries. One pass is required to load all entries;
-        // results are not stored to avoid unnecessary allocations.
-        for i in 0..self.entries.len() {
-            self.entry(i, allocator.memory());
+        {
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("node_save_v2_preload"); // May add significant overhead.
+
+            // Load all the entries. One pass is required to load all entries;
+            // results are not stored to avoid unnecessary allocations.
+            for i in 0..self.entries.len() {
+                self.entry(i, allocator.memory());
+            }
         }
 
         // Initialize a NodeWriter. The NodeWriter takes care of allocating/deallocating
@@ -249,33 +274,48 @@ impl<K: Storable + Ord + Clone> Node<K> {
             writer.write_u64(offset, child.get());
             offset += Address::size();
         }
+        // writer.write_u64_vec(
+        //     offset,
+        //     &self.children.iter().map(|c| c.get()).collect::<Vec<_>>(),
+        // );
+        // offset += Address::size() * Bytes::from(self.children.len() as u64);
 
-        // Write the keys.
-        for i in 0..self.entries.len() {
-            let key = self.key(i, writer.memory());
-            let key_bytes = key.to_bytes_checked();
+        {
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("node_save_v2_keys"); // May add significant overhead.
 
-            // Write the size of the key if it isn't fixed in size.
-            if !K::BOUND.is_fixed_size() {
-                writer.write_u32(offset, key_bytes.len() as u32);
-                offset += U32_SIZE;
+            // Write the keys.
+            for i in 0..self.entries.len() {
+                let key = self.key(i, writer.memory());
+                let key_bytes = key.to_bytes_checked();
+
+                // Write the size of the key if it isn't fixed in size.
+                if !K::BOUND.is_fixed_size() {
+                    writer.write_u32(offset, key_bytes.len() as u32);
+                    offset += U32_SIZE;
+                }
+
+                // Write the key.
+                writer.write(offset, key_bytes.borrow());
+                offset += Bytes::from(key_bytes.len());
             }
-
-            // Write the key.
-            writer.write(offset, key_bytes.borrow());
-            offset += Bytes::from(key_bytes.len());
         }
 
-        // Write the values.
-        for i in 0..self.entries.len() {
-            // Write the size of the value.
-            let value = self.value(i, writer.memory());
-            writer.write_u32(offset, value.len() as u32);
-            offset += U32_SIZE;
+        {
+            #[cfg(feature = "bench_scope")]
+            let _p = canbench_rs::bench_scope("node_save_v2_values"); // May add significant overhead.
 
-            // Write the value.
-            writer.write(offset, value);
-            offset += Bytes::from(value.len());
+            // Write the values.
+            for i in 0..self.entries.len() {
+                // Write the size of the value.
+                let value = self.value(i, writer.memory());
+                writer.write_u32(offset, value.len() as u32);
+                offset += U32_SIZE;
+
+                // Write the value.
+                writer.write(offset, value);
+                offset += Bytes::from(value.len());
+            }
         }
 
         self.overflows = writer.finish();
