@@ -201,16 +201,15 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     /// Adds a new item at the end of the vector.
     ///
     /// Complexity: O(max_size(T))
-    pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
+    pub fn push(&self, item: &T) {
         let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes_checked();
         let data_offset = self.write_entry_size(offset, bytes.len() as u32)?;
-        safe_write(&self.memory, data_offset, bytes.borrow())?;
+        write(&self.memory, data_offset, bytes.borrow());
         // NB. We update the size only after we ensure that the data
         // write succeeded.
         self.set_len(index + 1);
-        Ok(())
     }
 
     /// Removes the item at the end of the vector.
@@ -257,21 +256,21 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     }
 
     /// Writes the size of the item at the specified offset.
-    fn write_entry_size(&self, offset: u64, size: u32) -> Result<u64, GrowFailed> {
+    fn write_entry_size(&self, offset: u64, size: u32) -> u64 {
         let t_bounds = bounds::<T>();
         debug_assert!(size <= t_bounds.max_size);
 
         if t_bounds.is_fixed_size {
-            Ok(offset)
+            offset
         } else if t_bounds.max_size <= u8::MAX as u32 {
-            safe_write(&self.memory, offset, &[size as u8; 1])?;
-            Ok(offset + 1)
+            write(&self.memory, offset, &[size as u8; 1]);
+            offset + 1
         } else if t_bounds.max_size <= u16::MAX as u32 {
-            safe_write(&self.memory, offset, &(size as u16).to_le_bytes())?;
-            Ok(offset + 2)
+            write(&self.memory, offset, &(size as u16).to_le_bytes());
+            offset + 2
         } else {
-            safe_write(&self.memory, offset, &size.to_le_bytes())?;
-            Ok(offset + 4)
+            write(&self.memory, offset, &size.to_le_bytes());
+            offset + 4
         }
     }
 
@@ -295,13 +294,12 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     }
 
     /// Write the layout header to the memory.
-    fn write_header(header: &HeaderV1, memory: &M) -> Result<(), GrowFailed> {
-        safe_write(memory, 0, &header.magic)?;
+    fn write_header(header: &HeaderV1, memory: &M) {
+        write(memory, 0, &header.magic);
         memory.write(3, &[header.version; 1]);
         write_u64(memory, Address::from(4), header.len);
         write_u32(memory, Address::from(12), header.max_size);
         memory.write(16, &[if header.is_fixed_size { 1u8 } else { 0u8 }; 1]);
-        Ok(())
     }
 
     /// Reads the header from the specified memory.
