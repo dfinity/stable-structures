@@ -33,7 +33,8 @@
 //! bytes required to represent integers up to that max size.
 use crate::storable::{bounds, bytes_to_store_size_bounded};
 use crate::{
-    read_to_vec, read_u32, read_u64, write, write_u32, write_u64, Address, Memory, Storable,
+    read_to_vec, read_u32, read_u64, safe_write, write, write_u32, write_u64, Address, GrowFailed,
+    Memory, Storable,
 };
 use std::borrow::{Borrow, Cow};
 use std::cmp::min;
@@ -104,6 +105,12 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     ///
     /// Complexity: O(1)
     pub fn new(memory: M, magic: [u8; 3]) -> Self {
+        Self::safe_new(memory, magic)
+            .map_err(|e| panic!("Failed to create a new base stable vector: {}", e))
+            .unwrap()
+    }
+
+    fn safe_new(memory: M, magic: [u8; 3]) -> Result<Self, GrowFailed> {
         let t_bounds = bounds::<T>();
 
         let header = HeaderV1 {
@@ -114,10 +121,10 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
             is_fixed_size: t_bounds.is_fixed_size,
         };
         Self::write_header(&header, &memory);
-        Self {
+        Ok(Self {
             memory,
             _marker: PhantomData,
-        }
+        })
     }
 
     /// Initializes a vector in the specified memory.
@@ -128,7 +135,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     /// stable vector.
     pub fn init(memory: M, magic: [u8; 3]) -> Result<Self, InitError> {
         if memory.size() == 0 {
-            return Self::new(memory, magic).map_err(|_| InitError::OutOfMemory);
+            return Self::safe_new(memory, magic).map_err(|_| InitError::OutOfMemory);
         }
         let header = Self::read_header(&memory);
         if header.magic != magic {
@@ -291,8 +298,8 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     }
 
     /// Write the layout header to the memory.
-    fn write_header(header: &HeaderV1, memory: &M) {
-        write(memory, 0, &header.magic);
+    fn write_header(header: &HeaderV1, memory: &M) -> Result<(), GrowFailed> {
+        safe_write(memory, 0, &header.magic)?;
         memory.write(3, &[header.version; 1]);
         write_u64(memory, Address::from(4), header.len);
         write_u32(memory, Address::from(12), header.max_size);
