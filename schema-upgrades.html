@@ -172,7 +172,7 @@ struct Asset {
 }
 
 impl Storable for Asset {
-    fn to_bytes(&amp;self) -&gt; std::borrow::Cow&lt;[u8]&gt; {
+    fn to_bytes(&amp;self) -&gt; std::borrow::Cow&lt;'_, [u8]&gt; {
         let mut bytes = vec![];
         ciborium::ser::into_writer(&amp;self, &amp;mut bytes).unwrap();
         Cow::Owned(bytes)
