@@ -233,18 +233,25 @@ To provide maximum flexibility, the library introduces the <code>Memory</code> t
     fn size(&amp;self) -&gt; u64;
 
     /// Equivalent to WebAssembly memory.grow.
+    /// Returns the previous size, or -1 if the grow fails.
     fn grow(&amp;self, pages: u64) -&gt; i64;
 
     /// Copies bytes from this memory to the heap (in Wasm, memory 0).
+    /// Panics or traps if out of bounds.
     fn read(&amp;self, offset: u64, dst: &amp;mut [u8]);
 
     /// Writes bytes from the heap (in Wasm, memory 0) to this memory.
+    /// Panics or traps if out of bounds.
     fn write(&amp;self, offset: u64, src: &amp;[u8]);
 }
 <span class="boring">}</span></code></pre></pre>
 <p>The <code>Memory</code> trait intentionally models a <a href="https://webassembly.github.io/multi-memory/core/exec/runtime.html#memory-instances">WebAssembly memory instance</a>.
 This design choice ensures consistency with the interface of memories available to canisters.
 It also provides future compatibility with potential multi-memory support in canisters.</p>
+<h2 id="panics"><a class="header" href="#panics">Panics</a></h2>
+<p>⚠️ <code>read</code> and <code>write</code> <strong>assume the caller will not access memory outside the current size</strong>.</p>
+<p>If the range <code>[offset … offset + len)</code> exceeds available memory, the call panics (in native tests) or traps (in a Wasm canister).
+Callers must store and check data lengths themselves or use higher-level containers such as <code>StableVec</code>.</p>
 <h2 id="available-memory-implementations"><a class="header" href="#available-memory-implementations">Available Memory Implementations</a></h2>
 <p>The library provides several implementations of the <code>Memory</code> trait, each designed for specific use cases:</p>
 <ul>
