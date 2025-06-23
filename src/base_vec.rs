@@ -33,8 +33,7 @@
 //! bytes required to represent integers up to that max size.
 use crate::storable::{bounds, bytes_to_store_size_bounded};
 use crate::{
-    read_to_vec, read_u32, read_u64, safe_write, write, write_u32, write_u64, Address, GrowFailed,
-    Memory, Storable,
+    read_to_vec, read_u32, read_u64, write, write_u32, write_u64, Address, Memory, Storable,
 };
 use std::borrow::{Borrow, Cow};
 use std::cmp::min;
@@ -104,7 +103,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     /// contained previously.
     ///
     /// Complexity: O(1)
-    pub fn new(memory: M, magic: [u8; 3]) -> Result<Self, GrowFailed> {
+    pub fn new(memory: M, magic: [u8; 3]) -> Self {
         let t_bounds = bounds::<T>();
 
         let header = HeaderV1 {
@@ -114,11 +113,11 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
             max_size: t_bounds.max_size,
             is_fixed_size: t_bounds.is_fixed_size,
         };
-        Self::write_header(&header, &memory)?;
-        Ok(Self {
+        Self::write_header(&header, &memory);
+        Self {
             memory,
             _marker: PhantomData,
-        })
+        }
     }
 
     /// Initializes a vector in the specified memory.
@@ -181,9 +180,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
 
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes_checked();
-        let data_offset = self
-            .write_entry_size(offset, bytes.len() as u32)
-            .expect("unreachable: cannot fail to write to pre-allocated area");
+        let data_offset = self.write_entry_size(offset, bytes.len() as u32);
         write(&self.memory, data_offset, bytes.borrow());
     }
 
@@ -205,7 +202,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes_checked();
-        let data_offset = self.write_entry_size(offset, bytes.len() as u32)?;
+        let data_offset = self.write_entry_size(offset, bytes.len() as u32);
         write(&self.memory, data_offset, bytes.borrow());
         // NB. We update the size only after we ensure that the data
         // write succeeded.

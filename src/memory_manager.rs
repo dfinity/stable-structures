@@ -644,7 +644,6 @@ impl BucketCache {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::safe_write;
     use proptest::prelude::*;
 
     const MAX_MEMORY_IN_PAGES: u64 = MAX_NUM_BUCKETS * BUCKET_SIZE_IN_PAGES;

@@ -3,7 +3,7 @@
 use crate::base_vec::BaseVec;
 pub use crate::base_vec::InitError;
 use crate::storable::Storable;
-use crate::{GrowFailed, Memory};
+use crate::Memory;
 use std::fmt;
 
 #[cfg(test)]
@@ -20,8 +20,8 @@ impl<T: Storable, M: Memory> Vec<T, M> {
     /// contained previously.
     ///
     /// Complexity: O(1)
-    pub fn new(memory: M) -> Result<Self, GrowFailed> {
-        BaseVec::<T, M>::new(memory, MAGIC).map(Self)
+    pub fn new(memory: M) -> Self {
+        BaseVec::<T, M>::new(memory, MAGIC)
     }
 
     /// Initializes a vector in the specified memory.
@@ -72,7 +72,7 @@ impl<T: Storable, M: Memory> Vec<T, M> {
     /// Adds a new item at the end of the vector.
     ///
     /// Complexity: O(max_size(T))
-    pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
+    pub fn push(&self, item: &T) {
         self.0.push(item)
     }
 

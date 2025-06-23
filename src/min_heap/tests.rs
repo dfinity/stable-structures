@@ -29,7 +29,7 @@ proptest! {
         for op in ops {
             match op {
                 Operation::Push(x) => {
-                    sh.push(&x).unwrap();
+                    sh.push(&x);
                     h.push(Reverse(x));
                 }
                 Operation::Pop => {
@@ -43,7 +43,7 @@ proptest! {
     fn pop_sorted(mut items in pvec(any::<u64>(), 0..50)) {
         let mut sh = StableMinHeap::<u64, M>::new(M::default()).unwrap();
         for x in &items {
-            sh.push(x).unwrap();
+            sh.push(x);
         }
         items.sort();
         for x in items {
@@ -56,10 +56,10 @@ proptest! {
 fn test_simple_case() {
     let mut h = StableMinHeap::<u64, M>::new(M::default()).unwrap();
     assert_eq!(h.pop(), None);
-    h.push(&0).unwrap();
-    h.push(&3).unwrap();
-    h.push(&0).unwrap();
-    h.push(&1).unwrap();
+    h.push(&0);
+    h.push(&3);
+    h.push(&0);
+    h.push(&1);
     assert_eq!(h.pop(), Some(0));
     assert_eq!(h.pop(), Some(0));
     assert_eq!(h.pop(), Some(1));

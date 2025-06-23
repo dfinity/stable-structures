@@ -72,9 +72,9 @@ proptest! {
 
     #[test]
     fn init_after_new(vals in pvec(any::<u64>(), 0..20)) {
-        let sv = StableVec::<u64, M>::new(M::default()).unwrap();
+        let sv = StableVec::<u64, M>::new(M::default());
         for v in vals {
-            sv.push(&v).unwrap();
+            sv.push(&v);
         }
         let vec = sv.to_vec();
         prop_assert_eq!(StableVec::<u64, M>::init(sv.into_memory()).unwrap().to_vec(), vec);
@@ -85,12 +85,12 @@ fn check_push_pop_model<T: Storable + Debug + Clone + PartialEq>(
     ops: Vec<Operation<T>>,
 ) -> Result<(), TestCaseError> {
     let mut v = Vec::new();
-    let sv = StableVec::<T, M>::new(M::default()).unwrap();
+    let sv = StableVec::<T, M>::new(M::default());
 
     for op in ops {
         match op {
             Operation::Push(x) => {
-                sv.push(&x).unwrap();
+                sv.push(&x);
                 v.push(x);
                 prop_assert_eq!(&sv.to_vec(), &v);
             }
@@ -105,14 +105,14 @@ fn check_push_pop_model<T: Storable + Debug + Clone + PartialEq>(
 
 #[test]
 fn test_init_type_compatibility() {
-    let v = StableVec::<u64, M>::new(M::default()).unwrap();
+    let v = StableVec::<u64, M>::new(M::default());
 
     assert_eq!(
         StableVec::<u32, M>::init(v.into_memory()).unwrap_err(),
         InitError::IncompatibleElementType
     );
 
-    let v = StableVec::<u64, M>::new(M::default()).unwrap();
+    let v = StableVec::<u64, M>::new(M::default());
     assert_eq!(
         StableVec::<UnfixedU64<8>, M>::init(v.into_memory()).unwrap_err(),
         InitError::IncompatibleElementType
@@ -173,11 +173,11 @@ fn test_init_failures() {
 #[allow(clippy::iter_nth_zero)]
 #[test]
 fn test_iter() {
-    let sv = StableVec::<u64, M>::new(M::default()).unwrap();
+    let sv = StableVec::<u64, M>::new(M::default());
     assert_eq!(sv.iter().next(), None);
-    sv.push(&1).unwrap();
-    sv.push(&2).unwrap();
-    sv.push(&3).unwrap();
+    sv.push(&1);
+    sv.push(&2);
+    sv.push(&3);
 
     let mut iter = sv.iter();
     assert_eq!(iter.size_hint(), (3, None));
@@ -235,11 +235,11 @@ fn test_iter() {
 
 #[test]
 fn test_iter_count() {
-    let sv = StableVec::<u64, M>::new(M::default()).unwrap();
-    sv.push(&1).unwrap();
-    sv.push(&2).unwrap();
-    sv.push(&3).unwrap();
-    sv.push(&4).unwrap();
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.push(&1);
+    sv.push(&2);
+    sv.push(&3);
+    sv.push(&4);
     {
         let mut iter = sv.iter();
         iter.next_back();
@@ -280,17 +280,17 @@ impl crate::Storable for BuggyStruct {
 #[test]
 #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
 fn push_element_bigger_than_max_size_panics() {
-    let sv = StableVec::<BuggyStruct, M>::new(M::default()).unwrap();
+    let sv = StableVec::<BuggyStruct, M>::new(M::default());
     // Insert a struct where the serialized size is > `MAX_SIZE`. Should panic.
-    sv.push(&BuggyStruct(vec![1, 2, 3, 4])).unwrap();
+    sv.push(&BuggyStruct(vec![1, 2, 3, 4]));
 }
 
 #[test]
 #[should_panic(expected = "expected an element with length <= 1 bytes, but found 5")]
 fn set_element_bigger_than_max_size_panics() {
-    let sv = StableVec::<BuggyStruct, M>::new(M::default()).unwrap();
+    let sv = StableVec::<BuggyStruct, M>::new(M::default());
     // Insert a struct where the serialized size is <= `MAX_SIZE`. This should succeed.
-    sv.push(&BuggyStruct(vec![1])).unwrap();
+    sv.push(&BuggyStruct(vec![1]));
 
     // Insert a struct where the serialized size is > `MAX_SIZE`. Should panic.
     sv.set(0, &BuggyStruct(vec![1, 2, 3, 4, 5]));
@@ -299,10 +299,10 @@ fn set_element_bigger_than_max_size_panics() {
 #[test]
 fn set_last_element_to_large_blob() {
     use crate::storable::Blob;
-    let sv = StableVec::<Blob<65536>, M>::new(M::default()).unwrap();
+    let sv = StableVec::<Blob<65536>, M>::new(M::default());
 
     // Store a small blob.
-    sv.push(&Blob::default()).unwrap();
+    sv.push(&Blob::default());
 
     // Store a large blob that would require growing the memory.
     sv.set(0, &Blob::try_from(vec![1; 65536].as_slice()).unwrap());
