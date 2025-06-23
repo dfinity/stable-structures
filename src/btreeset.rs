@@ -108,7 +108,7 @@ where
 /// }
 ///
 /// impl Storable for CustomType {
-///     fn to_bytes(&self) -> Cow<[u8]> {
+///     fn to_bytes(&self) -> Cow<'_, [u8]> {
 ///         Cow::Owned(self.id.to_le_bytes().to_vec())
 ///     }
 ///

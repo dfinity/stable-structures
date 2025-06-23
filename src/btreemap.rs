@@ -172,7 +172,7 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 /// }
 ///
 /// impl Storable for User {
-///     fn to_bytes(&self) -> Cow<[u8]> {
+///     fn to_bytes(&self) -> Cow<'_, [u8]> {
 ///         let mut bytes = Vec::new();
 ///         // TODO: Convert your struct to bytes...
 ///         Cow::Owned(bytes)
@@ -2999,7 +2999,7 @@ mod test {
     #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
     struct BuggyStruct;
     impl crate::Storable for BuggyStruct {
-        fn to_bytes(&self) -> Cow<[u8]> {
+        fn to_bytes(&self) -> Cow<'_, [u8]> {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
@@ -3142,7 +3142,7 @@ mod test {
         #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
         struct T;
         impl Storable for T {
-            fn to_bytes(&self) -> Cow<[u8]> {
+            fn to_bytes(&self) -> Cow<'_, [u8]> {
                 Cow::Borrowed(&[1, 2, 3])
             }
 
@@ -3165,7 +3165,7 @@ mod test {
         #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
         struct T2;
         impl Storable for T2 {
-            fn to_bytes(&self) -> Cow<[u8]> {
+            fn to_bytes(&self) -> Cow<'_, [u8]> {
                 Cow::Owned(vec![1, 2, 3])
             }
 

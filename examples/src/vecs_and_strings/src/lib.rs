@@ -17,7 +17,7 @@ const MAX_USER_DATA_SIZE: u32 = 100;
 struct UserName(String);
 
 impl Storable for UserName {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
         // String already implements `Storable`.
         self.0.to_bytes()
     }
@@ -39,7 +39,7 @@ impl Storable for UserName {
 struct UserData(Vec<u8>);
 
 impl Storable for UserData {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
         // Vec<u8> already implements `Storable`.
         self.0.to_bytes()
     }
