@@ -9,12 +9,15 @@ pub trait Memory {
     fn size(&self) -> u64;
 
     /// Equivalent to WebAssembly memory.grow.
+    /// Returns the previous size, or -1 if the grow fails.
     fn grow(&self, pages: u64) -> i64;
 
     /// Copies bytes from this memory to the heap (in Wasm, memory 0).
+    /// Panics or traps if out of bounds.
     fn read(&self, offset: u64, dst: &mut [u8]);
 
     /// Writes bytes from the heap (in Wasm, memory 0) to this memory.
+    /// Panics or traps if out of bounds.
     fn write(&self, offset: u64, src: &[u8]);
 }
 ```
