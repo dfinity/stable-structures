@@ -45,44 +45,49 @@ const WASM_PAGE_SIZE: u64 = 65536;
 /// The maximum number of stable memory pages a canister can address.
 pub const MAX_PAGES: u64 = u64::MAX / WASM_PAGE_SIZE;
 
+/// Abstraction over a WebAssembly-style linear memory (e.g., stable memory).
+///
+/// Implementations are expected to mirror WebAssembly semantics:
+/// out-of-bounds accesses will cause a panic (in native) or trap (in Wasm).
 pub trait Memory {
-    /// Returns the current size of the stable memory in WebAssembly
-    /// pages. (One WebAssembly page is 64Ki bytes.)
+    /// Returns the current size of the memory in WebAssembly pages.
+    ///
+    /// One WebAssembly page is 64 KiB.
     fn size(&self) -> u64;
 
-    /// Tries to grow the memory by `pages` many pages containing
-    /// zeroes.  If successful, returns the previous size of the
-    /// memory (in pages).  Otherwise, returns -1.
+    /// Grows the memory by `pages` pages filled with zeroes.
+    ///
+    /// Returns the previous size in pages on success, or -1 if the
+    /// memory could not be grown.
     fn grow(&self, pages: u64) -> i64;
 
-    /// Copies the data referred to by `offset` out of the stable memory
-    /// and replaces the corresponding bytes in `dst`.
+    /// Copies `dst.len()` bytes from memory starting at `offset` into `dst`.
+    ///
+    /// Panics or traps if the read would go out of bounds.
     fn read(&self, offset: u64, dst: &mut [u8]);
 
-    /// Copies `count` number of bytes of the data starting from `offset` out of the stable memory
-    /// into the buffer starting at `dst`.
+    /// Unsafe variant of `read` for advanced use.
     ///
-    /// This method is an alternative to `read` which does not require initializing a buffer and may
-    /// therefore be faster.
+    /// Copies `count` bytes from memory starting at `offset` into the
+    /// raw pointer `dst`. Initializes the destination before reading.
     ///
     /// # Safety
     ///
-    /// Callers must guarantee that
-    ///   * it is valid to write `count` number of bytes starting from `dst`,
-    ///   * `dst..dst + count` does not overlap with `self`.
+    /// Caller must ensure:
+    /// - `dst` points to valid writable memory of at least `count` bytes.
+    /// - The memory range `dst..dst+count` does not overlap with `self`.
     ///
-    /// Implementations must guarantee that before the method returns, `count` number of bytes
-    /// starting from `dst` will be initialized.
+    /// Panics or traps if the read would go out of bounds.
     #[inline]
     unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
-        // Initialize the buffer to make the slice valid.
         std::ptr::write_bytes(dst, 0, count);
         let slice = std::slice::from_raw_parts_mut(dst, count);
         self.read(offset, slice)
     }
 
-    /// Copies the data referred to by `src` and replaces the
-    /// corresponding segment starting at offset in the stable memory.
+    /// Copies `src.len()` bytes from `src` into memory starting at `offset`.
+    ///
+    /// Panics or traps if the write would go out of bounds.
     fn write(&self, offset: u64, src: &[u8]);
 }
 

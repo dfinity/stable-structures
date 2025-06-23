@@ -23,6 +23,13 @@ The `Memory` trait intentionally models a [WebAssembly memory instance](https://
 This design choice ensures consistency with the interface of memories available to canisters.
 It also provides future compatibility with potential multi-memory support in canisters.
 
+## Safety contract  
+
+⚠️ `read` and `write` **assume the caller will not access memory outside the current size**.
+
+If the range `[offset … offset + len)` exceeds available memory, the call panics (in native tests) or traps (in a Wasm canister).
+Callers must store and check data lengths themselves or use higher-level containers such as `StableVec`.
+
 ## Available Memory Implementations
 
 The library provides several implementations of the `Memory` trait, each designed for specific use cases:
