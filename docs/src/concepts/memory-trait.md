@@ -26,7 +26,7 @@ The `Memory` trait intentionally models a [WebAssembly memory instance](https://
 This design choice ensures consistency with the interface of memories available to canisters.
 It also provides future compatibility with potential multi-memory support in canisters.
 
-## Safety contract  
+## Panics  
 
 ⚠️ `read` and `write` **assume the caller will not access memory outside the current size**.
 
