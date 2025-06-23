@@ -1161,7 +1161,7 @@ where
     ///     println!("{}: {}", key, value);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<K, V, M> {
+    pub fn iter(&self) -> Iter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
@@ -1184,7 +1184,7 @@ where
     ///     println!("{}: {}", key, value);
     /// }
     /// ```
-    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, V, M> {
+    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
@@ -1194,7 +1194,7 @@ where
     /// Useful when `range(bound..)` skips the previous element.
     ///
     /// Returns an empty iterator if no smaller key exists.
-    pub fn iter_from_prev_key(&self, bound: &K) -> Iter<K, V, M> {
+    pub fn iter_from_prev_key(&self, bound: &K) -> Iter<'_, K, V, M> {
         if let Some((start_key, _)) = self.range(..bound).next_back() {
             IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
         } else {
@@ -1211,36 +1211,36 @@ where
     /// The new name, [`iter_from_prev_key`], better reflects this behavior and
     /// improves code clarity.
     #[deprecated(note = "use `iter_from_prev_key` instead")]
-    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
+    pub fn iter_upper_bound(&self, bound: &K) -> Iter<'_, K, V, M> {
         self.iter_from_prev_key(bound)
     }
 
     /// Returns an iterator over the keys of the map.
-    pub fn keys(&self) -> KeysIter<K, V, M> {
+    pub fn keys(&self) -> KeysIter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
     /// Returns an iterator over the keys of the map which belong to the specified range.
-    pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<K, V, M> {
+    pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
     /// Returns an iterator over the values of the map, sorted by key.
-    pub fn values(&self) -> ValuesIter<K, V, M> {
+    pub fn values(&self) -> ValuesIter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
     /// Returns an iterator over the values of the map where keys
     /// belong to the specified range.
-    pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<K, V, M> {
+    pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
-    fn iter_internal(&self) -> IterInternal<K, V, M> {
+    fn iter_internal(&self) -> IterInternal<'_, K, V, M> {
         IterInternal::new(self)
     }
 
-    fn range_internal(&self, key_range: impl RangeBounds<K>) -> IterInternal<K, V, M> {
+    fn range_internal(&self, key_range: impl RangeBounds<K>) -> IterInternal<'_, K, V, M> {
         if self.root_addr == NULL {
             // Map is empty.
             return IterInternal::null(self);
