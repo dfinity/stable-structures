@@ -80,6 +80,7 @@ pub trait Memory {
     /// Panics or traps if the read would go out of bounds.
     #[inline]
     unsafe fn read_unsafe(&self, offset: u64, dst: *mut u8, count: usize) {
+        // Initialize the buffer to make the slice valid.
         std::ptr::write_bytes(dst, 0, count);
         let slice = std::slice::from_raw_parts_mut(dst, count);
         self.read(offset, slice)
