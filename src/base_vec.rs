@@ -120,7 +120,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
             max_size: t_bounds.max_size,
             is_fixed_size: t_bounds.is_fixed_size,
         };
-        Self::write_header(&header, &memory);
+        Self::write_header(&header, &memory)?;
         Ok(Self {
             memory,
             _marker: PhantomData,
