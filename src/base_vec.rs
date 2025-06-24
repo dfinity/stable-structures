@@ -187,7 +187,12 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
 
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes_checked();
-        let data_offset = self.write_entry_size(offset, bytes.len() as u32);
+        let data_offset = self
+            .write_entry_size(offset, bytes.len() as u32)
+            .map_err(|e| {
+                panic!("Failed to write to the stable vector: {}", e);
+            })
+            .unwrap();
         write(&self.memory, data_offset, bytes.borrow());
     }
 
@@ -209,8 +214,15 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes_checked();
-        let data_offset = self.write_entry_size(offset, bytes.len() as u32);
-        write(&self.memory, data_offset, bytes.borrow());
+        let data_offset = self
+            .write_entry_size(offset, bytes.len() as u32)
+            .map_err(|e| {
+                panic!("Failed to write to the stable vector: {}", e);
+            })
+            .unwrap();
+        safe_write(&self.memory, data_offset, bytes.borrow()).map_err(|e| {
+            panic!("Failed to write to the stable vector: {}", e);
+        });
         // NB. We update the size only after we ensure that the data
         // write succeeded.
         self.set_len(index + 1);
@@ -260,21 +272,21 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     }
 
     /// Writes the size of the item at the specified offset.
-    fn write_entry_size(&self, offset: u64, size: u32) -> u64 {
+    fn write_entry_size(&self, offset: u64, size: u32) -> Result<u64, GrowFailed> {
         let t_bounds = bounds::<T>();
         debug_assert!(size <= t_bounds.max_size);
 
         if t_bounds.is_fixed_size {
-            offset
+            Ok(offset)
         } else if t_bounds.max_size <= u8::MAX as u32 {
-            write(&self.memory, offset, &[size as u8; 1]);
-            offset + 1
+            safe_write(&self.memory, offset, &[size as u8; 1])?;
+            Ok(offset + 1)
         } else if t_bounds.max_size <= u16::MAX as u32 {
-            write(&self.memory, offset, &(size as u16).to_le_bytes());
-            offset + 2
+            safe_write(&self.memory, offset, &(size as u16).to_le_bytes())?;
+            Ok(offset + 2)
         } else {
-            write(&self.memory, offset, &size.to_le_bytes());
-            offset + 4
+            safe_write(&self.memory, offset, &size.to_le_bytes())?;
+            Ok(offset + 4)
         }
     }
 
