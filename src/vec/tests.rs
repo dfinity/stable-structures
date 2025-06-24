@@ -259,7 +259,7 @@ fn test_iter_count() {
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 struct BuggyStruct(Vec<u8>);
 impl crate::Storable for BuggyStruct {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Borrowed(&self.0)
     }
 

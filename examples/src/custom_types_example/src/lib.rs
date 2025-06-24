@@ -24,7 +24,7 @@ struct UserProfile {
 // The `Storable` trait is already implemented for several common types (e.g. u64),
 // so you can use those directly without implementing the `Storable` trait for them.
 impl Storable for UserProfile {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
 

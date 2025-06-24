@@ -108,7 +108,7 @@ where
 /// }
 ///
 /// impl Storable for CustomType {
-///     fn to_bytes(&self) -> Cow<[u8]> {
+///     fn to_bytes(&self) -> Cow<'_, [u8]> {
 ///         Cow::Owned(self.id.to_le_bytes().to_vec())
 ///     }
 ///
@@ -482,7 +482,7 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<K, M> {
+    pub fn iter(&self) -> Iter<'_, K, M> {
         Iter::new(self.map.iter())
     }
 
@@ -506,7 +506,7 @@ where
     /// let range: Vec<_> = set.range(2..).collect();
     /// assert_eq!(range, vec![2, 3]);
     /// ```
-    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, M> {
+    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<'_, K, M> {
         Iter::new(self.map.range(key_range))
     }
 
