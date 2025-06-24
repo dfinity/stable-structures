@@ -62,7 +62,7 @@ where
     ///
     /// Complexity: O(log(self.len()))
     pub fn push(&mut self, item: &T) {
-        self.0.push(item);
+        self.0.push(item).map_err(|e| panic!("{:?}", e)).unwrap();
         self.bubble_up(self.0.len() - 1, item);
         debug_assert_eq!(Ok(()), self.check_invariant());
     }

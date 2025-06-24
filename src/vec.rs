@@ -77,7 +77,7 @@ impl<T: Storable, M: Memory> Vec<T, M> {
     ///
     /// Complexity: O(max_size(T))
     pub fn push(&self, item: &T) {
-        self.0.push(item)
+        self.0.push(item).map_err(|e| panic!("{:?}", e)).unwrap();
     }
 
     /// Removes the item at the end of the vector.

@@ -246,7 +246,7 @@ fn api_conformance_min_heap() {
 
     // Push elements.
     for i in 0..n {
-        stable.push(&i).expect("push failed");
+        stable.push(&i);
         std.push(Reverse(i));
     }
 
@@ -279,13 +279,13 @@ fn api_conformance_min_heap() {
 #[test]
 fn api_conformance_vec() {
     let mem = make_memory();
-    let stable = StableVec::new(mem).unwrap();
+    let stable = StableVec::new(mem);
     let mut std = Vec::new();
     let n = 10_u32;
 
     // Push elements.
     for i in 0..n {
-        stable.push(&i).expect("push failed");
+        stable.push(&i);
         std.push(i);
     }
 
