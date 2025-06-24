@@ -1,5 +1,5 @@
 use crate::reader::{BufferedReader, Reader};
-use crate::{write, Memory, VectorMemory, WASM_PAGE_SIZE};
+use crate::{safe_write, Memory, VectorMemory, WASM_PAGE_SIZE};
 use proptest::proptest;
 use std::io::Read;
 
@@ -12,7 +12,7 @@ proptest! {
         len in 0..1024usize
     ) {
         let memory = VectorMemory::default();
-        write(&memory, 0, &bytes);
+        safe_write(&memory, 0, &bytes).unwrap();
         let mut reader = build_reader(&memory, buffer_size, offset);
 
         let mut output = vec![0u8; len];
@@ -30,7 +30,7 @@ proptest! {
         repetitions in 2..8
     ) {
         let memory = VectorMemory::default();
-        write(&memory, 0, &bytes);
+        safe_write(&memory, 0, &bytes).unwrap();
 
         // use unbuffered reader, because buffered read might return fewer bytes depending on buffer state
         let mut reader = Reader::new(&memory, offset);
@@ -53,7 +53,7 @@ proptest! {
         offset in 0..512u64,
     ) {
         let memory = VectorMemory::default();
-        write(&memory, 0, &bytes);
+        safe_write(&memory, 0, &bytes).unwrap();
         let mut reader = build_reader(&memory, buffer_size, offset);
 
         let mut output = vec![];
