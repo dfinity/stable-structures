@@ -104,13 +104,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     /// contained previously.
     ///
     /// Complexity: O(1)
-    pub fn new(memory: M, magic: [u8; 3]) -> Self {
-        Self::safe_new(memory, magic)
-            .map_err(|e| panic!("Failed to create a new base stable vector: {}", e))
-            .unwrap()
-    }
-
-    fn safe_new(memory: M, magic: [u8; 3]) -> Result<Self, GrowFailed> {
+    pub fn new(memory: M, magic: [u8; 3]) -> Result<Self, GrowFailed> {
         let t_bounds = bounds::<T>();
 
         let header = HeaderV1 {
@@ -135,7 +129,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     /// stable vector.
     pub fn init(memory: M, magic: [u8; 3]) -> Result<Self, InitError> {
         if memory.size() == 0 {
-            return Self::safe_new(memory, magic).map_err(|_| InitError::OutOfMemory);
+            return Self::new(memory, magic).map_err(|_| InitError::OutOfMemory);
         }
         let header = Self::read_header(&memory);
         if header.magic != magic {
@@ -189,10 +183,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         let bytes = item.to_bytes_checked();
         let data_offset = self
             .write_entry_size(offset, bytes.len() as u32)
-            .map_err(|e| {
-                panic!("Failed to write to the stable vector: {}", e);
-            })
-            .unwrap();
+            .expect("unreachable: cannot fail to write to pre-allocated area");
         write(&self.memory, data_offset, bytes.borrow());
     }
 
@@ -210,22 +201,16 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     /// Adds a new item at the end of the vector.
     ///
     /// Complexity: O(max_size(T))
-    pub fn push(&self, item: &T) {
+    pub fn push(&self, item: &T) -> Result<(), GrowFailed> {
         let index = self.len();
         let offset = DATA_OFFSET + slot_size::<T>() as u64 * index;
         let bytes = item.to_bytes_checked();
-        let data_offset = self
-            .write_entry_size(offset, bytes.len() as u32)
-            .map_err(|e| {
-                panic!("Failed to write to the stable vector: {}", e);
-            })
-            .unwrap();
-        safe_write(&self.memory, data_offset, bytes.borrow()).map_err(|e| {
-            panic!("Failed to write to the stable vector: {}", e);
-        });
+        let data_offset = self.write_entry_size(offset, bytes.len() as u32)?;
+        safe_write(&self.memory, data_offset, bytes.borrow())?;
         // NB. We update the size only after we ensure that the data
         // write succeeded.
         self.set_len(index + 1);
+        Ok(())
     }
 
     /// Removes the item at the end of the vector.
