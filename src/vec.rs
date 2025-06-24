@@ -34,8 +34,11 @@ impl<T: Storable, M: Memory> Vec<T, M> {
     ///
     /// PRECONDITION: the memory is either empty or contains a valid
     /// stable vector.
-    pub fn init(memory: M) -> Result<Self, InitError> {
-        BaseVec::<T, M>::init(memory, MAGIC).map(Self)
+    pub fn init(memory: M) -> Self {
+        BaseVec::<T, M>::init(memory, MAGIC)
+            .map(Self)
+            .map_err(|e| panic!("{:?}", e))
+            .unwrap()
     }
 
     /// Returns the underlying memory instance.
