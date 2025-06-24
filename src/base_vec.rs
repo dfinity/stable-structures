@@ -316,6 +316,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         write_u64(memory, Address::from(4), header.len);
         write_u32(memory, Address::from(12), header.max_size);
         memory.write(16, &[if header.is_fixed_size { 1u8 } else { 0u8 }; 1]);
+        Ok(())
     }
 
     /// Reads the header from the specified memory.
