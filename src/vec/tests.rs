@@ -138,7 +138,7 @@ fn test_init_failures() {
     }
 
     assert_eq!(
-        StableVec::<u64, EmptyMem>::new(EmptyMem),
+        StableVec::<u64, EmptyMem>::new(EmptyMem).unwrap_err(),
         GrowFailed {
             current_size: 0,
             delta: 1

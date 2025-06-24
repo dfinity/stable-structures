@@ -644,6 +644,7 @@ impl BucketCache {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::safe_write;
     use proptest::prelude::*;
 
     const MAX_MEMORY_IN_PAGES: u64 = MAX_NUM_BUCKETS * BUCKET_SIZE_IN_PAGES;
@@ -1009,15 +1010,16 @@ mod test {
 
         // There are 5 operations
         for _ in 0..MEMORIES * 5 {
-            write(&next_memory(), 0, data.as_slice());
-            write(&next_memory(), WASM_PAGE_SIZE / 2, data.as_slice());
-            write(&next_memory(), WASM_PAGE_SIZE - 1, data.as_slice());
-            write(&next_memory(), WASM_PAGE_SIZE + 1, data.as_slice());
-            write(
+            safe_write(&next_memory(), 0, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE / 2, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE - 1, data.as_slice()).unwrap();
+            safe_write(&next_memory(), WASM_PAGE_SIZE + 1, data.as_slice()).unwrap();
+            safe_write(
                 &next_memory(),
                 2 * WASM_PAGE_SIZE + WASM_PAGE_SIZE / 2,
                 data.as_slice(),
-            );
+            )
+            .unwrap();
         }
 
         let expected_write = include_bytes!("memory_manager/stability_write.golden");
