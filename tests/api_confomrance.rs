@@ -1,5 +1,6 @@
 use ic_stable_structures::btreemap::BTreeMap;
 use ic_stable_structures::btreeset::BTreeSet;
+use ic_stable_structures::cell::Cell as StableCell;
 use ic_stable_structures::min_heap::MinHeap;
 use ic_stable_structures::vec::Vec as StableVec;
 use std::cell::RefCell;
@@ -322,4 +323,31 @@ fn api_conformance_vec() {
     // After popping everything, both should be empty.
     assert_eq!(stable.len(), std.len() as u64);
     assert_eq!(stable.is_empty(), std.is_empty());
+}
+
+#[test]
+fn api_conformance_cell() {
+    let mem = make_memory();
+
+    // use u32 for simplicity; also supported by Storable
+    let initial = 42u32;
+    let updated = 777u32;
+
+    let mut stable = StableCell::new(mem.clone(), initial).expect("init stable cell");
+    let std = RefCell::new(initial);
+
+    // Get
+    assert_eq!(*stable.get(), *std.borrow());
+
+    // Set
+    let old_stable = stable.set(updated).expect("set stable cell");
+    let old_std = std.replace(updated);
+    assert_eq!(old_stable, old_std);
+
+    // After set
+    assert_eq!(*stable.get(), *std.borrow());
+
+    // Check that the value persists across re-init
+    let stable = StableCell::init(mem, 0).expect("reinit stable cell");
+    assert_eq!(*stable.get(), updated);
 }
