@@ -1,12 +1,14 @@
-use ic_stable_structures::btreemap::BTreeMap;
-use ic_stable_structures::btreeset::BTreeSet;
-use ic_stable_structures::cell::Cell as StableCell;
-use ic_stable_structures::min_heap::MinHeap;
-use ic_stable_structures::vec::Vec as StableVec;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::rc::Rc;
+
+use ic_stable_structures::btreemap::BTreeMap;
+use ic_stable_structures::btreeset::BTreeSet;
+use ic_stable_structures::cell::Cell as StableCell;
+use ic_stable_structures::log::Log as StableLog;
+use ic_stable_structures::min_heap::MinHeap;
+use ic_stable_structures::vec::Vec as StableVec;
 
 pub fn make_memory() -> Rc<RefCell<std::vec::Vec<u8>>> {
     Rc::new(RefCell::new(Vec::new()))
@@ -350,4 +352,34 @@ fn api_conformance_cell() {
     // Check that the value persists across re-init
     let stable = StableCell::init(mem, 0).expect("reinit stable cell");
     assert_eq!(*stable.get(), updated);
+}
+
+#[test]
+fn api_conformance_log() {
+    let index_mem = make_memory();
+    let data_mem = make_memory();
+    let log = StableLog::new(index_mem.clone(), data_mem.clone());
+    let mut std = Vec::new();
+
+    let n = 10_u32;
+
+    // Append elements and compare returned indices
+    for i in 0..n {
+        let idx = log.append(&i).expect("append should succeed");
+        assert_eq!(idx, std.len() as u64);
+        std.push(i);
+    }
+
+    // Length and is_empty
+    assert_eq!(log.len(), std.len() as u64);
+    assert_eq!(log.is_empty(), std.is_empty());
+
+    // Get by index
+    for i in 0..n {
+        assert_eq!(log.get(i as u64), Some(std[i as usize]));
+    }
+
+    // Iteration
+    let log_items: Vec<_> = log.iter().collect();
+    assert_eq!(log_items, std);
 }
