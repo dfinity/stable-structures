@@ -1,6 +1,6 @@
-use crate::base_vec::{BaseVec, InitError};
+use crate::base_vec::BaseVec;
 use crate::storable::Storable;
-use crate::{GrowFailed, Memory};
+use crate::Memory;
 use std::fmt;
 
 #[cfg(test)]
@@ -30,8 +30,10 @@ where
     /// contained.
     ///
     /// Complexity: O(1)
-    pub fn new(memory: M) -> Result<Self, GrowFailed> {
-        BaseVec::<T, M>::new(memory, MAGIC).map(Self)
+    pub fn new(memory: M) -> Self {
+        BaseVec::<T, M>::new(memory, MAGIC)
+            .map(Self)
+            .expect("Failed to create a new heap")
     }
 
     /// Initializes a heap in the specified memory.
@@ -40,8 +42,10 @@ where
     ///
     /// PRECONDITION: the memory is either empty or contains a valid
     /// stable heap.
-    pub fn init(memory: M) -> Result<Self, InitError> {
-        BaseVec::<T, M>::init(memory, MAGIC).map(Self)
+    pub fn init(memory: M) -> Self {
+        BaseVec::<T, M>::init(memory, MAGIC)
+            .map(Self)
+            .expect("Failed to initialize a heap")
     }
 
     /// Returns the number of items in the heap.

@@ -240,7 +240,7 @@ fn api_conformance_btreeset() {
 #[test]
 fn api_conformance_min_heap() {
     let mem = make_memory();
-    let mut stable = MinHeap::new(mem).unwrap();
+    let mut stable = MinHeap::new(mem);
     let mut std = BinaryHeap::new();
     let n = 10_u32;
 
