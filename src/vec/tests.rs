@@ -1,7 +1,7 @@
-use super::{InitError, Vec as StableVec};
+use super::Vec as StableVec;
 use crate::storable::{Bound, Storable};
 use crate::vec_mem::VectorMemory as M;
-use crate::{GrowFailed, Memory};
+use crate::Memory;
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
 use std::borrow::Cow;
@@ -77,7 +77,7 @@ proptest! {
             sv.push(&v);
         }
         let vec = sv.to_vec();
-        prop_assert_eq!(StableVec::<u64, M>::init(sv.into_memory()).unwrap().to_vec(), vec);
+        prop_assert_eq!(StableVec::<u64, M>::init(sv.into_memory()).to_vec(), vec);
     }
 }
 
@@ -104,70 +104,65 @@ fn check_push_pop_model<T: Storable + Debug + Clone + PartialEq>(
 }
 
 #[test]
-fn test_init_type_compatibility() {
+#[should_panic(expected = "IncompatibleElementType")]
+fn test_failure_incompatible_element_type() {
     let v = StableVec::<u64, M>::new(M::default());
-
-    assert_eq!(
-        StableVec::<u32, M>::init(v.into_memory()).unwrap_err(),
-        InitError::IncompatibleElementType
-    );
-
-    let v = StableVec::<u64, M>::new(M::default());
-    assert_eq!(
-        StableVec::<UnfixedU64<8>, M>::init(v.into_memory()).unwrap_err(),
-        InitError::IncompatibleElementType
-    );
+    StableVec::<u32, M>::init(v.into_memory());
 }
 
 #[test]
-fn test_init_failures() {
-    struct EmptyMem;
-    impl Memory for EmptyMem {
-        fn size(&self) -> u64 {
-            0
-        }
-        fn grow(&self, _: u64) -> i64 {
-            -1
-        }
-        fn read(&self, _: u64, _: &mut [u8]) {
-            panic!("out of bounds")
-        }
-        fn write(&self, _: u64, _: &[u8]) {
-            panic!("out of bounds")
-        }
+#[should_panic(expected = "IncompatibleElementType")]
+fn test_failure_incompatible_element_type_2() {
+    let v = StableVec::<u64, M>::new(M::default());
+    StableVec::<UnfixedU64<8>, M>::init(v.into_memory());
+}
+
+struct EmptyMem;
+
+impl Memory for EmptyMem {
+    fn size(&self) -> u64 {
+        0
     }
+    fn grow(&self, _: u64) -> i64 {
+        -1
+    }
+    fn read(&self, _: u64, _: &mut [u8]) {
+        panic!("out of bounds")
+    }
+    fn write(&self, _: u64, _: &[u8]) {
+        panic!("out of bounds")
+    }
+}
 
-    assert_eq!(
-        StableVec::<u64, EmptyMem>::new(EmptyMem).unwrap_err(),
-        GrowFailed {
-            current_size: 0,
-            delta: 1
-        }
-    );
+#[test]
+#[should_panic(expected = "GrowFailed { current_size: 0, delta: 1 }")]
+fn test_failure_new() {
+    StableVec::<u64, EmptyMem>::new(EmptyMem);
+}
 
-    assert_eq!(
-        StableVec::<u64, EmptyMem>::init(EmptyMem).unwrap_err(),
-        InitError::OutOfMemory,
-    );
+#[test]
+#[should_panic(expected = "OutOfMemory")]
+fn test_failure_init() {
+    StableVec::<u64, EmptyMem>::init(EmptyMem);
+}
 
+#[test]
+#[should_panic(expected = "BadMagic { actual: [83, 73, 67], expected: [83, 86, 67] }")]
+fn test_failure_bad_magic() {
+    // InitError::BadMagic { actual: *b"SIC", expected: *b"SVC" }
     let mem = M::default();
     mem.grow(1);
     mem.write(0, b"SIC\x01\x08\x00\x00\x00\x00\x00\x00\x00\x01");
-    assert_eq!(
-        StableVec::<u64, M>::init(mem).unwrap_err(),
-        InitError::BadMagic {
-            actual: *b"SIC",
-            expected: *b"SVC"
-        },
-    );
+    StableVec::<u64, M>::init(mem);
+}
 
+#[test]
+#[should_panic(expected = "IncompatibleVersion(15)")]
+fn test_failure_incompatible_version() {
     let mem = M::default();
     mem.grow(1);
     mem.write(0, b"SVC\x0f\x08\x00\x00\x00\x00\x00\x00\x00\x01");
-    assert_eq!(
-        StableVec::<u64, M>::init(mem).unwrap_err(),
-        InitError::IncompatibleVersion(15),
-    );
+    StableVec::<u64, M>::init(mem);
 }
 
 #[allow(clippy::iter_nth_zero)]
