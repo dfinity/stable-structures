@@ -4,7 +4,6 @@ use crate::base_vec::BaseVec;
 pub use crate::base_vec::InitError;
 use crate::storable::Storable;
 use crate::Memory;
-use core::panic;
 use std::fmt;
 
 #[cfg(test)]
