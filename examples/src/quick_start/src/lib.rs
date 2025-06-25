@@ -39,8 +39,7 @@ fn stable_get(key: u128) -> Option<u128> {
 // if it exists.
 #[update]
 fn stable_insert(key: u128, value: u128) -> Option<u128> {
-    STATE
-        .with(|s| s.borrow_mut().stable_data.insert(key, value))
+    STATE.with(|s| s.borrow_mut().stable_data.insert(key, value))
 }
 
 // Sets the data that lives on the heap.
@@ -61,7 +60,8 @@ fn pre_upgrade() {
     // Serialize the state.
     // This example is using CBOR, but you can use any data format you like.
     let mut state_bytes = vec![];
-    STATE.with(|s| ciborium::ser::into_writer(&*s.borrow(), &mut state_bytes))
+    STATE
+        .with(|s| ciborium::ser::into_writer(&*s.borrow(), &mut state_bytes))
         .expect("failed to encode state");
 
     // Write the length of the serialized bytes to memory, followed by the
@@ -89,9 +89,7 @@ fn post_upgrade() {
 
     // Deserialize and set the state.
     let state = ciborium::de::from_reader(&*state_bytes).expect("failed to decode state");
-    STATE.with(|s| {
-        *s.borrow_mut() = state
-    });
+    STATE.with(|s| *s.borrow_mut() = state);
 }
 
 fn init_stable_data() -> StableBTreeMap<u128, u128, Memory> {
@@ -106,4 +104,3 @@ impl Default for State {
         }
     }
 }
-
