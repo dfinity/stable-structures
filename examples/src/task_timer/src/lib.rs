@@ -14,7 +14,7 @@ thread_local! {
         MEMORY_MANAGER.with(|mm|
             RefCell::new(
                 StableMinHeap::init(mm.borrow().get(MemoryId::new(1)))
-                .expect("failed to initialize the tasks"))
+            )
         );
 }
 
