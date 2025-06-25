@@ -26,11 +26,7 @@ fn post_upgrade() {
 #[update]
 fn schedule_task(after_sec: u64) {
     let task_time = ic_cdk::api::time() + after_sec * 1_000_000_000;
-    TASKS.with(|t| {
-        t.borrow_mut()
-            .push(&task_time)
-            .expect("failed to schedule a task")
-    });
+    TASKS.with(|t| t.borrow_mut().push(&task_time));
     reschedule();
 }
 

@@ -24,8 +24,7 @@ impl<T: Storable, M: Memory> Vec<T, M> {
     pub fn new(memory: M) -> Self {
         BaseVec::<T, M>::new(memory, MAGIC)
             .map(Self)
-            .map_err(|e| panic!("{:?}", e))
-            .unwrap()
+            .expect("Failed to create a new vector")
     }
 
     /// Initializes a vector in the specified memory.
@@ -37,8 +36,7 @@ impl<T: Storable, M: Memory> Vec<T, M> {
     pub fn init(memory: M) -> Self {
         BaseVec::<T, M>::init(memory, MAGIC)
             .map(Self)
-            .map_err(|e| panic!("{:?}", e))
-            .unwrap()
+            .expect("Failed to initialize a vector")
     }
 
     /// Returns the underlying memory instance.
@@ -80,7 +78,9 @@ impl<T: Storable, M: Memory> Vec<T, M> {
     ///
     /// Complexity: O(max_size(T))
     pub fn push(&self, item: &T) {
-        self.0.push(item).map_err(|e| panic!("{:?}", e)).unwrap();
+        self.0
+            .push(item)
+            .expect("Failed to push item to the vector");
     }
 
     /// Removes the item at the end of the vector.
