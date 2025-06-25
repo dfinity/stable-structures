@@ -84,21 +84,19 @@ fn read_chunks_btreemap(mem_id: u8, n: usize) {
 // StableVec benchmarks
 
 fn write_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
-    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> =
-        StableVec::new(init_memory(mem_id)).expect("Vec::new failed");
+    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> = StableVec::new(init_memory(mem_id));
     let chunks: Vec<_> = chunk_data(n).iter().map(|v| BoundedVecN::from(v)).collect();
 
     bench_fn(|| {
         for chunk in &chunks {
-            vec.push(chunk).expect("Vec::push failed");
+            vec.push(chunk);
         }
     });
 }
 
 fn read_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
     write_chunks_vec::<CHUNK_SIZE>(mem_id, n);
-    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> =
-        StableVec::init(init_memory(mem_id)).expect("Vec::init failed");
+    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> = StableVec::init(init_memory(mem_id));
 
     bench_fn(|| {
         for i in 0..n as u64 {
