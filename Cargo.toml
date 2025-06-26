@@ -28,6 +28,10 @@ test-strategy.workspace = true
 [features]
 bench_scope = ["dep:canbench-rs"] # May add significant overhead.
 
+[lints.rustdoc]
+# Make rustdoc warnings into errors
+all = "deny"
+
 [workspace]
 members = ["benchmarks"]
 

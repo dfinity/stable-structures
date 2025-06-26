@@ -40,6 +40,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --tests --benches -- -D clippy::all
 
+      - name: Docs
+        run: cargo doc
+
       - name: Test
         run: cargo test -- --color always
         env:
