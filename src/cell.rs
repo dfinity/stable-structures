@@ -116,11 +116,13 @@ impl<T: Storable, M: Memory> Cell<T, M> {
         }
 
         if header.version != LAYOUT_VERSION {
-            let err = InitError::IncompatibleVersion {
-                last_supported_version: LAYOUT_VERSION,
-                decoded_version: header.version,
-            };
-            panic!("Failed to initialize cell: {}", err);
+            panic!(
+                "Failed to initialize cell: {}",
+                InitError::IncompatibleVersion {
+                    last_supported_version: LAYOUT_VERSION,
+                    decoded_version: header.version,
+                }
+            );
         }
 
         Self {
