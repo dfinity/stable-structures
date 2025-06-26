@@ -335,14 +335,14 @@ fn api_conformance_cell() {
     let initial = 42u32;
     let updated = 777u32;
 
-    let mut stable = StableCell::new(mem.clone(), initial).expect("init stable cell");
+    let mut stable = StableCell::new(mem.clone(), initial);
     let std = RefCell::new(initial);
 
     // Get
     assert_eq!(*stable.get(), *std.borrow());
 
     // Set
-    let old_stable = stable.set(updated).expect("set stable cell");
+    let old_stable = stable.set(updated);
     let old_std = std.replace(updated);
     assert_eq!(old_stable, old_std);
 
@@ -350,7 +350,7 @@ fn api_conformance_cell() {
     assert_eq!(*stable.get(), *std.borrow());
 
     // Check that the value persists across re-init
-    let stable = StableCell::init(mem, 0).expect("reinit stable cell");
+    let stable = StableCell::init(mem, 0);
     assert_eq!(*stable.get(), updated);
 }
 
