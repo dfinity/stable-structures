@@ -82,15 +82,6 @@ fn test_failure_log_load_bad_index_version() {
     assert_eq!(data_memory.grow(1), 0);
     data_memory.write(0, b"GLD\x01");
     Log::<Vec<u8>, _, _>::init(index_memory, data_memory);
-    // assert_eq!(
-    //     Log::<Vec<u8>, _, _>::init(index_memory, data_memory)
-    //         .map(|_| ())
-    //         .unwrap_err(),
-    //     InitError::IncompatibleIndexVersion {
-    //         last_supported_version: 1,
-    //         decoded_version: 2
-    //     },
-    // );
 }
 
 #[test]
@@ -102,15 +93,6 @@ fn test_failure_log_load_bad_data_version() {
     assert_eq!(mem.grow(1), 0);
     mem.write(0, b"GLD\x02");
     Log::<Vec<u8>, _, _>::init(VectorMemory::default(), mem);
-    // assert_eq!(
-    //     Log::<Vec<u8>, _, _>::init(VectorMemory::default(), mem)
-    //         .map(|_| ())
-    //         .unwrap_err(),
-    //     InitError::IncompatibleDataVersion {
-    //         last_supported_version: 1,
-    //         decoded_version: 2
-    //     },
-    // );
 }
 
 #[test]
