@@ -41,7 +41,7 @@ jobs:
         run: cargo clippy --tests --benches -- -D clippy::all
 
       - name: Docs
-        run: cargo doc
+        run: cargo doc --target wasm32-unknown-unknown
 
       - name: Test
         run: cargo test -- --color always
