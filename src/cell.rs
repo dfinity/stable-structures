@@ -82,7 +82,7 @@ impl From<ValueError> for InitError {
 }
 
 /// Represents a value stored in stable memory.
-/// 
+///
 /// A `Cell` stores a single value directly in stable memory and provides immediate persistence
 /// on every write operation. This makes it ideal for configuration values, metadata, or any
 /// small state that needs to survive canister upgrades.
