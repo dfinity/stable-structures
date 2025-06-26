@@ -11,6 +11,10 @@ readme = "README.md"
 repository = "https://github.com/dfinity/stable-structures"
 version = "0.6.9"
 
+[package.metadata.docs.rs]
+# Build docs for wasm32-unknown-unknown target
+targets = ["wasm32-unknown-unknown"]
+
 [dependencies]
 canbench-rs = { workspace = true, optional = true } # Optional to benchmark parts of the code.
 ic_principal.workspace = true
@@ -27,6 +31,10 @@ test-strategy.workspace = true
 
 [features]
 bench_scope = ["dep:canbench-rs"] # May add significant overhead.
+
+[lints.rustdoc]
+# Make rustdoc warnings into errors
+all = "deny"
 
 [workspace]
 members = ["benchmarks"]
