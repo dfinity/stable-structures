@@ -183,33 +183,39 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
     /// Initializes the log based on the contents of the provided memory trait objects.
     /// If the memory trait objects already contain a stable log, this function recovers it from the stable
     /// memory. Otherwise, this function allocates a new empty log.
-    pub fn init(index_memory: INDEX, data_memory: DATA) -> Result<Self, InitError> {
+    pub fn init(index_memory: INDEX, data_memory: DATA) -> Self {
         // if the data memory is not containing expected data, the index is useless anyway.
         if data_memory.size() == 0 {
-            return Ok(Self::new(index_memory, data_memory));
+            return Self::new(index_memory, data_memory);
         }
         let data_header = Self::read_header(&data_memory);
         if &data_header.magic != DATA_MAGIC {
-            return Ok(Self::new(index_memory, data_memory));
+            return Self::new(index_memory, data_memory);
         }
 
         if data_header.version != LAYOUT_VERSION {
-            return Err(InitError::IncompatibleDataVersion {
-                last_supported_version: LAYOUT_VERSION,
-                decoded_version: data_header.version,
-            });
+            panic!(
+                "Failed to initialize log: {}",
+                InitError::IncompatibleDataVersion {
+                    last_supported_version: LAYOUT_VERSION,
+                    decoded_version: data_header.version,
+                }
+            );
         }
 
         let index_header = Self::read_header(&index_memory);
         if &index_header.magic != INDEX_MAGIC {
-            return Err(InitError::InvalidIndex);
+            panic!("Failed to initialize log: {}", InitError::InvalidIndex);
         }
 
         if index_header.version != LAYOUT_VERSION {
-            return Err(InitError::IncompatibleIndexVersion {
-                last_supported_version: LAYOUT_VERSION,
-                decoded_version: index_header.version,
-            });
+            panic!(
+                "Failed to initialize log: {}",
+                InitError::IncompatibleIndexVersion {
+                    last_supported_version: LAYOUT_VERSION,
+                    decoded_version: index_header.version,
+                }
+            );
         }
 
         #[cfg(debug_assertions)]
@@ -217,11 +223,11 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
             assert_eq!(Ok(()), Self::validate_v1_index(&index_memory));
         }
 
-        Ok(Self {
+        Self {
             index_memory,
             data_memory,
             _marker: PhantomData,
-        })
+        }
     }
 
     /// Writes the stable log header to memory.
