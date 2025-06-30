@@ -238,6 +238,15 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
             return;
         }
 
+        // Batch overflow page allocation.
+        let needed_pages =
+            compute_num_overflow_pages_needed(end_offset, self.page_size.get() as u64) as usize;
+        self.overflows
+            .reserve(needed_pages.saturating_sub(self.overflows.len()));
+        while self.overflows.len() < needed_pages {
+            self.allocate_new_page();
+        }
+
         let iter = NodeIterator::new(
             VirtualSegment {
                 address: Address::from(offset),
@@ -246,33 +255,22 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
             Bytes::from(self.page_size.get()),
         );
 
-        let mut bytes_written = 0;
+        let mut position = 0;
         for RealSegment {
             page_idx,
             offset,
             length,
         } in iter
         {
-            let offset = if page_idx == 0 {
-                // Write to the initial page.
-                (self.address + offset).get()
-            } else {
-                // Write to an overflow page, allocating it if it doesn't already exist.
-                if self.overflows.len() < page_idx {
-                    self.allocate_new_page();
-                }
-
-                (self.overflows[page_idx - 1] + offset).get()
+            let address = match page_idx {
+                0 => self.address,                 // Write to the initial page.
+                _ => self.overflows[page_idx - 1], // Write to an overflow page.
             };
-
+            let offset = (address + offset).get();
             let len = length.get() as usize;
-            write(
-                self.allocator.memory(),
-                offset,
-                &src[bytes_written..bytes_written + len],
-            );
-
-            bytes_written += len;
+            let slice = &src[position..position + len];
+            write(self.allocator.memory(), offset, slice);
+            position += len;
         }
     }
 
