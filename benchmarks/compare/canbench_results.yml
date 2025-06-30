@@ -65,21 +65,21 @@ benches:
   write_chunks_btreemap_1:
     total:
       calls: 1
-      instructions: 357412144
+      instructions: 357205117
       heap_increase: 13
       stable_memory_increase: 1536
     scopes: {}
   write_chunks_btreemap_1k:
     total:
       calls: 1
-      instructions: 4191327135
+      instructions: 4188695663
       heap_increase: 2
       stable_memory_increase: 1536
     scopes: {}
   write_chunks_btreemap_1m:
     total:
       calls: 1
-      instructions: 88839231407
+      instructions: 88827798790
       heap_increase: 0
       stable_memory_increase: 3072
     scopes: {}

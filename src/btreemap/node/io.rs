@@ -48,15 +48,17 @@ impl<M: Memory> Memory for NodeReader<'_, M> {
             // caller guarantees that we can write `count` number of bytes to `dst`.
             let len = length.get() as usize;
             assert!(position + len <= count);
-            if page_idx == 0 {
-                self.memory
-                    .read_unsafe((self.address + offset).get(), dst.add(position), len);
-            } else {
-                self.memory.read_unsafe(
+            match page_idx {
+                // Initial page.
+                0 => self
+                    .memory
+                    .read_unsafe((self.address + offset).get(), dst.add(position), len),
+                // Overflow page.
+                _ => self.memory.read_unsafe(
                     (self.overflows[page_idx - 1] + offset).get(),
                     dst.add(position),
                     len,
-                );
+                ),
             }
 
             position += len;
@@ -254,7 +256,6 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         );
 
         let mut position = 0;
-        let memory = self.allocator.memory();
         for RealSegment {
             page_idx,
             offset,
@@ -262,11 +263,20 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         } in iter
         {
             let len = length.get() as usize;
-            let addr = match page_idx {
-                0 => self.address,                 // Initial page.
-                _ => self.overflows[page_idx - 1], // Overflow page.
-            } + offset;
-            write(memory, addr.get(), &src[position..position + len]);
+            match page_idx {
+                // Initial page.
+                0 => write(
+                    self.allocator.memory(),
+                    (self.address + offset).get(),
+                    &src[position..position + len],
+                ),
+                // Overflow page.
+                _ => write(
+                    self.allocator.memory(),
+                    (self.overflows[page_idx - 1] + offset).get(),
+                    &src[position..position + len],
+                ),
+            };
             position += len;
         }
     }
