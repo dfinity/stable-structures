@@ -37,31 +37,27 @@ impl<M: Memory> Memory for NodeReader<'_, M> {
             Bytes::from(self.page_size.get()),
         );
 
-        let mut bytes_read = 0;
+        let mut position = 0;
         for RealSegment {
             page_idx,
             offset,
             length,
         } in iter
         {
-            // SAFETY: read_unsafe() is safe to call iff bytes_read + length <= count since the
+            // SAFETY: read_unsafe() is safe to call iff position + length <= count since the
             // caller guarantees that we can write `count` number of bytes to `dst`.
-            assert!(bytes_read + length.get() as usize <= count);
-            if page_idx == 0 {
-                self.memory.read_unsafe(
-                    (self.address + offset).get(),
-                    dst.add(bytes_read),
-                    length.get() as usize,
-                );
-            } else {
-                self.memory.read_unsafe(
-                    (self.overflows[page_idx - 1] + offset).get(),
-                    dst.add(bytes_read),
-                    length.get() as usize,
-                );
-            }
-
-            bytes_read += length.get() as usize;
+            let len = length.get() as usize;
+            assert!(position + len <= count);
+            self.memory.read_unsafe(
+                (match page_idx {
+                    0 => self.address,                 // Initial page.
+                    _ => self.overflows[page_idx - 1], // Overflow page.
+                } + offset)
+                    .get(),
+                dst.add(position),
+                len,
+            );
+            position += len;
         }
     }
 
@@ -262,14 +258,16 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
             length,
         } in iter
         {
-            let address = match page_idx {
-                0 => self.address,                 // Write to the initial page.
-                _ => self.overflows[page_idx - 1], // Write to an overflow page.
-            };
-            let offset = (address + offset).get();
             let len = length.get() as usize;
-            let slice = &src[position..position + len];
-            write(self.allocator.memory(), offset, slice);
+            write(
+                self.allocator.memory(),
+                (match page_idx {
+                    0 => self.address,                 // Initial page.
+                    _ => self.overflows[page_idx - 1], // Overflow page.
+                } + offset)
+                    .get(),
+                &src[position..position + len],
+            );
             position += len;
         }
     }
