@@ -128,38 +128,38 @@ macro_rules! bench_case_sized {
 
 // Benchmark registrations
 
-// // Stable Memory
-// bench_case!(write_chunks_stable_1, write_chunks_stable, 10, 1);
-// bench_case!(write_chunks_stable_1k, write_chunks_stable, 11, K);
-// bench_case!(write_chunks_stable_1m, write_chunks_stable, 12, M);
-// bench_case!(read_chunks_stable_1, read_chunks_stable, 20, 1);
-// bench_case!(read_chunks_stable_1k, read_chunks_stable, 21, K);
-// bench_case!(read_chunks_stable_1m, read_chunks_stable, 22, M);
+// Stable Memory
+bench_case!(write_chunks_stable_1, write_chunks_stable, 10, 1);
+bench_case!(write_chunks_stable_1k, write_chunks_stable, 11, K);
+bench_case!(write_chunks_stable_1m, write_chunks_stable, 12, M);
+bench_case!(read_chunks_stable_1, read_chunks_stable, 20, 1);
+bench_case!(read_chunks_stable_1k, read_chunks_stable, 21, K);
+bench_case!(read_chunks_stable_1m, read_chunks_stable, 22, M);
 
-// // BTreeMap
-// bench_case!(write_chunks_btreemap_1, write_chunks_btreemap, 30, 1);
-// bench_case!(write_chunks_btreemap_1k, write_chunks_btreemap, 31, K);
-// bench_case!(write_chunks_btreemap_1m, write_chunks_btreemap, 32, M);
-// bench_case!(read_chunks_btreemap_1, read_chunks_btreemap, 40, 1);
-// bench_case!(read_chunks_btreemap_1k, read_chunks_btreemap, 41, K);
-// bench_case!(read_chunks_btreemap_1m, read_chunks_btreemap, 42, M);
+// BTreeMap
+bench_case!(write_chunks_btreemap_1, write_chunks_btreemap, 30, 1);
+bench_case!(write_chunks_btreemap_1k, write_chunks_btreemap, 31, K);
+bench_case!(write_chunks_btreemap_1m, write_chunks_btreemap, 32, M);
+bench_case!(read_chunks_btreemap_1, read_chunks_btreemap, 40, 1);
+bench_case!(read_chunks_btreemap_1k, read_chunks_btreemap, 41, K);
+bench_case!(read_chunks_btreemap_1m, read_chunks_btreemap, 42, M);
 
-// // StableVec
-// bench_case_sized!(write_chunks_vec_1, write_chunks_vec, 50, 1);
-// bench_case_sized!(write_chunks_vec_1k, write_chunks_vec, 51, K);
-// bench_case_sized!(write_chunks_vec_1m, write_chunks_vec, 52, M);
-// bench_case_sized!(read_chunks_vec_1, read_chunks_vec, 60, 1);
-// bench_case_sized!(read_chunks_vec_1k, read_chunks_vec, 61, K);
-// bench_case_sized!(read_chunks_vec_1m, read_chunks_vec, 62, M);
+// StableVec
+bench_case_sized!(write_chunks_vec_1, write_chunks_vec, 50, 1);
+bench_case_sized!(write_chunks_vec_1k, write_chunks_vec, 51, K);
+bench_case_sized!(write_chunks_vec_1m, write_chunks_vec, 52, M);
+bench_case_sized!(read_chunks_vec_1, read_chunks_vec, 60, 1);
+bench_case_sized!(read_chunks_vec_1k, read_chunks_vec, 61, K);
+bench_case_sized!(read_chunks_vec_1m, read_chunks_vec, 62, M);
 
-#[bench(raw)]
-fn test_flamegraph() -> BenchResult {
-    let mut map = BTreeMap::init(init_memory(10));
-    let value = vec![82; 10 * 1024];
+// #[bench(raw)]
+// fn test_flamegraph() -> BenchResult {
+//     let mut map = BTreeMap::init(init_memory(10));
+//     let value = vec![82; 5 * 1024];
 
-    bench_fn(|| {
-        map.insert(1_u32, value);
-    })
-}
+//     bench_fn(|| {
+//         map.insert(1_u32, value);
+//     })
+// }
 
 fn main() {}

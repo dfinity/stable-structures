@@ -265,13 +265,14 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
                 (self.overflows[page_idx - 1] + offset).get()
             };
 
+            let len = length.get() as usize;
             write(
                 self.allocator.memory(),
                 offset,
-                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
+                &src[bytes_written..bytes_written + len],
             );
 
-            bytes_written += length.get();
+            bytes_written += len;
         }
     }
 
