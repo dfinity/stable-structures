@@ -48,15 +48,11 @@ impl<M: Memory> Memory for NodeReader<'_, M> {
             // caller guarantees that we can write `count` number of bytes to `dst`.
             let len = length.get() as usize;
             assert!(position + len <= count);
-            self.memory.read_unsafe(
-                (match page_idx {
-                    0 => self.address,                 // Initial page.
-                    _ => self.overflows[page_idx - 1], // Overflow page.
-                } + offset)
-                    .get(),
-                dst.add(position),
-                len,
-            );
+            let addr = match page_idx {
+                0 => self.address,                 // Initial page.
+                _ => self.overflows[page_idx - 1], // Overflow page.
+            } + offset;
+            self.memory.read_unsafe(addr.get(), dst.add(position), len);
             position += len;
         }
     }
@@ -252,6 +248,7 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         );
 
         let mut position = 0;
+        let memory = self.allocator.memory();
         for RealSegment {
             page_idx,
             offset,
@@ -259,15 +256,11 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         } in iter
         {
             let len = length.get() as usize;
-            write(
-                self.allocator.memory(),
-                (match page_idx {
-                    0 => self.address,                 // Initial page.
-                    _ => self.overflows[page_idx - 1], // Overflow page.
-                } + offset)
-                    .get(),
-                &src[position..position + len],
-            );
+            let addr = match page_idx {
+                0 => self.address,                 // Initial page.
+                _ => self.overflows[page_idx - 1], // Overflow page.
+            } + offset;
+            write(memory, addr.get(), &src[position..position + len]);
             position += len;
         }
     }
