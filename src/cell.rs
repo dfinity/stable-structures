@@ -138,7 +138,7 @@ impl From<ValueError> for InitError {
 ///                 name: "MyConfig".to_string(),
 ///                 version: 1,
 ///             }
-///         ).expect("failed to initialize config cell")
+///         )
 ///     );
 /// }
 ///
@@ -148,20 +148,19 @@ impl From<ValueError> for InitError {
 /// }
 ///
 /// // Update the configuration
-/// fn update_version(new_version: u32) -> Result<(), String> {
+/// fn update_version(new_version: u32) {
 ///     CONFIG.with(|c| {
 ///         let mut cell = c.borrow_mut();
 ///         let mut config = cell.get().clone();
 ///         config.version = new_version;
-///         cell.set(config).map_err(|e| format!("Failed to update: {:?}", e))?;
-///         Ok(())
-///     })
+///         cell.set(config);
+///     });
 /// }
 ///
 /// # // Test to ensure example works as expected.
 /// # fn main() {
 /// #    assert_eq!(get_version(), 1);
-/// #    update_version(2).unwrap();
+/// #    update_version(2);
 /// #    assert_eq!(get_version(), 2);
 /// # }
 /// ```
