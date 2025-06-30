@@ -1,11 +1,14 @@
-use ic_stable_structures::btreemap::BTreeMap;
-use ic_stable_structures::btreeset::BTreeSet;
-use ic_stable_structures::min_heap::MinHeap;
-use ic_stable_structures::vec::Vec as StableVec;
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::rc::Rc;
+
+use ic_stable_structures::btreemap::BTreeMap;
+use ic_stable_structures::btreeset::BTreeSet;
+use ic_stable_structures::cell::Cell as StableCell;
+use ic_stable_structures::log::Log as StableLog;
+use ic_stable_structures::min_heap::MinHeap;
+use ic_stable_structures::vec::Vec as StableVec;
 
 pub fn make_memory() -> Rc<RefCell<std::vec::Vec<u8>>> {
     Rc::new(RefCell::new(Vec::new()))
@@ -240,13 +243,13 @@ fn api_conformance_btreeset() {
 #[test]
 fn api_conformance_min_heap() {
     let mem = make_memory();
-    let mut stable = MinHeap::new(mem).unwrap();
+    let mut stable = MinHeap::new(mem);
     let mut std = BinaryHeap::new();
     let n = 10_u32;
 
     // Push elements.
     for i in 0..n {
-        stable.push(&i).expect("push failed");
+        stable.push(&i);
         std.push(Reverse(i));
     }
 
@@ -279,13 +282,13 @@ fn api_conformance_min_heap() {
 #[test]
 fn api_conformance_vec() {
     let mem = make_memory();
-    let stable = StableVec::new(mem).unwrap();
+    let stable = StableVec::new(mem);
     let mut std = Vec::new();
     let n = 10_u32;
 
     // Push elements.
     for i in 0..n {
-        stable.push(&i).expect("push failed");
+        stable.push(&i);
         std.push(i);
     }
 
@@ -322,4 +325,61 @@ fn api_conformance_vec() {
     // After popping everything, both should be empty.
     assert_eq!(stable.len(), std.len() as u64);
     assert_eq!(stable.is_empty(), std.is_empty());
+}
+
+#[test]
+fn api_conformance_cell() {
+    let mem = make_memory();
+
+    // use u32 for simplicity; also supported by Storable
+    let initial = 42u32;
+    let updated = 777u32;
+
+    let mut stable = StableCell::new(mem.clone(), initial);
+    let std = RefCell::new(initial);
+
+    // Get
+    assert_eq!(*stable.get(), *std.borrow());
+
+    // Set
+    let old_stable = stable.set(updated);
+    let old_std = std.replace(updated);
+    assert_eq!(old_stable, old_std);
+
+    // After set
+    assert_eq!(*stable.get(), *std.borrow());
+
+    // Check that the value persists across re-init
+    let stable = StableCell::init(mem, 0);
+    assert_eq!(*stable.get(), updated);
+}
+
+#[test]
+fn api_conformance_log() {
+    let index_mem = make_memory();
+    let data_mem = make_memory();
+    let log = StableLog::new(index_mem.clone(), data_mem.clone());
+    let mut std = Vec::new();
+
+    let n = 10_u32;
+
+    // Append elements and compare returned indices
+    for i in 0..n {
+        let idx = log.append(&i).expect("append should succeed");
+        assert_eq!(idx, std.len() as u64);
+        std.push(i);
+    }
+
+    // Length and is_empty
+    assert_eq!(log.len(), std.len() as u64);
+    assert_eq!(log.is_empty(), std.is_empty());
+
+    // Get by index
+    for i in 0..n {
+        assert_eq!(log.get(i as u64), Some(std[i as usize]));
+    }
+
+    // Iteration
+    let log_items: Vec<_> = log.iter().collect();
+    assert_eq!(log_items, std);
 }

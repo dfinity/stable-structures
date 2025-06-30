@@ -172,36 +172,39 @@ pub struct Cell<T: Storable, M: Memory> {
 
 impl<T: Storable, M: Memory> Cell<T, M> {
     /// Creates a new cell in the specified memory, overwriting the previous contents of the memory.
-    pub fn new(memory: M, value: T) -> Result<Self, ValueError> {
-        Self::flush_value(&memory, &value)?;
-        Ok(Self { memory, value })
+    pub fn new(memory: M, value: T) -> Self {
+        Self::flush_value(&memory, &value).expect("Failed to write initial value to the memory");
+        Self { memory, value }
     }
 
     /// Initializes the value of the cell based on the contents of the `memory`.
     /// If the memory already contains a cell, initializes the cell with the decoded value.
     /// Otherwise, sets the cell value to `default_value` and writes it to the memory.
-    pub fn init(memory: M, default_value: T) -> Result<Self, InitError> {
+    pub fn init(memory: M, default_value: T) -> Self {
         if memory.size() == 0 {
-            return Ok(Self::new(memory, default_value)?);
+            return Self::new(memory, default_value);
         }
 
         let header = Self::read_header(&memory);
 
         if &header.magic != MAGIC {
-            return Ok(Self::new(memory, default_value)?);
+            return Self::new(memory, default_value);
         }
 
         if header.version != LAYOUT_VERSION {
-            return Err(InitError::IncompatibleVersion {
-                last_supported_version: LAYOUT_VERSION,
-                decoded_version: header.version,
-            });
+            panic!(
+                "Failed to initialize cell: {}",
+                InitError::IncompatibleVersion {
+                    last_supported_version: LAYOUT_VERSION,
+                    decoded_version: header.version,
+                }
+            );
         }
 
-        Ok(Self {
+        Self {
             value: Self::read_value(&memory, header.value_length),
             memory,
-        })
+        }
     }
 
     /// Reads and decodes the value of specified length.
@@ -245,9 +248,9 @@ impl<T: Storable, M: Memory> Cell<T, M> {
     /// Updates the current value in the cell.
     /// If the new value is too large to fit into the memory, the value in the cell does not
     /// change.
-    pub fn set(&mut self, value: T) -> Result<T, ValueError> {
-        Self::flush_value(&self.memory, &value)?;
-        Ok(std::mem::replace(&mut self.value, value))
+    pub fn set(&mut self, value: T) -> T {
+        Self::flush_value(&self.memory, &value).expect("Failed to write value to the memory");
+        std::mem::replace(&mut self.value, value)
     }
 
     /// Writes the value to the memory, growing the memory size if needed.

@@ -1202,13 +1202,13 @@ where
         }
     }
 
-    /// **Deprecated**: use [`iter_from_prev_key`] instead.
+    /// **Deprecated**: use `iter_from_prev_key` instead.
     ///
     /// The name `iter_upper_bound` was misleading — it suggested an inclusive
     /// upper bound. In reality, it starts from the largest key strictly less
     /// than the given bound.
     ///
-    /// The new name, [`iter_from_prev_key`], better reflects this behavior and
+    /// The new name, `iter_from_prev_key`, better reflects this behavior and
     /// improves code clarity.
     #[deprecated(note = "use `iter_from_prev_key` instead")]
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<'_, K, V, M> {
