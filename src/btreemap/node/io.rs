@@ -44,24 +44,22 @@ impl<M: Memory> Memory for NodeReader<'_, M> {
             length,
         } in iter
         {
-            // SAFETY: read_unsafe() is safe to call iff position + length <= count since the
+            // SAFETY: read_unsafe() is safe to call iff `position + length <= count` since the
             // caller guarantees that we can write `count` number of bytes to `dst`.
-            assert!(position + length.get() as usize <= count);
+            let len = length.get() as usize;
+            assert!(position + len <= count);
             if page_idx == 0 {
-                self.memory.read_unsafe(
-                    (self.address + offset).get(),
-                    dst.add(position),
-                    length.get() as usize,
-                );
+                self.memory
+                    .read_unsafe((self.address + offset).get(), dst.add(position), len);
             } else {
                 self.memory.read_unsafe(
                     (self.overflows[page_idx - 1] + offset).get(),
                     dst.add(position),
-                    length.get() as usize,
+                    len,
                 );
             }
 
-            position += length.get() as usize;
+            position += len;
         }
     }
 
