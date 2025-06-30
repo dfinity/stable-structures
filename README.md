@@ -23,11 +23,11 @@ This library aims to simplify managing data structures directly in stable memory
 
 ## Available Data Structures
 
+- [Cell]: A serializable value
 - [BTreeMap]: A Key-Value store
 - [BTreeSet]: A set of unique elements
 - [Vec]: A growable array
 - [Log]: An append-only list of variable-size entries
-- [Cell]: A serializable value
 - [MinHeap]: A priority queue.
 
 ## Tutorials

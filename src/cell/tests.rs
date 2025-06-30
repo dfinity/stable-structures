@@ -54,3 +54,20 @@ fn test_cell_grow_and_shrink() {
     let cell = reload(cell);
     assert_eq!(&[3u8; 5][..], &cell.get()[..]);
 }
+
+#[test]
+fn can_store_unbounded_type() {
+    let mem = VectorMemory::default();
+    let test_string = "Another string with different content".to_string();
+
+    let mut cell = Cell::init(mem, test_string.clone());
+    assert_eq!(test_string, *cell.get());
+
+    let new_string = "This is a test string that can be very long and unbounded".to_string();
+    cell.set(new_string.clone());
+    assert_eq!(new_string, *cell.get());
+
+    // Test reloading from memory
+    let cell = reload(cell);
+    assert_eq!(new_string, *cell.get());
+}
