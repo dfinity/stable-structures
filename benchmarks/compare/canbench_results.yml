@@ -62,13 +62,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  test_flamegraph:
-    total:
-      calls: 1
-      instructions: 15164
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   write_chunks_btreemap_1:
     total:
       calls: 1

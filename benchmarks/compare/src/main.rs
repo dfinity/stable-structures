@@ -152,14 +152,15 @@ bench_case_sized!(read_chunks_vec_1, read_chunks_vec, 60, 1);
 bench_case_sized!(read_chunks_vec_1k, read_chunks_vec, 61, K);
 bench_case_sized!(read_chunks_vec_1m, read_chunks_vec, 62, M);
 
-#[bench(raw)]
-fn test_flamegraph() -> BenchResult {
-    let mut map = BTreeMap::init(init_memory(10));
-    let value = vec![82; 3 * 1024];
+// #[bench(raw)]
+// fn test_flamegraph() -> BenchResult {
+//     let mut map = BTreeMap::init(init_memory(10));
+//     let value = vec![82; 3 * 1024];
 
-    bench_fn(|| {
-        map.insert(1_u32, value);
-    })
-}
+//     map.insert(1_u32, value);
+//     bench_fn(|| {
+//         map.get(&1_u32);
+//     })
+// }
 
 fn main() {}
