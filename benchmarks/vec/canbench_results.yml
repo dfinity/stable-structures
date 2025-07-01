@@ -65,49 +65,49 @@ benches:
   vec_insert_blob_128:
     total:
       calls: 1
-      instructions: 4151424
+      instructions: 4171424
       heap_increase: 0
       stable_memory_increase: 19
     scopes: {}
   vec_insert_blob_16:
     total:
       calls: 1
-      instructions: 3316227
+      instructions: 3336227
       heap_increase: 0
       stable_memory_increase: 2
     scopes: {}
   vec_insert_blob_32:
     total:
       calls: 1
-      instructions: 3435467
+      instructions: 3455467
       heap_increase: 0
       stable_memory_increase: 5
     scopes: {}
   vec_insert_blob_4:
     total:
       calls: 1
-      instructions: 3227468
+      instructions: 3247468
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_insert_blob_64:
     total:
       calls: 1
-      instructions: 3675804
+      instructions: 3695804
       heap_increase: 0
       stable_memory_increase: 9
     scopes: {}
   vec_insert_blob_8:
     total:
       calls: 1
-      instructions: 3256889
+      instructions: 3276889
       heap_increase: 0
       stable_memory_increase: 1
     scopes: {}
   vec_insert_u64:
     total:
       calls: 1
-      instructions: 5359519
+      instructions: 5379519
       heap_increase: 0
       stable_memory_increase: 1
     scopes: {}
