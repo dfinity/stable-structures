@@ -1,4 +1,4 @@
-use crate::log::{iter_thread_local, InitError, Log, WriteError};
+use crate::log::{iter_thread_local, Log, WriteError};
 use crate::vec_mem::VectorMemory;
 use crate::{Memory, RestrictedMemory, WASM_PAGE_SIZE};
 use std::cell::RefCell;
@@ -9,7 +9,6 @@ thread_local! {
 
 fn new_string_log() -> Log<String, VectorMemory, VectorMemory> {
     Log::init(VectorMemory::default(), VectorMemory::default())
-        .expect("failed to initialize stable log")
 }
 
 #[test]
@@ -21,7 +20,7 @@ fn test_log_construct() {
     assert_eq!(log.index_size_bytes(), 40);
     let (index_memory, data_memory) = log.into_memories();
 
-    let log = Log::<Vec<u8>, _, _>::init(index_memory, data_memory).expect("failed to init log");
+    let log = Log::<Vec<u8>, _, _>::init(index_memory, data_memory);
     assert_eq!(log.len(), 0);
     assert_eq!(log.log_size_bytes(), 0);
     assert_eq!(log.index_size_bytes(), 40);
@@ -42,8 +41,7 @@ fn test_new_overwrites() {
 
 #[test]
 fn test_log_init_empty() {
-    let log = Log::<Vec<u8>, _, _>::init(VectorMemory::default(), VectorMemory::default())
-        .expect("failed to init log");
+    let log = Log::<Vec<u8>, _, _>::init(VectorMemory::default(), VectorMemory::default());
 
     assert_eq!(log.len(), 0);
     assert_eq!(log.log_size_bytes(), 0);
@@ -55,28 +53,27 @@ fn test_log_init_with_different_data_magic() {
     let mem = VectorMemory::default();
     assert_eq!(mem.grow(1), 0);
     mem.write(0, b"WAS");
-    let log = Log::<Vec<u8>, _, _>::init(VectorMemory::default(), mem).expect("failed to init log");
+    let log = Log::<Vec<u8>, _, _>::init(VectorMemory::default(), mem);
     assert_eq!(log.len(), 0);
 }
 
 #[test]
-fn test_log_init_with_different_index_magic() {
+#[should_panic(expected = "Invalid index")]
+fn test_failure_log_init_with_different_index_magic() {
     let index_mem = VectorMemory::default();
     assert_eq!(index_mem.grow(1), 0);
     index_mem.write(0, b"WAS");
     let data_mem = VectorMemory::default();
     assert_eq!(data_mem.grow(1), 0);
     data_mem.write(0, b"GLD\x01");
-    assert_eq!(
-        Log::<Vec<u8>, _, _>::init(index_mem, data_mem)
-            .map(|_| ())
-            .unwrap_err(),
-        InitError::InvalidIndex
-    );
+    Log::<Vec<u8>, _, _>::init(index_mem, data_mem);
 }
 
 #[test]
-fn test_log_load_bad_index_version() {
+#[should_panic(
+    expected = "Incompatible index version: last supported version is 1, but decoded version is 2"
+)]
+fn test_failure_log_load_bad_index_version() {
     let index_memory = VectorMemory::default();
     assert_eq!(index_memory.grow(1), 0);
     index_memory.write(0, b"GLI\x02");
@@ -84,32 +81,18 @@ fn test_log_load_bad_index_version() {
     let data_memory = VectorMemory::default();
     assert_eq!(data_memory.grow(1), 0);
     data_memory.write(0, b"GLD\x01");
-    assert_eq!(
-        Log::<Vec<u8>, _, _>::init(index_memory, data_memory)
-            .map(|_| ())
-            .unwrap_err(),
-        InitError::IncompatibleIndexVersion {
-            last_supported_version: 1,
-            decoded_version: 2
-        },
-    );
+    Log::<Vec<u8>, _, _>::init(index_memory, data_memory);
 }
 
 #[test]
-fn test_log_load_bad_data_version() {
+#[should_panic(
+    expected = "Incompatible data version: last supported version is 1, but decoded version is 2"
+)]
+fn test_failure_log_load_bad_data_version() {
     let mem = VectorMemory::default();
     assert_eq!(mem.grow(1), 0);
     mem.write(0, b"GLD\x02");
-
-    assert_eq!(
-        Log::<Vec<u8>, _, _>::init(VectorMemory::default(), mem)
-            .map(|_| ())
-            .unwrap_err(),
-        InitError::IncompatibleDataVersion {
-            last_supported_version: 1,
-            decoded_version: 2
-        },
-    );
+    Log::<Vec<u8>, _, _>::init(VectorMemory::default(), mem);
 }
 
 #[test]
@@ -138,7 +121,7 @@ fn test_log_append_persistence() {
 
     let (index_memory, data_memory) = log.into_memories();
 
-    let log = Log::<Vec<u8>, _, _>::init(index_memory, data_memory).unwrap();
+    let log = Log::<Vec<u8>, _, _>::init(index_memory, data_memory);
     assert_eq!(log.len(), 1);
     assert_eq!(log.get(idx).unwrap(), b"DEADBEEF".to_vec());
     assert_eq!(log.log_size_bytes(), b"DEADBEEF".len() as u64);

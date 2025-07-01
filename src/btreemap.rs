@@ -172,10 +172,16 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 /// }
 ///
 /// impl Storable for User {
-///     fn to_bytes(&self) -> Cow<[u8]> {
+///     fn to_bytes(&self) -> Cow<'_, [u8]> {
 ///         let mut bytes = Vec::new();
 ///         // TODO: Convert your struct to bytes...
 ///         Cow::Owned(bytes)
+///     }
+///
+///     fn into_bytes(self) -> Vec<u8> {
+///         let mut bytes = Vec::new();
+///         // TODO: Convert your struct to bytes...
+///         bytes
 ///     }
 ///
 ///     fn from_bytes(bytes: Cow<[u8]>) -> Self {
@@ -492,7 +498,7 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let value = value.to_bytes_checked().into_owned();
+        let value = value.into_bytes_checked();
 
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.
@@ -506,10 +512,10 @@ where
 
             // Check if the key already exists in the root.
             if let Ok(idx) = root.search(&key, self.memory()) {
-                // The key exists. Overwrite it and return the previous value.
-                let (_, previous_value) = root.swap_entry(idx, (key, value), self.memory());
-                self.save_node(&mut root);
-                return Some(V::from_bytes(Cow::Owned(previous_value)));
+                // Key found, replace its value and return the old one.
+                return Some(V::from_bytes(Cow::Owned(
+                    self.update_value(&mut root, idx, value),
+                )));
             }
 
             // If the root is full, we need to introduce a new node as the root.
@@ -550,12 +556,8 @@ where
         // Look for the key in the node.
         match node.search(&key, self.memory()) {
             Ok(idx) => {
-                // The key is already in the node.
-                // Overwrite it and return the previous value.
-                let (_, previous_value) = node.swap_entry(idx, (key, value), self.memory());
-
-                self.save_node(&mut node);
-                Some(previous_value)
+                // Key found, replace its value and return the old one.
+                Some(self.update_value(&mut node, idx, value))
             }
             Err(idx) => {
                 // The key isn't in the node. `idx` is where that key should be inserted.
@@ -582,11 +584,8 @@ where
                         if child.is_full() {
                             // Check if the key already exists in the child.
                             if let Ok(idx) = child.search(&key, self.memory()) {
-                                // The key exists. Overwrite it and return the previous value.
-                                let (_, previous_value) =
-                                    child.swap_entry(idx, (key, value), self.memory());
-                                self.save_node(&mut child);
-                                return Some(previous_value);
+                                // Key found, replace its value and return the old one.
+                                return Some(self.update_value(&mut child, idx, value));
                             }
 
                             // The child is full. Split the child.
@@ -1162,7 +1161,7 @@ where
     ///     println!("{}: {}", key, value);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<K, V, M> {
+    pub fn iter(&self) -> Iter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
@@ -1185,13 +1184,17 @@ where
     ///     println!("{}: {}", key, value);
     /// }
     /// ```
-    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, V, M> {
+    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
-    /// Returns an iterator pointing to the first element below the given bound.
-    /// Returns an empty iterator if there are no keys below the given bound.
-    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
+    /// Returns an iterator starting just before the given key.
+    ///
+    /// Finds the largest key strictly less than `bound` and starts from it.
+    /// Useful when `range(bound..)` skips the previous element.
+    ///
+    /// Returns an empty iterator if no smaller key exists.
+    pub fn iter_from_prev_key(&self, bound: &K) -> Iter<'_, K, V, M> {
         if let Some((start_key, _)) = self.range(..bound).next_back() {
             IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
         } else {
@@ -1199,32 +1202,45 @@ where
         }
     }
 
+    /// **Deprecated**: use `iter_from_prev_key` instead.
+    ///
+    /// The name `iter_upper_bound` was misleading — it suggested an inclusive
+    /// upper bound. In reality, it starts from the largest key strictly less
+    /// than the given bound.
+    ///
+    /// The new name, `iter_from_prev_key`, better reflects this behavior and
+    /// improves code clarity.
+    #[deprecated(note = "use `iter_from_prev_key` instead")]
+    pub fn iter_upper_bound(&self, bound: &K) -> Iter<'_, K, V, M> {
+        self.iter_from_prev_key(bound)
+    }
+
     /// Returns an iterator over the keys of the map.
-    pub fn keys(&self) -> KeysIter<K, V, M> {
+    pub fn keys(&self) -> KeysIter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
     /// Returns an iterator over the keys of the map which belong to the specified range.
-    pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<K, V, M> {
+    pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
     /// Returns an iterator over the values of the map, sorted by key.
-    pub fn values(&self) -> ValuesIter<K, V, M> {
+    pub fn values(&self) -> ValuesIter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
     /// Returns an iterator over the values of the map where keys
     /// belong to the specified range.
-    pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<K, V, M> {
+    pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
-    fn iter_internal(&self) -> IterInternal<K, V, M> {
+    fn iter_internal(&self) -> IterInternal<'_, K, V, M> {
         IterInternal::new(self)
     }
 
-    fn range_internal(&self, key_range: impl RangeBounds<K>) -> IterInternal<K, V, M> {
+    fn range_internal(&self, key_range: impl RangeBounds<K>) -> IterInternal<'_, K, V, M> {
         if self.root_addr == NULL {
             // Map is empty.
             return IterInternal::null(self);
@@ -1279,6 +1295,13 @@ where
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
         node.save(self.allocator_mut());
+    }
+
+    /// Replaces the value at `idx` in the node, saves the node, and returns the old value.
+    fn update_value(&mut self, node: &mut Node<K>, idx: usize, new_value: Vec<u8>) -> Vec<u8> {
+        let old_value = node.swap_value(idx, new_value, self.memory());
+        self.save_node(node);
+        old_value
     }
 
     /// Saves the map to memory.
@@ -1428,7 +1451,7 @@ mod test {
 
     /// Encodes an object into a byte vector.
     fn encode<T: Storable>(object: T) -> Vec<u8> {
-        object.to_bytes_checked().into_owned()
+        object.into_bytes_checked()
     }
 
     /// A helper method to succinctly create a blob.
@@ -2949,35 +2972,39 @@ mod test {
     }
     btree_test!(test_bruteforce_range_search, bruteforce_range_search);
 
-    fn test_iter_upper_bound<K: TestKey, V: TestValue>() {
+    fn test_iter_from_prev_key<K: TestKey, V: TestValue>() {
         let (key, value) = (K::build, V::build);
         run_btree_test(|mut btree| {
             for j in 0..100 {
                 btree.insert(key(j), value(j));
                 for i in 0..=j {
                     assert_eq!(
-                        btree.iter_upper_bound(&key(i + 1)).next(),
+                        btree.iter_from_prev_key(&key(i + 1)).next(),
                         Some((key(i), value(i))),
                         "failed to get an upper bound for key({})",
                         i + 1
                     );
                 }
                 assert_eq!(
-                    btree.iter_upper_bound(&key(0)).next(),
+                    btree.iter_from_prev_key(&key(0)).next(),
                     None,
                     "key(0) must not have an upper bound"
                 );
             }
         });
     }
-    btree_test!(test_test_iter_upper_bound, test_iter_upper_bound);
+    btree_test!(test_test_iter_from_prev_key, test_iter_from_prev_key);
 
     // A buggy implementation of storable where the max_size is smaller than the serialized size.
     #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
     struct BuggyStruct;
     impl crate::Storable for BuggyStruct {
-        fn to_bytes(&self) -> Cow<[u8]> {
+        fn to_bytes(&self) -> Cow<'_, [u8]> {
             Cow::Borrowed(&[1, 2, 3, 4])
+        }
+
+        fn into_bytes(self) -> Vec<u8> {
+            self.to_bytes().into_owned()
         }
 
         fn from_bytes(_: Cow<[u8]>) -> Self {
@@ -3115,8 +3142,12 @@ mod test {
         #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
         struct T;
         impl Storable for T {
-            fn to_bytes(&self) -> Cow<[u8]> {
-                Cow::Owned(vec![1, 2, 3])
+            fn to_bytes(&self) -> Cow<'_, [u8]> {
+                Cow::Borrowed(&[1, 2, 3])
+            }
+
+            fn into_bytes(self) -> Vec<u8> {
+                self.to_bytes().into_owned()
             }
 
             fn from_bytes(bytes: Cow<[u8]>) -> Self {
@@ -3134,8 +3165,12 @@ mod test {
         #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
         struct T2;
         impl Storable for T2 {
-            fn to_bytes(&self) -> Cow<[u8]> {
+            fn to_bytes(&self) -> Cow<'_, [u8]> {
                 Cow::Owned(vec![1, 2, 3])
+            }
+
+            fn into_bytes(self) -> Vec<u8> {
+                self.to_bytes().into_owned()
             }
 
             fn from_bytes(bytes: Cow<[u8]>) -> Self {

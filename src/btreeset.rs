@@ -108,8 +108,12 @@ where
 /// }
 ///
 /// impl Storable for CustomType {
-///     fn to_bytes(&self) -> Cow<[u8]> {
+///     fn to_bytes(&self) -> Cow<'_, [u8]> {
 ///         Cow::Owned(self.id.to_le_bytes().to_vec())
+///     }
+///
+///     fn into_bytes(self) -> Vec<u8> {
+///         self.id.to_le_bytes().to_vec()
 ///     }
 ///
 ///     fn from_bytes(bytes: Cow<[u8]>) -> Self {
@@ -478,7 +482,7 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<K, M> {
+    pub fn iter(&self) -> Iter<'_, K, M> {
         Iter::new(self.map.iter())
     }
 
@@ -502,33 +506,8 @@ where
     /// let range: Vec<_> = set.range(2..).collect();
     /// assert_eq!(range, vec![2, 3]);
     /// ```
-    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, M> {
+    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<'_, K, M> {
         Iter::new(self.map.range(key_range))
-    }
-
-    /// Returns an iterator pointing to the first element strictly below the given bound.
-    /// Returns an empty iterator if there are no keys strictly below the given bound.
-    ///
-    /// # Complexity
-    /// O(log n) for creating the iterator, where n is the number of elements in the set.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
-    /// use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
-    ///
-    /// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
-    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(mem_mgr.get(MemoryId::new(0)));
-    /// set.insert(1);
-    /// set.insert(2);
-    /// set.insert(3);
-    ///
-    /// let upper_bound: Option<u64> = set.iter_upper_bound(&3).next();
-    /// assert_eq!(upper_bound, Some(2));
-    /// ```
-    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, M> {
-        Iter::new(self.map.iter_upper_bound(bound))
     }
 
     /// Returns an iterator over the union of this set and another.
@@ -1107,31 +1086,6 @@ mod test {
     }
 
     #[test]
-    fn test_iter_upper_bound() {
-        let mem = make_memory();
-        let mut btreeset = BTreeSet::new(mem);
-
-        for i in 0u32..100 {
-            btreeset.insert(i);
-
-            // Test that `iter_upper_bound` returns the largest element strictly below the bound.
-            for j in 1u32..=i {
-                assert_eq!(
-                    btreeset.iter_upper_bound(&(j + 1)).next(),
-                    Some(j),
-                    "failed to get an upper bound for {}",
-                    j + 1
-                );
-            }
-            assert_eq!(
-                btreeset.iter_upper_bound(&0).next(),
-                None,
-                "0 must not have an upper bound"
-            );
-        }
-    }
-
-    #[test]
     fn test_iter() {
         let mem = make_memory();
         let mut btreeset = BTreeSet::new(mem);
@@ -1231,20 +1185,6 @@ mod test {
     }
 
     #[test]
-    fn test_iter_upper_bound_large_set() {
-        let mem = make_memory();
-        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
-
-        for i in 0u32..1000 {
-            btreeset.insert(i);
-        }
-
-        assert_eq!(btreeset.iter_upper_bound(&500).next(), Some(499));
-        assert_eq!(btreeset.iter_upper_bound(&0).next(), None);
-        assert_eq!(btreeset.iter_upper_bound(&1000).next(), Some(999));
-    }
-
-    #[test]
     fn test_range_large_set() {
         let mem = make_memory();
         let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
@@ -1298,14 +1238,6 @@ mod test {
 
         assert_eq!(btreeset.pop_first(), None);
         assert_eq!(btreeset.pop_last(), None);
-    }
-
-    #[test]
-    fn test_iter_upper_bound_empty() {
-        let mem = make_memory();
-        let btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
-
-        assert_eq!(btreeset.iter_upper_bound(&42u32).next(), None);
     }
 
     #[test]
@@ -1408,20 +1340,6 @@ mod test {
         }
 
         assert!(btreeset.is_empty());
-    }
-
-    #[test]
-    fn test_iter_upper_bound_edge_cases() {
-        let mem = make_memory();
-        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(mem);
-
-        for i in 1..=10 {
-            btreeset.insert(i);
-        }
-
-        assert_eq!(btreeset.iter_upper_bound(&1).next(), None); // No element strictly below 1
-        assert_eq!(btreeset.iter_upper_bound(&5).next(), Some(4)); // Largest element below 5
-        assert_eq!(btreeset.iter_upper_bound(&11).next(), Some(10)); // Largest element below 11
     }
 
     #[test]

@@ -1,6 +1,10 @@
 name: CI
 on: [pull_request]
 
+env:
+  CARGO_TERM_COLOR: always # Force Cargo to use colors
+  TERM: xterm-256color
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,8 +40,11 @@ jobs:
       - name: Clippy
         run: cargo clippy --tests --benches -- -D clippy::all
 
+      - name: Docs
+        run: cargo doc --target wasm32-unknown-unknown
+
       - name: Test
-        run: cargo test
+        run: cargo test -- --color always
         env:
           RUST_BACKTRACE: 1
 
@@ -68,7 +75,7 @@ jobs:
       - name: Install DFX
         run: |
           wget --output-document install-dfx.sh "https://internetcomputer.org/install.sh"
-          DFX_VERSION=${DFX_VERSION:=0.14.3} DFXVM_INIT_YES=true bash install-dfx.sh < <(yes Y)
+          DFX_VERSION=${DFX_VERSION:=0.23.0} DFXVM_INIT_YES=true bash install-dfx.sh < <(yes Y)
           echo "$HOME/.local/share/dfx/bin" >> $GITHUB_PATH
           source "$HOME/.local/share/dfx/env"
           rm install-dfx.sh
@@ -86,12 +93,15 @@ jobs:
       matrix:
         name:
           - btreemap
+          - btreeset
           - memory-manager
           - vec
           - compare
         include:
           - name: btreemap
             project_dir: ./benchmarks/btreemap
+          - name: btreeset
+            project_dir: ./benchmarks/btreeset
           - name: memory-manager
             project_dir: ./benchmarks/memory_manager
           - name: vec

@@ -37,31 +37,31 @@ impl<M: Memory> Memory for NodeReader<'_, M> {
             Bytes::from(self.page_size.get()),
         );
 
-        let mut bytes_read = 0;
+        let mut position = 0;
         for RealSegment {
             page_idx,
             offset,
             length,
         } in iter
         {
-            // SAFETY: read_unsafe() is safe to call iff bytes_read + length <= count since the
+            // SAFETY: read_unsafe() is safe to call iff `position + length <= count` since the
             // caller guarantees that we can write `count` number of bytes to `dst`.
-            assert!(bytes_read + length.get() as usize <= count);
-            if page_idx == 0 {
-                self.memory.read_unsafe(
-                    (self.address + offset).get(),
-                    dst.add(bytes_read),
-                    length.get() as usize,
-                );
-            } else {
-                self.memory.read_unsafe(
+            let len = length.get() as usize;
+            assert!(position + len <= count);
+            match page_idx {
+                // Initial page.
+                0 => self
+                    .memory
+                    .read_unsafe((self.address + offset).get(), dst.add(position), len),
+                // Overflow page.
+                _ => self.memory.read_unsafe(
                     (self.overflows[page_idx - 1] + offset).get(),
-                    dst.add(bytes_read),
-                    length.get() as usize,
-                );
+                    dst.add(position),
+                    len,
+                ),
             }
 
-            bytes_read += length.get() as usize;
+            position += len;
         }
     }
 
@@ -238,6 +238,15 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
             return;
         }
 
+        // Batch overflow page allocation.
+        let needed_pages =
+            compute_num_overflow_pages_needed(end_offset, self.page_size.get() as u64) as usize;
+        self.overflows
+            .reserve(needed_pages.saturating_sub(self.overflows.len()));
+        while self.overflows.len() < needed_pages {
+            self.allocate_new_page();
+        }
+
         let iter = NodeIterator::new(
             VirtualSegment {
                 address: Address::from(offset),
@@ -246,32 +255,29 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
             Bytes::from(self.page_size.get()),
         );
 
-        let mut bytes_written = 0;
+        let mut position = 0;
         for RealSegment {
             page_idx,
             offset,
             length,
         } in iter
         {
-            let offset = if page_idx == 0 {
-                // Write to the initial page.
-                (self.address + offset).get()
-            } else {
-                // Write to an overflow page, allocating it if it doesn't already exist.
-                if self.overflows.len() < page_idx {
-                    self.allocate_new_page();
-                }
-
-                (self.overflows[page_idx - 1] + offset).get()
+            let len = length.get() as usize;
+            match page_idx {
+                // Initial page.
+                0 => write(
+                    self.allocator.memory(),
+                    (self.address + offset).get(),
+                    &src[position..position + len],
+                ),
+                // Overflow page.
+                _ => write(
+                    self.allocator.memory(),
+                    (self.overflows[page_idx - 1] + offset).get(),
+                    &src[position..position + len],
+                ),
             };
-
-            write(
-                self.allocator.memory(),
-                offset,
-                &src[bytes_written as usize..(bytes_written + length.get()) as usize],
-            );
-
-            bytes_written += length.get();
+            position += len;
         }
     }
 

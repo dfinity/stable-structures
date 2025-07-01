@@ -20,4 +20,4 @@ benches:
       heap_increase: 0
       stable_memory_increase: 8320
     scopes: {}
-version: 0.1.15
+version: 0.2.0

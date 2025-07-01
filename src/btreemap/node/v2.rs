@@ -98,7 +98,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             address,
             node_type,
             version: Version::V2(page_size),
-            keys_and_encoded_values: vec![],
+            entries: vec![],
             children: vec![],
             overflows: Vec::with_capacity(0),
         }
@@ -151,7 +151,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load the keys (eagerly if small).
         const EAGER_LOAD_KEY_SIZE_THRESHOLD: u32 = 16;
-        let mut keys_encoded_values = Vec::with_capacity(num_entries);
+        let mut entries = Vec::with_capacity(num_entries);
         let mut buf = vec![];
 
         for _ in 0..num_entries {
@@ -176,24 +176,24 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 );
                 LazyKey::by_value(K::from_bytes(Cow::Borrowed(&buf)))
             } else {
-                LazyKey::by_ref(key_offset)
+                LazyKey::by_ref(key_offset, key_size)
             };
 
             offset += Bytes::from(key_size);
-            keys_encoded_values.push((key, LazyValue::by_ref(Bytes::from(0_u64))));
+            entries.push((key, LazyValue::by_ref(Bytes::from(0_u64), 0)));
         }
 
         // Load the values
-        for (_key, value) in keys_encoded_values.iter_mut() {
+        for (_key, value) in entries.iter_mut() {
             // Load the values lazily.
-            *value = LazyValue::by_ref(Bytes::from(offset.get()));
-            let value_size = read_u32(&reader, offset) as usize;
+            let value_size = read_u32(&reader, offset);
+            *value = LazyValue::by_ref(Bytes::from(offset.get()), value_size);
             offset += U32_SIZE + Bytes::from(value_size as u64);
         }
 
         Self {
             address,
-            keys_and_encoded_values: keys_encoded_values,
+            entries,
             children,
             node_type,
             version: Version::V2(page_size),
@@ -211,7 +211,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load all the entries. One pass is required to load all entries;
         // results are not stored to avoid unnecessary allocations.
-        for i in 0..self.keys_and_encoded_values.len() {
+        for i in 0..self.entries.len() {
             self.entry(i, allocator.memory());
         }
 
@@ -233,7 +233,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 NodeType::Leaf => LEAF_NODE_TYPE,
                 NodeType::Internal => INTERNAL_NODE_TYPE,
             },
-            num_entries: self.keys_and_encoded_values.len() as u16,
+            num_entries: self.entries.len() as u16,
         };
 
         writer.write_struct(&header, offset);
@@ -251,7 +251,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the keys.
-        for i in 0..self.keys_and_encoded_values.len() {
+        for i in 0..self.entries.len() {
             let key = self.key(i, writer.memory());
             let key_bytes = key.to_bytes_checked();
 
@@ -267,7 +267,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         }
 
         // Write the values.
-        for i in 0..self.keys_and_encoded_values.len() {
+        for i in 0..self.entries.len() {
             // Write the size of the value.
             let value = self.value(i, writer.memory());
             writer.write_u32(offset, value.len() as u32);

@@ -8,41 +8,12 @@ where
     A: Storable,
     B: Storable,
 {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        match Self::BOUND {
-            Bound::Bounded { max_size, .. } => {
-                let a_bytes = self.0.to_bytes();
-                let b_bytes = self.1.to_bytes();
-                let a_bounds = bounds::<A>();
-                let b_bounds = bounds::<B>();
-                let a_max_size = a_bounds.max_size as usize;
-                let b_max_size = b_bounds.max_size as usize;
-                let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
-                let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
-                let sizes_offset = a_max_size + b_max_size;
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
+        Cow::Owned(into_bytes_inner_2(Self::BOUND, &self.0, &self.1))
+    }
 
-                debug_assert!(a_bytes.len() <= a_max_size);
-                debug_assert!(b_bytes.len() <= b_max_size);
-
-                let mut bytes = vec![0; max_size as usize];
-                bytes[..a_bytes.len()].copy_from_slice(a_bytes.as_ref());
-                bytes[a_max_size..a_max_size + b_bytes.len()].copy_from_slice(b_bytes.as_ref());
-
-                encode_size_of_bound(
-                    &mut bytes[sizes_offset..sizes_offset + a_size_len],
-                    a_bytes.len(),
-                    &a_bounds,
-                );
-                encode_size_of_bound(
-                    &mut bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
-                    b_bytes.len(),
-                    &b_bounds,
-                );
-
-                Cow::Owned(bytes)
-            }
-            _ => todo!("Serializing tuples with unbounded types is not yet supported."),
-        }
+    fn into_bytes(self) -> Vec<u8> {
+        into_bytes_inner_2(Self::BOUND, &self.0, &self.1)
     }
 
     #[inline]
@@ -89,6 +60,48 @@ where
         }
         _ => Bound::Unbounded,
     };
+}
+
+#[inline]
+fn into_bytes_inner_2<A, B>(bound: Bound, a: &A, b: &B) -> Vec<u8>
+where
+    A: Storable,
+    B: Storable,
+{
+    match bound {
+        Bound::Bounded { max_size, .. } => {
+            let a_bytes = a.to_bytes();
+            let b_bytes = b.to_bytes();
+            let a_bounds = bounds::<A>();
+            let b_bounds = bounds::<B>();
+            let a_max_size = a_bounds.max_size as usize;
+            let b_max_size = b_bounds.max_size as usize;
+            let a_size_len = bytes_to_store_size_bounded(&a_bounds) as usize;
+            let b_size_len = bytes_to_store_size_bounded(&b_bounds) as usize;
+            let sizes_offset = a_max_size + b_max_size;
+
+            debug_assert!(a_bytes.len() <= a_max_size);
+            debug_assert!(b_bytes.len() <= b_max_size);
+
+            let mut bytes = vec![0; max_size as usize];
+            bytes[..a_bytes.len()].copy_from_slice(a_bytes.as_ref());
+            bytes[a_max_size..a_max_size + b_bytes.len()].copy_from_slice(b_bytes.as_ref());
+
+            encode_size_of_bound(
+                &mut bytes[sizes_offset..sizes_offset + a_size_len],
+                a_bytes.len(),
+                &a_bounds,
+            );
+            encode_size_of_bound(
+                &mut bytes[sizes_offset + a_size_len..sizes_offset + a_size_len + b_size_len],
+                b_bytes.len(),
+                &b_bounds,
+            );
+
+            bytes
+        }
+        _ => todo!("Serializing tuples with unbounded types is not yet supported."),
+    }
 }
 
 fn decode_size_of_bound(src: &[u8], bounds: &Bounds) -> usize {
@@ -242,30 +255,12 @@ where
     //     <a_bytes> <b_bytes> <c_bytes>
     //   Otherwise:
     //     <size_lengths (1B)> <size_a (0-4B)> <a_bytes> <size_b(0-4B)> <b_bytes> <c_bytes>
-    fn to_bytes(&self) -> Cow<[u8]> {
-        let a_bytes = self.0.to_bytes();
-        let b_bytes = self.1.to_bytes();
-        let c_bytes = self.2.to_bytes();
-        let a_size = a_bytes.len();
-        let b_size = b_bytes.len();
-        let c_size = c_bytes.len();
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
+        Cow::Owned(into_bytes_inner_3(&self.0, &self.1, &self.2))
+    }
 
-        let sizes_overhead = sizes_overhead::<A, B>(a_size, b_size);
-        let output_size = a_size + b_size + c_size + sizes_overhead;
-        let mut bytes = vec![0; output_size];
-        let mut offset = 0;
-
-        if sizes_overhead != 0 {
-            bytes[offset] = encode_size_lengths(&[a_size, b_size]);
-            offset += 1;
-        }
-
-        offset += encode_tuple_element::<A>(&mut bytes[offset..], a_bytes.as_ref(), false);
-        offset += encode_tuple_element::<B>(&mut bytes[offset..], b_bytes.as_ref(), false);
-        offset += encode_tuple_element::<C>(&mut bytes[offset..], c_bytes.as_ref(), true);
-
-        debug_assert_eq!(offset, output_size);
-        Cow::Owned(bytes)
+    fn into_bytes(self) -> Vec<u8> {
+        into_bytes_inner_3(&self.0, &self.1, &self.2)
     }
 
     #[inline]
@@ -315,4 +310,36 @@ where
         }
         _ => Bound::Unbounded,
     };
+}
+
+#[inline]
+fn into_bytes_inner_3<A, B, C>(a: &A, b: &B, c: &C) -> Vec<u8>
+where
+    A: Storable,
+    B: Storable,
+    C: Storable,
+{
+    let a_bytes = a.to_bytes();
+    let b_bytes = b.to_bytes();
+    let c_bytes = c.to_bytes();
+    let a_size = a_bytes.len();
+    let b_size = b_bytes.len();
+    let c_size = c_bytes.len();
+
+    let sizes_overhead = sizes_overhead::<A, B>(a_size, b_size);
+    let output_size = a_size + b_size + c_size + sizes_overhead;
+    let mut bytes = vec![0; output_size];
+    let mut offset = 0;
+
+    if sizes_overhead != 0 {
+        bytes[offset] = encode_size_lengths(&[a_size, b_size]);
+        offset += 1;
+    }
+
+    offset += encode_tuple_element::<A>(&mut bytes[offset..], a_bytes.as_ref(), false);
+    offset += encode_tuple_element::<B>(&mut bytes[offset..], b_bytes.as_ref(), false);
+    offset += encode_tuple_element::<C>(&mut bytes[offset..], c_bytes.as_ref(), true);
+
+    debug_assert_eq!(offset, output_size);
+    bytes
 }

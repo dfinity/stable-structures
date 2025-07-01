@@ -24,7 +24,7 @@ MAIN_BRANCH_RESULTS_FILE="$MAIN_BRANCH_DIR/$CANBENCH_RESULTS_FILE"
 CANBENCH_RESULTS_CSV_FILE="/tmp/canbench_results_${CANBENCH_JOB_NAME}.csv"
 
 # Install canbench.
-cargo install --version 0.1.15 canbench
+cargo install --version 0.2.0 --locked canbench
 
 # Verify that the canbench results file exists.
 if [ ! -f "$CANBENCH_RESULTS_FILE" ]; then
@@ -32,19 +32,40 @@ if [ ! -f "$CANBENCH_RESULTS_FILE" ]; then
     exit 1
 fi
 
+# Function that checks if the benchmark output contains any updates
+has_updates() {
+  # Triggers for streamed results (old format)
+  local streamed_patterns=(
+    "\(regressed by"
+    "\(improved by"
+    "\(new\)"
+  )
+
+  # Triggers for summary status (new format)
+  local summary_patterns=(
+    "status:[[:space:]]+Regressions"
+    "status:[[:space:]]+Improvements"
+    "status:[[:space:]]+New[[:space:]]+benchmarks"
+  )
+
+  # Combine all patterns into a single extended regex
+  local all_patterns
+  all_patterns=$(IFS='|'; echo "${streamed_patterns[*]}|${summary_patterns[*]}")
+
+  grep -qE "$all_patterns" "$CANBENCH_OUTPUT"
+}
+
 # Check if the canbench results file is up to date.
 pushd "$CANISTER_PATH"
 canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
 cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
-if grep -q "(regress\|(improved by \|(new)" "$CANBENCH_OUTPUT"; then
+if has_updates; then
   UPDATED_MSG="**❌ \`$CANBENCH_RESULTS_FILE\` is not up to date**
   If the performance change is expected, run \`canbench --persist [--csv]\` to update the benchmark results."
-
   # Results are outdated; fail the job.
   echo "EXIT_STATUS=1" >> "$GITHUB_ENV"
 else
-  UPDATED_MSG="✅ \`$CANBENCH_RESULTS_FILE\` is up to date";
-
+  UPDATED_MSG="✅ \`$CANBENCH_RESULTS_FILE\` is up to date"
   # Results are up to date; job succeeds.
   echo "EXIT_STATUS=0" >> "$GITHUB_ENV"
 fi

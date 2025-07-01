@@ -14,7 +14,7 @@ thread_local! {
         MEMORY_MANAGER.with(|mm|
             RefCell::new(
                 StableMinHeap::init(mm.borrow().get(MemoryId::new(1)))
-                .expect("failed to initialize the tasks"))
+            )
         );
 }
 
@@ -26,11 +26,7 @@ fn post_upgrade() {
 #[update]
 fn schedule_task(after_sec: u64) {
     let task_time = ic_cdk::api::time() + after_sec * 1_000_000_000;
-    TASKS.with(|t| {
-        t.borrow_mut()
-            .push(&task_time)
-            .expect("failed to schedule a task")
-    });
+    TASKS.with(|t| t.borrow_mut().push(&task_time));
     reschedule();
 }
 
@@ -56,7 +52,7 @@ fn execute_task(scheduled_at: u64, now: u64) {
 fn reschedule() {
     if let Some(task_time) = TASKS.with(|t| t.borrow().peek()) {
         unsafe {
-            ic0::global_timer_set(task_time as i64);
+            ic0::global_timer_set(task_time as u64);
         }
     }
 }

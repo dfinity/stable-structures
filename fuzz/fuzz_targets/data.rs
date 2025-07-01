@@ -20,11 +20,15 @@ pub struct UnboundedFuzzStruct {
 
 // The struct has size bounds reflected by Bound::Bounded::max_size
 impl Storable for BoundedFuzzStruct {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
         Cow::Owned(serde_cbor::ser::to_vec(self).unwrap())
     }
 
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+    fn into_bytes(self) -> Vec<u8> {
+        serde_cbor::ser::to_vec(&self).unwrap()
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<'_, [u8]>) -> Self {
         let value: Self = serde_cbor::de::from_slice(bytes.as_ref()).unwrap();
         value
     }
@@ -37,11 +41,15 @@ impl Storable for BoundedFuzzStruct {
 
 // The struct has no size bounds
 impl Storable for UnboundedFuzzStruct {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> std::borrow::Cow<'_, [u8]> {
         Cow::Owned(serde_cbor::ser::to_vec(self).unwrap())
     }
 
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+    fn into_bytes(self) -> Vec<u8> {
+        serde_cbor::ser::to_vec(&self).unwrap()
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<'_, [u8]>) -> Self {
         let value: Self = serde_cbor::de::from_slice(bytes.as_ref()).unwrap();
         value
     }
