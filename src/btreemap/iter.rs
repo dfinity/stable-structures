@@ -5,11 +5,12 @@ use super::{
 use crate::{types::NULL, Address, Memory, Storable};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
+use std::rc::Rc;
 
 /// An indicator of the current position in the map.
 pub(crate) enum Cursor<K: Storable + Ord + Clone> {
     Address(Address),
-    Node { node: Node<K>, next: Index },
+    Node { node: Rc<Node<K>>, next: Index },
 }
 
 /// An index into a node's child or entry.
@@ -100,7 +101,7 @@ where
                                 // We found the key exactly matching the left bound.
                                 // Here is where we'll start the iteration.
                                 self.forward_cursors.push(Cursor::Node {
-                                    node,
+                                    node: Rc::new(node),
                                     next: Index::Entry(idx),
                                 });
                                 break;
@@ -118,7 +119,7 @@ where
                                     && self.range.contains(node.key(idx + 1, self.map.memory()))
                                 {
                                     self.forward_cursors.push(Cursor::Node {
-                                        node,
+                                        node: Rc::new(node),
                                         next: Index::Entry(idx + 1),
                                     });
                                 }
@@ -156,7 +157,7 @@ where
                                 && self.range.contains(node.key(idx, self.map.memory()))
                             {
                                 self.forward_cursors.push(Cursor::Node {
-                                    node,
+                                    node: Rc::new(node),
                                     next: Index::Entry(idx),
                                 });
                             }
@@ -196,7 +197,7 @@ where
                                 // We found the key exactly matching the right bound.
                                 // Here is where we'll start the iteration.
                                 self.backward_cursors.push(Cursor::Node {
-                                    node,
+                                    node: Rc::new(node),
                                     next: Index::Entry(idx),
                                 });
                                 break;
@@ -214,7 +215,7 @@ where
                                     && self.range.contains(node.key(idx - 1, self.map.memory()))
                                 {
                                     self.backward_cursors.push(Cursor::Node {
-                                        node,
+                                        node: Rc::new(node),
                                         next: Index::Entry(idx - 1),
                                     });
                                 }
@@ -250,7 +251,7 @@ where
                             if idx > 0 && self.range.contains(node.key(idx - 1, self.map.memory()))
                             {
                                 self.backward_cursors.push(Cursor::Node {
-                                    node,
+                                    node: Rc::new(node),
                                     next: Index::Entry(idx - 1),
                                 });
                             }
@@ -293,7 +294,7 @@ where
                             // Iterate on leaf nodes starting from the first entry.
                             NodeType::Leaf => Index::Entry(0),
                         },
-                        node,
+                        node: Rc::new(node),
                     });
                 }
                 self.next_map(map)
@@ -377,7 +378,10 @@ where
                         }
                         _ => None,
                     } {
-                        self.backward_cursors.push(Cursor::Node { next, node });
+                        self.backward_cursors.push(Cursor::Node {
+                            next,
+                            node: Rc::new(node),
+                        });
                     }
                 }
                 self.next_back_map(map)
