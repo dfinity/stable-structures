@@ -91,7 +91,7 @@ fn vec_insert_blob<const N: usize>() -> BenchResult {
 
 fn vec_insert<T: Storable + Random>() -> BenchResult {
     let num_items = 10_000;
-    let svec: StableVec<T, _> = StableVec::new(DefaultMemoryImpl::default());
+    let svec: StableVec<T, _> = StableVec::new(DefaultMemoryImpl::default()).unwrap();
 
     let mut rng = Rng::from_seed(0);
     let mut random_items = Vec::with_capacity(num_items);
@@ -102,7 +102,7 @@ fn vec_insert<T: Storable + Random>() -> BenchResult {
 
     bench_fn(|| {
         for item in random_items.iter() {
-            svec.push(item);
+            svec.push(item).unwrap();
         }
     })
 }
@@ -118,12 +118,12 @@ fn vec_get_blob_mem_manager<const N: usize>() -> BenchResult {
 
 fn vec_get<T: Storable + Random>(memory: impl Memory) -> BenchResult {
     let num_items = 10_000;
-    let svec: StableVec<T, _> = StableVec::new(memory);
+    let svec: StableVec<T, _> = StableVec::new(memory).unwrap();
 
     let mut rng = Rng::from_seed(0);
 
     for _ in 0..num_items {
-        svec.push(&T::random(&mut rng));
+        svec.push(&T::random(&mut rng)).unwrap();
     }
 
     bench_fn(|| {
