@@ -549,7 +549,12 @@ where
     }
 
     /// Inserts an entry into a node that is *not full*.
-    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
+    fn insert_nonfull(
+        &mut self,
+        mut node: Box<Node<K>>,
+        key: K,
+        value: Vec<u8>,
+    ) -> Option<Vec<u8>> {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
 
@@ -669,7 +674,7 @@ where
     /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
     fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
     where
-        F: Fn(Node<K>, usize) -> R + Clone,
+        F: Fn(Box<Node<K>>, usize) -> R + Clone,
     {
         let node = self.load_node(node_addr);
         // Look for the key in the current node.
@@ -779,7 +784,7 @@ where
     }
 
     /// A helper method for recursively removing a key from the B-tree.
-    fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
+    fn remove_helper(&mut self, mut node: Box<Node<K>>, key: &K) -> Option<Vec<u8>> {
         if node.address() != self.root_addr {
             // We're guaranteed that whenever this method is called an entry can be
             // removed from the node without it needing to be merged into a sibling.
@@ -1266,13 +1271,18 @@ where
     /// Output:
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
-    fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
+    fn merge(
+        &mut self,
+        source: Box<Node<K>>,
+        mut into: Box<Node<K>>,
+        median: Entry<K>,
+    ) -> Box<Node<K>> {
         into.merge(source, median, &mut self.allocator);
         into
     }
 
     /// Allocates a new node of the given type.
-    fn allocate_node(&mut self, node_type: NodeType) -> Node<K> {
+    fn allocate_node(&mut self, node_type: NodeType) -> Box<Node<K>> {
         match self.version {
             Version::V1(page_size) => Node::new_v1(self.allocator.allocate(), node_type, page_size),
             Version::V2(page_size) => Node::new_v2(self.allocator.allocate(), node_type, page_size),
@@ -1281,13 +1291,13 @@ where
 
     /// Deallocates a node.
     #[inline]
-    fn deallocate_node(&mut self, node: Node<K>) {
+    fn deallocate_node(&mut self, node: Box<Node<K>>) {
         node.deallocate(self.allocator_mut());
     }
 
     /// Loads a node from memory.
     #[inline]
-    fn load_node(&self, address: Address) -> Node<K> {
+    fn load_node(&self, address: Address) -> Box<Node<K>> {
         Node::load(address, self.version.page_size(), self.memory())
     }
 

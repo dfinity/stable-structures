@@ -44,15 +44,19 @@ use super::*;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v1 node at the given address.
-    pub fn new_v1(address: Address, node_type: NodeType, page_size: DerivedPageSize) -> Node<K> {
-        Node {
+    pub fn new_v1(
+        address: Address,
+        node_type: NodeType,
+        page_size: DerivedPageSize,
+    ) -> Box<Node<K>> {
+        Box::new(Node {
             address,
             node_type,
             entries: vec![],
             children: vec![],
             version: Version::V1(page_size),
             overflows: Vec::with_capacity(0),
-        }
+        })
     }
 
     /// Loads a v1 node from memory at the given address.
@@ -62,7 +66,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         max_key_size: u32,
         max_value_size: u32,
         memory: &M,
-    ) -> Self {
+    ) -> Box<Self> {
         #[cfg(feature = "bench_scope")]
         let _p = canbench_rs::bench_scope("node_load_v1"); // May add significant overhead.
 
@@ -95,7 +99,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
             assert_eq!(children.len(), entries.len() + 1);
         }
 
-        Self {
+        Box::new(Self {
             address,
             entries,
             children,
@@ -109,7 +113,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
                 max_value_size,
             }),
             overflows: Vec::with_capacity(0),
-        }
+        })
     }
 
     pub(super) fn save_v1<M: Memory>(&self, memory: &M) {

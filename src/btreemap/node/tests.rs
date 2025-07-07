@@ -59,7 +59,7 @@ impl NodeV1Data {
             node.push_child(child);
         }
 
-        node
+        *node
     }
 
     fn children(&self) -> Vec<Address> {
@@ -100,7 +100,7 @@ impl NodeV2Data {
             node.push_child(child);
         }
 
-        node
+        *node
     }
 
     fn children(&self) -> Vec<Address> {

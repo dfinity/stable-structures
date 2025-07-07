@@ -100,7 +100,7 @@ where
                                 // We found the key exactly matching the left bound.
                                 // Here is where we'll start the iteration.
                                 self.forward_cursors.push(Cursor::Node {
-                                    node: Box::new(node),
+                                    node,
                                     next: Index::Entry(idx),
                                 });
                                 break;
@@ -118,7 +118,7 @@ where
                                     && self.range.contains(node.key(idx + 1, self.map.memory()))
                                 {
                                     self.forward_cursors.push(Cursor::Node {
-                                        node: Box::new(node),
+                                        node,
                                         next: Index::Entry(idx + 1),
                                     });
                                 }
@@ -156,7 +156,7 @@ where
                                 && self.range.contains(node.key(idx, self.map.memory()))
                             {
                                 self.forward_cursors.push(Cursor::Node {
-                                    node: Box::new(node),
+                                    node,
                                     next: Index::Entry(idx),
                                 });
                             }
@@ -196,7 +196,7 @@ where
                                 // We found the key exactly matching the right bound.
                                 // Here is where we'll start the iteration.
                                 self.backward_cursors.push(Cursor::Node {
-                                    node: Box::new(node),
+                                    node,
                                     next: Index::Entry(idx),
                                 });
                                 break;
@@ -214,7 +214,7 @@ where
                                     && self.range.contains(node.key(idx - 1, self.map.memory()))
                                 {
                                     self.backward_cursors.push(Cursor::Node {
-                                        node: Box::new(node),
+                                        node,
                                         next: Index::Entry(idx - 1),
                                     });
                                 }
@@ -250,7 +250,7 @@ where
                             if idx > 0 && self.range.contains(node.key(idx - 1, self.map.memory()))
                             {
                                 self.backward_cursors.push(Cursor::Node {
-                                    node: Box::new(node),
+                                    node,
                                     next: Index::Entry(idx - 1),
                                 });
                             }
@@ -293,7 +293,7 @@ where
                             // Iterate on leaf nodes starting from the first entry.
                             NodeType::Leaf => Index::Entry(0),
                         },
-                        node: Box::new(node),
+                        node,
                     });
                 }
                 self.next_map(map)
@@ -377,10 +377,7 @@ where
                         }
                         _ => None,
                     } {
-                        self.backward_cursors.push(Cursor::Node {
-                            next,
-                            node: Box::new(node),
-                        });
+                        self.backward_cursors.push(Cursor::Node { next, node });
                     }
                 }
                 self.next_back_map(map)
