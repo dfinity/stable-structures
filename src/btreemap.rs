@@ -498,8 +498,10 @@ where
     ///   key.to_bytes().len() <= max_size(Key)
     ///   value.to_bytes().len() <= max_size(Value)
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let value = value.into_bytes_checked();
+        #[cfg(feature = "bench_scope")]
+        let _p = canbench_rs::bench_scope("insert"); // May add significant overhead.
 
+        let value = value.into_bytes_checked();
         let root = if self.root_addr == NULL {
             // No root present. Allocate one.
             let node = self.allocate_node(NodeType::Leaf);
@@ -653,8 +655,8 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        self.traverse(self.root_addr, key, |node, idx| {
-            node.into_entry(idx, self.memory()).1 // Extract value.
+        self.traverse(self.root_addr, key, self.memory(), |node, idx, mem| {
+            node.extract_entry_at(idx, mem).1 // Extract value.
         })
         .map(Cow::Owned)
         .map(V::from_bytes)
@@ -663,23 +665,38 @@ where
     /// Returns true if the key exists.
     pub fn contains_key(&self, key: &K) -> bool {
         // An empty closure returns Some(()) if the key is found.
-        self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
+        self.root_addr != NULL
+            && self
+                .traverse(self.root_addr, key, self.memory(), |_, _, _| ())
+                .is_some()
     }
 
     /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
-    fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
+    fn traverse<F, R>(&self, node_addr: Address, key: &K, mem: &M, f: F) -> Option<R>
     where
-        F: Fn(Node<K>, usize) -> R + Clone,
+        F: Fn(&mut Node<K>, usize, &M) -> R,
     {
-        let node = self.load_node(node_addr);
+        let mut node = self.load_node(node_addr);
         // Look for the key in the current node.
-        match node.search(key, self.memory()) {
-            Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
+        match node.search(key, mem) {
+            Ok(idx) => Some(f(&mut node, idx, mem)), // Key found: apply `f`.
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
-                NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
+                NodeType::Internal => self.traverse(node.child(idx), key, mem, f), // Continue search in child.
             },
         }
+        // let mut addr = node_addr;
+        // loop {
+        //     let mut node = self.load_node(addr);
+        //     // Look for the key in the current node.
+        //     match node.search(key, mem) {
+        //         Ok(idx) => return Some(f(&mut node, idx, mem)), // Key found: apply `f`.
+        //         Err(idx) => match node.node_type() {
+        //             NodeType::Leaf => return None, // At a leaf: key not present.
+        //             NodeType::Internal => addr = node.child(idx), // Continue search in child.
+        //         },
+        //     }
+        // }
     }
 
     /// Returns `true` if the map contains no elements.
