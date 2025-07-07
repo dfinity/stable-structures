@@ -28,7 +28,7 @@ dependencies = [
  "candid",
  "ic-cdk",
  "ic-cdk-macros",
- "ic-stable-structures 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ic-stable-structures 0.6.7",
  "maplit",
  "serde",
  "tiny-rng",
@@ -302,6 +302,15 @@ dependencies = [
 
 [[package]]
 name = "ic-stable-structures"
+version = "0.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b492c5a16455ae78623eaa12ead96dda6c69a83c535b1b00789f19b381c8a24c"
+dependencies = [
+ "ic_principal",
+]
+
+[[package]]
+name = "ic-stable-structures"
 version = "0.6.9"
 dependencies = [
  "canbench-rs",
@@ -314,15 +323,6 @@ dependencies = [
  "proptest",
  "tempfile",
  "test-strategy",
-]
-
-[[package]]
-name = "ic-stable-structures"
-version = "0.6.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d30d4cf17aff1024e13133897048bcba580e063c9000571ab766ca37e2996f4"
-dependencies = [
- "ic_principal",
 ]
 
 [[package]]
