@@ -138,28 +138,25 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load children if this is an internal node.
         offset += ENTRIES_OFFSET;
-        let mut children = vec![];
-        if node_type == NodeType::Internal {
+        let children = if node_type == NodeType::Internal {
             let count = num_entries + 1;
-            // Use batch read for all cases except when there are no children
-            if count == 0 {
-                // No children to load
-            } else if count <= 4 {
-                // For small counts, use individual reads to avoid overhead
-                children.reserve_exact(count);
+            if count <= 2 {
+                // For very small counts, use individual reads to avoid allocation overhead
+                let mut children = Vec::with_capacity(count);
                 for _ in 0..count {
                     children.push(Address::from(read_u64(&reader, offset)));
                     offset += Address::size();
                 }
+                children
             } else {
                 // For larger counts, use the optimized batch read
-                children = read_u64_vec(&reader, offset, count)
-                    .into_iter()
-                    .map(Address::from)
-                    .collect();
+                let children = read_address_vec(&reader, offset, count);
                 offset += Bytes::from(count) * Address::size();
+                children
             }
-        }
+        } else {
+            vec![]
+        };
 
         // Load the keys (eagerly if small).
         const EAGER_LOAD_KEY_SIZE_THRESHOLD: u32 = 16;

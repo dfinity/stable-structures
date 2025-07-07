@@ -125,20 +125,23 @@ fn read_u64<M: Memory>(m: &M, addr: Address) -> u64 {
     u64::from_le_bytes(buf)
 }
 
-/// Reads `count` u64 values from memory starting at `addr` using a single memory read.
-fn read_u64_vec<M: Memory>(m: &M, addr: Address, count: usize) -> std::vec::Vec<u64> {
-    let byte_len = count * 8;
-    let mut buf = std::vec::Vec::with_capacity(byte_len);
-    read_to_vec(m, addr, &mut buf, byte_len);
+/// Reads `count` Address values with maximum performance using unsafe code.
+fn read_address_vec<M: Memory>(m: &M, addr: Address, count: usize) -> std::vec::Vec<Address> {
+    if count == 0 {
+        return std::vec::Vec::new();
+    }
+
+    let byte_len = count * 8; // 8 bytes per u64.
+    let mut buf = vec![0u8; byte_len];
+    m.read(addr.get(), &mut buf);
 
     let mut result = std::vec::Vec::with_capacity(count);
-    let mut chunks = buf.chunks_exact(8);
 
     unsafe {
-        for chunk in &mut chunks {
-            // SAFETY: each chunk has length 8
-            let bytes: [u8; 8] = chunk.try_into().unwrap_unchecked();
-            result.push(u64::from_le_bytes(bytes));
+        let ptr = buf.as_ptr() as *const u64;
+        for i in 0..count {
+            let value = ptr.add(i).read_unaligned();
+            result.push(Address::from(u64::from_le(value)));
         }
     }
 

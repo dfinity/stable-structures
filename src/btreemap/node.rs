@@ -1,6 +1,6 @@
 use crate::{
     btreemap::Allocator,
-    read_struct, read_to_vec, read_u32, read_u64, read_u64_vec,
+    read_address_vec, read_struct, read_to_vec, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
     write, write_struct, write_u32, Memory,
