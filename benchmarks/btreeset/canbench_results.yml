@@ -2,700 +2,700 @@ benches:
   btreeset_insert_blob_1024:
     total:
       calls: 1
-      instructions: 7270803862
+      instructions: 7263107292
       heap_increase: 1
       stable_memory_increase: 256
     scopes: {}
   btreeset_insert_blob_128:
     total:
       calls: 1
-      instructions: 1641288121
+      instructions: 1633591551
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_insert_blob_16:
     total:
       calls: 1
-      instructions: 719804818
+      instructions: 712108248
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_insert_blob_256:
     total:
       calls: 1
-      instructions: 2449765486
+      instructions: 2442068916
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_insert_blob_32:
     total:
       calls: 1
-      instructions: 819771022
+      instructions: 812074452
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_insert_blob_512:
     total:
       calls: 1
-      instructions: 4054662595
+      instructions: 4046966025
       heap_increase: 0
       stable_memory_increase: 128
     scopes: {}
   btreeset_insert_blob_64:
     total:
       calls: 1
-      instructions: 984824581
+      instructions: 977128011
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_insert_blob_8:
     total:
       calls: 1
-      instructions: 698630408
+      instructions: 690933838
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_insert_u32:
     total:
       calls: 1
-      instructions: 544615153
+      instructions: 536918583
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_insert_u64:
     total:
       calls: 1
-      instructions: 566164962
+      instructions: 558468392
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_blob_1024:
     total:
       calls: 1
-      instructions: 108424494
+      instructions: 108415789
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_blob_128:
     total:
       calls: 1
-      instructions: 17929949
+      instructions: 17921244
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_blob_16:
     total:
       calls: 1
-      instructions: 3395220
+      instructions: 3386515
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_blob_256:
     total:
       calls: 1
-      instructions: 31045130
+      instructions: 31036425
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_blob_32:
     total:
       calls: 1
-      instructions: 4665278
+      instructions: 4656573
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_blob_512:
     total:
       calls: 1
-      instructions: 56887138
+      instructions: 56878433
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_blob_64:
     total:
       calls: 1
-      instructions: 10055807
+      instructions: 10047102
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_blob_8:
     total:
       calls: 1
-      instructions: 3158556
+      instructions: 3149851
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_u32:
     total:
       calls: 1
-      instructions: 2269546
+      instructions: 2260841
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_intersection_u64:
     total:
       calls: 1
-      instructions: 2284944
+      instructions: 2276239
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_blob_1024:
     total:
       calls: 1
-      instructions: 52329080
+      instructions: 52322836
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_blob_128:
     total:
       calls: 1
-      instructions: 9329949
+      instructions: 9323705
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_blob_16:
     total:
       calls: 1
-      instructions: 2172087
+      instructions: 2165843
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_blob_256:
     total:
       calls: 1
-      instructions: 15577139
+      instructions: 15570895
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_blob_32:
     total:
       calls: 1
-      instructions: 2846520
+      instructions: 2840276
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_blob_512:
     total:
       calls: 1
-      instructions: 27827934
+      instructions: 27821690
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_blob_64:
     total:
       calls: 1
-      instructions: 5303402
+      instructions: 5297158
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_blob_8:
     total:
       calls: 1
-      instructions: 2092610
+      instructions: 2086366
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_u32:
     total:
       calls: 1
-      instructions: 1530366
+      instructions: 1524122
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_disjoint_u64:
     total:
       calls: 1
-      instructions: 1548849
+      instructions: 1542605
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_blob_1024:
     total:
       calls: 1
-      instructions: 384573
+      instructions: 383704
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_blob_128:
     total:
       calls: 1
-      instructions: 89803
+      instructions: 88934
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_blob_16:
     total:
       calls: 1
-      instructions: 54728
+      instructions: 53859
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_blob_256:
     total:
       calls: 1
-      instructions: 131901
+      instructions: 131032
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_blob_32:
     total:
       calls: 1
-      instructions: 46617
+      instructions: 45748
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_blob_512:
     total:
       calls: 1
-      instructions: 216125
+      instructions: 215256
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_blob_64:
     total:
       calls: 1
-      instructions: 58323
+      instructions: 57454
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_blob_8:
     total:
       calls: 1
-      instructions: 53847
+      instructions: 52978
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_u32:
     total:
       calls: 1
-      instructions: 44629
+      instructions: 43760
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_subset_u64:
     total:
       calls: 1
-      instructions: 45191
+      instructions: 44322
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_blob_1024:
     total:
       calls: 1
-      instructions: 91613462
+      instructions: 91604757
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_blob_128:
     total:
       calls: 1
-      instructions: 15503389
+      instructions: 15494684
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_blob_16:
     total:
       calls: 1
-      instructions: 3318013
+      instructions: 3309308
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_blob_256:
     total:
       calls: 1
-      instructions: 26675728
+      instructions: 26667023
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_blob_32:
     total:
       calls: 1
-      instructions: 4538099
+      instructions: 4529394
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_blob_512:
     total:
       calls: 1
-      instructions: 48318327
+      instructions: 48309622
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_blob_64:
     total:
       calls: 1
-      instructions: 8642506
+      instructions: 8633801
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_blob_8:
     total:
       calls: 1
-      instructions: 3092181
+      instructions: 3083476
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_u32:
     total:
       calls: 1
-      instructions: 2257395
+      instructions: 2248690
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_is_superset_u64:
     total:
       calls: 1
-      instructions: 2271527
+      instructions: 2262822
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_blob_1024:
     total:
       calls: 1
-      instructions: 433242634
+      instructions: 433182543
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_blob_128:
     total:
       calls: 1
-      instructions: 75762312
+      instructions: 75702221
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_blob_16:
     total:
       calls: 1
-      instructions: 15890159
+      instructions: 15830068
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_blob_256:
     total:
       calls: 1
-      instructions: 127996524
+      instructions: 127936433
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_blob_32:
     total:
       calls: 1
-      instructions: 22188396
+      instructions: 22128305
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_blob_512:
     total:
       calls: 1
-      instructions: 229722895
+      instructions: 229662804
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_blob_64:
     total:
       calls: 1
-      instructions: 40712897
+      instructions: 40652806
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_blob_8:
     total:
       calls: 1
-      instructions: 15278751
+      instructions: 15218660
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_u32:
     total:
       calls: 1
-      instructions: 12028474
+      instructions: 11968383
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_iter_u64:
     total:
       calls: 1
-      instructions: 12114746
+      instructions: 12054655
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_blob_1024:
     total:
       calls: 1
-      instructions: 260437822
+      instructions: 260400808
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_blob_128:
     total:
       calls: 1
-      instructions: 46227427
+      instructions: 46190413
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_blob_16:
     total:
       calls: 1
-      instructions: 10232489
+      instructions: 10195475
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_blob_256:
     total:
       calls: 1
-      instructions: 77036879
+      instructions: 76999865
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_blob_32:
     total:
       calls: 1
-      instructions: 14003172
+      instructions: 13966158
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_blob_512:
     total:
       calls: 1
-      instructions: 138156812
+      instructions: 138119798
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_blob_64:
     total:
       calls: 1
-      instructions: 25149179
+      instructions: 25112165
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_blob_8:
     total:
       calls: 1
-      instructions: 9861138
+      instructions: 9824124
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_u32:
     total:
       calls: 1
-      instructions: 7256372
+      instructions: 7219358
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_range_u64:
     total:
       calls: 1
-      instructions: 7298486
+      instructions: 7261472
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_1024:
     total:
       calls: 1
-      instructions: 7728107921
+      instructions: 7720379503
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_128:
     total:
       calls: 1
-      instructions: 1671607079
+      instructions: 1663878661
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_16:
     total:
       calls: 1
-      instructions: 710372188
+      instructions: 702643770
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_256:
     total:
       calls: 1
-      instructions: 2538830830
+      instructions: 2531102412
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_32:
     total:
       calls: 1
-      instructions: 807625631
+      instructions: 799897213
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_512:
     total:
       calls: 1
-      instructions: 4266821763
+      instructions: 4259093345
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_64:
     total:
       calls: 1
-      instructions: 992223554
+      instructions: 984495136
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_8:
     total:
       calls: 1
-      instructions: 688956381
+      instructions: 681227963
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_u32:
     total:
       calls: 1
-      instructions: 533253067
+      instructions: 525524649
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_u64:
     total:
       calls: 1
-      instructions: 558479980
+      instructions: 550751562
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_blob_1024:
     total:
       calls: 1
-      instructions: 108438620
+      instructions: 108429915
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_blob_128:
     total:
       calls: 1
-      instructions: 17933323
+      instructions: 17924618
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_blob_16:
     total:
       calls: 1
-      instructions: 3396844
+      instructions: 3388139
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_blob_256:
     total:
       calls: 1
-      instructions: 31050040
+      instructions: 31041335
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_blob_32:
     total:
       calls: 1
-      instructions: 4666946
+      instructions: 4658241
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_blob_512:
     total:
       calls: 1
-      instructions: 56895120
+      instructions: 56886415
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_blob_64:
     total:
       calls: 1
-      instructions: 10058413
+      instructions: 10049708
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_blob_8:
     total:
       calls: 1
-      instructions: 3160159
+      instructions: 3151454
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_u32:
     total:
       calls: 1
-      instructions: 2285654
+      instructions: 2276949
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_symmetric_difference_u64:
     total:
       calls: 1
-      instructions: 2291029
+      instructions: 2282324
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_blob_1024:
     total:
       calls: 1
-      instructions: 108439128
+      instructions: 108430423
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_blob_128:
     total:
       calls: 1
-      instructions: 17933831
+      instructions: 17925126
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_blob_16:
     total:
       calls: 1
-      instructions: 3397352
+      instructions: 3388647
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_blob_256:
     total:
       calls: 1
-      instructions: 31050548
+      instructions: 31041843
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_blob_32:
     total:
       calls: 1
-      instructions: 4667454
+      instructions: 4658749
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_blob_512:
     total:
       calls: 1
-      instructions: 56895628
+      instructions: 56886923
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_blob_64:
     total:
       calls: 1
-      instructions: 10058921
+      instructions: 10050216
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_blob_8:
     total:
       calls: 1
-      instructions: 3160667
+      instructions: 3151962
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_u32:
     total:
       calls: 1
-      instructions: 2283161
+      instructions: 2274456
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_union_u64:
     total:
       calls: 1
-      instructions: 2286539
+      instructions: 2277834
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
