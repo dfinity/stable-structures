@@ -128,20 +128,17 @@ fn read_u64<M: Memory>(m: &M, addr: Address) -> u64 {
 /// Reads `count` u64 values from memory starting at `addr` using a single memory read.
 fn read_u64_vec<M: Memory>(m: &M, addr: Address, count: usize) -> std::vec::Vec<u64> {
     let byte_len = count * 8;
+    let mut buf = std::vec::Vec::with_capacity(byte_len);
+    read_to_vec(m, addr, &mut buf, byte_len);
+
     let mut result = std::vec::Vec::with_capacity(count);
+    let mut chunks = buf.chunks_exact(8);
 
-    // Read directly into a properly sized buffer
-    let mut buf = vec![0u8; byte_len];
-    m.read(addr.get(), &mut buf);
-
-    // Convert bytes to u64s in-place using unsafe for better performance
     unsafe {
-        let ptr = buf.as_ptr() as *const u64;
-        for i in 0..count {
-            // Use from_le_bytes for endianness safety, but read directly from memory
-            let bytes = std::slice::from_raw_parts(ptr.add(i) as *const u8, 8);
-            let value = u64::from_le_bytes(bytes.try_into().unwrap());
-            result.push(value);
+        for chunk in &mut chunks {
+            // SAFETY: each chunk has length 8
+            let bytes: [u8; 8] = chunk.try_into().unwrap_unchecked();
+            result.push(u64::from_le_bytes(bytes));
         }
     }
 
