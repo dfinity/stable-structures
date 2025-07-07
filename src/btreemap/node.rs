@@ -460,8 +460,21 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// returned, containing the index where a matching key could be inserted
     /// while maintaining sorted order.
     pub fn search<M: Memory>(&self, key: &K, memory: &M) -> Result<usize, usize> {
-        self.entries
-            .binary_search_by_key(&key, |entry| self.get_key(entry, memory))
+        // For small nodes, linear search may be faster due to cache locality
+        if self.entries.len() <= 8 {
+            for (i, entry) in self.entries.iter().enumerate() {
+                match self.get_key(entry, memory).cmp(key) {
+                    std::cmp::Ordering::Less => continue,
+                    std::cmp::Ordering::Equal => return Ok(i),
+                    std::cmp::Ordering::Greater => return Err(i),
+                }
+            }
+            Err(self.entries.len())
+        } else {
+            // Use the existing binary search for larger nodes
+            self.entries
+                .binary_search_by_key(&key, |entry| self.get_key(entry, memory))
+        }
     }
 
     /// Returns the maximum size a node can be if it has bounded keys and values.
