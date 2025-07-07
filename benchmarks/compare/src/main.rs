@@ -1,5 +1,5 @@
 use benchmarks::vec::BoundedVecN;
-use canbench_rs::{bench, bench_fn};
+use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
@@ -32,7 +32,7 @@ fn chunk_data(n: usize) -> Vec<Vec<u8>> {
 
 // Stable Memory benchmarks
 
-fn write_chunks_stable(mem_id: u8, n: usize) {
+fn write_chunks_stable(mem_id: u8, n: usize) -> BenchResult {
     let memory = init_memory(mem_id);
     let chunks = chunk_data(n);
     let chunk_size = TOTAL_SIZE / n;
@@ -42,10 +42,10 @@ fn write_chunks_stable(mem_id: u8, n: usize) {
         for (i, chunk) in chunks.iter().enumerate() {
             memory.write((i * chunk_size) as u64, chunk);
         }
-    });
+    })
 }
 
-fn read_chunks_stable(mem_id: u8, n: usize) {
+fn read_chunks_stable(mem_id: u8, n: usize) -> BenchResult {
     write_chunks_stable(mem_id, n);
     let memory = init_memory(mem_id);
     let chunk_size = TOTAL_SIZE / n;
@@ -55,12 +55,12 @@ fn read_chunks_stable(mem_id: u8, n: usize) {
         for i in 0..n {
             memory.read((i * chunk_size) as u64, &mut buf);
         }
-    });
+    })
 }
 
 // BTreeMap benchmarks
 
-fn write_chunks_btreemap(mem_id: u8, n: usize) {
+fn write_chunks_btreemap(mem_id: u8, n: usize) -> BenchResult {
     let mut map = BTreeMap::init(init_memory(mem_id));
     let chunks = chunk_data(n);
 
@@ -68,62 +68,60 @@ fn write_chunks_btreemap(mem_id: u8, n: usize) {
         for (i, chunk) in chunks.into_iter().enumerate() {
             map.insert(i as u32, chunk);
         }
-    });
+    })
 }
 
-fn read_chunks_btreemap(mem_id: u8, n: usize) {
+fn read_chunks_btreemap(mem_id: u8, n: usize) -> BenchResult {
     write_chunks_btreemap(mem_id, n);
     let map: BTreeMap<_, Vec<u8>, _> = BTreeMap::init(init_memory(mem_id));
     bench_fn(|| {
         for i in 0..n {
             let _ = map.get(&(i as u32));
         }
-    });
+    })
 }
 
 // StableVec benchmarks
 
-fn write_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
-    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> =
-        StableVec::new(init_memory(mem_id)).expect("Vec::new failed");
+fn write_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) -> BenchResult {
+    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> = StableVec::new(init_memory(mem_id));
     let chunks: Vec<_> = chunk_data(n).iter().map(|v| BoundedVecN::from(v)).collect();
 
     bench_fn(|| {
         for chunk in &chunks {
-            vec.push(chunk).expect("Vec::push failed");
+            vec.push(chunk);
         }
-    });
+    })
 }
 
-fn read_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) {
+fn read_chunks_vec<const CHUNK_SIZE: usize>(mem_id: u8, n: usize) -> BenchResult {
     write_chunks_vec::<CHUNK_SIZE>(mem_id, n);
-    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> =
-        StableVec::init(init_memory(mem_id)).expect("Vec::init failed");
+    let vec: StableVec<BoundedVecN<CHUNK_SIZE>, _> = StableVec::init(init_memory(mem_id));
 
     bench_fn(|| {
         for i in 0..n as u64 {
             let _ = vec.get(i);
         }
-    });
+    })
 }
 
 // Benchmark macros
 
 macro_rules! bench_case {
     ($name:ident, $func:ident, $mem_id:expr, $n:expr) => {
-        #[bench]
-        fn $name() {
-            $func($mem_id, $n);
+        #[bench(raw)]
+        fn $name() -> BenchResult {
+            $func($mem_id, $n)
         }
     };
 }
 
 macro_rules! bench_case_sized {
     ($name:ident, $func:ident, $mem_id:expr, $n:expr) => {
-        #[bench]
-        fn $name() {
+        #[bench(raw)]
+        fn $name() -> BenchResult {
             const SIZE: usize = chunk_size::<$n>();
-            $func::<SIZE>($mem_id, $n);
+            $func::<SIZE>($mem_id, $n)
         }
     };
 }

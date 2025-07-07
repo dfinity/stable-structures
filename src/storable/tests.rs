@@ -135,7 +135,7 @@ proptest! {
 fn to_bytes_checked_element_too_long_panics() {
     struct X;
     impl Storable for X {
-        fn to_bytes(&self) -> Cow<[u8]> {
+        fn to_bytes(&self) -> Cow<'_, [u8]> {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
@@ -160,7 +160,7 @@ fn to_bytes_checked_element_too_long_panics() {
 fn to_bytes_checked_unbounded_element_no_panic() {
     struct X;
     impl Storable for X {
-        fn to_bytes(&self) -> Cow<[u8]> {
+        fn to_bytes(&self) -> Cow<'_, [u8]> {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
@@ -182,7 +182,7 @@ fn to_bytes_checked_unbounded_element_no_panic() {
 fn to_bytes_checked_element_correct_size_no_panic() {
     struct X;
     impl Storable for X {
-        fn to_bytes(&self) -> Cow<[u8]> {
+        fn to_bytes(&self) -> Cow<'_, [u8]> {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
@@ -208,7 +208,7 @@ fn to_bytes_checked_element_correct_size_no_panic() {
 fn to_bytes_checked_fixed_element_wrong_size_panics() {
     struct X;
     impl Storable for X {
-        fn to_bytes(&self) -> Cow<[u8]> {
+        fn to_bytes(&self) -> Cow<'_, [u8]> {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
@@ -233,7 +233,7 @@ fn to_bytes_checked_fixed_element_wrong_size_panics() {
 fn to_bytes_checked_fixed_element_correct_size_no_panic() {
     struct X;
     impl Storable for X {
-        fn to_bytes(&self) -> Cow<[u8]> {
+        fn to_bytes(&self) -> Cow<'_, [u8]> {
             Cow::Borrowed(&[1, 2, 3, 4, 5])
         }
 

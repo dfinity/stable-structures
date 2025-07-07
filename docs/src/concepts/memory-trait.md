@@ -9,12 +9,15 @@ pub trait Memory {
     fn size(&self) -> u64;
 
     /// Equivalent to WebAssembly memory.grow.
+    /// Returns the previous size, or -1 if the grow fails.
     fn grow(&self, pages: u64) -> i64;
 
     /// Copies bytes from this memory to the heap (in Wasm, memory 0).
+    /// Panics or traps if out of bounds.
     fn read(&self, offset: u64, dst: &mut [u8]);
 
     /// Writes bytes from the heap (in Wasm, memory 0) to this memory.
+    /// Panics or traps if out of bounds.
     fn write(&self, offset: u64, src: &[u8]);
 }
 ```
@@ -22,6 +25,13 @@ pub trait Memory {
 The `Memory` trait intentionally models a [WebAssembly memory instance](https://webassembly.github.io/multi-memory/core/exec/runtime.html#memory-instances).
 This design choice ensures consistency with the interface of memories available to canisters.
 It also provides future compatibility with potential multi-memory support in canisters.
+
+## Panics  
+
+⚠️ `read` and `write` **assume the caller will not access memory outside the current size**.
+
+If the range `[offset … offset + len)` exceeds available memory, the call panics (in native tests) or traps (in a Wasm canister).
+Callers must store and check data lengths themselves or use higher-level containers such as `StableVec`.
 
 ## Available Memory Implementations
 

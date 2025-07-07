@@ -25,7 +25,6 @@ thread_local! {
         StableMinHeap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
         )
-        .expect("Unable to init Bounded StableMinHeap")
     );
 
     static DIR: TempDir = tempdir().unwrap();

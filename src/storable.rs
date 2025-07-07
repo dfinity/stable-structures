@@ -14,7 +14,7 @@ pub trait Storable {
     /// Converts the element into a possibly borrowed byte slice.
     ///
     /// NOTE: `Cow` is used here to avoid unnecessary cloning.
-    fn to_bytes(&self) -> Cow<[u8]>;
+    fn to_bytes(&self) -> Cow<'_, [u8]>;
 
     /// Converts the element into an owned byte vector.
     ///
@@ -28,7 +28,7 @@ pub trait Storable {
     const BOUND: Bound;
 
     /// Like `to_bytes`, but checks that bytes conform to declared bounds.
-    fn to_bytes_checked(&self) -> Cow<[u8]> {
+    fn to_bytes_checked(&self) -> Cow<'_, [u8]> {
         let bytes = self.to_bytes();
         Self::check_bounds(&bytes);
         bytes
@@ -195,7 +195,7 @@ impl<const N: usize> fmt::Debug for Blob<N> {
 
 impl<const N: usize> Storable for Blob<N> {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self.as_slice())
     }
 
@@ -243,7 +243,7 @@ impl<const N: usize> Default for UnboundedVecN<N> {
 }
 
 impl<const N: usize> Storable for UnboundedVecN<N> {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.0.clone())
     }
 
@@ -288,7 +288,7 @@ impl<const N: usize> Default for BoundedVecN<N> {
 }
 
 impl<const N: usize> Storable for BoundedVecN<N> {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.0.clone())
     }
 
@@ -322,7 +322,7 @@ impl<const N: usize> Storable for BoundedVecN<N> {
 
 impl Storable for () {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Borrowed(&[])
     }
 
@@ -346,7 +346,7 @@ impl Storable for () {
 
 impl Storable for Vec<u8> {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self)
     }
 
@@ -365,7 +365,7 @@ impl Storable for Vec<u8> {
 
 impl Storable for String {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self.as_bytes())
     }
 
@@ -384,7 +384,7 @@ impl Storable for String {
 
 impl Storable for u128 {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.into_bytes())
     }
 
@@ -406,7 +406,7 @@ impl Storable for u128 {
 
 impl Storable for u64 {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.into_bytes())
     }
 
@@ -428,7 +428,7 @@ impl Storable for u64 {
 
 impl Storable for f64 {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.into_bytes())
     }
 
@@ -450,7 +450,7 @@ impl Storable for f64 {
 
 impl Storable for u32 {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.into_bytes())
     }
 
@@ -472,7 +472,7 @@ impl Storable for u32 {
 
 impl Storable for f32 {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.into_bytes())
     }
 
@@ -494,7 +494,7 @@ impl Storable for f32 {
 
 impl Storable for u16 {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.into_bytes())
     }
 
@@ -516,7 +516,7 @@ impl Storable for u16 {
 
 impl Storable for u8 {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.into_bytes())
     }
 
@@ -537,7 +537,7 @@ impl Storable for u8 {
 }
 
 impl Storable for bool {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(if *self { 1_u8 } else { 0_u8 }.to_be_bytes().to_vec())
     }
 
@@ -563,7 +563,7 @@ impl Storable for bool {
 
 impl<const N: usize> Storable for [u8; N] {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Borrowed(&self[..])
     }
 
@@ -588,7 +588,7 @@ impl<const N: usize> Storable for [u8; N] {
 
 impl<T: Storable> Storable for Reverse<T> {
     #[inline]
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         self.0.to_bytes()
     }
 
@@ -606,7 +606,7 @@ impl<T: Storable> Storable for Reverse<T> {
 }
 
 impl<T: Storable> Storable for Option<T> {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         match self {
             Some(t) => {
                 let mut bytes = t.to_bytes().into_owned();
@@ -658,7 +658,7 @@ impl<T: Storable> Storable for Option<T> {
 }
 
 impl Storable for Principal {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Borrowed(self.as_slice())
     }
 

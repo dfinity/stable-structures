@@ -178,7 +178,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
     /// Returns a reference to the entry at the specified index.
     #[inline(always)]
-    pub fn entry<M: Memory>(&self, idx: usize, memory: &M) -> EntryRef<K> {
+    pub fn entry<M: Memory>(&self, idx: usize, memory: &M) -> EntryRef<'_, K> {
         (self.key(idx, memory), self.value(idx, memory))
     }
 

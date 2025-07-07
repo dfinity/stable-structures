@@ -81,14 +81,89 @@ impl From<ValueError> for InitError {
     }
 }
 
-/// Represents a serializable value stored in the stable memory.
-/// It has semantics similar to "stable variables" in Motoko and share the same limitations.
-/// The main difference is that Cell writes its value to the memory on each assignment, not just in
-/// upgrade hooks.
-/// You should use cells only for small (up to a few MiB) values to keep upgrades safe.
+/// Represents a value stored in stable memory.
 ///
-/// Cell is a good choice for small read-only configuration values set once on canister installation
-/// and rarely updated.
+/// A `Cell` stores a single value directly in stable memory and provides immediate persistence
+/// on every write operation. This makes it ideal for configuration values, metadata, or any
+/// small state that needs to survive canister upgrades.
+///
+/// You should use cells only for small (up to a few MiB) values to keep upgrades safe. For larger
+/// values, consider using other data structures like `Vec` or `BTreeMap` instead.
+///
+/// # Example
+///
+/// ```rust
+/// use ic_stable_structures::{Cell, DefaultMemoryImpl, Storable, storable::Bound};
+/// use std::borrow::Cow;
+/// use std::cell::RefCell;
+///
+/// #[derive(Clone)]
+/// struct Config {
+///     name: String,
+///     version: u32,
+/// }
+///
+/// // Implement Storable for serialization/deserialization when saving to stable memory.
+/// impl Storable for Config {
+///     fn to_bytes(&self) -> Cow<'_, [u8]> {
+///         # let mut bytes = Vec::new();
+///         // Convert config into bytes...
+///         # Cow::Owned(bytes)
+///     }
+///
+///     fn into_bytes(self) -> Vec<u8> {
+///         # let mut bytes = Vec::new();
+///         // Convert config into bytes...
+///         # bytes
+///     }
+///
+///     fn from_bytes(bytes: Cow<[u8]>) -> Self {
+///         // Convert bytes back to Config
+///         # let (name, version) = ("".to_string(), 0);
+///         # Config { name, version }
+///     }
+///
+///     // Types can be bounded or unbounded:
+///     // - Use Bound::Unbounded if the size can vary or isn't known in advance (recommended for most cases)
+///     // - Use Bound::Bounded if you know the maximum size and want memory optimization
+///     const BOUND: Bound = Bound::Unbounded;
+/// }
+///
+/// // Create a global cell variable
+/// thread_local! {
+///     static CONFIG: RefCell<Cell<Config, DefaultMemoryImpl>> = RefCell::new(
+///         Cell::init(
+///             DefaultMemoryImpl::default(),
+///             Config {
+///                 name: "MyConfig".to_string(),
+///                 version: 1,
+///             }
+///         )
+///     );
+/// }
+///
+/// // Read the current configuration
+/// fn get_version() -> u32 {
+///     CONFIG.with(|c| c.borrow().get().version)
+/// }
+///
+/// // Update the configuration
+/// fn update_version(new_version: u32) {
+///     CONFIG.with(|c| {
+///         let mut cell = c.borrow_mut();
+///         let mut config = cell.get().clone();
+///         config.version = new_version;
+///         cell.set(config);
+///     });
+/// }
+///
+/// # // Test to ensure example works as expected.
+/// # fn main() {
+/// #    assert_eq!(get_version(), 1);
+/// #    update_version(2);
+/// #    assert_eq!(get_version(), 2);
+/// # }
+/// ```
 pub struct Cell<T: Storable, M: Memory> {
     memory: M,
     value: T,
@@ -96,36 +171,39 @@ pub struct Cell<T: Storable, M: Memory> {
 
 impl<T: Storable, M: Memory> Cell<T, M> {
     /// Creates a new cell in the specified memory, overwriting the previous contents of the memory.
-    pub fn new(memory: M, value: T) -> Result<Self, ValueError> {
-        Self::flush_value(&memory, &value)?;
-        Ok(Self { memory, value })
+    pub fn new(memory: M, value: T) -> Self {
+        Self::flush_value(&memory, &value).expect("Failed to write initial value to the memory");
+        Self { memory, value }
     }
 
     /// Initializes the value of the cell based on the contents of the `memory`.
     /// If the memory already contains a cell, initializes the cell with the decoded value.
     /// Otherwise, sets the cell value to `default_value` and writes it to the memory.
-    pub fn init(memory: M, default_value: T) -> Result<Self, InitError> {
+    pub fn init(memory: M, default_value: T) -> Self {
         if memory.size() == 0 {
-            return Ok(Self::new(memory, default_value)?);
+            return Self::new(memory, default_value);
         }
 
         let header = Self::read_header(&memory);
 
         if &header.magic != MAGIC {
-            return Ok(Self::new(memory, default_value)?);
+            return Self::new(memory, default_value);
         }
 
         if header.version != LAYOUT_VERSION {
-            return Err(InitError::IncompatibleVersion {
-                last_supported_version: LAYOUT_VERSION,
-                decoded_version: header.version,
-            });
+            panic!(
+                "Failed to initialize cell: {}",
+                InitError::IncompatibleVersion {
+                    last_supported_version: LAYOUT_VERSION,
+                    decoded_version: header.version,
+                }
+            );
         }
 
-        Ok(Self {
+        Self {
             value: Self::read_value(&memory, header.value_length),
             memory,
-        })
+        }
     }
 
     /// Reads and decodes the value of specified length.
@@ -169,9 +247,9 @@ impl<T: Storable, M: Memory> Cell<T, M> {
     /// Updates the current value in the cell.
     /// If the new value is too large to fit into the memory, the value in the cell does not
     /// change.
-    pub fn set(&mut self, value: T) -> Result<T, ValueError> {
-        Self::flush_value(&self.memory, &value)?;
-        Ok(std::mem::replace(&mut self.value, value))
+    pub fn set(&mut self, value: T) -> T {
+        Self::flush_value(&self.memory, &value).expect("Failed to write value to the memory");
+        std::mem::replace(&mut self.value, value)
     }
 
     /// Writes the value to the memory, growing the memory size if needed.

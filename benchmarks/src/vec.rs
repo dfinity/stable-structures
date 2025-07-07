@@ -29,7 +29,7 @@ impl<const N: usize> Default for UnboundedVecN<N> {
 }
 
 impl<const N: usize> Storable for UnboundedVecN<N> {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.0.clone())
     }
 
@@ -76,7 +76,7 @@ impl<const N: usize> Default for BoundedVecN<N> {
 }
 
 impl<const N: usize> Storable for BoundedVecN<N> {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.0.clone())
     }
 

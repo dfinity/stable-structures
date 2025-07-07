@@ -172,7 +172,7 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 /// }
 ///
 /// impl Storable for User {
-///     fn to_bytes(&self) -> Cow<[u8]> {
+///     fn to_bytes(&self) -> Cow<'_, [u8]> {
 ///         let mut bytes = Vec::new();
 ///         // TODO: Convert your struct to bytes...
 ///         Cow::Owned(bytes)
@@ -1163,7 +1163,7 @@ where
     ///     println!("{}: {}", key, value);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<K, V, M> {
+    pub fn iter(&self) -> Iter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
@@ -1186,13 +1186,17 @@ where
     ///     println!("{}: {}", key, value);
     /// }
     /// ```
-    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<K, V, M> {
+    pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
-    /// Returns an iterator pointing to the first element below the given bound.
-    /// Returns an empty iterator if there are no keys below the given bound.
-    pub fn iter_upper_bound(&self, bound: &K) -> Iter<K, V, M> {
+    /// Returns an iterator starting just before the given key.
+    ///
+    /// Finds the largest key strictly less than `bound` and starts from it.
+    /// Useful when `range(bound..)` skips the previous element.
+    ///
+    /// Returns an empty iterator if no smaller key exists.
+    pub fn iter_from_prev_key(&self, bound: &K) -> Iter<'_, K, V, M> {
         if let Some((start_key, _)) = self.range(..bound).next_back() {
             IterInternal::new_in_range(self, (Bound::Included(start_key), Bound::Unbounded)).into()
         } else {
@@ -1200,32 +1204,45 @@ where
         }
     }
 
+    /// **Deprecated**: use `iter_from_prev_key` instead.
+    ///
+    /// The name `iter_upper_bound` was misleading — it suggested an inclusive
+    /// upper bound. In reality, it starts from the largest key strictly less
+    /// than the given bound.
+    ///
+    /// The new name, `iter_from_prev_key`, better reflects this behavior and
+    /// improves code clarity.
+    #[deprecated(note = "use `iter_from_prev_key` instead")]
+    pub fn iter_upper_bound(&self, bound: &K) -> Iter<'_, K, V, M> {
+        self.iter_from_prev_key(bound)
+    }
+
     /// Returns an iterator over the keys of the map.
-    pub fn keys(&self) -> KeysIter<K, V, M> {
+    pub fn keys(&self) -> KeysIter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
     /// Returns an iterator over the keys of the map which belong to the specified range.
-    pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<K, V, M> {
+    pub fn keys_range(&self, key_range: impl RangeBounds<K>) -> KeysIter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
     /// Returns an iterator over the values of the map, sorted by key.
-    pub fn values(&self) -> ValuesIter<K, V, M> {
+    pub fn values(&self) -> ValuesIter<'_, K, V, M> {
         self.iter_internal().into()
     }
 
     /// Returns an iterator over the values of the map where keys
     /// belong to the specified range.
-    pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<K, V, M> {
+    pub fn values_range(&self, key_range: impl RangeBounds<K>) -> ValuesIter<'_, K, V, M> {
         self.range_internal(key_range).into()
     }
 
-    fn iter_internal(&self) -> IterInternal<K, V, M> {
+    fn iter_internal(&self) -> IterInternal<'_, K, V, M> {
         IterInternal::new(self)
     }
 
-    fn range_internal(&self, key_range: impl RangeBounds<K>) -> IterInternal<K, V, M> {
+    fn range_internal(&self, key_range: impl RangeBounds<K>) -> IterInternal<'_, K, V, M> {
         if self.root_addr == NULL {
             // Map is empty.
             return IterInternal::null(self);
@@ -2957,34 +2974,34 @@ mod test {
     }
     btree_test!(test_bruteforce_range_search, bruteforce_range_search);
 
-    fn test_iter_upper_bound<K: TestKey, V: TestValue>() {
+    fn test_iter_from_prev_key<K: TestKey, V: TestValue>() {
         let (key, value) = (K::build, V::build);
         run_btree_test(|mut btree| {
             for j in 0..100 {
                 btree.insert(key(j), value(j));
                 for i in 0..=j {
                     assert_eq!(
-                        btree.iter_upper_bound(&key(i + 1)).next(),
+                        btree.iter_from_prev_key(&key(i + 1)).next(),
                         Some((key(i), value(i))),
                         "failed to get an upper bound for key({})",
                         i + 1
                     );
                 }
                 assert_eq!(
-                    btree.iter_upper_bound(&key(0)).next(),
+                    btree.iter_from_prev_key(&key(0)).next(),
                     None,
                     "key(0) must not have an upper bound"
                 );
             }
         });
     }
-    btree_test!(test_test_iter_upper_bound, test_iter_upper_bound);
+    btree_test!(test_test_iter_from_prev_key, test_iter_from_prev_key);
 
     // A buggy implementation of storable where the max_size is smaller than the serialized size.
     #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
     struct BuggyStruct;
     impl crate::Storable for BuggyStruct {
-        fn to_bytes(&self) -> Cow<[u8]> {
+        fn to_bytes(&self) -> Cow<'_, [u8]> {
             Cow::Borrowed(&[1, 2, 3, 4])
         }
 
@@ -3127,7 +3144,7 @@ mod test {
         #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
         struct T;
         impl Storable for T {
-            fn to_bytes(&self) -> Cow<[u8]> {
+            fn to_bytes(&self) -> Cow<'_, [u8]> {
                 Cow::Borrowed(&[1, 2, 3])
             }
 
@@ -3150,7 +3167,7 @@ mod test {
         #[derive(PartialOrd, Ord, Clone, Eq, PartialEq, Debug)]
         struct T2;
         impl Storable for T2 {
-            fn to_bytes(&self) -> Cow<[u8]> {
+            fn to_bytes(&self) -> Cow<'_, [u8]> {
                 Cow::Owned(vec![1, 2, 3])
             }
 

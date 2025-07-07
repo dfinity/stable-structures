@@ -8,7 +8,7 @@ where
     A: Storable,
     B: Storable,
 {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(into_bytes_inner_2(Self::BOUND, &self.0, &self.1))
     }
 
@@ -255,7 +255,7 @@ where
     //     <a_bytes> <b_bytes> <c_bytes>
     //   Otherwise:
     //     <size_lengths (1B)> <size_a (0-4B)> <a_bytes> <size_b(0-4B)> <b_bytes> <c_bytes>
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(into_bytes_inner_3(&self.0, &self.1, &self.2))
     }
 
