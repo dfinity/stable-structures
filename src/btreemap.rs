@@ -676,14 +676,26 @@ where
     where
         F: Fn(&mut Node<K>, usize, &M) -> R,
     {
-        let mut node = self.load_node(node_addr);
-        // Look for the key in the current node.
-        match node.search(key, mem) {
-            Ok(idx) => Some(f(&mut node, idx, mem)), // Key found: apply `f`.
-            Err(idx) => match node.node_type() {
-                NodeType::Leaf => None, // At a leaf: key not present.
-                NodeType::Internal => self.traverse(node.child(idx), key, mem, f), // Continue search in child.
-            },
+        // let mut node = self.load_node(node_addr);
+        // // Look for the key in the current node.
+        // match node.search(key, mem) {
+        //     Ok(idx) => Some(f(&mut node, idx, mem)), // Key found: apply `f`.
+        //     Err(idx) => match node.node_type() {
+        //         NodeType::Leaf => None, // At a leaf: key not present.
+        //         NodeType::Internal => self.traverse(node.child(idx), key, mem, f), // Continue search in child.
+        //     },
+        // }
+        let mut addr = node_addr;
+        loop {
+            let mut node = self.load_node(addr);
+            // Look for the key in the current node.
+            match node.search(key, mem) {
+                Ok(idx) => return Some(f(&mut node, idx, mem)), // Key found: apply `f`.
+                Err(idx) => match node.node_type() {
+                    NodeType::Leaf => return None, // At a leaf: key not present.
+                    NodeType::Internal => addr = node.child(idx), // Continue search in child.
+                },
+            }
         }
     }
 
