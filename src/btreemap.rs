@@ -654,7 +654,7 @@ where
             return None;
         }
         self.traverse(self.root_addr, key, |node, idx| {
-            node.into_entry(idx, self.memory()).1 // Extract value.
+            node.extract_entry_at(idx, self.memory()).1 // Extract value.
         })
         .map(Cow::Owned)
         .map(V::from_bytes)
@@ -669,12 +669,12 @@ where
     /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
     fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
     where
-        F: Fn(Node<K>, usize) -> R + Clone,
+        F: Fn(&mut Node<K>, usize) -> R,
     {
-        let node = self.load_node(node_addr);
+        let mut node = self.load_node(node_addr);
         // Look for the key in the current node.
         match node.search(key, self.memory()) {
-            Ok(idx) => Some(f(node, idx)), // Key found: apply `f`.
+            Ok(idx) => Some(f(&mut node, idx)), // Key found: apply `f`.
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => None, // At a leaf: key not present.
                 NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
