@@ -257,9 +257,21 @@ impl<K: Storable + Ord + Clone> Node<K> {
         offset += Bytes::from(8u64);
 
         // Write the children
-        for child in self.children.iter() {
-            writer.write_u64(offset, child.get());
-            offset += Address::size();
+        if self.children.len() <= 4 {
+            // For small counts, use individual writes to avoid allocation overhead
+            for child in self.children.iter() {
+                writer.write_u64(offset, child.get());
+                offset += Address::size();
+            }
+        } else {
+            // For larger counts, use batch write for better performance
+            let bytes: Vec<_> = self
+                .children
+                .iter()
+                .flat_map(|c| c.get().to_le_bytes())
+                .collect();
+            writer.write(offset, bytes.as_slice());
+            offset += Bytes::from(self.children.len()) * Address::size();
         }
 
         // Write the keys.
