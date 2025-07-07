@@ -119,8 +119,7 @@ jobs:
       - name: Checkout baseline branch
         uses: actions/checkout@v4
         with:
-          #ref: main
-          ref: maksym/baseline-v0.6.7
+          ref: main
           path: _canbench_baseline_branch
 
       - uses: actions/cache@v4
