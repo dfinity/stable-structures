@@ -9,14 +9,14 @@ benches:
   memory_manager_grow:
     total:
       calls: 1
-      instructions: 347433966
+      instructions: 350601057
       heap_increase: 2
       stable_memory_increase: 32000
     scopes: {}
   memory_manager_overhead:
     total:
       calls: 1
-      instructions: 1181977502
+      instructions: 1182131418
       heap_increase: 0
       stable_memory_increase: 8320
     scopes: {}

@@ -2,126 +2,126 @@ benches:
   read_chunks_btreemap_1:
     total:
       calls: 1
-      instructions: 148723586
-      heap_increase: 1601
+      instructions: 917929728
+      heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   read_chunks_btreemap_1k:
     total:
       calls: 1
-      instructions: 499375452
+      instructions: 1717538684
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   read_chunks_btreemap_1m:
     total:
       calls: 1
-      instructions: 44067415740
+      instructions: 87473007440
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   read_chunks_stable_1:
     total:
       calls: 1
-      instructions: 104859143
+      instructions: 104860129
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   read_chunks_stable_1k:
     total:
       calls: 1
-      instructions: 104985739
+      instructions: 105217171
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   read_chunks_stable_1m:
     total:
       calls: 1
-      instructions: 230002739
+      instructions: 462002171
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   read_chunks_vec_1:
     total:
       calls: 1
-      instructions: 104859760
+      instructions: 393219636
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   read_chunks_vec_1k:
     total:
       calls: 1
-      instructions: 105826498
+      instructions: 394716162
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   read_chunks_vec_1m:
     total:
       calls: 1
-      instructions: 1010905944
+      instructions: 1897002163
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   write_chunks_btreemap_1:
     total:
       calls: 1
-      instructions: 357205117
-      heap_increase: 13
+      instructions: 957543884
+      heap_increase: 1632
       stable_memory_increase: 1536
     scopes: {}
   write_chunks_btreemap_1k:
     total:
       calls: 1
-      instructions: 4188695663
-      heap_increase: 2
+      instructions: 9545553907
+      heap_increase: 4
       stable_memory_increase: 1536
     scopes: {}
   write_chunks_btreemap_1m:
     total:
       calls: 1
-      instructions: 88827798790
+      instructions: 168849688164
       heap_increase: 0
       stable_memory_increase: 3072
     scopes: {}
   write_chunks_stable_1:
     total:
       calls: 1
-      instructions: 130471968
+      instructions: 130474938
       heap_increase: 0
       stable_memory_increase: 1664
     scopes: {}
   write_chunks_stable_1k:
     total:
       calls: 1
-      instructions: 130598745
+      instructions: 130840059
       heap_increase: 0
       stable_memory_increase: 1664
     scopes: {}
   write_chunks_stable_1m:
     total:
       calls: 1
-      instructions: 255406658
+      instructions: 495407977
       heap_increase: 0
       stable_memory_increase: 1664
     scopes: {}
   write_chunks_vec_1:
     total:
       calls: 1
-      instructions: 549903573
+      instructions: 549906989
       heap_increase: 0
       stable_memory_increase: 1536
     scopes: {}
   write_chunks_vec_1k:
     total:
       calls: 1
-      instructions: 562257515
+      instructions: 562978193
       heap_increase: 0
       stable_memory_increase: 1536
     scopes: {}
   write_chunks_vec_1m:
     total:
       calls: 1
-      instructions: 1896593101
+      instructions: 2641609036
       heap_increase: 0
       stable_memory_increase: 1536
     scopes: {}
