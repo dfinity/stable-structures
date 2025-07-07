@@ -140,13 +140,25 @@ impl<K: Storable + Ord + Clone> Node<K> {
         offset += ENTRIES_OFFSET;
         let mut children = vec![];
         if node_type == NodeType::Internal {
-            // The number of children is equal to the number of entries + 1.
-            children.reserve_exact(num_entries + 1);
-            for _ in 0..num_entries + 1 {
-                let child = Address::from(read_u64(&reader, offset));
-                offset += Address::size();
+            let total = num_entries + 1;
+            let byte_len = Bytes::from(total) * Address::size();
+
+            // Read all child bytes into buffer in one go
+            let mut buf = Vec::with_capacity(byte_len.get() as usize);
+            read_to_vec(&reader, offset, &mut buf, byte_len.get() as usize);
+
+            // Decode each u64 from the buffer
+            children.reserve_exact(total);
+            let address_size = Address::size().get() as usize;
+            for i in 0..total {
+                let start = i * address_size;
+                let end = start + address_size;
+                let bytes: [u8; 8] = buf[start..end].try_into().expect("slice length incorrect");
+                let child = Address::from(u64::from_le_bytes(bytes)); // or from_be_bytes depending on format
                 children.push(child);
             }
+
+            offset += byte_len;
         }
 
         // Load the keys (eagerly if small).
