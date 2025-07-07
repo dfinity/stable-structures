@@ -319,9 +319,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Returns the entry at the specified index while consuming this node.
-    pub fn into_entry<M: Memory>(mut self, idx: usize, memory: &M) -> Entry<K> {
-        let entries = core::mem::take(&mut self.entries);
-        let (key, value) = entries.into_iter().nth(idx).unwrap();
+    pub fn extract_entry_at<M: Memory>(&mut self, idx: usize, memory: &M) -> Entry<K> {
+        let (key, value) = self.entries.swap_remove(idx);
         (
             self.extract_key(key, memory),
             self.extract_value(value, memory),
