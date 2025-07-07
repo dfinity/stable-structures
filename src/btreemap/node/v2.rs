@@ -139,8 +139,11 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load children if this is an internal node.
         offset += ENTRIES_OFFSET;
         let children = if node_type == NodeType::Internal {
+            // Use batch read if number of children exceeds this threshold.
+            // Below it, individual reads are faster due to lower overhead.
+            const CHILDREN_BATCH_READ_THRESHOLD: usize = 4;
             let count = num_entries + 1;
-            if count <= 2 {
+            if count <= CHILDREN_BATCH_READ_THRESHOLD {
                 // For very small counts, use individual reads to avoid allocation overhead
                 let mut children = Vec::with_capacity(count);
                 for _ in 0..count {
