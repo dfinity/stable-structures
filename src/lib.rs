@@ -127,13 +127,13 @@ fn read_u64<M: Memory>(m: &M, addr: Address) -> u64 {
 
 /// Reads `count` consecutive u64 values from memory starting at `addr` into a Vec.
 /// This is more efficient than calling `read_u64` in a loop.
-fn read_u64_vec<M: Memory>(m: &M, addr: Address, count: usize) -> std::vec::Vec<u64> {
-    let mut buf = vec![0u8; count * 8];
-    m.read(addr.get(), &mut buf);
-    buf.chunks_exact(8)
-        .map(|chunk| u64::from_le_bytes(chunk.try_into().unwrap()))
-        .collect()
-}
+// fn read_u64_vec<M: Memory>(m: &M, addr: Address, count: usize) -> std::vec::Vec<u64> {
+//     let mut buf = vec![0u8; count * 8];
+//     m.read(addr.get(), &mut buf);
+//     buf.chunks_exact(8)
+//         .map(|chunk| u64::from_le_bytes(chunk.try_into().unwrap()))
+//         .collect()
+// }
 
 /// Writes a single 32-bit integer encoded as little-endian.
 fn write_u32<M: Memory>(m: &M, addr: Address, val: u32) {

@@ -289,13 +289,13 @@ impl<'a, M: Memory> NodeWriter<'a, M> {
         self.write(offset, &val.to_le_bytes());
     }
 
-    pub fn write_u64_vec(&mut self, offset: Address, values: &[u64]) {
-        let mut buf = vec![0u8; values.len() * 8];
-        for (i, &value) in values.iter().enumerate() {
-            buf[i * 8..(i + 1) * 8].copy_from_slice(&value.to_le_bytes());
-        }
-        self.write(offset, &buf);
-    }
+    // pub fn write_u64_vec(&mut self, offset: Address, values: &[u64]) {
+    //     let mut buf = vec![0u8; values.len() * 8];
+    //     for (i, &value) in values.iter().enumerate() {
+    //         buf[i * 8..(i + 1) * 8].copy_from_slice(&value.to_le_bytes());
+    //     }
+    //     self.write(offset, &buf);
+    // }
 
     pub fn write_struct<T>(&mut self, t: &T, addr: Address) {
         let slice = unsafe {
