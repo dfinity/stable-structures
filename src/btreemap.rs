@@ -655,8 +655,8 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        self.traverse(self.root_addr, key, |node, idx| {
-            node.to_entry(idx, self.memory()).1 // Extract value.
+        self.traverse(self.root_addr, key, self.memory(), |node, idx, mem| {
+            node.extract_entry_at(idx, mem).1 // Extract value.
         })
         .map(Cow::Owned)
         .map(V::from_bytes)
@@ -665,26 +665,25 @@ where
     /// Returns true if the key exists.
     pub fn contains_key(&self, key: &K) -> bool {
         // An empty closure returns Some(()) if the key is found.
-        self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
+        self.root_addr != NULL
+            && self
+                .traverse(self.root_addr, key, self.memory(), |_, _, _| ())
+                .is_some()
     }
 
     /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
-    #[inline(always)]
-    fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
+    fn traverse<F, R>(&self, node_addr: Address, key: &K, mem: &M, f: F) -> Option<R>
     where
-        F: Fn(&mut Node<K>, usize) -> R,
+        F: Fn(&mut Node<K>, usize, &M) -> R,
     {
-        let mut addr = node_addr;
-        loop {
-            let mut node = self.load_node(addr);
-            // Look for the key in the current node.
-            match node.search(key, self.memory()) {
-                Ok(idx) => return Some(f(&mut node, idx)), // Key found: apply `f`.
-                Err(idx) => match node.node_type() {
-                    NodeType::Leaf => return None, // At a leaf: key not present.
-                    NodeType::Internal => addr = node.child(idx), // Continue search in child.
-                },
-            }
+        let mut node = self.load_node(node_addr);
+        // Look for the key in the current node.
+        match node.search(key, mem) {
+            Ok(idx) => Some(f(&mut node, idx, mem)), // Key found: apply `f`.
+            Err(idx) => match node.node_type() {
+                NodeType::Leaf => None, // At a leaf: key not present.
+                NodeType::Internal => self.traverse(node.child(idx), key, mem, f), // Continue search in child.
+            },
         }
     }
 
