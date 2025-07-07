@@ -140,25 +140,25 @@ impl<K: Storable + Ord + Clone> Node<K> {
         offset += ENTRIES_OFFSET;
         let mut children = vec![];
         if node_type == NodeType::Internal {
-            let total = num_entries + 1;
-            let byte_len = Bytes::from(total) * Address::size();
-
-            // Read all child bytes into buffer in one go
-            let mut buf = Vec::with_capacity(byte_len.get() as usize);
-            read_to_vec(&reader, offset, &mut buf, byte_len.get() as usize);
-
-            // Decode each u64 from the buffer
-            children.reserve_exact(total);
-            let address_size = Address::size().get() as usize;
-            for i in 0..total {
-                let start = i * address_size;
-                let end = start + address_size;
-                let bytes: [u8; 8] = buf[start..end].try_into().expect("slice length incorrect");
-                let child = Address::from(u64::from_le_bytes(bytes)); // or from_be_bytes depending on format
-                children.push(child);
+            let count = num_entries + 1;
+            // Use batch read for all cases except when there are no children
+            if count == 0 {
+                // No children to load
+            } else if count <= 4 {
+                // For small counts, use individual reads to avoid overhead
+                children.reserve_exact(count);
+                for _ in 0..count {
+                    children.push(Address::from(read_u64(&reader, offset)));
+                    offset += Address::size();
+                }
+            } else {
+                // For larger counts, use the optimized batch read
+                children = read_u64_vec(&reader, offset, count)
+                    .into_iter()
+                    .map(Address::from)
+                    .collect();
+                offset += Bytes::from(count) * Address::size();
             }
-
-            offset += byte_len;
         }
 
         // Load the keys (eagerly if small).
