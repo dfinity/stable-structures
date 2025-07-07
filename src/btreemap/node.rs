@@ -68,7 +68,7 @@ pub struct Node<K: Storable + Ord + Clone> {
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a node from memory at the given address.
-    pub fn load<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
+    pub fn load<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Box<Self> {
         // Load the header to determine which version the node is, then load the node accordingly.
         let header: NodeHeader = read_struct(address, memory);
         assert_eq!(&header.magic, MAGIC, "Bad magic.");
@@ -371,7 +371,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
     ///      order.
     pub fn merge<M: Memory>(
         &mut self,
-        mut source: Node<K>,
+        mut source: Box<Node<K>>,
         median: Entry<K>,
         allocator: &mut Allocator<M>,
     ) {

@@ -91,17 +91,17 @@ const MINIMUM_PAGE_SIZE: u32 = 128;
 
 impl<K: Storable + Ord + Clone> Node<K> {
     /// Creates a new v2 node at the given address.
-    pub fn new_v2(address: Address, node_type: NodeType, page_size: PageSize) -> Node<K> {
+    pub fn new_v2(address: Address, node_type: NodeType, page_size: PageSize) -> Box<Node<K>> {
         assert!(page_size.get() >= MINIMUM_PAGE_SIZE);
 
-        Node {
+        Box::new(Node {
             address,
             node_type,
             version: Version::V2(page_size),
             entries: vec![],
             children: vec![],
             overflows: Vec::with_capacity(0),
-        }
+        })
     }
 
     /// Loads a v2 node from memory at the given address.
@@ -110,7 +110,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         page_size: PageSize,
         header: NodeHeader,
         memory: &M,
-    ) -> Self {
+    ) -> Box<Self> {
         #[cfg(feature = "bench_scope")]
         let _p = canbench_rs::bench_scope("node_load_v2"); // May add significant overhead.
 
@@ -191,14 +191,14 @@ impl<K: Storable + Ord + Clone> Node<K> {
             offset += U32_SIZE + Bytes::from(value_size as u64);
         }
 
-        Self {
+        Box::new(Self {
             address,
             entries,
             children,
             node_type,
             version: Version::V2(page_size),
             overflows,
-        }
+        })
     }
 
     // Saves the node to memory.
