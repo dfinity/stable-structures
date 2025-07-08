@@ -128,7 +128,7 @@ fn vec_get<T: Storable + Random>(memory: impl Memory) -> BenchResult {
 
     bench_fn(|| {
         for i in 0..num_items {
-            svec.get(i as u64);
+            svec.get(i as u64).unwrap();
         }
     })
 }
