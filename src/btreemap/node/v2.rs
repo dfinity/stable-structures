@@ -256,11 +256,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         writer.write_u64(offset, self.overflows.first().unwrap_or(&NULL).get());
         offset += Bytes::from(8u64);
 
-        // Write the children
-        for child in self.children.iter() {
-            writer.write_u64(offset, child.get());
-            offset += Address::size();
+        // Write the children.
+        let count = self.children.len();
+        let byte_len = count * Address::size().get() as usize;
+        let mut bytes = Vec::with_capacity(byte_len);
+        for child in &self.children {
+            bytes.extend_from_slice(&child.get().to_le_bytes());
         }
+        writer.write(offset, &bytes);
+        offset += Bytes::from(byte_len);
 
         // Write the keys.
         for i in 0..self.entries.len() {
