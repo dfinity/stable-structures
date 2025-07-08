@@ -10,8 +10,7 @@ canbench-rs.workspace = true
 candid.workspace = true
 ic-cdk-macros.workspace = true
 ic-cdk.workspace = true
-#ic-stable-structures = { path = "../", features = [] }
-ic-stable-structures = { version = "=0.6.7", features = [] }
+ic-stable-structures = { path = "../", features = [] }
 maplit.workspace = true
 serde.workspace = true
 tiny-rng.workspace = true
@@ -35,6 +34,6 @@ path = "vec/src/main.rs"
 name = "compare"
 path = "compare/src/main.rs"
 
-# [[bin]]
-# name = "btreeset"
-# path = "btreeset/src/main.rs"
+[[bin]]
+name = "btreeset"
+path = "btreeset/src/main.rs"

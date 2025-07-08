@@ -33,10 +33,10 @@ impl<const N: usize> Storable for UnboundedVecN<N> {
         Cow::Owned(self.0.clone())
     }
 
-    // #[inline]
-    // fn into_bytes(self) -> Vec<u8> {
-    //     self.0
-    // }
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
 
     #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
@@ -80,10 +80,10 @@ impl<const N: usize> Storable for BoundedVecN<N> {
         Cow::Owned(self.0.clone())
     }
 
-    // #[inline]
-    // fn into_bytes(self) -> Vec<u8> {
-    //     self.0
-    // }
+    #[inline]
+    fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
 
     #[inline]
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
