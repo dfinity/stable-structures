@@ -93,15 +93,15 @@ jobs:
       matrix:
         name:
           - btreemap
-          - btreeset
+          # - btreeset
           - memory-manager
           - vec
           - compare
         include:
           - name: btreemap
             project_dir: ./benchmarks/btreemap
-          - name: btreeset
-            project_dir: ./benchmarks/btreeset
+          # - name: btreeset
+          #   project_dir: ./benchmarks/btreeset
           - name: memory-manager
             project_dir: ./benchmarks/memory_manager
           - name: vec
