@@ -780,9 +780,6 @@ where
 
     /// A helper method for recursively removing a key from the B-tree.
     fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
-        #[cfg(feature = "bench_scope")]
-        let _p = canbench_rs::bench_scope("remove_helper"); // May add significant overhead.
-
         if node.address() != self.root_addr {
             // We're guaranteed that whenever this method is called an entry can be
             // removed from the node without it needing to be merged into a sibling.
@@ -1297,9 +1294,6 @@ where
     /// Saves the node to memory.
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
-        #[cfg(feature = "bench_scope")]
-        let _p = canbench_rs::bench_scope("save_node"); // May add significant overhead.
-
         node.save(self.allocator_mut());
     }
 
