@@ -58,7 +58,7 @@ has_updates() {
 
 # Check if the canbench results file is up to date.
 pushd "$CANISTER_PATH"
-canbench --less-verbose --hide-results --show-summary --csv --compare-order=computed-vs-stored > "$CANBENCH_OUTPUT"
+canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
 cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
 if has_updates; then
   UPDATED_MSG="**❌ \`$CANBENCH_RESULTS_FILE\` is not up to date**
@@ -86,7 +86,7 @@ if [ -f "$BASELINE_BRANCH_RESULTS_FILE" ]; then
 
   # Run canbench to compare results with the baseline branch.
   pushd "$CANISTER_PATH"
-  canbench --less-verbose --hide-results --show-summary --csv --compare-order=computed-vs-stored > "$CANBENCH_OUTPUT"
+  canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
   cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
   popd
 fi
