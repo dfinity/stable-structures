@@ -133,16 +133,13 @@ fn read_address_vec<M: Memory>(m: &M, addr: Address, count: usize) -> std::vec::
     let mut buf = std::vec::Vec::with_capacity(byte_len);
     read_to_vec(m, addr, &mut buf, byte_len);
 
-    let mut result = std::vec::Vec::with_capacity(count);
-    let mut chunks = buf.chunks_exact(chunk_size);
-
-    for chunk in &mut chunks {
-        // SAFETY: chunks_exact(chunk_size) ensures each chunk has exactly 8 bytes
-        let bytes: [u8; 8] = chunk.try_into().expect("each chunk must be 8 bytes");
-        result.push(Address::from(u64::from_le_bytes(bytes)));
-    }
-
-    result
+    buf.chunks_exact(chunk_size)
+        .map(|chunk| {
+            // SAFETY: chunks_exact(chunk_size) ensures each chunk has exactly 8 bytes
+            let bytes: [u8; 8] = chunk.try_into().expect("chunk must be 8 bytes");
+            Address::from(u64::from_le_bytes(bytes))
+        })
+        .collect()
 }
 
 /// Writes a single 32-bit integer encoded as little-endian.
