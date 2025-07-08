@@ -139,73 +139,9 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load children if this is an internal node.
         offset += ENTRIES_OFFSET;
         let children = if node_type == NodeType::Internal {
-            /*
-            #1
-            instructions:
-            status:   Regressions and improvements 🔴🟢
-            counts:   [total 285 | regressed 4 | improved 43 | new 0 | unchanged 238]
-            change:   [max +37.22M | p75 -3.03M | median -5.73M | p25 -12.52M | min -56.85M]
-            change %: [max +4.55% | p75 -0.29% | median -0.89% | p25 -1.53% | min -7.84%]
-
-            #2
-            instructions:
-            status:   Regressions and improvements 🔴🟢
-            counts:   [total 285 | regressed 1 | improved 67 | new 0 | unchanged 217]
-            change:   [max +31.82M | p75 -5.50M | median -7.58M | p25 -13.28M | min -28.03M]
-            change %: [max +4.55% | p75 -0.51% | median -1.10% | p25 -1.98% | min -8.37%]
-
-            #3
-            instructions:
-            status:   Regressions and improvements 🔴🟢
-            counts:   [total 285 | regressed 1 | improved 68 | new 0 | unchanged 216]
-            change:   [max +31.82M | p75 -5.52M | median -7.58M | p25 -13.37M | min -28.03M]
-            change %: [max +4.55% | p75 -0.52% | median -1.12% | p25 -1.98% | min -8.37%]
-
-            #4
-            instructions:
-            status:   Regressions and improvements 🔴🟢
-            counts:   [total 285 | regressed 1 | improved 68 | new 0 | unchanged 216]
-            change:   [max +31.82M | p75 -5.67M | median -7.76M | p25 -13.45M | min -28.03M]
-            change %: [max +3.19% | p75 -0.53% | median -1.15% | p25 -1.98% | min -8.37%]
-
-            #5
-            instructions:
-            status:   Regressions and improvements 🔴🟢
-            counts:   [total 285 | regressed 1 | improved 67 | new 0 | unchanged 217]
-            change:   [max +31.82M | p75 -5.73M | median -7.75M | p25 -13.50M | min -28.03M]
-            change %: [max +3.19% | p75 -0.53% | median -1.14% | p25 -1.98% | min -8.37%]
-
-            #6
-            instructions:
-            status:   Improvements detected 🟢
-            counts:   [total 285 | regressed 0 | improved 57 | new 0 | unchanged 228]
-            change:   [max +31.37M | p75 -5.54M | median -7.26M | p25 -13.60M | min -26.92M]
-            change %: [max +1.71% | p75 -0.52% | median -1.08% | p25 -1.90% | min -8.02%]
-
-            #7
-            instructions:
-            status:   Regressions and improvements 🔴🟢
-            counts:   [total 285 | regressed 2 | improved 34 | new 0 | unchanged 249]
-            change:   [max +35.08M | p75 -4.50M | median -5.83M | p25 -11.08M | min -25.01M]
-            change %: [max +3.05% | p75 -0.40% | median -0.91% | p25 -1.50% | min -7.34%]
-
-            #8
-            instructions:
-            status:   Regressions and improvements 🔴🟢
-            counts:   [total 285 | regressed 2 | improved 23 | new 0 | unchanged 260]
-            change:   [max +32.28M | p75 -3.34M | median -4.53M | p25 -9.33M | min -21.76M]
-            change %: [max +3.28% | p75 -0.30% | median -0.69% | p25 -1.20% | min -5.53%]
-
-            #9
-            instructions:
-            status:   Regressions and improvements 🔴🟢
-            counts:   [total 285 | regressed 3 | improved 9 | new 0 | unchanged 273]
-            change:   [max +33.02M | p75 -2.23M | median -3.18M | p25 -7.23M | min -12.70M]
-            change %: [max +3.58% | p75 -0.20% | median -0.47% | p25 -0.93% | min -3.05%]
-            */
-            // Empirical constant from benchmarks: individual reads are faster for ≤6 children.
-            // From 7 up, batch reads consistently perform better.
-            const CHILDREN_BATCH_READ_THRESHOLD: usize = 6;
+            // Empirical constant from benchmarks: individual reads are faster for ≤4 children.
+            // From 5 up, batch reads consistently perform better.
+            const CHILDREN_BATCH_READ_THRESHOLD: usize = 4;
             let count = num_entries + 1;
             if count <= CHILDREN_BATCH_READ_THRESHOLD {
                 // For very small counts, use individual reads to avoid allocation overhead
