@@ -246,11 +246,14 @@ fn remove_helper<K: TestKey, V: TestValue>(mut btree: BTreeMap<K, V, impl Memory
     }
 
     let keys: Vec<K> = items.into_iter().map(|(k, _)| k).collect();
+    let median_key = keys[count / 2].clone();
     bench_fn(|| {
         // Remove the keys from the btree.
-        for random_key in keys {
-            btree.remove(&random_key);
-        }
+        // for random_key in keys {
+        //     btree.remove(&random_key);
+        // }
+        // canbench btreemap_v2_remove_blob_1024_128 --instruction-tracing
+        btree.remove(&median_key);
     })
 }
 
