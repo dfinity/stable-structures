@@ -138,16 +138,28 @@ impl<K: Storable + Ord + Clone> Node<K> {
 
         // Load children if this is an internal node.
         offset += ENTRIES_OFFSET;
-        let mut children = vec![];
-        if node_type == NodeType::Internal {
-            // The number of children is equal to the number of entries + 1.
-            children.reserve_exact(num_entries + 1);
-            for _ in 0..num_entries + 1 {
-                let child = Address::from(read_u64(&reader, offset));
-                offset += Address::size();
-                children.push(child);
+        let children = if node_type == NodeType::Internal {
+            // Empirical constant from benchmarks: individual reads are faster for ≤4 children.
+            // From 5 up, batch reads consistently perform better.
+            const CHILDREN_BATCH_READ_THRESHOLD: usize = 4;
+            let count = num_entries + 1;
+            if count <= CHILDREN_BATCH_READ_THRESHOLD {
+                // For very small counts, use individual reads to avoid allocation overhead
+                let mut children = Vec::with_capacity(count);
+                for _ in 0..count {
+                    children.push(Address::from(read_u64(&reader, offset)));
+                    offset += Address::size();
+                }
+                children
+            } else {
+                // For larger counts, use the optimized batch read
+                let children = read_address_vec(&reader, offset, count);
+                offset += Bytes::from(count) * Address::size();
+                children
             }
-        }
+        } else {
+            vec![]
+        };
 
         // Load the keys (eagerly if small).
         const EAGER_LOAD_KEY_SIZE_THRESHOLD: u32 = 16;
@@ -244,11 +256,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         writer.write_u64(offset, self.overflows.first().unwrap_or(&NULL).get());
         offset += Bytes::from(8u64);
 
-        // Write the children
-        for child in self.children.iter() {
-            writer.write_u64(offset, child.get());
-            offset += Address::size();
+        // Write the children.
+        let count = self.children.len();
+        let byte_len = count * Address::size().get() as usize;
+        let mut bytes = Vec::with_capacity(byte_len);
+        for child in &self.children {
+            bytes.extend_from_slice(&child.get().to_le_bytes());
         }
+        writer.write(offset, &bytes);
+        offset += Bytes::from(byte_len);
 
         // Write the keys.
         for i in 0..self.entries.len() {
