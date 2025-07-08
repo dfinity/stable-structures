@@ -139,8 +139,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         // Load children if this is an internal node.
         offset += ENTRIES_OFFSET;
         let children = if node_type == NodeType::Internal {
-            // Use batch read if number of children exceeds this threshold.
-            // Below it, individual reads are faster due to lower overhead.
+            // Empirical constant from benchmarks: individual reads are faster for ≤4 children.
+            // From 5 up, batch reads consistently perform better.
             const CHILDREN_BATCH_READ_THRESHOLD: usize = 4;
             let count = num_entries + 1;
             if count <= CHILDREN_BATCH_READ_THRESHOLD {
