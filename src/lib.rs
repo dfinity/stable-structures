@@ -127,17 +127,18 @@ fn read_u64<M: Memory>(m: &M, addr: Address) -> u64 {
 
 /// Reads `count` Address values with maximum performance using unsafe code.
 fn read_address_vec<M: Memory>(m: &M, addr: Address, count: usize) -> std::vec::Vec<Address> {
-    const CHUNK_SIZE: usize = 8; // Each Address is 8 bytes (64 bits).
-    let byte_len = count * CHUNK_SIZE;
+    let chunk_size = Address::size().get() as usize;
+    assert_eq!(chunk_size, 8);
+    let byte_len = count * chunk_size;
     let mut buf = std::vec::Vec::with_capacity(byte_len);
     read_to_vec(m, addr, &mut buf, byte_len);
 
     let mut result = std::vec::Vec::with_capacity(count);
-    let mut chunks = buf.chunks_exact(CHUNK_SIZE);
+    let mut chunks = buf.chunks_exact(chunk_size);
 
     for chunk in &mut chunks {
-        // SAFETY: chunks_exact(CHUNK_SIZE) guarantees each chunk has length CHUNK_SIZE.
-        let bytes: [u8; CHUNK_SIZE] = chunk.try_into().unwrap();
+        // SAFETY: chunks_exact(chunk_size) ensures each chunk has exactly 8 bytes
+        let bytes: [u8; 8] = chunk.try_into().expect("each chunk must be 8 bytes");
         result.push(Address::from(u64::from_le_bytes(bytes)));
     }
 
