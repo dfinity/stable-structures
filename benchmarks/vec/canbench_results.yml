@@ -2,63 +2,63 @@ benches:
   vec_get_blob_128:
     total:
       calls: 1
-      instructions: 19196661
+      instructions: 19246661
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_16:
     total:
       calls: 1
-      instructions: 6355945
+      instructions: 6405945
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_32:
     total:
       calls: 1
-      instructions: 7073504
+      instructions: 7123504
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_4:
     total:
       calls: 1
-      instructions: 4774326
+      instructions: 4824326
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_4_mem_manager:
     total:
       calls: 1
-      instructions: 7141676
+      instructions: 7191676
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_64:
     total:
       calls: 1
-      instructions: 11260943
+      instructions: 11310943
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_64_mem_manager:
     total:
       calls: 1
-      instructions: 13601091
+      instructions: 13651091
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_blob_8:
     total:
       calls: 1
-      instructions: 5673200
+      instructions: 5723200
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vec_get_u64:
     total:
       calls: 1
-      instructions: 4740305
+      instructions: 4790305
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
