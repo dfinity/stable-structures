@@ -116,11 +116,11 @@ jobs:
       - name: Checkout current PR
         uses: actions/checkout@v4
 
-      - name: Checkout main branch
+      - name: Checkout baseline branch
         uses: actions/checkout@v4
         with:
           ref: main
-          path: _canbench_main_branch
+          path: _canbench_baseline_branch
 
       - uses: actions/cache@v4
         with:
