@@ -125,6 +125,23 @@ fn read_u64<M: Memory>(m: &M, addr: Address) -> u64 {
     u64::from_le_bytes(buf)
 }
 
+/// Reads `count` Address values with maximum performance using unsafe code.
+fn read_address_vec<M: Memory>(m: &M, addr: Address, count: usize) -> std::vec::Vec<Address> {
+    let chunk_size = Address::size().get() as usize;
+    assert_eq!(chunk_size, 8);
+    let byte_len = count * chunk_size;
+    let mut buf = std::vec::Vec::with_capacity(byte_len);
+    read_to_vec(m, addr, &mut buf, byte_len);
+
+    buf.chunks_exact(chunk_size)
+        .map(|chunk| {
+            // SAFETY: chunks_exact(chunk_size) ensures each chunk has exactly 8 bytes
+            let bytes: [u8; 8] = chunk.try_into().expect("chunk must be 8 bytes");
+            Address::from(u64::from_le_bytes(bytes))
+        })
+        .collect()
+}
+
 /// Writes a single 32-bit integer encoded as little-endian.
 fn write_u32<M: Memory>(m: &M, addr: Address, val: u32) {
     write(m, addr.get(), &val.to_le_bytes());
