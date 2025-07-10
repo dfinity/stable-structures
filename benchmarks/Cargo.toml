@@ -31,8 +31,8 @@ name = "vec"
 path = "vec/src/main.rs"
 
 [[bin]]
-name = "compare"
-path = "compare/src/main.rs"
+name = "io_chunks"
+path = "io_chunks/src/main.rs"
 
 [[bin]]
 name = "btreeset"
