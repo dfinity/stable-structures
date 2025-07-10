@@ -94,7 +94,7 @@ jobs:
         name:
           - btreemap
           - btreeset
-          # - io_chunks TODO: re-enable after new folder is merged.
+          - io_chunks
           - memory-manager
           - vec
         include:
@@ -102,8 +102,8 @@ jobs:
             project_dir: ./benchmarks/btreemap
           - name: btreeset
             project_dir: ./benchmarks/btreeset
-          # - name: io_chunks
-          #   project_dir: ./benchmarks/io_chunks
+          - name: io_chunks
+            project_dir: ./benchmarks/io_chunks
           - name: memory-manager
             project_dir: ./benchmarks/memory_manager
           - name: vec
