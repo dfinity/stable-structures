@@ -93,15 +93,15 @@ jobs:
       matrix:
         name:
           - btreemap
-          - btreeset
+          # - btreeset
           - io_chunks
           - memory-manager
           - vec
         include:
           - name: btreemap
             project_dir: ./benchmarks/btreemap
-          - name: btreeset
-            project_dir: ./benchmarks/btreeset
+          # - name: btreeset
+          #   project_dir: ./benchmarks/btreeset
           - name: io_chunks
             project_dir: ./benchmarks/io_chunks
           - name: memory-manager
