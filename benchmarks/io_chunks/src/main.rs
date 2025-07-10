@@ -1,3 +1,21 @@
+//! # I/O Chunks Benchmark
+//!
+//! Measures read/write performance across different stable storage approaches
+//! when handling 100 MiB of data split into varying chunk sizes.
+//!
+//! Tests approaches:
+//! - **Stable Memory**: Direct memory operations (baseline)
+//! - **BTreeMap**: Key-value storage with chunk index as key
+//! - **StableVec**: Sequential storage pushing chunks
+//!
+//! Each approach is tested with:
+//! - 1 chunk (100 MiB)
+//! - 1K chunks (~100 KiB each)  
+//! - 1M chunks (~100 B each)
+//!
+//! **Goal**: Evaluate how chunk size affects performance and compare
+//! the overhead of stable structures versus raw memory operations.
+
 use benchmarks::vec::BoundedVecN;
 use canbench_rs::{bench, bench_fn, BenchResult};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;

@@ -94,20 +94,20 @@ jobs:
         name:
           - btreemap
           # - btreeset
+          - io_chunks
           - memory-manager
           - vec
-          - compare
         include:
           - name: btreemap
             project_dir: ./benchmarks/btreemap
           # - name: btreeset
           #   project_dir: ./benchmarks/btreeset
+          - name: io_chunks
+            project_dir: ./benchmarks/io_chunks
           - name: memory-manager
             project_dir: ./benchmarks/memory_manager
           - name: vec
             project_dir: ./benchmarks/vec
-          - name: compare
-            project_dir: ./benchmarks/compare
 
     env:
       PROJECT_DIR: ${{ matrix.project_dir }}
