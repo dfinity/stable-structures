@@ -23,17 +23,17 @@ name = "btreemap"
 path = "btreemap/src/main.rs"
 
 [[bin]]
+name = "btreeset"
+path = "btreeset/src/main.rs"
+
+[[bin]]
+name = "io_chunks"
+path = "io_chunks/src/main.rs"
+
+[[bin]]
 name = "memory_manager"
 path = "memory_manager/src/main.rs"
 
 [[bin]]
 name = "vec"
 path = "vec/src/main.rs"
-
-[[bin]]
-name = "compare"
-path = "compare/src/main.rs"
-
-[[bin]]
-name = "btreeset"
-path = "btreeset/src/main.rs"
