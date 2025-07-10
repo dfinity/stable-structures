@@ -96,7 +96,7 @@ jobs:
           - btreeset
           - memory-manager
           - vec
-          - compare
+          - io_chunks
         include:
           - name: btreemap
             project_dir: ./benchmarks/btreemap
@@ -106,8 +106,8 @@ jobs:
             project_dir: ./benchmarks/memory_manager
           - name: vec
             project_dir: ./benchmarks/vec
-          - name: compare
-            project_dir: ./benchmarks/compare
+          - name: io_chunks
+            project_dir: ./benchmarks/io_chunks
 
     env:
       PROJECT_DIR: ${{ matrix.project_dir }}
