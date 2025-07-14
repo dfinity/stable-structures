@@ -36,5 +36,9 @@ name = "memory_manager"
 path = "memory_manager/src/main.rs"
 
 [[bin]]
+name = "nns"
+path = "nns/src/main.rs"
+
+[[bin]]
 name = "vec"
 path = "vec/src/main.rs"

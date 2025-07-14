@@ -249,8 +249,8 @@ fn test_iter_count() {
     }
 }
 
-// A struct with a bugg implementation of storable where the max_size can
-// smaller than the serialized size.
+// A struct with a buggy implementation of `Storable` where the max_size can
+// be smaller than the serialized size.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 struct BuggyStruct(Vec<u8>);
 impl crate::Storable for BuggyStruct {
