@@ -96,6 +96,7 @@ jobs:
           - btreeset
           - io_chunks
           - memory-manager
+          - nns
           - vec
         include:
           - name: btreemap
@@ -106,6 +107,8 @@ jobs:
             project_dir: ./benchmarks/io_chunks
           - name: memory-manager
             project_dir: ./benchmarks/memory_manager
+          - name: nns
+            project_dir: ./benchmarks/nns
           - name: vec
             project_dir: ./benchmarks/vec
 
