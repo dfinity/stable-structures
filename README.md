@@ -40,7 +40,7 @@ Stable structures are able to work directly in stable memory because each data s
 its own memory.
 When initializing a stable structure, a memory is provided that the data structure can use to store its data.
 
-Here's a basic examples:
+Here are some basic examples:
 
 ### Example: BTreeMap
 
