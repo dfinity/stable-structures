@@ -1,4 +1,5 @@
 use crate::vec::{BoundedVecN, UnboundedVecN};
+use candid::Principal;
 use ic_stable_structures::storable::{Blob, Storable};
 use tiny_rng::{Rand, Rng};
 
@@ -45,4 +46,19 @@ impl Random for u64 {
     fn random(rng: &mut Rng) -> Self {
         rng.rand_u64()
     }
+}
+
+impl Random for Principal {
+    fn random(rng: &mut Rng) -> Self {
+        let size = rng.rand_u32() % Principal::MAX_LENGTH_IN_BYTES as u32;
+        let mut buf = Vec::with_capacity(size as usize);
+        for _ in 0..size {
+            buf.push(rng.rand_u8());
+        }
+        Principal::from_slice(&buf)
+    }
+}
+
+impl Random for () {
+    fn random(_: &mut Rng) -> Self {}
 }
