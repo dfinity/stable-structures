@@ -50,7 +50,7 @@ impl Random for u64 {
 
 impl Random for Principal {
     fn random(rng: &mut Rng) -> Self {
-        let size = rng.rand_u32() % Principal::MAX_LENGTH_IN_BYTES as u32;
+        let size = 1 + (rng.rand_u32() % (Principal::MAX_LENGTH_IN_BYTES as u32 - 1));
         let mut buf = Vec::with_capacity(size as usize);
         for _ in 0..size {
             buf.push(rng.rand_u8());
