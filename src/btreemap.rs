@@ -1157,8 +1157,8 @@ where
     /// map.insert(1, "one".to_string());
     /// map.insert(2, "two".to_string());
     ///
-    /// for (key, value) in map.iter() {
-    ///     println!("{}: {}", key, value);
+    /// for entry in map.iter() {
+    ///     println!("{}: {}", entry.key(), entry.value());
     /// }
     /// ```
     pub fn iter(&self) -> Iter<'_, K, V, M> {
@@ -1180,8 +1180,8 @@ where
     /// map.insert(3, "three".to_string());
     ///
     /// // Get entries with keys between 1 and 3 (inclusive)
-    /// for (key, value) in map.range((Bound::Included(1), Bound::Included(3))) {
-    ///     println!("{}: {}", key, value);
+    /// for entry in map.range((Bound::Included(1), Bound::Included(3))) {
+    ///     println!("{}: {}", entry.key(), entry.value());
     /// }
     /// ```
     pub fn range(&self, key_range: impl RangeBounds<K>) -> Iter<'_, K, V, M> {
