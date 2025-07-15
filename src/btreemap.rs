@@ -1368,7 +1368,7 @@ mod test {
 
     /// A helper function to collect owned key/value pairs into a `Vec`.
     fn collect<K: Clone, V: Clone>(it: impl Iterator<Item = (K, V)>) -> Vec<(K, V)> {
-        it.map(|(k, v)| (k, v)).collect()
+        it.collect()
     }
 
     fn collect_e<'a, K, V, M>(it: impl Iterator<Item = LazyEntry<'a, K, V, M>>) -> Vec<(K, V)>
