@@ -69,12 +69,12 @@ impl NeuronStore for StableNeuronStore {
         let previous_followees = self
             .followees_map
             .range(min_followee_map_key..=max_followee_map_key)
-            .map(|(_key, value)| value)
+            .map(|entry| entry.value())
             .collect::<HashSet<_>>();
         let previous_followee_keys = self
             .followees_map
             .range(min_followee_map_key..=max_followee_map_key)
-            .map(|(key, _value)| key)
+            .map(|entry| *entry.key())
             .collect::<Vec<_>>();
         for key in previous_followee_keys {
             self.followees_map.remove(&key);
@@ -104,7 +104,7 @@ impl NeuronStore for StableNeuronStore {
 
         self.followees_map
             .range(min_key..=max_key)
-            .map(|(_key, followee_neuron_id)| followee_neuron_id)
+            .map(|entry| entry.value())
             .collect()
     }
 
@@ -114,7 +114,11 @@ impl NeuronStore for StableNeuronStore {
 
         self.followers_index
             .range(min_key..=max_key)
-            .map(|(((_topic, _followee_neuron_id), follower_neuron_id), _value)| follower_neuron_id)
+            //.map(|(((_topic, _followee_neuron_id), follower_neuron_id), _value)| follower_neuron_id)
+            .map(|entry| {
+                let ((_, follower_neuron_id), _) = entry.key();
+                *follower_neuron_id
+            })
             .collect()
     }
 }

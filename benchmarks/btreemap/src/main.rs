@@ -777,6 +777,7 @@ fn range_key_sum_helper_v2(count: usize, size: usize) -> BenchResult {
     bench_fn(|| {
         btree
             .range((Bound::Included(0), Bound::Included(size as u32)))
+            .map(|entry| (entry.key().clone(), entry.value()))
             .map(|(k, _)| k)
             .sum::<u32>()
     })
@@ -794,8 +795,8 @@ fn range_value_sum_helper_v2(count: usize, size: usize) -> BenchResult {
     bench_fn(|| {
         btree
             .range((Bound::Included(0), Bound::Included(size as u32)))
-            .filter(|(k, _)| k % 3 == 0)
-            .map(|(_, v)| v.len())
+            .filter(|entry| *entry.key() % 3 == 0)
+            .map(|entry| entry.value().len())
             .sum::<usize>()
     })
 }

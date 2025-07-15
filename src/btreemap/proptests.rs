@@ -146,7 +146,12 @@ fn map_iter_from_prev_key(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: V
         for k in keys.iter() {
             map.insert(*k, ());
 
-            prop_assert_eq!(Some((*k, ())), map.iter_from_prev_key(&(k + 1)).next());
+            prop_assert_eq!(
+                Some((*k, ())),
+                map.iter_from_prev_key(&(k + 1))
+                    .next()
+                    .map(|entry| (*entry.key(), entry.value()))
+            );
         }
 
         Ok(())
@@ -215,7 +220,10 @@ fn execute_operation<M: Memory>(
             let std_iter = std_btree.iter().skip(from).take(len);
             let mut stable_iter = btree.iter().skip(from).take(len);
             for (k1, v1) in std_iter {
-                let (k2, v2) = stable_iter.next().unwrap();
+                let (k2, v2) = stable_iter
+                    .next()
+                    .map(|entry| (entry.key().clone(), entry.value()))
+                    .unwrap();
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
             }
@@ -234,7 +242,10 @@ fn execute_operation<M: Memory>(
             let std_iter = std_btree.iter().rev().skip(from).take(len);
             let mut stable_iter = btree.iter().rev().skip(from).take(len);
             for (k1, v1) in std_iter {
-                let (k2, v2) = stable_iter.next().unwrap();
+                let (k2, v2) = stable_iter
+                    .next()
+                    .map(|entry| (entry.key().clone(), entry.value()))
+                    .unwrap();
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
             }
@@ -283,7 +294,13 @@ fn execute_operation<M: Memory>(
             }
             let idx = idx % std_btree.len();
 
-            if let Some((k, v)) = btree.iter().skip(idx).take(1).next() {
+            if let Some((k, v)) = btree
+                .iter()
+                .skip(idx)
+                .take(1)
+                .next()
+                .map(|entry| (entry.key().clone(), entry.value()))
+            {
                 eprintln!("Get({})", hex::encode(&k));
                 assert_eq!(std_btree.get(&k), Some(&v));
                 assert_eq!(btree.get(&k), Some(v));
@@ -297,7 +314,13 @@ fn execute_operation<M: Memory>(
 
             let idx = idx % std_btree.len();
 
-            if let Some((k, v)) = btree.iter().skip(idx).take(1).next() {
+            if let Some((k, v)) = btree
+                .iter()
+                .skip(idx)
+                .take(1)
+                .next()
+                .map(|entry| (entry.key().clone(), entry.value()))
+            {
                 eprintln!("Remove({})", hex::encode(&k));
                 assert_eq!(std_btree.remove(&k), Some(v.clone()));
                 assert_eq!(btree.remove(&k), Some(v));
@@ -314,8 +337,24 @@ fn execute_operation<M: Memory>(
             let end = std::cmp::min(std_btree.len() - 1, from + len);
 
             // Create a range for the stable btree from the keys at indexes `from` and `end`.
-            let range_start = btree.iter().skip(from).take(1).next().unwrap().0.clone();
-            let range_end = btree.iter().skip(end).take(1).next().unwrap().0.clone();
+            let range_start = btree
+                .iter()
+                .skip(from)
+                .take(1)
+                .next()
+                .map(|entry| (entry.key().clone(), entry.value()))
+                .unwrap()
+                .0
+                .clone();
+            let range_end = btree
+                .iter()
+                .skip(end)
+                .take(1)
+                .next()
+                .map(|entry| (entry.key().clone(), entry.value()))
+                .unwrap()
+                .0
+                .clone();
             let stable_range = btree.range(range_start..range_end);
 
             // Create a range for the std btree from the keys at indexes `from` and `end`.
@@ -330,9 +369,9 @@ fn execute_operation<M: Memory>(
             let range_end = std_btree.iter().skip(end).take(1).next().unwrap().0.clone();
             let std_range = std_btree.range(range_start..range_end);
 
-            for ((k1, v1), (k2, v2)) in std_range.zip(stable_range) {
-                assert_eq!(k1, &k2);
-                assert_eq!(v1, &v2);
+            for ((k1, v1), entry2) in std_range.zip(stable_range) {
+                assert_eq!(k1, entry2.key());
+                assert_eq!(*v1, entry2.value());
             }
         }
         Operation::PopLast => {
