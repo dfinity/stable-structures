@@ -2,16 +2,13 @@ name: CI
 on: [pull_request]
 
 env:
+  RUST_VERSION: 1.84.0 # Use the same version as in `rust-toolchain.toml`
   CARGO_TERM_COLOR: always # Force Cargo to use colors
   TERM: xterm-256color
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust: [1.84.0]
-
     steps:
       - uses: actions/checkout@v4
 
@@ -28,8 +25,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
+          rustup update $RUST_VERSION --no-self-update
+          rustup default $RUST_VERSION
           rustup component add rustfmt
           rustup component add clippy
           rustup toolchain install nightly
@@ -68,8 +65,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update ${{ matrix.rust }} --no-self-update
-          rustup default ${{ matrix.rust }}
+          rustup update $RUST_VERSION --no-self-update
+          rustup default $RUST_VERSION
           rustup target add wasm32-unknown-unknown
 
       - name: Install DFX
@@ -135,8 +132,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update ${{ matrix.rust || 'stable' }} --no-self-update
-          rustup default ${{ matrix.rust || 'stable' }}
+          rustup update $RUST_VERSION --no-self-update
+          rustup default $RUST_VERSION
           rustup target add wasm32-unknown-unknown
 
       - name: Benchmark
