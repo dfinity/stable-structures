@@ -25,8 +25,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update $RUST_VERSION --no-self-update
-          rustup default $RUST_VERSION
+          rustup update ${RUST_VERSION} --no-self-update
+          rustup default ${RUST_VERSION}
           rustup component add rustfmt
           rustup component add clippy
           rustup toolchain install nightly
@@ -65,8 +65,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update $RUST_VERSION --no-self-update
-          rustup default $RUST_VERSION
+          rustup update ${RUST_VERSION} --no-self-update
+          rustup default ${RUST_VERSION}
           rustup target add wasm32-unknown-unknown
 
       - name: Install DFX
@@ -132,8 +132,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update $RUST_VERSION --no-self-update
-          rustup default $RUST_VERSION
+          rustup update ${RUST_VERSION} --no-self-update
+          rustup default ${RUST_VERSION}
           rustup target add wasm32-unknown-unknown
 
       - name: Benchmark
