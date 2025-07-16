@@ -57,6 +57,8 @@ has_updates() {
 
 # Check if the canbench results file is up to date.
 pushd "$CANISTER_PATH"
+git log -n 5 --oneline
+
 canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
 cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
 if has_updates; then
