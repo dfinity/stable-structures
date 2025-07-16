@@ -59,10 +59,11 @@ has_updates() {
 pushd "$CANISTER_PATH"
 git log -n 5 --oneline
 
-canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
+cp "./canbench_results.yml" "/tmp/canbench_results_${CANBENCH_JOB_NAME}_before.yml"
+canbench --less-verbose --hide-results --show-summary --csv --persist > "$CANBENCH_OUTPUT"
 cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
 # TODO: remove debug code.
-cp "./canbench_results.yml" "/tmp/canbench_results_${CANBENCH_JOB_NAME}.yml"
+cp "./canbench_results.yml" "/tmp/canbench_results_${CANBENCH_JOB_NAME}_after.yml"
 
 if has_updates; then
   UPDATED_MSG="**❌ \`$CANBENCH_RESULTS_FILE\` is not up to date**
