@@ -2,7 +2,7 @@ name: CI
 on: [pull_request]
 
 env:
-  RUST_VERSION: 1.84.0
+  RUST_VERSION: 1.84.0 # Use the same version as in `rust-toolchain.toml`
   CARGO_TERM_COLOR: always # Force Cargo to use colors
   TERM: xterm-256color
 
@@ -25,8 +25,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update $RUST_VERSION --no-self-update
-          rustup default $RUST_VERSION
+          rustup update ${RUST_VERSION} --no-self-update
+          rustup default ${RUST_VERSION}
           rustup component add rustfmt
           rustup component add clippy
           rustup toolchain install nightly
@@ -65,8 +65,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update $RUST_VERSION --no-self-update
-          rustup default $RUST_VERSION
+          rustup update ${RUST_VERSION} --no-self-update
+          rustup default ${RUST_VERSION}
           rustup target add wasm32-unknown-unknown
 
       - name: Install DFX
@@ -132,8 +132,8 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup update $RUST_VERSION --no-self-update
-          rustup default $RUST_VERSION
+          rustup update ${RUST_VERSION} --no-self-update
+          rustup default ${RUST_VERSION}
           rustup target add wasm32-unknown-unknown
 
       - name: Benchmark
@@ -147,18 +147,13 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
+          name: canbench_results_persisted_${{ matrix.name }}_yml
+          path: /tmp/canbench_results_persisted_${{ matrix.name }}.yml
+
+      - uses: actions/upload-artifact@v4
+        with:
           name: canbench_results_${{ matrix.name }}_csv
           path: /tmp/canbench_results_${{ matrix.name }}.csv
-
-      # TODO: remove debug code.
-      - uses: actions/upload-artifact@v4
-        with:
-          name: canbench_results_${{ matrix.name }}_yml_before
-          path: /tmp/canbench_results_${{ matrix.name }}_before.yml
-      - uses: actions/upload-artifact@v4
-        with:
-          name: canbench_results_${{ matrix.name }}_yml_after
-          path: /tmp/canbench_results_${{ matrix.name }}_after.yml
 
       - name: Pass or fail
         run: |
