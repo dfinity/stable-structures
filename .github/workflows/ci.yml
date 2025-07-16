@@ -147,6 +147,11 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
+          name: canbench_results_persisted_${{ matrix.name }}_yml
+          path: /tmp/canbench_results_persisted_${{ matrix.name }}.yml
+
+      - uses: actions/upload-artifact@v4
+        with:
           name: canbench_results_${{ matrix.name }}_csv
           path: /tmp/canbench_results_${{ matrix.name }}.csv
 
