@@ -220,10 +220,7 @@ fn execute_operation<M: Memory>(
             let std_iter = std_btree.iter().skip(from).take(len);
             let mut stable_iter = btree.iter().skip(from).take(len);
             for (k1, v1) in std_iter {
-                let (k2, v2) = stable_iter
-                    .next()
-                    .map(|entry| (entry.key().clone(), entry.value()))
-                    .unwrap();
+                let (k2, v2) = stable_iter.next().map(|entry| entry.into_pair()).unwrap();
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
             }
