@@ -5,11 +5,12 @@ use super::{
 use crate::{types::NULL, Address, Memory, Storable};
 use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
+use std::rc::Rc;
 
 /// An indicator of the current position in the map.
 pub(crate) enum Cursor<K: Storable + Ord + Clone> {
     Address(Address),
-    Node { node: Box<Node<K>>, next: Index },
+    Node { node: Rc<Node<K>>, next: Index },
 }
 
 /// An index into a node's child or entry.
@@ -100,7 +101,7 @@ where
                                 // We found the key exactly matching the left bound.
                                 // Here is where we'll start the iteration.
                                 self.forward_cursors.push(Cursor::Node {
-                                    node: Box::new(node),
+                                    node: Rc::new(node),
                                     next: Index::Entry(idx),
                                 });
                                 break;
@@ -118,7 +119,7 @@ where
                                     && self.range.contains(node.key(idx + 1, self.map.memory()))
                                 {
                                     self.forward_cursors.push(Cursor::Node {
-                                        node: Box::new(node),
+                                        node: Rc::new(node),
                                         next: Index::Entry(idx + 1),
                                     });
                                 }
@@ -156,7 +157,7 @@ where
                                 && self.range.contains(node.key(idx, self.map.memory()))
                             {
                                 self.forward_cursors.push(Cursor::Node {
-                                    node: Box::new(node),
+                                    node: Rc::new(node),
                                     next: Index::Entry(idx),
                                 });
                             }
@@ -196,7 +197,7 @@ where
                                 // We found the key exactly matching the right bound.
                                 // Here is where we'll start the iteration.
                                 self.backward_cursors.push(Cursor::Node {
-                                    node: Box::new(node),
+                                    node: Rc::new(node),
                                     next: Index::Entry(idx),
                                 });
                                 break;
@@ -214,7 +215,7 @@ where
                                     && self.range.contains(node.key(idx - 1, self.map.memory()))
                                 {
                                     self.backward_cursors.push(Cursor::Node {
-                                        node: Box::new(node),
+                                        node: Rc::new(node),
                                         next: Index::Entry(idx - 1),
                                     });
                                 }
@@ -250,7 +251,7 @@ where
                             if idx > 0 && self.range.contains(node.key(idx - 1, self.map.memory()))
                             {
                                 self.backward_cursors.push(Cursor::Node {
-                                    node: Box::new(node),
+                                    node: Rc::new(node),
                                     next: Index::Entry(idx - 1),
                                 });
                             }
@@ -275,7 +276,7 @@ where
 
     // Iterates to find the next element in the requested range.
     // If it exists, `map` is applied to that element and the result is returned.
-    fn next_map<T, F: Fn(&Node<K>, usize) -> T>(&mut self, map: F) -> Option<T> {
+    fn next_map<T, F: Fn(&Rc<Node<K>>, usize) -> T>(&mut self, map: F) -> Option<T> {
         if !self.forward_cursors_initialized {
             self.initialize_forward_cursors();
         }
@@ -293,7 +294,7 @@ where
                             // Iterate on leaf nodes starting from the first entry.
                             NodeType::Leaf => Index::Entry(0),
                         },
-                        node: Box::new(node),
+                        node: Rc::new(node),
                     });
                 }
                 self.next_map(map)
@@ -355,7 +356,7 @@ where
 
     // Iterates to find the next back element in the requested range.
     // If it exists, `map` is applied to that element and the result is returned.
-    fn next_back_map<T, F: Fn(&Node<K>, usize) -> T>(&mut self, map: F) -> Option<T> {
+    fn next_back_map<T, F: Fn(&Rc<Node<K>>, usize) -> T>(&mut self, map: F) -> Option<T> {
         if !self.backward_cursors_initialized {
             self.initialize_backward_cursors();
         }
@@ -379,7 +380,7 @@ where
                     } {
                         self.backward_cursors.push(Cursor::Node {
                             next,
-                            node: Box::new(node),
+                            node: Rc::new(node),
                         });
                     }
                 }
@@ -446,24 +447,63 @@ where
     }
 }
 
+/// A lazily evaluated key-value entry from a `BTreeMap` iterator.
+///
+/// This struct defers deserialization and cloning of the key and value
+/// until they are explicitly accessed, improving performance.
+pub struct LazyEntry<'a, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    node: Rc<Node<K>>,
+    entry_idx: usize,
+    map: &'a BTreeMap<K, V, M>,
+}
+
+impl<K, V, M> LazyEntry<'_, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    /// Returns a reference to the key.
+    pub fn key(&self) -> &K {
+        self.node.key(self.entry_idx, self.map.memory())
+    }
+
+    /// Returns the value by deserializing it.
+    pub fn value(&self) -> V {
+        let encoded_value = self.node.value(self.entry_idx, self.map.memory());
+        V::from_bytes(Cow::Borrowed(encoded_value))
+    }
+
+    /// Converts the entry into an owned (K, V) pair.
+    pub fn into_pair(self) -> (K, V) {
+        (self.key().clone(), self.value())
+    }
+}
+
 pub struct Iter<'a, K, V, M>(IterInternal<'a, K, V, M>)
 where
     K: Storable + Ord + Clone,
     V: Storable,
     M: Memory;
 
-impl<K, V, M> Iterator for Iter<'_, K, V, M>
+impl<'a, K, V, M> Iterator for Iter<'a, K, V, M>
 where
     K: Storable + Ord + Clone,
     V: Storable,
     M: Memory,
 {
-    type Item = (K, V);
+    type Item = LazyEntry<'a, K, V, M>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next_map(|node, entry_idx| {
-            let (key, encoded_value) = node.entry(entry_idx, self.0.map.memory());
-            (key.clone(), V::from_bytes(Cow::Borrowed(encoded_value)))
+        self.0.next_map(|node, entry_idx| LazyEntry {
+            node: node.clone(),
+            entry_idx,
+            map: self.0.map,
         })
     }
 
@@ -482,9 +522,10 @@ where
     M: Memory,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.0.next_back_map(|node, entry_idx| {
-            let (key, encoded_value) = node.entry(entry_idx, self.0.map.memory());
-            (key.clone(), V::from_bytes(Cow::Borrowed(encoded_value)))
+        self.0.next_back_map(|node, entry_idx| LazyEntry {
+            node: node.clone(),
+            entry_idx,
+            map: self.0.map,
         })
     }
 }
@@ -624,9 +665,9 @@ mod test {
         }
 
         let mut i = 0;
-        for (key, value) in btree.iter() {
-            assert_eq!(key, i);
-            assert_eq!(value, i + 1);
+        for entry in btree.iter() {
+            assert_eq!(*entry.key(), i);
+            assert_eq!(entry.value(), i + 1);
             i += 1;
         }
 
@@ -645,9 +686,9 @@ mod test {
 
         // Iteration should be in ascending order.
         let mut i = 0;
-        for (key, value) in btree.iter() {
-            assert_eq!(key, i);
-            assert_eq!(value, i + 1);
+        for entry in btree.iter() {
+            assert_eq!(*entry.key(), i);
+            assert_eq!(entry.value(), i + 1);
             i += 1;
         }
 
@@ -666,9 +707,9 @@ mod test {
 
         // Iteration should be in ascending order.
         let mut i = 10;
-        for (key, value) in btree.range(10..90) {
-            assert_eq!(key, i);
-            assert_eq!(value, i + 1);
+        for entry in btree.range(10..90) {
+            assert_eq!(*entry.key(), i);
+            assert_eq!(entry.value(), i + 1);
             i += 1;
         }
 
@@ -687,10 +728,10 @@ mod test {
 
         // Iteration should be in descending order.
         let mut i = 100;
-        for (key, value) in btree.iter().rev() {
+        for entry in btree.iter().rev() {
             i -= 1;
-            assert_eq!(key, i);
-            assert_eq!(value, i + 1);
+            assert_eq!(*entry.key(), i);
+            assert_eq!(entry.value(), i + 1);
         }
 
         assert_eq!(i, 0);
@@ -708,10 +749,10 @@ mod test {
 
         // Iteration should be in descending order.
         let mut i = 80;
-        for (key, value) in btree.range(20..80).rev() {
+        for entry in btree.range(20..80).rev() {
             i -= 1;
-            assert_eq!(key, i);
-            assert_eq!(value, i + 1);
+            assert_eq!(*entry.key(), i);
+            assert_eq!(entry.value(), i + 1);
         }
 
         assert_eq!(i, 20);
@@ -730,13 +771,13 @@ mod test {
         let mut iter = btree.iter();
 
         for i in 0..50 {
-            let (key, value) = iter.next().unwrap();
-            assert_eq!(key, i);
-            assert_eq!(value, i + 1);
+            let entry = iter.next().unwrap();
+            assert_eq!(*entry.key(), i);
+            assert_eq!(entry.value(), i + 1);
 
-            let (key, value) = iter.next_back().unwrap();
-            assert_eq!(key, 99 - i);
-            assert_eq!(value, 100 - i);
+            let entry = iter.next_back().unwrap();
+            assert_eq!(*entry.key(), 99 - i);
+            assert_eq!(entry.value(), 100 - i);
         }
 
         assert!(iter.next().is_none());
@@ -756,13 +797,13 @@ mod test {
         let mut iter = btree.range(30..70);
 
         for i in 0..20 {
-            let (key, value) = iter.next().unwrap();
-            assert_eq!(key, 30 + i);
-            assert_eq!(value, 31 + i);
+            let entry = iter.next().unwrap();
+            assert_eq!(*entry.key(), 30 + i);
+            assert_eq!(entry.value(), 31 + i);
 
-            let (key, value) = iter.next_back().unwrap();
-            assert_eq!(key, 69 - i);
-            assert_eq!(value, 70 - i);
+            let entry = iter.next_back().unwrap();
+            assert_eq!(*entry.key(), 69 - i);
+            assert_eq!(entry.value(), 70 - i);
         }
 
         assert!(iter.next().is_none());
