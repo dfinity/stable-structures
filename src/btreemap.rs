@@ -1372,7 +1372,7 @@ mod test {
     }
 
     /// A helper function to collect lazy entries into a `Vec`.
-    fn collect_e<'a, K, V, M>(it: impl Iterator<Item = LazyEntry<'a, K, V, M>>) -> Vec<(K, V)>
+    fn collect_entry<'a, K, V, M>(it: impl Iterator<Item = LazyEntry<'a, K, V, M>>) -> Vec<(K, V)>
     where
         K: Storable + Ord + Clone + 'a,
         V: Storable + 'a,
@@ -2440,9 +2440,9 @@ mod test {
         let key = K::build;
         run_btree_test(|btree: BTreeMap<K, V, _>| {
             // Test prefixes that don't exist in the map.
-            assert_eq!(collect_e(btree.range(key(0)..)), vec![]);
-            assert_eq!(collect_e(btree.range(key(10)..)), vec![]);
-            assert_eq!(collect_e(btree.range(key(100)..)), vec![]);
+            assert_eq!(collect_entry(btree.range(key(0)..)), vec![]);
+            assert_eq!(collect_entry(btree.range(key(10)..)), vec![]);
+            assert_eq!(collect_entry(btree.range(key(100)..)), vec![]);
         });
     }
     btree_test!(test_range_empty, range_empty);
@@ -2454,7 +2454,7 @@ mod test {
             btree.insert(key(0), value(0));
 
             // Test a prefix that's larger than the value in the leaf node. Should be empty.
-            assert_eq!(collect_e(btree.range(key(1)..)), vec![]);
+            assert_eq!(collect_entry(btree.range(key(1)..)), vec![]);
         });
     }
     btree_test!(
@@ -2477,7 +2477,7 @@ mod test {
 
             // Test a prefix that's larger than the key in the internal node.
             assert_eq!(
-                collect_e(btree.range(key(7)..key(8))),
+                collect_entry(btree.range(key(7)..key(8))),
                 vec![(key(7), value(7))]
             );
         });
@@ -2518,7 +2518,7 @@ mod test {
 
             // Tests a prefix that's smaller than the key in the internal node.
             assert_eq!(
-                collect_e(btree.range(key(0)..key(11))),
+                collect_entry(btree.range(key(0)..key(11))),
                 vec![
                     (key(1), value(100)),
                     (key(2), value(200)),
@@ -2529,7 +2529,7 @@ mod test {
 
             // Tests a prefix that crosses several nodes.
             assert_eq!(
-                collect_e(btree.range(key(10)..key(20))),
+                collect_entry(btree.range(key(10)..key(20))),
                 vec![
                     (key(11), value(500)),
                     (key(12), value(600)),
@@ -2540,7 +2540,7 @@ mod test {
 
             // Tests a prefix that's larger than the key in the internal node.
             assert_eq!(
-                collect_e(btree.range(key(20)..key(30))),
+                collect_entry(btree.range(key(20)..key(30))),
                 vec![
                     (key(21), value(900)),
                     (key(22), value(1_000)),
@@ -2630,11 +2630,11 @@ mod test {
             );
 
             // Tests a prefix that doesn't exist, but is in the middle of the root node.
-            assert_eq!(collect_e(btree.range(key(15)..key(16))), vec![]);
+            assert_eq!(collect_entry(btree.range(key(15)..key(16))), vec![]);
 
             // Tests a prefix beginning in the middle of the tree and crossing several nodes.
             assert_eq!(
-                collect_e(btree.range(key(15)..=key(26))),
+                collect_entry(btree.range(key(15)..=key(26))),
                 vec![
                     (key(16), value(700)),
                     (key(18), value(800)),
@@ -2650,7 +2650,7 @@ mod test {
 
             // Tests a prefix that crosses several nodes.
             assert_eq!(
-                collect_e(btree.range(key(10)..key(20))),
+                collect_entry(btree.range(key(10)..key(20))),
                 vec![
                     (key(12), value(500)),
                     (key(14), value(600)),
@@ -2663,7 +2663,7 @@ mod test {
             // Tests a prefix that starts from a leaf node, then iterates through the root and right
             // sibling.
             assert_eq!(
-                collect_e(btree.range(key(20)..key(30))),
+                collect_entry(btree.range(key(20)..key(30))),
                 vec![
                     (key(21), value(1000)),
                     (key(22), value(1100)),
@@ -2741,7 +2741,7 @@ mod test {
             assert_eq!(root.children_len(), 2);
 
             assert_eq!(
-                collect_e(btree.range(key(0)..key(10))),
+                collect_entry(btree.range(key(0)..key(10))),
                 vec![
                     (key(1), value(100)),
                     (key(2), value(200)),
@@ -2752,12 +2752,12 @@ mod test {
 
             // Tests an offset that has a keys somewhere in the range of keys of an internal node.
             assert_eq!(
-                collect_e(btree.range(key(13)..key(20))),
+                collect_entry(btree.range(key(13)..key(20))),
                 vec![(key(13), value(700)), (key(14), value(800))]
             );
 
             // Tests an offset that's larger than the key in the internal node.
-            assert_eq!(collect_e(btree.range(key(25)..)), vec![]);
+            assert_eq!(collect_entry(btree.range(key(25)..)), vec![]);
         });
     }
     btree_test!(
@@ -2842,7 +2842,7 @@ mod test {
 
             // Tests a offset that crosses several nodes.
             assert_eq!(
-                collect_e(btree.range(key(14)..key(20))),
+                collect_entry(btree.range(key(14)..key(20))),
                 vec![
                     (key(14), value(0)),
                     (key(16), value(0)),
@@ -2854,7 +2854,7 @@ mod test {
             // Tests a offset that starts from a leaf node, then iterates through the root and right
             // sibling.
             assert_eq!(
-                collect_e(btree.range(key(22)..key(30))),
+                collect_entry(btree.range(key(22)..key(30))),
                 vec![
                     (key(22), value(0)),
                     (key(23), value(0)),
@@ -2951,23 +2951,23 @@ mod test {
 
             assert_eq!(
                 collect_kv(std_map.range(..)),
-                collect_e(stable_map.range(..))
+                collect_entry(stable_map.range(..))
             );
 
             for l in 0..=NKEYS {
                 assert_eq!(
                     collect_kv(std_map.range(key(l)..)),
-                    collect_e(stable_map.range(key(l)..))
+                    collect_entry(stable_map.range(key(l)..))
                 );
 
                 assert_eq!(
                     collect_kv(std_map.range(..key(l))),
-                    collect_e(stable_map.range(..key(l)))
+                    collect_entry(stable_map.range(..key(l)))
                 );
 
                 assert_eq!(
                     collect_kv(std_map.range(..=key(l))),
-                    collect_e(stable_map.range(..=key(l)))
+                    collect_entry(stable_map.range(..=key(l)))
                 );
 
                 for r in l + 1..=NKEYS {
@@ -2976,7 +2976,7 @@ mod test {
                             let range = (lbound.clone(), rbound);
                             assert_eq!(
                                 collect_kv(std_map.range(range.clone())),
-                                collect_e(stable_map.range(range.clone())),
+                                collect_entry(stable_map.range(range.clone())),
                                 "range: {range:?}"
                             );
                         }
