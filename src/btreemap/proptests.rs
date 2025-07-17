@@ -239,10 +239,7 @@ fn execute_operation<M: Memory>(
             let std_iter = std_btree.iter().rev().skip(from).take(len);
             let mut stable_iter = btree.iter().rev().skip(from).take(len);
             for (k1, v1) in std_iter {
-                let (k2, v2) = stable_iter
-                    .next()
-                    .map(|entry| (entry.key().clone(), entry.value()))
-                    .unwrap();
+                let (k2, v2) = stable_iter.next().map(|entry| entry.into_pair()).unwrap();
                 assert_eq!(k1, &k2);
                 assert_eq!(v1, &v2);
             }
@@ -296,7 +293,7 @@ fn execute_operation<M: Memory>(
                 .skip(idx)
                 .take(1)
                 .next()
-                .map(|entry| (entry.key().clone(), entry.value()))
+                .map(|entry| entry.into_pair())
             {
                 eprintln!("Get({})", hex::encode(&k));
                 assert_eq!(std_btree.get(&k), Some(&v));
@@ -316,7 +313,7 @@ fn execute_operation<M: Memory>(
                 .skip(idx)
                 .take(1)
                 .next()
-                .map(|entry| (entry.key().clone(), entry.value()))
+                .map(|entry| entry.into_pair())
             {
                 eprintln!("Remove({})", hex::encode(&k));
                 assert_eq!(std_btree.remove(&k), Some(v.clone()));
@@ -339,7 +336,7 @@ fn execute_operation<M: Memory>(
                 .skip(from)
                 .take(1)
                 .next()
-                .map(|entry| (entry.key().clone(), entry.value()))
+                .map(|entry| entry.into_pair())
                 .unwrap()
                 .0
                 .clone();
@@ -348,7 +345,7 @@ fn execute_operation<M: Memory>(
                 .skip(end)
                 .take(1)
                 .next()
-                .map(|entry| (entry.key().clone(), entry.value()))
+                .map(|entry| entry.into_pair())
                 .unwrap()
                 .0
                 .clone();
