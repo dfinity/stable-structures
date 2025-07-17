@@ -366,8 +366,8 @@ fn execute_operation<M: Memory>(
             let std_range = std_btree.range(range_start..range_end);
 
             for ((k1, v1), (k2, v2)) in std_range.zip(stable_range) {
-                assert_eq!(*k1, k2);
-                assert_eq!(*v1, v2);
+                assert_eq!(k1, &k2);
+                assert_eq!(v1, &v2);
             }
         }
         Operation::PopLast => {
