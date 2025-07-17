@@ -114,9 +114,8 @@ impl NeuronStore for StableNeuronStore {
 
         self.followers_index
             .range(min_key..=max_key)
-            //.map(|(((_topic, _followee_neuron_id), follower_neuron_id), _value)| follower_neuron_id)
             .map(|entry| {
-                let ((_, follower_neuron_id), _) = entry.key();
+                let ((_topic, _followee_neuron_id), follower_neuron_id) = entry.key();
                 *follower_neuron_id
             })
             .collect()
