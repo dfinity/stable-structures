@@ -447,6 +447,10 @@ where
     }
 }
 
+/// A lazily evaluated key-value entry from a `BTreeMap` iterator.
+///
+/// This struct defers deserialization and cloning of the key and value
+/// until they are explicitly accessed, improving performance.
 pub struct LazyEntry<'a, K, V, M>
 where
     K: Storable + Ord + Clone,
@@ -464,15 +468,18 @@ where
     V: Storable,
     M: Memory,
 {
+    /// Returns a reference to the key.
     pub fn key(&self) -> &K {
         self.node.key(self.entry_idx, self.map.memory())
     }
 
+    /// Returns the value by deserializing it.
     pub fn value(&self) -> V {
         let encoded_value = self.node.value(self.entry_idx, self.map.memory());
         V::from_bytes(Cow::Borrowed(encoded_value))
     }
 
+    /// Converts the entry into an owned (K, V) pair.
     pub fn into_pair(self) -> (K, V) {
         (self.key().clone(), self.value())
     }
