@@ -1377,8 +1377,7 @@ mod test {
         V: Storable + 'a,
         M: Memory + 'a,
     {
-        it.map(|entry| (entry.key().clone(), entry.value()))
-            .collect()
+        it.map(|entry| entry.into_pair()).collect()
     }
 
     /// Returns a fixed‑size buffer for the given u32.
@@ -2997,7 +2996,7 @@ mod test {
                         btree
                             .iter_from_prev_key(&key(i + 1))
                             .next()
-                            .map(|entry| (entry.key().clone(), entry.value())),
+                            .map(|entry| entry.into_pair()),
                         Some((key(i), value(i))),
                         "failed to get an upper bound for key({})",
                         i + 1
@@ -3007,7 +3006,7 @@ mod test {
                     btree
                         .iter_from_prev_key(&key(0))
                         .next()
-                        .map(|entry| (entry.key().clone(), entry.value())),
+                        .map(|entry| entry.into_pair()),
                     None,
                     "key(0) must not have an upper bound"
                 );

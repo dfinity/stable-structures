@@ -472,6 +472,10 @@ where
         let encoded_value = self.node.value(self.entry_idx, self.map.memory());
         V::from_bytes(Cow::Borrowed(encoded_value))
     }
+
+    pub fn into_pair(self) -> (K, V) {
+        (self.key().clone(), self.value())
+    }
 }
 
 pub struct Iter<'a, K, V, M>(IterInternal<'a, K, V, M>)
