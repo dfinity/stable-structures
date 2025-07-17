@@ -150,7 +150,7 @@ fn map_iter_from_prev_key(#[strategy(pvec(0u64..u64::MAX -1 , 10..100))] keys: V
                 Some((*k, ())),
                 map.iter_from_prev_key(&(k + 1))
                     .next()
-                    .map(|entry| (*entry.key(), entry.value()))
+                    .map(|entry| entry.into_pair())
             );
         }
 
