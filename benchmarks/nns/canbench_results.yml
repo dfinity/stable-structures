@@ -58,42 +58,42 @@ benches:
   vote_cascading_stable_centralized_10k:
     total:
       calls: 1
-      instructions: 22034014
-      heap_increase: 0
+      instructions: 1375501036
+      heap_increase: 10
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_centralized_1k:
     total:
       calls: 1
-      instructions: 2218292
-      heap_increase: 0
+      instructions: 99996435
+      heap_increase: 1
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_chain_10k_15:
     total:
       calls: 1
-      instructions: 150207
-      heap_increase: 0
+      instructions: 9819218496
+      heap_increase: 5
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_chain_10k_5:
     total:
       calls: 1
-      instructions: 122149
-      heap_increase: 0
+      instructions: 3007431336
+      heap_increase: 5
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_chain_1k_15:
     total:
       calls: 1
-      instructions: 122677
+      instructions: 867330736
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_chain_1k_5:
     total:
       calls: 1
-      instructions: 94284
+      instructions: 253041123
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
