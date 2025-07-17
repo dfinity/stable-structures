@@ -1371,6 +1371,7 @@ mod test {
         it.collect()
     }
 
+    /// A helper function to collect lazy entries into a `Vec`.
     fn collect_e<'a, K, V, M>(it: impl Iterator<Item = LazyEntry<'a, K, V, M>>) -> Vec<(K, V)>
     where
         K: Storable + Ord + Clone + 'a,
