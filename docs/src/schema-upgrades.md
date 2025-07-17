@@ -32,7 +32,7 @@ impl Storable for Asset {
 }
 ```
 
-> **Note:** Stables structures do not enforce a specific data format.
+> **Note:** Stable structures do not enforce a specific data format.
 It's up to the developer to use the data format that fits their use-case.
 In this example, CBOR is used for encoding `Asset`.
 
