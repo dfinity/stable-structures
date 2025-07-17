@@ -349,7 +349,9 @@ fn execute_operation<M: Memory>(
                 .unwrap()
                 .0
                 .clone();
-            let stable_range = btree.range(range_start..range_end);
+            let stable_range = btree
+                .range(range_start..range_end)
+                .map(|entry| entry.into_pair());
 
             // Create a range for the std btree from the keys at indexes `from` and `end`.
             let range_start = std_btree
@@ -363,9 +365,9 @@ fn execute_operation<M: Memory>(
             let range_end = std_btree.iter().skip(end).take(1).next().unwrap().0.clone();
             let std_range = std_btree.range(range_start..range_end);
 
-            for ((k1, v1), entry2) in std_range.zip(stable_range) {
-                assert_eq!(k1, entry2.key());
-                assert_eq!(*v1, entry2.value());
+            for ((k1, v1), (k2, v2)) in std_range.zip(stable_range) {
+                assert_eq!(*k1, k2);
+                assert_eq!(*v1, v2);
             }
         }
         Operation::PopLast => {

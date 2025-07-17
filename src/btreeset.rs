@@ -35,7 +35,7 @@ where
     type Item = K;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter_internal.next().map(|entry| entry.key().clone()) // TODO: maybe iterate over keys only?
+        self.iter_internal.next().map(|entry| entry.key().clone())
     }
 }
 
