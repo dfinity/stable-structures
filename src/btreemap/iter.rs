@@ -276,7 +276,7 @@ where
 
     // Iterates to find the next element in the requested range.
     // If it exists, `map` is applied to that element and the result is returned.
-    fn next_map<T, F: Fn(&Rc<Node<K>>, usize) -> T>(&mut self, map: F) -> Option<T> {
+    fn next_map<T, F: Fn(Rc<Node<K>>, usize) -> T>(&mut self, map: F) -> Option<T> {
         if !self.forward_cursors_initialized {
             self.initialize_forward_cursors();
         }
@@ -333,7 +333,7 @@ where
                     return None;
                 }
 
-                let res = map(&node, entry_idx);
+                let res = map(node.clone(), entry_idx);
                 self.range.0 = Bound::Excluded(node.key(entry_idx, self.map.memory()).clone());
 
                 let next = match node.node_type() {
@@ -356,7 +356,7 @@ where
 
     // Iterates to find the next back element in the requested range.
     // If it exists, `map` is applied to that element and the result is returned.
-    fn next_back_map<T, F: Fn(&Rc<Node<K>>, usize) -> T>(&mut self, map: F) -> Option<T> {
+    fn next_back_map<T, F: Fn(Rc<Node<K>>, usize) -> T>(&mut self, map: F) -> Option<T> {
         if !self.backward_cursors_initialized {
             self.initialize_backward_cursors();
         }
@@ -419,7 +419,7 @@ where
                     return None;
                 }
 
-                let res = map(&node, entry_idx);
+                let res = map(node.clone(), entry_idx);
                 self.range.1 = Bound::Excluded(node.key(entry_idx, self.map.memory()).clone());
 
                 if let Some(next) = match node.node_type() {
@@ -501,7 +501,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next_map(|node, entry_idx| LazyEntry {
-            node: node.clone(),
+            node,
             entry_idx,
             map: self.0.map,
         })
@@ -523,7 +523,7 @@ where
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back_map(|node, entry_idx| LazyEntry {
-            node: node.clone(),
+            node,
             entry_idx,
             map: self.0.map,
         })
