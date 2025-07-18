@@ -57,7 +57,10 @@ fn api_conformance_btreemap() {
 
     // Iterators.
     // Note: stable.iter() yields (K, V), std.iter() yields (&K, &V)
-    let stable_items: std::vec::Vec<_> = stable.iter().collect();
+    let stable_items: std::vec::Vec<_> = stable
+        .iter()
+        .map(|entry| (*entry.key(), entry.value()))
+        .collect();
     let std_items: std::vec::Vec<_> = std.iter().map(|(k, v)| (*k, v.clone())).collect();
     assert_eq!(stable_items, std_items);
 
@@ -93,7 +96,10 @@ fn api_conformance_btreemap() {
     let range_start = 3;
     let range_end = 7;
 
-    let stable_range: std::vec::Vec<_> = stable.range(range_start..range_end).collect();
+    let stable_range: std::vec::Vec<_> = stable
+        .range(range_start..range_end)
+        .map(|entry| (*entry.key(), entry.value()))
+        .collect();
     let std_range: std::vec::Vec<_> = std
         .range(range_start..range_end)
         .map(|(k, v)| (*k, v.clone()))
@@ -123,7 +129,10 @@ fn api_conformance_btreemap() {
     // To simulate in std: use .range(..bound).next_back() to get the largest < bound,
     // then iterate from that key forward using .range(start..).
     let bound = 5;
-    let stable_result: std::vec::Vec<_> = stable.iter_from_prev_key(&bound).collect();
+    let stable_result: std::vec::Vec<_> = stable
+        .iter_from_prev_key(&bound)
+        .map(|entry| (*entry.key(), entry.value()))
+        .collect();
     let std_result: std::vec::Vec<_> = if let Some((start, _)) = std.range(..bound).next_back() {
         std.range(start..).map(|(k, v)| (*k, v.clone())).collect()
     } else {

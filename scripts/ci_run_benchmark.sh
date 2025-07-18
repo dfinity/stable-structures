@@ -19,6 +19,7 @@ BASELINE_BRANCH_DIR=_canbench_baseline_branch
 CANBENCH_OUTPUT=/tmp/canbench_output.txt
 
 CANBENCH_RESULTS_FILE="$CANISTER_PATH/canbench_results.yml"
+CANBENCH_RESULTS_PERSISTED_FILE="/tmp/canbench_results_persisted_${CANBENCH_JOB_NAME}.yml"
 BASELINE_BRANCH_RESULTS_FILE="$BASELINE_BRANCH_DIR/$CANBENCH_RESULTS_FILE"
 
 CANBENCH_RESULTS_CSV_FILE="/tmp/canbench_results_${CANBENCH_JOB_NAME}.csv"
@@ -58,7 +59,8 @@ has_updates() {
 
 # Check if the canbench results file is up to date.
 pushd "$CANISTER_PATH"
-canbench --less-verbose --hide-results --show-summary --csv > "$CANBENCH_OUTPUT"
+canbench --less-verbose --hide-results --show-summary --csv --persist > "$CANBENCH_OUTPUT"
+cp "./canbench_results.yml" "$CANBENCH_RESULTS_PERSISTED_FILE"
 cp "./canbench_results.csv" "$CANBENCH_RESULTS_CSV_FILE"
 if has_updates; then
   UPDATED_MSG="**❌ \`$CANBENCH_RESULTS_FILE\` is not up to date**
