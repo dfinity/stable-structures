@@ -2,112 +2,112 @@ benches:
   vote_cascading_heap_centralized_10k:
     total:
       calls: 1
-      instructions: 77758498
+      instructions: 77758460
       heap_increase: 16
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_heap_centralized_1k:
     total:
       calls: 1
-      instructions: 7815170
+      instructions: 7815132
       heap_increase: 1
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_heap_chain_10k_15:
     total:
       calls: 1
-      instructions: 1272207091
+      instructions: 1272207053
       heap_increase: 10
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_heap_chain_10k_5:
     total:
       calls: 1
-      instructions: 239649002
+      instructions: 239648964
       heap_increase: 10
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_heap_chain_1k_15:
     total:
       calls: 1
-      instructions: 124352608
+      instructions: 124352570
       heap_increase: 1
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_heap_chain_1k_5:
     total:
       calls: 1
-      instructions: 23867596
+      instructions: 23867558
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_heap_single_vote_10k:
     total:
       calls: 1
-      instructions: 5677
+      instructions: 5639
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_heap_single_vote_1k:
     total:
       calls: 1
-      instructions: 5775
+      instructions: 5737
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_centralized_10k:
     total:
       calls: 1
-      instructions: 2899319276
+      instructions: 1375501036
       heap_increase: 10
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_centralized_1k:
     total:
       calls: 1
-      instructions: 200603941
+      instructions: 99996435
       heap_increase: 1
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_chain_10k_15:
     total:
       calls: 1
-      instructions: 17777502664
+      instructions: 9819218496
       heap_increase: 5
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_chain_10k_5:
     total:
       calls: 1
-      instructions: 5915696623
+      instructions: 3007431336
       heap_increase: 5
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_chain_1k_15:
     total:
       calls: 1
-      instructions: 1522351356
+      instructions: 867330736
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_chain_1k_5:
     total:
       calls: 1
-      instructions: 509357284
+      instructions: 253041123
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_single_vote_10k:
     total:
       calls: 1
-      instructions: 189276
+      instructions: 91466
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   vote_cascading_stable_single_vote_1k:
     total:
       calls: 1
-      instructions: 134644
+      instructions: 66840
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
