@@ -9,7 +9,7 @@ license = "Apache-2.0"
 name = "ic-stable-structures"
 readme = "README.md"
 repository = "https://github.com/dfinity/stable-structures"
-version = "0.6.9"
+version = "0.7.0"
 
 [package.metadata.docs.rs]
 # Build docs for wasm32-unknown-unknown target
