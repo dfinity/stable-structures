@@ -42,8 +42,7 @@ fn api_conformance_btreemap() {
     assert_eq!(stable.is_empty(), std.is_empty());
 
     // Clear.
-    // Note: stable uses clear_new(); std uses clear().
-    stable.clear_new();
+    stable.clear();
     std.clear();
     assert_eq!(stable.len(), std.len() as u64);
     assert_eq!(stable.is_empty(), std.is_empty());

@@ -698,7 +698,7 @@ where
     }
 
     /// Removes all elements from the map.
-    pub fn clear_new(&mut self) {
+    pub fn clear(&mut self) {
         self.root_addr = NULL;
         self.length = 0;
         self.allocator.clear();
@@ -3214,7 +3214,7 @@ mod test {
     }
 
     #[test]
-    fn test_clear_new_bounded_type() {
+    fn test_clear_bounded_type() {
         let mem = make_memory();
         let mut btree: BTreeMap<Blob<4>, Blob<4>, _> = BTreeMap::new(mem.clone());
 
@@ -3227,7 +3227,7 @@ mod test {
         assert_ne!(btree.allocator.num_allocated_chunks(), 0);
         assert_ne!(btree.root_addr, NULL);
 
-        btree.clear_new();
+        btree.clear();
 
         let header_actual = BTreeMap::<Blob<4>, Blob<4>, _>::read_header(&mem);
 
@@ -3239,7 +3239,7 @@ mod test {
     }
 
     #[test]
-    fn test_clear_new_unbounded_type() {
+    fn test_clear_unbounded_type() {
         let mem = make_memory();
         let mut btree: BTreeMap<String, String, _> = BTreeMap::new(mem.clone());
         btree.insert("asd".into(), "bce".into());
@@ -3248,7 +3248,7 @@ mod test {
         assert_ne!(btree.allocator.num_allocated_chunks(), 0);
         assert_ne!(btree.root_addr, NULL);
 
-        btree.clear_new();
+        btree.clear();
 
         let header_actual = BTreeMap::<String, String, _>::read_header(&mem);
 
