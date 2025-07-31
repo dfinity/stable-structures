@@ -604,301 +604,301 @@ benches:
   btreemap_v2_insert_10mib_values:
     total:
       calls: 1
-      instructions: 4387226354
+      instructions: 4388592719
       heap_increase: 161
       stable_memory_increase: 3613
     scopes: {}
   btreemap_v2_insert_blob8_u64:
     total:
       calls: 1
-      instructions: 436629416
+      instructions: 436633391
       heap_increase: 0
       stable_memory_increase: 4
     scopes: {}
   btreemap_v2_insert_blob_1024_128:
     total:
       calls: 1
-      instructions: 5496218165
+      instructions: 5496222167
       heap_increase: 0
       stable_memory_increase: 196
     scopes: {}
   btreemap_v2_insert_blob_128_128:
     total:
       calls: 1
-      instructions: 1180834208
+      instructions: 1180838234
       heap_increase: 0
       stable_memory_increase: 46
     scopes: {}
   btreemap_v2_insert_blob_16_128:
     total:
       calls: 1
-      instructions: 486246194
+      instructions: 486249812
       heap_increase: 0
       stable_memory_increase: 24
     scopes: {}
   btreemap_v2_insert_blob_256_128:
     total:
       calls: 1
-      instructions: 1789034049
+      instructions: 1789038066
       heap_increase: 0
       stable_memory_increase: 67
     scopes: {}
   btreemap_v2_insert_blob_32_0:
     total:
       calls: 1
-      instructions: 490455134
+      instructions: 490459106
       heap_increase: 0
       stable_memory_increase: 8
     scopes: {}
   btreemap_v2_insert_blob_32_1024:
     total:
       calls: 1
-      instructions: 703496225
+      instructions: 703500065
       heap_increase: 0
       stable_memory_increase: 173
     scopes: {}
   btreemap_v2_insert_blob_32_128:
     total:
       calls: 1
-      instructions: 542564351
+      instructions: 542568143
       heap_increase: 0
       stable_memory_increase: 28
     scopes: {}
   btreemap_v2_insert_blob_32_16:
     total:
       calls: 1
-      instructions: 519113244
+      instructions: 519117156
       heap_increase: 0
       stable_memory_increase: 11
     scopes: {}
   btreemap_v2_insert_blob_32_256:
     total:
       calls: 1
-      instructions: 570686267
+      instructions: 570690137
       heap_increase: 0
       stable_memory_increase: 49
     scopes: {}
   btreemap_v2_insert_blob_32_32:
     total:
       calls: 1
-      instructions: 528947313
+      instructions: 528951192
       heap_increase: 0
       stable_memory_increase: 13
     scopes: {}
   btreemap_v2_insert_blob_32_4:
     total:
       calls: 1
-      instructions: 509376109
+      instructions: 509380036
       heap_increase: 0
       stable_memory_increase: 8
     scopes: {}
   btreemap_v2_insert_blob_32_512:
     total:
       calls: 1
-      instructions: 610059178
+      instructions: 610063051
       heap_increase: 0
       stable_memory_increase: 91
     scopes: {}
   btreemap_v2_insert_blob_32_64:
     total:
       calls: 1
-      instructions: 534917409
+      instructions: 534921249
       heap_increase: 0
       stable_memory_increase: 18
     scopes: {}
   btreemap_v2_insert_blob_32_8:
     total:
       calls: 1
-      instructions: 517590057
+      instructions: 517593840
       heap_increase: 0
       stable_memory_increase: 9
     scopes: {}
   btreemap_v2_insert_blob_4_128:
     total:
       calls: 1
-      instructions: 407266843
+      instructions: 407268940
       heap_increase: 0
       stable_memory_increase: 13
     scopes: {}
   btreemap_v2_insert_blob_512_128:
     total:
       calls: 1
-      instructions: 3041219347
+      instructions: 3041223382
       heap_increase: 0
       stable_memory_increase: 111
     scopes: {}
   btreemap_v2_insert_blob_64_128:
     total:
       calls: 1
-      instructions: 661175552
+      instructions: 661179485
       heap_increase: 0
       stable_memory_increase: 34
     scopes: {}
   btreemap_v2_insert_blob_8_128:
     total:
       calls: 1
-      instructions: 458612442
+      instructions: 458615568
       heap_increase: 0
       stable_memory_increase: 20
     scopes: {}
   btreemap_v2_insert_principal:
     total:
       calls: 1
-      instructions: 503303086
+      instructions: 503308324
       heap_increase: 0
       stable_memory_increase: 8
     scopes: {}
   btreemap_v2_insert_u64_blob8:
     total:
       calls: 1
-      instructions: 406739905
+      instructions: 406744693
       heap_increase: 0
       stable_memory_increase: 5
     scopes: {}
   btreemap_v2_insert_u64_u64:
     total:
       calls: 1
-      instructions: 414575469
+      instructions: 414580548
       heap_increase: 0
       stable_memory_increase: 6
     scopes: {}
   btreemap_v2_insert_u64_vec8:
     total:
       calls: 1
-      instructions: 410368222
+      instructions: 410372254
       heap_increase: 0
       stable_memory_increase: 21
     scopes: {}
   btreemap_v2_insert_vec8_u64:
     total:
       calls: 1
-      instructions: 594100537
+      instructions: 594103663
       heap_increase: 0
       stable_memory_increase: 16
     scopes: {}
   btreemap_v2_insert_vec_1024_128:
     total:
       calls: 1
-      instructions: 2744513878
+      instructions: 2744606200
       heap_increase: 0
       stable_memory_increase: 193
     scopes: {}
   btreemap_v2_insert_vec_128_128:
     total:
       calls: 1
-      instructions: 1012625574
+      instructions: 1012643373
       heap_increase: 0
       stable_memory_increase: 51
     scopes: {}
   btreemap_v2_insert_vec_16_128:
     total:
       calls: 1
-      instructions: 708984362
+      instructions: 708997439
       heap_increase: 0
       stable_memory_increase: 31
     scopes: {}
   btreemap_v2_insert_vec_256_128:
     total:
       calls: 1
-      instructions: 1402182234
+      instructions: 1402219761
       heap_increase: 0
       stable_memory_increase: 71
     scopes: {}
   btreemap_v2_insert_vec_32_0:
     total:
       calls: 1
-      instructions: 621845953
+      instructions: 621849784
       heap_increase: 0
       stable_memory_increase: 20
     scopes: {}
   btreemap_v2_insert_vec_32_1024:
     total:
       calls: 1
-      instructions: 1182054323
+      instructions: 1182132701
       heap_increase: 0
       stable_memory_increase: 171
     scopes: {}
   btreemap_v2_insert_vec_32_128:
     total:
       calls: 1
-      instructions: 756092289
+      instructions: 756106158
       heap_increase: 0
       stable_memory_increase: 33
     scopes: {}
   btreemap_v2_insert_vec_32_16:
     total:
       calls: 1
-      instructions: 666188006
+      instructions: 666191903
       heap_increase: 0
       stable_memory_increase: 20
     scopes: {}
   btreemap_v2_insert_vec_32_256:
     total:
       calls: 1
-      instructions: 869200138
+      instructions: 869225881
       heap_increase: 0
       stable_memory_increase: 54
     scopes: {}
   btreemap_v2_insert_vec_32_32:
     total:
       calls: 1
-      instructions: 661641515
+      instructions: 661645394
       heap_increase: 0
       stable_memory_increase: 20
     scopes: {}
   btreemap_v2_insert_vec_32_4:
     total:
       calls: 1
-      instructions: 660350181
+      instructions: 660354036
       heap_increase: 0
       stable_memory_increase: 20
     scopes: {}
   btreemap_v2_insert_vec_32_512:
     total:
       calls: 1
-      instructions: 973623252
+      instructions: 973664463
       heap_increase: 0
       stable_memory_increase: 91
     scopes: {}
   btreemap_v2_insert_vec_32_64:
     total:
       calls: 1
-      instructions: 691630844
+      instructions: 691643081
       heap_increase: 0
       stable_memory_increase: 24
     scopes: {}
   btreemap_v2_insert_vec_32_8:
     total:
       calls: 1
-      instructions: 659842170
+      instructions: 659845953
       heap_increase: 0
       stable_memory_increase: 20
     scopes: {}
   btreemap_v2_insert_vec_4_128:
     total:
       calls: 1
-      instructions: 604348722
+      instructions: 604355928
       heap_increase: 0
       stable_memory_increase: 16
     scopes: {}
   btreemap_v2_insert_vec_512_128:
     total:
       calls: 1
-      instructions: 1859108239
+      instructions: 1859161681
       heap_increase: 0
       stable_memory_increase: 112
     scopes: {}
   btreemap_v2_insert_vec_64_128:
     total:
       calls: 1
-      instructions: 846297779
+      instructions: 846320282
       heap_increase: 0
       stable_memory_increase: 41
     scopes: {}
   btreemap_v2_insert_vec_8_128:
     total:
       calls: 1
-      instructions: 666278550
+      instructions: 666289233
       heap_increase: 0
       stable_memory_increase: 23
     scopes: {}
@@ -975,1148 +975,1148 @@ benches:
   btreemap_v2_mem_manager_insert_blob512_u64:
     total:
       calls: 1
-      instructions: 3127693876
+      instructions: 3127680452
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_insert_u64_blob512:
     total:
       calls: 1
-      instructions: 607302030
+      instructions: 607288370
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_insert_u64_u64:
     total:
       calls: 1
-      instructions: 520562305
+      instructions: 520545864
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_insert_u64_vec512:
     total:
       calls: 1
-      instructions: 834230066
+      instructions: 834100595
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_insert_vec512_u64:
     total:
       calls: 1
-      instructions: 1964533302
+      instructions: 1964405448
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_remove_blob512_u64:
     total:
       calls: 1
-      instructions: 4310230683
+      instructions: 4310221225
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_remove_u64_blob512:
     total:
       calls: 1
-      instructions: 882979670
+      instructions: 882970074
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_remove_u64_u64:
     total:
       calls: 1
-      instructions: 736797990
+      instructions: 736785650
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_remove_u64_vec512:
     total:
       calls: 1
-      instructions: 1223992077
+      instructions: 1223804753
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_mem_manager_remove_vec512_u64:
     total:
       calls: 1
-      instructions: 3084753399
+      instructions: 3084565257
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob8_u64:
     total:
       calls: 1
-      instructions: 599252070
+      instructions: 599256189
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_1024_128:
     total:
       calls: 1
-      instructions: 8387598840
+      instructions: 8387602842
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_128_128:
     total:
       calls: 1
-      instructions: 1824721939
+      instructions: 1824725965
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_16_128:
     total:
       calls: 1
-      instructions: 743080488
+      instructions: 743084112
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_256_128:
     total:
       calls: 1
-      instructions: 2763907811
+      instructions: 2763911828
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_0:
     total:
       calls: 1
-      instructions: 751493486
+      instructions: 751497584
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_1024:
     total:
       calls: 1
-      instructions: 1121477481
+      instructions: 1121481321
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_128:
     total:
       calls: 1
-      instructions: 860281370
+      instructions: 860285162
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_16:
     total:
       calls: 1
-      instructions: 795091803
+      instructions: 795095715
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_256:
     total:
       calls: 1
-      instructions: 891735934
+      instructions: 891739804
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_32:
     total:
       calls: 1
-      instructions: 808556626
+      instructions: 808560505
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_4:
     total:
       calls: 1
-      instructions: 778860667
+      instructions: 778864648
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_512:
     total:
       calls: 1
-      instructions: 957567308
+      instructions: 957571175
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_64:
     total:
       calls: 1
-      instructions: 817402668
+      instructions: 817406508
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_32_8:
     total:
       calls: 1
-      instructions: 796775177
+      instructions: 796779002
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_4_128:
     total:
       calls: 1
-      instructions: 371433628
+      instructions: 371435725
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_512_128:
     total:
       calls: 1
-      instructions: 4613696303
+      instructions: 4613700344
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_64_128:
     total:
       calls: 1
-      instructions: 1031691323
+      instructions: 1031695256
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_blob_8_128:
     total:
       calls: 1
-      instructions: 604973040
+      instructions: 604976184
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_principal:
     total:
       calls: 1
-      instructions: 800186729
+      instructions: 800191973
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_u64_blob8:
     total:
       calls: 1
-      instructions: 669272017
+      instructions: 669276877
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_u64_u64:
     total:
       calls: 1
-      instructions: 681259383
+      instructions: 681264462
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_u64_vec8:
     total:
       calls: 1
-      instructions: 671825185
+      instructions: 671829217
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec8_u64:
     total:
       calls: 1
-      instructions: 782873009
+      instructions: 782876135
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_1024_128:
     total:
       calls: 1
-      instructions: 4049152840
+      instructions: 4049265076
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_128_128:
     total:
       calls: 1
-      instructions: 1503200945
+      instructions: 1503218744
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_16_128:
     total:
       calls: 1
-      instructions: 1024759071
+      instructions: 1024772148
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_256_128:
     total:
       calls: 1
-      instructions: 2019833997
+      instructions: 2019891066
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_0:
     total:
       calls: 1
-      instructions: 862942768
+      instructions: 862946599
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_1024:
     total:
       calls: 1
-      instructions: 1689732148
+      instructions: 1689829372
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_128:
     total:
       calls: 1
-      instructions: 1088853861
+      instructions: 1088869698
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_16:
     total:
       calls: 1
-      instructions: 928266909
+      instructions: 928270806
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_256:
     total:
       calls: 1
-      instructions: 1215441024
+      instructions: 1215466767
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_32:
     total:
       calls: 1
-      instructions: 931024329
+      instructions: 931028208
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_4:
     total:
       calls: 1
-      instructions: 914741844
+      instructions: 914745699
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_512:
     total:
       calls: 1
-      instructions: 1373208474
+      instructions: 1373268399
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_64:
     total:
       calls: 1
-      instructions: 972723364
+      instructions: 972735601
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_32_8:
     total:
       calls: 1
-      instructions: 924963880
+      instructions: 924967663
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_4_128:
     total:
       calls: 1
-      instructions: 540977502
+      instructions: 540984708
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_512_128:
     total:
       calls: 1
-      instructions: 2716276969
+      instructions: 2716330411
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_64_128:
     total:
       calls: 1
-      instructions: 1234517190
+      instructions: 1234556907
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_first_vec_8_128:
     total:
       calls: 1
-      instructions: 850723549
+      instructions: 850734232
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob8_u64:
     total:
       calls: 1
-      instructions: 575657399
+      instructions: 575661530
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_1024_128:
     total:
       calls: 1
-      instructions: 8055243789
+      instructions: 8055247791
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_128_128:
     total:
       calls: 1
-      instructions: 1755505092
+      instructions: 1755509118
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_16_128:
     total:
       calls: 1
-      instructions: 716552465
+      instructions: 716556083
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_256_128:
     total:
       calls: 1
-      instructions: 2669726290
+      instructions: 2669730307
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_0:
     total:
       calls: 1
-      instructions: 723331257
+      instructions: 723335313
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_1024:
     total:
       calls: 1
-      instructions: 1085446885
+      instructions: 1085450731
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_128:
     total:
       calls: 1
-      instructions: 825898514
+      instructions: 825902306
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_16:
     total:
       calls: 1
-      instructions: 766897485
+      instructions: 766901397
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_256:
     total:
       calls: 1
-      instructions: 860875781
+      instructions: 860879651
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_32:
     total:
       calls: 1
-      instructions: 775932537
+      instructions: 775936416
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_4:
     total:
       calls: 1
-      instructions: 755120630
+      instructions: 755124599
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_512:
     total:
       calls: 1
-      instructions: 932316858
+      instructions: 932320719
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_64:
     total:
       calls: 1
-      instructions: 791541850
+      instructions: 791545690
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_32_8:
     total:
       calls: 1
-      instructions: 768157909
+      instructions: 768161716
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_4_128:
     total:
       calls: 1
-      instructions: 357882924
+      instructions: 357885021
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_512_128:
     total:
       calls: 1
-      instructions: 4444563339
+      instructions: 4444567386
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_64_128:
     total:
       calls: 1
-      instructions: 999734778
+      instructions: 999738711
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_blob_8_128:
     total:
       calls: 1
-      instructions: 598939732
+      instructions: 598942864
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_principal:
     total:
       calls: 1
-      instructions: 780286737
+      instructions: 780291969
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_u64_blob8:
     total:
       calls: 1
-      instructions: 645807686
+      instructions: 645812582
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_u64_u64:
     total:
       calls: 1
-      instructions: 657450509
+      instructions: 657455588
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_u64_vec8:
     total:
       calls: 1
-      instructions: 648264001
+      instructions: 648268033
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec8_u64:
     total:
       calls: 1
-      instructions: 759543968
+      instructions: 759547094
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_1024_128:
     total:
       calls: 1
-      instructions: 4254705881
+      instructions: 4254818123
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_128_128:
     total:
       calls: 1
-      instructions: 1509632411
+      instructions: 1509650210
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_16_128:
     total:
       calls: 1
-      instructions: 1006112737
+      instructions: 1006125814
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_256_128:
     total:
       calls: 1
-      instructions: 2073306796
+      instructions: 2073363853
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_0:
     total:
       calls: 1
-      instructions: 846105831
+      instructions: 846109662
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_1024:
     total:
       calls: 1
-      instructions: 1664340419
+      instructions: 1664437667
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_128:
     total:
       calls: 1
-      instructions: 1064595433
+      instructions: 1064611264
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_16:
     total:
       calls: 1
-      instructions: 902970558
+      instructions: 902974455
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_256:
     total:
       calls: 1
-      instructions: 1193426296
+      instructions: 1193452039
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_32:
     total:
       calls: 1
-      instructions: 910486468
+      instructions: 910490347
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_4:
     total:
       calls: 1
-      instructions: 898981741
+      instructions: 898985596
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_512:
     total:
       calls: 1
-      instructions: 1356854198
+      instructions: 1356914135
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_64:
     total:
       calls: 1
-      instructions: 949770518
+      instructions: 949782755
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_32_8:
     total:
       calls: 1
-      instructions: 902469709
+      instructions: 902473492
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_4_128:
     total:
       calls: 1
-      instructions: 527057733
+      instructions: 527064939
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_512_128:
     total:
       calls: 1
-      instructions: 2808111599
+      instructions: 2808165041
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_64_128:
     total:
       calls: 1
-      instructions: 1220784792
+      instructions: 1220824533
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_pop_last_vec_8_128:
     total:
       calls: 1
-      instructions: 850608896
+      instructions: 850619579
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_count_1k_0b:
     total:
       calls: 1
-      instructions: 16905
+      instructions: 16962
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_count_1k_10kib:
     total:
       calls: 1
-      instructions: 2475828
+      instructions: 2507196
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_count_20_10mib:
     total:
       calls: 1
-      instructions: 18469125
+      instructions: 18468765
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_key_sum_1k_0b:
     total:
       calls: 1
-      instructions: 17147
+      instructions: 16933
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_key_sum_1k_10kib:
     total:
       calls: 1
-      instructions: 56755378
+      instructions: 2572994
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_key_sum_20_10mib:
     total:
       calls: 1
-      instructions: 1103713932
+      instructions: 18469999
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_value_sum_1k_0b:
     total:
       calls: 1
-      instructions: 17161
+      instructions: 17300
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_value_sum_1k_10kib:
     total:
       calls: 1
-      instructions: 56767374
+      instructions: 20668618
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_range_value_sum_20_10mib:
     total:
       calls: 1
-      instructions: 1103714168
+      instructions: 398305226
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_10mib_values:
     total:
       calls: 1
-      instructions: 4709565702
+      instructions: 4711118385
       heap_increase: 0
       stable_memory_increase: 657
     scopes: {}
   btreemap_v2_remove_blob8_u64:
     total:
       calls: 1
-      instructions: 584632796
+      instructions: 584636969
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_1024_128:
     total:
       calls: 1
-      instructions: 7363796307
+      instructions: 7363800309
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_128_128:
     total:
       calls: 1
-      instructions: 1588752303
+      instructions: 1588756329
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_16_128:
     total:
       calls: 1
-      instructions: 665334293
+      instructions: 665337905
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_256_128:
     total:
       calls: 1
-      instructions: 2421693283
+      instructions: 2421697300
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_0:
     total:
       calls: 1
-      instructions: 654246003
+      instructions: 654250005
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_1024:
     total:
       calls: 1
-      instructions: 985322023
+      instructions: 985325869
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_128:
     total:
       calls: 1
-      instructions: 746605092
+      instructions: 746608890
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_16:
     total:
       calls: 1
-      instructions: 700056094
+      instructions: 700059994
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_256:
     total:
       calls: 1
-      instructions: 784121825
+      instructions: 784125701
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_32:
     total:
       calls: 1
-      instructions: 711915619
+      instructions: 711919498
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_4:
     total:
       calls: 1
-      instructions: 696210302
+      instructions: 696214241
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_512:
     total:
       calls: 1
-      instructions: 857932817
+      instructions: 857936684
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_64:
     total:
       calls: 1
-      instructions: 737070467
+      instructions: 737074307
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_32_8:
     total:
       calls: 1
-      instructions: 696054096
+      instructions: 696057915
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_4_128:
     total:
       calls: 1
-      instructions: 452855812
+      instructions: 452857933
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_512_128:
     total:
       calls: 1
-      instructions: 4071503214
+      instructions: 4071507249
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_64_128:
     total:
       calls: 1
-      instructions: 910048338
+      instructions: 910052271
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_blob_8_128:
     total:
       calls: 1
-      instructions: 599296531
+      instructions: 599299651
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_principal:
     total:
       calls: 1
-      instructions: 684154256
+      instructions: 684159422
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_u64_blob8:
     total:
       calls: 1
-      instructions: 566075041
+      instructions: 566079913
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_u64_u64:
     total:
       calls: 1
-      instructions: 586713652
+      instructions: 586718731
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_u64_vec8:
     total:
       calls: 1
-      instructions: 571362323
+      instructions: 571366355
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec8_u64:
     total:
       calls: 1
-      instructions: 755820792
+      instructions: 755823918
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_1024_128:
     total:
       calls: 1
-      instructions: 4475823940
+      instructions: 4475943466
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_128_128:
     total:
       calls: 1
-      instructions: 1418195415
+      instructions: 1418213214
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_16_128:
     total:
       calls: 1
-      instructions: 921098213
+      instructions: 921111290
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_256_128:
     total:
       calls: 1
-      instructions: 2244605357
+      instructions: 2244668594
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_0:
     total:
       calls: 1
-      instructions: 834326197
+      instructions: 834330028
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_1024:
     total:
       calls: 1
-      instructions: 1701459670
+      instructions: 1701563272
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_128:
     total:
       calls: 1
-      instructions: 1036942087
+      instructions: 1036968514
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_16:
     total:
       calls: 1
-      instructions: 871324986
+      instructions: 871328883
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_256:
     total:
       calls: 1
-      instructions: 1240150803
+      instructions: 1240176546
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_32:
     total:
       calls: 1
-      instructions: 867565590
+      instructions: 867569469
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_4:
     total:
       calls: 1
-      instructions: 862143565
+      instructions: 862147420
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_512:
     total:
       calls: 1
-      instructions: 1405903551
+      instructions: 1405971132
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_64:
     total:
       calls: 1
-      instructions: 968300744
+      instructions: 968312981
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_32_8:
     total:
       calls: 1
-      instructions: 856473374
+      instructions: 856477157
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_4_128:
     total:
       calls: 1
-      instructions: 662114708
+      instructions: 662121914
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_512_128:
     total:
       calls: 1
-      instructions: 3082652829
+      instructions: 3082706271
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_64_128:
     total:
       calls: 1
-      instructions: 1183921648
+      instructions: 1183958569
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_remove_vec_8_128:
     total:
       calls: 1
-      instructions: 821763732
+      instructions: 821774415
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_iter_1k_0b:
     total:
       calls: 1
-      instructions: 1230497
+      instructions: 975992
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_iter_1k_10kib:
     total:
       calls: 1
-      instructions: 56742812
+      instructions: 2491763
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_iter_20_10mib:
     total:
       calls: 1
-      instructions: 1103712198
+      instructions: 18467176
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_iter_rev_1k_0b:
     total:
       calls: 1
-      instructions: 1230076
+      instructions: 978166
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_iter_rev_1k_10kib:
     total:
       calls: 1
-      instructions: 56713761
+      instructions: 2475597
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_iter_rev_20_10mib:
     total:
       calls: 1
-      instructions: 1103711703
+      instructions: 18467168
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_keys_1k_0b:
     total:
       calls: 1
-      instructions: 964793
+      instructions: 982657
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_keys_1k_10kib:
     total:
       calls: 1
-      instructions: 2477281
+      instructions: 2498428
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_keys_20_10mib:
     total:
       calls: 1
-      instructions: 18468280
+      instructions: 18467320
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_keys_rev_1k_0b:
     total:
       calls: 1
-      instructions: 964096
+      instructions: 984223
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_keys_rev_1k_10kib:
     total:
       calls: 1
-      instructions: 2474637
+      instructions: 2481654
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_keys_rev_20_10mib:
     total:
       calls: 1
-      instructions: 18468224
+      instructions: 18467298
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_values_1k_0b:
     total:
       calls: 1
-      instructions: 1207835
+      instructions: 1230992
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_values_1k_10kib:
     total:
       calls: 1
-      instructions: 56720150
+      instructions: 56740279
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_values_20_10mib:
     total:
       calls: 1
-      instructions: 1103711748
+      instructions: 1103710894
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_values_rev_1k_0b:
     total:
       calls: 1
-      instructions: 1208078
+      instructions: 1231498
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_values_rev_1k_10kib:
     total:
       calls: 1
-      instructions: 56691763
+      instructions: 56683107
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_scan_values_rev_20_10mib:
     total:
       calls: 1
-      instructions: 1103711265
+      instructions: 1103710405
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
