@@ -62,7 +62,7 @@ pub enum InitError {
     /// The memory already contains another data structure.
     /// Use [Vec::new] to overwrite it.
     BadMagic { actual: [u8; 3], expected: [u8; 3] },
-    /// The current version of [Vec] does not support the of the
+    /// The current version of [Vec] does not support the version of the
     /// memory layout.
     IncompatibleVersion(u8),
     /// The vector type is not compatible with the current vector
