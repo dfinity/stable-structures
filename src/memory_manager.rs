@@ -70,6 +70,37 @@ const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
 // Reserved bytes in the header for future extensions.
 const HEADER_RESERVED_BYTES: usize = 32;
 
+// Data structure header offsets for safety checks during bucket release
+// These offsets are based on the stable memory layout of BTreeMap and Vec structures
+// 
+// IMPORTANT: These constants must be kept in sync with the actual header layouts
+// defined in btreemap.rs and vec.rs. If the header formats change, these constants
+// must be updated accordingly to maintain correct bucket release safety checks.
+
+/// Offset to BTreeMap length field in its header (8 bytes, u64 little-endian)
+/// BTreeMap header layout: magic[3] + version[1] + reserved[16] + length[8] + ...
+/// See: btreemap.rs for the complete BTreeMap header structure
+const BTREEMAP_LENGTH_OFFSET: u64 = 20;
+
+/// Offset to BTreeMap allocator within the BTreeMap header
+/// The allocator manages dynamic memory allocation within the BTreeMap
+/// See: btreemap/allocator.rs for allocator implementation details
+const BTREEMAP_ALLOCATOR_OFFSET: u64 = 52;
+
+/// Offset within allocator header to the number of allocated chunks field
+/// Allocator header: magic[3] + version[1] + alignment[4] + allocation_size[8] + num_allocated_chunks[8]
+/// See: btreemap/allocator.rs for complete allocator header layout
+const ALLOCATOR_NUM_CHUNKS_OFFSET: u64 = 16;
+
+/// Offset to Vec length field in its header (8 bytes, u64 little-endian)  
+/// Vec header layout: magic[3] + version[1] + length[8] + ...
+/// See: vec.rs for the complete Vec header structure
+const VEC_LENGTH_OFFSET: u64 = 4;
+
+/// Size of sample buffer for detecting uninitialized memory
+/// Used when magic bytes don't match known data structures
+const UNINITIALIZED_MEMORY_SAMPLE_SIZE: usize = 32;
+
 /// A memory manager simulates multiple memories within a single memory.
 ///
 /// The memory manager can return up to 255 unique instances of [`VirtualMemory`], and each can be
@@ -468,7 +499,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             }
             _ => {
                 // Check if it's uninitialized memory (all zeros)
-                let mut sample = [0u8; 32];
+                let mut sample = [0u8; UNINITIALIZED_MEMORY_SAMPLE_SIZE];
                 self.memory.read(first_bucket_addr.get(), &mut sample);
 
                 if sample.iter().all(|&b| b == 0) {
@@ -487,21 +518,19 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     /// Check if a BTreeMap appears to be empty by examining its header
     fn check_btreemap_empty(&mut self, id: MemoryId, base_addr: Address) -> Result<usize, String> {
-        // Read BTreeMap length (at offset 20 in the header)
+        // Read BTreeMap length from header
         let mut len_bytes = [0u8; 8];
-        self.memory.read(base_addr.get() + 20, &mut len_bytes);
+        self.memory.read(base_addr.get() + BTREEMAP_LENGTH_OFFSET, &mut len_bytes);
         let btree_len = u64::from_le_bytes(len_bytes);
 
         if btree_len > 0 {
             return Err(format!("BTreeMap contains {} items", btree_len));
         }
 
-        // Check allocator state (at ALLOCATOR_OFFSET = 52)
-        // The allocator header starts with magic [3 bytes] + version [1 byte] + alignment [4 bytes]
-        // Then allocation_size [8 bytes] + num_allocated_chunks [8 bytes] at offset 16
+        // Check allocator state - read number of allocated chunks
         let mut chunks_bytes = [0u8; 8];
         self.memory
-            .read(base_addr.get() + 52 + 16, &mut chunks_bytes);
+            .read(base_addr.get() + BTREEMAP_ALLOCATOR_OFFSET + ALLOCATOR_NUM_CHUNKS_OFFSET, &mut chunks_bytes);
         let allocated_chunks = u64::from_le_bytes(chunks_bytes);
 
         if allocated_chunks > 0 {
@@ -517,9 +546,9 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     /// Check if a Vec appears to be empty by examining its header
     fn check_vec_empty(&mut self, id: MemoryId, base_addr: Address) -> Result<usize, String> {
-        // Read Vec length (at offset 4 in the header)
+        // Read Vec length from header
         let mut len_bytes = [0u8; 8];
-        self.memory.read(base_addr.get() + 4, &mut len_bytes);
+        self.memory.read(base_addr.get() + VEC_LENGTH_OFFSET, &mut len_bytes);
         let vec_len = u64::from_le_bytes(len_bytes);
 
         if vec_len > 0 {
