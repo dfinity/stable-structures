@@ -410,7 +410,6 @@ impl<M: Memory> MemoryManagerInner<M> {
         let new_buckets_needed = required_buckets - current_buckets;
 
         // Check if we have enough buckets available (either already allocated or can allocate new ones)
-        let available_free_buckets = self.free_buckets.len() as u64;
         let free_bucket_count = self.free_buckets.len() as u64;
         let new_buckets_to_allocate = new_buckets_needed.saturating_sub(free_bucket_count);
 
