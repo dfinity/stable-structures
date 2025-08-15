@@ -699,12 +699,16 @@ where
 
     /// Removes all elements from the map.
     #[deprecated(since = "0.6.3", note = "please use `clear_new` instead")]
+    // TODO: In next major release (v1.0), remove this deprecated method and rename
+    // `clear_new` to `clear` for consistency with standard Rust collections.
     pub fn clear(self) -> Self {
         let mem = self.allocator.into_memory();
         Self::new(mem)
     }
 
     /// Removes all elements from the map.
+    // TODO: In next major release (v1.0), rename this method to `clear` to follow
+    // standard Rust collection naming conventions.
     pub fn clear_new(&mut self) {
         self.root_addr = NULL;
         self.length = 0;
@@ -1212,6 +1216,7 @@ where
     /// The new name, `iter_from_prev_key`, better reflects this behavior and
     /// improves code clarity.
     #[deprecated(note = "use `iter_from_prev_key` instead")]
+    // TODO: In next major release (v1.0), remove this deprecated method to clean up the API.
     pub fn iter_upper_bound(&self, bound: &K) -> Iter<'_, K, V, M> {
         self.iter_from_prev_key(bound)
     }
