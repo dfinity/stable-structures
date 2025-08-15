@@ -378,7 +378,8 @@ impl<M: Memory> MemoryManagerInner<M> {
         let new_buckets_needed = required_buckets - current_buckets;
 
         // Check if we have enough buckets available (either already allocated or can allocate new ones)
-        let free_bucket_count = self.free_buckets.len() as u64;
+        let free_bucket_count = u64::try_from(self.free_buckets.len())
+            .expect("free_buckets.len() does not fit in u64");
         let new_buckets_to_allocate = new_buckets_needed.saturating_sub(free_bucket_count);
 
         if self.allocated_buckets as u64 + new_buckets_to_allocate > MAX_NUM_BUCKETS {
