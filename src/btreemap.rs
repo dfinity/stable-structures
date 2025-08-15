@@ -700,7 +700,7 @@ where
     /// Removes all elements from the map.
     #[deprecated(since = "0.6.3", note = "please use `clear_new` instead")]
     // TODO: In next major release (v1.0), remove this deprecated method and rename
-    // `clear_new` to `clear` for consistency with standard Rust collections.
+    // TODO: In next major release (v1.0), remove this deprecated method and rename `clear_new` to `clear` for consistency with standard Rust collections.
     pub fn clear(self) -> Self {
         let mem = self.allocator.into_memory();
         Self::new(mem)
