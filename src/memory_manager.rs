@@ -72,7 +72,7 @@ const HEADER_RESERVED_BYTES: usize = 32;
 
 // Data structure header offsets for safety checks during bucket release
 // These offsets are based on the stable memory layout of BTreeMap and Vec structures
-// 
+//
 // IMPORTANT: These constants must be kept in sync with the actual header layouts
 // defined in btreemap.rs and vec.rs. If the header formats change, these constants
 // must be updated accordingly to maintain correct bucket release safety checks.
@@ -520,7 +520,8 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn check_btreemap_empty(&mut self, id: MemoryId, base_addr: Address) -> Result<usize, String> {
         // Read BTreeMap length from header
         let mut len_bytes = [0u8; 8];
-        self.memory.read(base_addr.get() + BTREEMAP_LENGTH_OFFSET, &mut len_bytes);
+        self.memory
+            .read(base_addr.get() + BTREEMAP_LENGTH_OFFSET, &mut len_bytes);
         let btree_len = u64::from_le_bytes(len_bytes);
 
         if btree_len > 0 {
@@ -529,8 +530,10 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         // Check allocator state - read number of allocated chunks
         let mut chunks_bytes = [0u8; 8];
-        self.memory
-            .read(base_addr.get() + BTREEMAP_ALLOCATOR_OFFSET + ALLOCATOR_NUM_CHUNKS_OFFSET, &mut chunks_bytes);
+        self.memory.read(
+            base_addr.get() + BTREEMAP_ALLOCATOR_OFFSET + ALLOCATOR_NUM_CHUNKS_OFFSET,
+            &mut chunks_bytes,
+        );
         let allocated_chunks = u64::from_le_bytes(chunks_bytes);
 
         if allocated_chunks > 0 {
@@ -548,7 +551,8 @@ impl<M: Memory> MemoryManagerInner<M> {
     fn check_vec_empty(&mut self, id: MemoryId, base_addr: Address) -> Result<usize, String> {
         // Read Vec length from header
         let mut len_bytes = [0u8; 8];
-        self.memory.read(base_addr.get() + VEC_LENGTH_OFFSET, &mut len_bytes);
+        self.memory
+            .read(base_addr.get() + VEC_LENGTH_OFFSET, &mut len_bytes);
         let vec_len = u64::from_le_bytes(len_bytes);
 
         if vec_len > 0 {
