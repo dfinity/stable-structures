@@ -70,37 +70,6 @@ const BUCKETS_OFFSET_IN_BYTES: u64 = BUCKETS_OFFSET_IN_PAGES * WASM_PAGE_SIZE;
 // Reserved bytes in the header for future extensions.
 const HEADER_RESERVED_BYTES: usize = 32;
 
-// Data structure header offsets for safety checks during bucket release
-// These offsets are based on the stable memory layout of BTreeMap and Vec structures
-//
-// IMPORTANT: These constants must be kept in sync with the actual header layouts
-// defined in btreemap.rs and vec.rs. If the header formats change, these constants
-// must be updated accordingly to maintain correct bucket release safety checks.
-
-/// Offset to BTreeMap length field in its header (8 bytes, u64 little-endian)
-/// BTreeMap header layout: magic[3] + version[1] + reserved[16] + length[8] + ...
-/// See: btreemap.rs for the complete BTreeMap header structure
-const BTREEMAP_LENGTH_OFFSET: u64 = 20;
-
-/// Offset to BTreeMap allocator within the BTreeMap header
-/// The allocator manages dynamic memory allocation within the BTreeMap
-/// See: btreemap/allocator.rs for allocator implementation details
-const BTREEMAP_ALLOCATOR_OFFSET: u64 = 52;
-
-/// Offset within allocator header to the number of allocated chunks field
-/// Allocator header: magic[3] + version[1] + alignment[4] + allocation_size[8] + num_allocated_chunks[8]
-/// See: btreemap/allocator.rs for complete allocator header layout
-const ALLOCATOR_NUM_CHUNKS_OFFSET: u64 = 16;
-
-/// Offset to Vec length field in its header (8 bytes, u64 little-endian)  
-/// Vec header layout: magic[3] + version[1] + length[8] + ...
-/// See: vec.rs for the complete Vec header structure
-const VEC_LENGTH_OFFSET: u64 = 4;
-
-/// Size of sample buffer for detecting uninitialized memory
-/// Used when magic bytes don't match known data structures
-const UNINITIALIZED_MEMORY_SAMPLE_SIZE: usize = 32;
-
 /// A memory manager simulates multiple memories within a single memory.
 ///
 /// The memory manager can return up to 255 unique instances of [`VirtualMemory`], and each can be
@@ -199,29 +168,21 @@ impl<M: Memory> MemoryManager<M> {
         }
     }
 
-    /// Safely releases buckets if data structures using this memory appear empty.
+    /// Releases buckets allocated to the specified virtual memory.
     ///
-    /// Returns `Ok(bucket_count)` if successful, `Err(reason)` if unsafe.
-    /// Attempts to safely release buckets if data structures using this memory appear empty.
+    /// **Warning**: This method does not verify that the data structures are empty.
+    /// It is the caller's responsibility to ensure that all data structures using
+    /// this memory have been properly cleared before calling this method.
     ///
-    /// This method examines specific standard data structures (`BTreeMap`, `Vec`) to determine
-    /// if it is safe to release the associated buckets. It may not work correctly with custom
-    /// data structures or other types not explicitly supported.
-    ///
-    /// Returns:
-    /// - `Ok(bucket_count)`: The number of buckets successfully released.
-    /// - `Err(reason)`: A string describing why buckets could not be released safely (e.g., if
-    ///   the data structure is not empty or is of an unsupported type).
+    /// Returns the number of buckets that were released.
     ///
     /// # Example
     /// ```rust,ignore
-    /// map.clear_new();
-    /// match memory_manager.try_release_virtual_memory_buckets(memory_id) {
-    ///     Ok(count) => println!("Released {} buckets", count),
-    ///     Err(reason) => println!("Cannot release: {}", reason),
-    /// }
+    /// map.clear_new();  // User must ensure data structure is empty
+    /// let count = memory_manager.try_release_virtual_memory_buckets(memory_id);
+    /// println!("Released {} buckets", count);
     /// ```
-    pub fn try_release_virtual_memory_buckets(&self, id: MemoryId) -> Result<usize, String> {
+    pub fn try_release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
         self.inner
             .borrow_mut()
             .try_release_virtual_memory_buckets(id)
@@ -471,115 +432,19 @@ impl<M: Memory> MemoryManagerInner<M> {
         old_size as i64
     }
 
-    /// Safely releases buckets only if data structures using this memory appear to be empty.
+    /// Releases buckets allocated to the specified virtual memory.
     ///
-    /// This method examines the actual state of data structures to determine if bucket release
-    /// is safe, rather than relying solely on virtual memory size (which rarely shrinks to 0).
+    /// **Warning**: This method does not verify that the data structures are empty.
+    /// It is the caller's responsibility to ensure that all data structures using
+    /// this memory have been properly cleared before calling this method.
     ///
-    /// Returns:
-    /// - `Ok(bucket_count)` if buckets were successfully released
-    /// - `Err(reason)` with a descriptive message explaining why release was denied
-    fn try_release_virtual_memory_buckets(&mut self, id: MemoryId) -> Result<usize, String> {
-        let current_size = self.memory_sizes_in_pages[id.0 as usize];
-        let virtual_memory_buckets = &self.memory_buckets[id.0 as usize];
-
-        if virtual_memory_buckets.is_empty() {
-            // No buckets allocated to this memory, nothing to release
-            return Ok(0);
-        }
-
-        if current_size == 0 {
-            // Memory size is 0, definitely safe to release buckets
-            return self.release_virtual_memory_buckets_unchecked(id);
-        }
-
-        // Read the magic bytes from the first bucket to identify the data structure
-        let first_bucket_addr = self.bucket_address(&virtual_memory_buckets[0]);
-        let mut magic = [0u8; 3];
-        self.memory.read(first_bucket_addr.get(), &mut magic);
-
-        match &magic {
-            b"BTR" => {
-                // BTreeMap detected - check if it's empty
-                self.check_btreemap_empty(id, first_bucket_addr)
-            }
-            b"SVC" => {
-                // Vec detected - check if it's empty
-                self.check_vec_empty(id, first_bucket_addr)
-            }
-            _ => {
-                // Check if it's uninitialized memory (all zeros)
-                let mut sample = [0u8; UNINITIALIZED_MEMORY_SAMPLE_SIZE];
-                self.memory.read(first_bucket_addr.get(), &mut sample);
-
-                if sample.iter().all(|&b| b == 0) {
-                    // Appears to be uninitialized memory, probably safe
-                    self.release_virtual_memory_buckets_unchecked(id)
-                } else {
-                    Err(format!(
-                        "Unknown data structure with magic {:?} - cannot verify if empty. \
-                         No unsafe release method is available; cannot release buckets.",
-                        magic
-                    ))
-                }
-            }
-        }
-    }
-
-    /// Check if a BTreeMap appears to be empty by examining its header
-    fn check_btreemap_empty(&mut self, id: MemoryId, base_addr: Address) -> Result<usize, String> {
-        // Read BTreeMap length from header
-        let mut len_bytes = [0u8; 8];
-        self.memory
-            .read(base_addr.get() + BTREEMAP_LENGTH_OFFSET, &mut len_bytes);
-        let btree_len = u64::from_le_bytes(len_bytes);
-
-        if btree_len > 0 {
-            return Err(format!("BTreeMap contains {} items", btree_len));
-        }
-
-        // Check allocator state - read number of allocated chunks
-        let mut chunks_bytes = [0u8; 8];
-        self.memory.read(
-            base_addr.get() + BTREEMAP_ALLOCATOR_OFFSET + ALLOCATOR_NUM_CHUNKS_OFFSET,
-            &mut chunks_bytes,
-        );
-        let allocated_chunks = u64::from_le_bytes(chunks_bytes);
-
-        if allocated_chunks > 0 {
-            return Err(format!(
-                "BTreeMap allocator has {} allocated chunks (not empty)",
-                allocated_chunks
-            ));
-        }
-
-        // BTreeMap appears empty, safe to release
-        self.release_virtual_memory_buckets_unchecked(id)
-    }
-
-    /// Check if a Vec appears to be empty by examining its header
-    fn check_vec_empty(&mut self, id: MemoryId, base_addr: Address) -> Result<usize, String> {
-        // Read Vec length from header
-        let mut len_bytes = [0u8; 8];
-        self.memory
-            .read(base_addr.get() + VEC_LENGTH_OFFSET, &mut len_bytes);
-        let vec_len = u64::from_le_bytes(len_bytes);
-
-        if vec_len > 0 {
-            return Err(format!("Vec contains {} items", vec_len));
-        }
-
-        // Vec appears empty, safe to release
-        self.release_virtual_memory_buckets_unchecked(id)
-    }
-
-    /// Release buckets without safety checks - caller must ensure it's safe
-    fn release_virtual_memory_buckets_unchecked(&mut self, id: MemoryId) -> Result<usize, String> {
+    /// Returns the number of buckets that were released.
+    fn try_release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
         let memory_buckets = &mut self.memory_buckets[id.0 as usize];
         let bucket_count = memory_buckets.len();
 
         if bucket_count == 0 {
-            return Ok(0);
+            return 0;
         }
 
         // Mark all buckets as unallocated in stable storage and move to free pool
@@ -600,7 +465,7 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         self.save_header();
 
-        Ok(bucket_count)
+        bucket_count
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8], bucket_cache: &BucketCache) {
