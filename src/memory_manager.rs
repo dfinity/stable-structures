@@ -508,7 +508,7 @@ impl<M: Memory> MemoryManagerInner<M> {
                 } else {
                     Err(format!(
                         "Unknown data structure with magic {:?} - cannot verify if empty. \
-                         Use explicit release method if you're certain it's safe.",
+                         No unsafe release method is available; cannot release buckets.",
                         magic
                     ))
                 }
