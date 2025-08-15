@@ -353,7 +353,7 @@ where
     /// assert!(set.is_empty());
     /// ```
     pub fn clear(&mut self) {
-        self.map.clear_new();
+        self.map.clear();
     }
 
     /// Returns the first key in the set. This key
