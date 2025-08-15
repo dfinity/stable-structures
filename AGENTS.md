@@ -2,7 +2,6 @@
 
 ## Overview
 
-This repository provides stable data structures for the Internet Computer that persist across canister upgrades. These structures do not require `pre_upgrade` or `post_upgrade` hooks. The main modules include `BTreeMap` and `BTreeSet` for key-value storage and sets, `Vec` for growable arrays, `Cell` for single values, `Log` for append-only data, `MinHeap` for priority queues, and a `MemoryManager` for coordinating multiple structures in stable memory.
 This repository provides stable data structures for the Internet Computer that persist across canister upgrades. These structures do not require `pre_upgrade` or `post_upgrade` hooks.
 
 The main modules include:
@@ -14,6 +13,7 @@ The main modules include:
 - `Log` — append-only data
 - `MinHeap` — priority queues
 - `MemoryManager` — coordinates multiple structures in stable memory
+
 ## Index
 
 Key entry points for understanding and using this library:
@@ -39,11 +39,11 @@ Code defines behavior. Documentation must accurately reflect the current impleme
 Follow this sequence to understand the library:
 
 1. `README.md` for overview and quick examples
-2. `docs/src/introduction/` for concepts and design principles
-3. `docs/src/concepts/` for `Memory` trait and `MemoryManager` details
-4. module documentation (`src/*.rs`) for specific data structure APIs
-5. `examples/` for production usage patterns
-6. code comments for implementation details
+1. `docs/src/introduction/` for concepts and design principles
+1. `docs/src/concepts/` for `Memory` trait and `MemoryManager` details
+1. module documentation (`src/*.rs`) for specific data structure APIs
+1. `examples/` for production usage patterns
+1. code comments for implementation details
 
 ## Checklist
 
