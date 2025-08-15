@@ -60,7 +60,7 @@ const MAX_NUM_BUCKETS: u64 = 32768;
 
 const BUCKET_SIZE_IN_PAGES: u64 = 128;
 
-// A value used internally to indicate that a bucket is unallocated.
+// Marker value for unallocated buckets in stable storage (uses invalid memory ID).
 const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
 
 // The offset where buckets are in memory.
@@ -129,16 +129,15 @@ const HEADER_RESERVED_BYTES: usize = 32;
 ///
 /// # Memory Reclamation
 ///
-/// Buckets can be manually released for reuse via `try_release_virtual_memory_buckets()`, which
-/// safely checks that virtual memory size is 0 before releasing. Released buckets are automatically
-/// reused when new virtual memories require storage.
+/// Buckets can be manually released for reuse via `try_release_virtual_memory_buckets()`.
+/// **Warning**: No safety checks are performed - ensure data structures are cleared first.
+/// Released buckets are automatically reused by other virtual memories.
 ///
-/// # Current Limitations and Future Improvements
+/// # Current Limitations
 ///
-/// - Manual bucket release is required - clearing data structures does not automatically reclaim buckets
-/// - Virtual memory size must be 0 for safe bucket release (data structures don't auto-shrink on clear)
-/// - Long-running canisters should periodically release unused buckets to optimize storage costs
-/// - Future versions may consider automatic bucket reclamation and memory compaction features
+/// - Manual bucket release required after clearing data structures  
+/// - User responsibility to clear data before releasing (no verification)
+/// - Releasing active buckets causes data corruption
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
@@ -168,19 +167,17 @@ impl<M: Memory> MemoryManager<M> {
         }
     }
 
-    /// Releases buckets allocated to the specified virtual memory.
+    /// Releases buckets allocated to the specified virtual memory for reuse.
     ///
-    /// **Warning**: This method does not verify that the data structures are empty.
-    /// It is the caller's responsibility to ensure that all data structures using
-    /// this memory have been properly cleared before calling this method.
+    /// **Warning**: No verification performed. User must clear data structures first
+    /// to avoid data corruption. Released buckets are automatically reused by other memories.
     ///
-    /// Returns the number of buckets that were released.
+    /// Returns the number of buckets released.
     ///
     /// # Example
     /// ```rust,ignore
-    /// map.clear_new();  // User must ensure data structure is empty
+    /// map.clear_new();  // Clear data first
     /// let count = memory_manager.try_release_virtual_memory_buckets(memory_id);
-    /// println!("Released {} buckets", count);
     /// ```
     pub fn try_release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
         self.inner
@@ -432,13 +429,10 @@ impl<M: Memory> MemoryManagerInner<M> {
         old_size as i64
     }
 
-    /// Releases buckets allocated to the specified virtual memory.
+    /// Releases buckets for the specified memory, marking them unallocated in stable storage
+    /// and adding them to the free pool. Resets memory size to 0.
     ///
-    /// **Warning**: This method does not verify that the data structures are empty.
-    /// It is the caller's responsibility to ensure that all data structures using
-    /// this memory have been properly cleared before calling this method.
-    ///
-    /// Returns the number of buckets that were released.
+    /// **Warning**: No verification performed - caller must ensure data is cleared first.
     fn try_release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
         let memory_buckets = &mut self.memory_buckets[id.0 as usize];
         let bucket_count = memory_buckets.len();
