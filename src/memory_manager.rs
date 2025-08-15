@@ -202,6 +202,16 @@ impl<M: Memory> MemoryManager<M> {
     /// Safely releases buckets if data structures using this memory appear empty.
     ///
     /// Returns `Ok(bucket_count)` if successful, `Err(reason)` if unsafe.
+    /// Attempts to safely release buckets if data structures using this memory appear empty.
+    ///
+    /// This method examines specific standard data structures (`BTreeMap`, `Vec`) to determine
+    /// if it is safe to release the associated buckets. It may not work correctly with custom
+    /// data structures or other types not explicitly supported.
+    ///
+    /// Returns:
+    /// - `Ok(bucket_count)`: The number of buckets successfully released.
+    /// - `Err(reason)`: A string describing why buckets could not be released safely (e.g., if
+    ///   the data structure is not empty or is of an unsupported type).
     ///
     /// # Example
     /// ```rust,ignore
