@@ -126,6 +126,13 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// -------------------------------------------------- <- Page ((MAX_NUM_BUCKETS - 1) * N + 1)
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
 /// ```
+///
+/// # Current Limitations and Future Improvements
+///
+/// - Buckets are never deallocated once assigned to a memory ID, even when the memory becomes empty
+/// - Clearing data structures (BTreeMap, Vec) does not reclaim underlying bucket allocations
+/// - Long-running canisters may accumulate unused buckets, increasing storage costs
+/// - Future versions may include automatic bucket reclamation and memory compaction features
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
