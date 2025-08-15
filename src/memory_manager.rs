@@ -336,7 +336,12 @@ impl<M: Memory> MemoryManagerInner<M> {
                 memory_buckets[memory_id as usize].push(BucketId(bucket_idx as u16));
             } else if (bucket_idx as u16) < header.num_allocated_buckets {
                 // This bucket was allocated but is now marked as unallocated, so it's free to reuse
-                free_buckets.push(BucketId(bucket_idx as u16));
+            let bucket_id = BucketId(u16::try_from(bucket_idx).expect("bucket_idx exceeds u16::MAX"));
+            if memory_id != UNALLOCATED_BUCKET_MARKER {
+                memory_buckets[memory_id as usize].push(bucket_id);
+            } else if bucket_id.0 < header.num_allocated_buckets {
+                // This bucket was allocated but is now marked as unallocated, so it's free to reuse
+                free_buckets.push(bucket_id);
             }
         }
 
