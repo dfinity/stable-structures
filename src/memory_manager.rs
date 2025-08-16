@@ -330,7 +330,8 @@ impl<M: Memory> MemoryManagerInner<M> {
             if memory_id != UNALLOCATED_BUCKET_MARKER {
                 memory_buckets[memory_id as usize].push(bucket_id);
             } else if bucket_id.0 < header.num_allocated_buckets {
-                // This bucket was allocated but is now marked as unallocated, so it's free to reuse
+                // Only buckets with indices less than `num_allocated_buckets` were ever allocated.
+                // If such a bucket is now marked as unallocated, it is free to reuse.
                 free_buckets.push(bucket_id);
             }
         }
