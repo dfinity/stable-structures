@@ -60,7 +60,7 @@ const MAX_NUM_BUCKETS: u64 = 32768;
 
 const BUCKET_SIZE_IN_PAGES: u64 = 128;
 
-// Marker value for unallocated buckets in stable storage (uses invalid memory ID).
+// A value used internally to indicate that a bucket is unallocated.
 const UNALLOCATED_BUCKET_MARKER: u8 = MAX_NUM_MEMORIES;
 
 // The offset where buckets are in memory.
