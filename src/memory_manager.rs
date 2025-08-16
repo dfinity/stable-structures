@@ -129,7 +129,7 @@ const HEADER_RESERVED_BYTES: usize = 32;
 ///
 /// # Current Limitations
 ///
-/// - Bucket release is manual - call `try_release_virtual_memory_buckets()` after clearing
+/// - Bucket release is manual - call `release_virtual_memory_buckets()` after clearing
 /// - No safety verification - user must ensure memory is empty before releasing
 /// - Incorrect usage leads to data corruption and undefined behavior
 pub struct MemoryManager<M: Memory> {
@@ -171,12 +171,10 @@ impl<M: Memory> MemoryManager<M> {
     /// # Example
     /// ```rust,ignore
     /// map.clear_new();  // MANDATORY: Clear all data before releasing buckets
-    /// let count = memory_manager.try_release_virtual_memory_buckets(memory_id);
+    /// let count = memory_manager.release_virtual_memory_buckets(memory_id);
     /// ```
-    pub fn try_release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
-        self.inner
-            .borrow_mut()
-            .try_release_virtual_memory_buckets(id)
+    pub fn release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
+        self.inner.borrow_mut().release_virtual_memory_buckets(id)
     }
 
     /// Returns the underlying memory.
@@ -429,7 +427,7 @@ impl<M: Memory> MemoryManagerInner<M> {
     /// and adding them to the free pool. Resets memory size to 0.
     ///
     /// **Warning**: No verification performed - caller must ensure data is cleared first.
-    fn try_release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
+    fn release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
         let memory_buckets = &mut self.memory_buckets[id.0 as usize];
         let bucket_count = memory_buckets.len();
 

@@ -60,7 +60,7 @@ fn migration_with_release_reuses_buckets() {
 
     // Clear A and release its buckets
     a_map.clear_new();
-    let released_buckets = mm.try_release_virtual_memory_buckets(a);
+    let released_buckets = mm.release_virtual_memory_buckets(a);
     assert!(released_buckets > 0);
     let stable_before = mock_stable_memory.size();
 
@@ -88,7 +88,7 @@ fn release_empty_memory_returns_zero() {
     let mm = MemoryManager::init(mock_stable_memory);
 
     // Try to release buckets from empty memory
-    let released_buckets = mm.try_release_virtual_memory_buckets(memory_id);
+    let released_buckets = mm.release_virtual_memory_buckets(memory_id);
 
     // Should return 0 since no buckets were allocated
     assert_eq!(released_buckets, 0, "Empty memory should release 0 buckets");
@@ -109,11 +109,11 @@ fn double_release_returns_zero_second_time() {
 
     // Clear and release buckets
     map.clear_new();
-    let first_release = mm.try_release_virtual_memory_buckets(memory_id);
+    let first_release = mm.release_virtual_memory_buckets(memory_id);
     assert!(first_release > 0, "First release should return >0 buckets");
 
     // Try to release again
-    let second_release = mm.try_release_virtual_memory_buckets(memory_id);
+    let second_release = mm.release_virtual_memory_buckets(memory_id);
     assert_eq!(second_release, 0, "Second release should return 0 buckets");
 }
 
@@ -134,7 +134,7 @@ fn release_only_affects_target_memory() {
 
     // Clear and release A's buckets
     a_map.clear_new();
-    let released_buckets = mm.try_release_virtual_memory_buckets(a);
+    let released_buckets = mm.release_virtual_memory_buckets(a);
     assert!(released_buckets > 0, "Should release A's buckets");
 
     // Verify B can still allocate new data (its buckets weren't affected)
@@ -164,7 +164,7 @@ fn multiple_release_cycles() {
 
         // Clear and release buckets
         map.clear_new();
-        let released_buckets = mm.try_release_virtual_memory_buckets(memory_id);
+        let released_buckets = mm.release_virtual_memory_buckets(memory_id);
 
         assert!(
             released_buckets > 0,
