@@ -127,10 +127,10 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
 /// ```
 ///
-/// # Current Limitations  
+/// # Current Limitations
 ///
 /// - Bucket release is manual - call `try_release_virtual_memory_buckets()` after clearing
-/// - No safety verification - user must ensure memory is empty before releasing  
+/// - No safety verification - user must ensure memory is empty before releasing
 /// - Incorrect usage leads to data corruption and undefined behavior
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
