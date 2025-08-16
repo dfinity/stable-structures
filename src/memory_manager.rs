@@ -127,12 +127,6 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
 /// ```
 ///
-/// # Memory Reclamation
-///
-/// Buckets can be manually released for reuse via `try_release_virtual_memory_buckets()`.
-/// **Warning**: No safety checks are performed - ensure data structures are cleared first.
-/// Released buckets are automatically reused by other virtual memories.
-///
 /// # Current Limitations
 ///
 /// - Manual bucket release required after clearing data structures  
