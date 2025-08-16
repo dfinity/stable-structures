@@ -127,12 +127,11 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
 /// ```
 ///
-/// # Current Limitations and Future Improvements
+/// # Current Limitations
 ///
-/// - Buckets are never deallocated once assigned to a memory ID, even when the memory becomes empty
-/// - Clearing data structures (BTreeMap, Vec) does not reclaim underlying bucket allocations
-/// - Long-running canisters may accumulate unused buckets, increasing storage costs
-/// - Future versions may consider automatic bucket reclamation and memory compaction features
+/// - Bucket release is manual - call `release_virtual_memory_buckets()` after clearing
+/// - No safety verification - user must ensure memory is empty before releasing
+/// - Incorrect usage leads to data corruption and undefined behavior
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
@@ -160,6 +159,22 @@ impl<M: Memory> MemoryManager<M> {
             memory_manager: self.inner.clone(),
             cache: BucketCache::new(),
         }
+    }
+
+    /// Releases buckets allocated to the specified virtual memory for reuse.
+    ///
+    /// **Warning**: No verification performed. User must clear data structures first
+    /// to avoid data corruption. Released buckets are automatically reused by other memories.
+    ///
+    /// Returns the number of buckets released.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// map.clear_new();  // MANDATORY: Clear all data before releasing buckets
+    /// let count = memory_manager.release_virtual_memory_buckets(memory_id);
+    /// ```
+    pub fn release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
+        self.inner.borrow_mut().release_virtual_memory_buckets(id)
     }
 
     /// Returns the underlying memory.
@@ -246,6 +261,9 @@ struct MemoryManagerInner<M: Memory> {
 
     /// A map mapping each managed memory to the bucket ids that are allocated to it.
     memory_buckets: Vec<Vec<BucketId>>,
+
+    /// A pool of free buckets that can be reused by any memory.
+    free_buckets: Vec<BucketId>,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -274,6 +292,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: vec![vec![]; MAX_NUM_MEMORIES as usize],
             bucket_size_in_pages,
+            free_buckets: Vec::new(),
         };
 
         mem_mgr.save_header();
@@ -303,9 +322,15 @@ impl<M: Memory> MemoryManagerInner<M> {
         );
 
         let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
-        for (bucket_idx, memory) in buckets.into_iter().enumerate() {
-            if memory != UNALLOCATED_BUCKET_MARKER {
-                memory_buckets[memory as usize].push(BucketId(bucket_idx as u16));
+        let mut free_buckets = Vec::new();
+        for (bucket_idx, memory_id) in buckets.into_iter().enumerate() {
+            let bucket_id = BucketId(bucket_idx as u16);
+            if memory_id != UNALLOCATED_BUCKET_MARKER {
+                memory_buckets[memory_id as usize].push(bucket_id);
+            } else if bucket_id.0 < header.num_allocated_buckets {
+                // Only buckets with indices less than `num_allocated_buckets` were ever allocated.
+                // If such a bucket is now marked as unallocated, it is free to reuse.
+                free_buckets.push(bucket_id);
             }
         }
 
@@ -315,6 +340,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
+            free_buckets,
         }
     }
 
@@ -345,7 +371,11 @@ impl<M: Memory> MemoryManagerInner<M> {
         let required_buckets = self.num_buckets_needed(new_size);
         let new_buckets_needed = required_buckets - current_buckets;
 
-        if new_buckets_needed + self.allocated_buckets as u64 > MAX_NUM_BUCKETS {
+        // Check if we have enough buckets available (either already allocated or can allocate new ones)
+        let free_bucket_count = self.free_buckets.len() as u64;
+        let new_buckets_to_allocate = new_buckets_needed.saturating_sub(free_bucket_count);
+
+        if self.allocated_buckets as u64 + new_buckets_to_allocate > MAX_NUM_BUCKETS {
             // Exceeded the memory that can be managed.
             return -1;
         }
@@ -354,7 +384,16 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Allocate new buckets as needed.
         memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = BucketId(self.allocated_buckets);
+            let new_bucket_id = if let Some(free_bucket) = self.free_buckets.pop() {
+                // Reuse a bucket from the free pool
+                free_bucket
+            } else {
+                // Allocate a new bucket
+                let bucket = BucketId(self.allocated_buckets);
+                self.allocated_buckets += 1;
+                bucket
+            };
+
             memory_bucket.push(new_bucket_id);
 
             // Write in stable store that this bucket belongs to the memory with the provided `id`.
@@ -363,8 +402,6 @@ impl<M: Memory> MemoryManagerInner<M> {
                 bucket_allocations_address(new_bucket_id).get(),
                 &[id.0],
             );
-
-            self.allocated_buckets += 1;
         }
 
         // Grow the underlying memory if necessary.
@@ -384,6 +421,39 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Update the header and return the old size.
         self.save_header();
         old_size as i64
+    }
+
+    /// Releases buckets for the specified memory, marking them unallocated in stable storage
+    /// and adding them to the free pool. Resets memory size to 0.
+    ///
+    /// **Warning**: No verification performed - caller must ensure data is cleared first.
+    fn release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
+        let memory_buckets = &mut self.memory_buckets[id.0 as usize];
+        let bucket_count = memory_buckets.len();
+
+        if bucket_count == 0 {
+            return 0;
+        }
+
+        // Mark all buckets as unallocated in stable storage and move to free pool
+        for &bucket_id in memory_buckets.iter() {
+            write(
+                &self.memory,
+                bucket_allocations_address(bucket_id).get(),
+                &[UNALLOCATED_BUCKET_MARKER],
+            );
+            self.free_buckets.push(bucket_id);
+        }
+
+        // Clear the memory's bucket list
+        memory_buckets.clear();
+
+        // Reset the memory size to 0
+        self.memory_sizes_in_pages[id.0 as usize] = 0;
+
+        self.save_header();
+
+        bucket_count
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8], bucket_cache: &BucketCache) {
@@ -1110,3 +1180,6 @@ mod test {
         );
     }
 }
+
+#[cfg(test)]
+mod bucket_release_tests;
