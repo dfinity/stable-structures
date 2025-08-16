@@ -332,8 +332,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
         let mut free_buckets = Vec::new();
         for (bucket_idx, memory_id) in buckets.into_iter().enumerate() {
-            let bucket_id =
-                BucketId(u16::try_from(bucket_idx).expect("bucket_idx exceeds u16::MAX"));
+            let bucket_id = BucketId(bucket_idx as u16);
             if memory_id != UNALLOCATED_BUCKET_MARKER {
                 memory_buckets[memory_id as usize].push(bucket_id);
             } else if bucket_id.0 < header.num_allocated_buckets {
@@ -380,8 +379,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         let new_buckets_needed = required_buckets - current_buckets;
 
         // Check if we have enough buckets available (either already allocated or can allocate new ones)
-        let free_bucket_count =
-            u64::try_from(self.free_buckets.len()).expect("free_buckets.len() does not fit in u64");
+        let free_bucket_count = self.free_buckets.len() as u64;
         let new_buckets_to_allocate = new_buckets_needed.saturating_sub(free_bucket_count);
 
         if self.allocated_buckets as u64 + new_buckets_to_allocate > MAX_NUM_BUCKETS {
