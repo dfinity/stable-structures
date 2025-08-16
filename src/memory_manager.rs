@@ -127,11 +127,11 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
 /// ```
 ///
-/// # Current Limitations
+/// # Current Limitations  
 ///
-/// - Manual bucket release required after clearing data structures  
-/// - User responsibility to clear data before releasing (no verification)
-/// - Releasing active buckets causes data corruption
+/// - Bucket release is manual - call `try_release_virtual_memory_buckets()` after clearing
+/// - No safety verification - user must ensure memory is empty before releasing  
+/// - Incorrect usage leads to data corruption and undefined behavior
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
@@ -170,7 +170,7 @@ impl<M: Memory> MemoryManager<M> {
     ///
     /// # Example
     /// ```rust,ignore
-    /// map.clear_new();  // Clear data first
+    /// map.clear_new();  // MANDATORY: Clear all data before releasing buckets
     /// let count = memory_manager.try_release_virtual_memory_buckets(memory_id);
     /// ```
     pub fn try_release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
