@@ -1,89 +1,176 @@
+//! Tests demonstrating bucket release efficiency in migration scenarios.
+//!
+//! Common pattern: User populates memory A, reads all data into heap memory,
+//! clears A, then populates memory B. Without bucket release, B cannot reuse
+//! A's buckets, causing memory waste. With bucket release, B can reuse A's
+//! buckets, preventing memory growth.
+
 use super::{MemoryId, MemoryManager};
 use crate::{btreemap::BTreeMap, vec_mem::VectorMemory, Memory};
 
-#[test]
-fn test_try_release_virtual_memory_buckets_empty_memory_no_release() {
-    // Arrange
-    let id = MemoryId(0);
-    let mem = VectorMemory::default();
-    let mm = MemoryManager::init(mem);
-
-    // Act
-    let released = mm.try_release_virtual_memory_buckets(id);
-
-    // Assert
-    assert_eq!(released, 0, "sanity: no buckets released");
-    assert_eq!(mm.get(id).size(), 0, "sanity: no pages allocated");
+/// Helper function to create a blob that triggers bucket allocation
+fn blob() -> Vec<u8> {
+    vec![42u8; 2000] // 2KB blob
 }
 
 #[test]
-fn test_try_release_virtual_memory_buckets_release_after_clear_reclaims_one_bucket() {
-    // Arrange
-    let id = MemoryId(0);
-    let mem = VectorMemory::default();
-    let mm = MemoryManager::init(mem);
-    let mut map: BTreeMap<u64, u64, _> = BTreeMap::init(mm.get(id));
+fn migration_without_release_wastes_buckets() {
+    // Scenario: Populate A → Clear A without bucket release → Populate B
+    // Result: B cannot reuse A's buckets, causing memory waste (growth)
+    let (a, b) = (MemoryId(0), MemoryId(1));
+    let mock_stable_memory = VectorMemory::default();
+    let mm = MemoryManager::init(mock_stable_memory.clone());
 
-    // Act
-    map.insert(1, 1);
-    assert_eq!(mm.get(id).size(), 1, "sanity: one page allocated");
+    // Allocate in A
+    let mut a_map = BTreeMap::init(mm.get(a));
+    for i in 0u64..50 {
+        a_map.insert(i, blob());
+    }
 
-    map.clear_new();
-    let released = mm.try_release_virtual_memory_buckets(id);
+    // Clear A without releasing buckets
+    a_map.clear_new();
+    let stable_before = mock_stable_memory.size();
 
-    // Assert
-    assert_eq!(released, 1, "sanity: one bucket released");
-    assert_eq!(mm.get(id).size(), 0, "sanity: no pages allocated");
+    // Allocate in B → should need new buckets since A's aren't released
+    let mut b_map = BTreeMap::init(mm.get(b));
+    for i in 0u64..50 {
+        b_map.insert(i, blob());
+    }
+    let stable_after = mock_stable_memory.size();
+
+    // Verify: maps correct, stable memory grew (waste)
+    assert_eq!(a_map.len(), 0);
+    assert_eq!(b_map.len(), 50);
+    assert!(stable_after > stable_before, "Stable memory grew (waste)");
 }
 
 #[test]
-fn double_release_is_idempotent() {
-    // Arrange
-    let id = MemoryId(0);
-    let mem = VectorMemory::default();
-    let mm = MemoryManager::init(mem);
-    let mut map: BTreeMap<u64, u64, _> = BTreeMap::init(mm.get(id));
+fn migration_with_release_reuses_buckets() {
+    // Scenario: Populate A → Clear A with bucket release → Populate B
+    // Result: B reuses A's released buckets, preventing memory waste (no growth)
+    let (a, b) = (MemoryId(0), MemoryId(1));
+    let mock_stable_memory = VectorMemory::default();
+    let mm = MemoryManager::init(mock_stable_memory.clone());
 
-    // Act
-    map.insert(1, 2);
-    assert_eq!(mm.get(id).size(), 1, "sanity: one page allocated");
+    // Allocate in A
+    let mut a_map = BTreeMap::init(mm.get(a));
+    for i in 0u64..50 {
+        a_map.insert(i, blob());
+    }
 
-    map.clear_new();
-    let _ = mm.try_release_virtual_memory_buckets(id); // first release
+    // Clear A and release its buckets
+    a_map.clear_new();
+    let released_buckets = mm.try_release_virtual_memory_buckets(a);
+    assert!(released_buckets > 0);
+    let stable_before = mock_stable_memory.size();
 
-    let released_again = mm.try_release_virtual_memory_buckets(id); // second release
+    // Allocate in B → should reuse A's released buckets
+    let mut b_map = BTreeMap::init(mm.get(b));
+    for i in 0u64..50 {
+        b_map.insert(i, blob());
+    }
+    let stable_after = mock_stable_memory.size();
 
-    // Assert
-    assert_eq!(released_again, 0, "sanity: no buckets released");
-    assert_eq!(mm.get(id).size(), 0, "sanity: no pages allocated");
-}
-
-#[test]
-fn buckets_can_be_reused_after_release() {
-    // Arrange
-    let a = MemoryId(0);
-    let b = MemoryId(1);
-    let mem = VectorMemory::default();
-    let mm = MemoryManager::init(mem);
-
-    // Act — allocate in A, clear, release
-    let mut map_a: BTreeMap<u64, u64, _> = BTreeMap::init(mm.get(a));
-    map_a.insert(1, 1);
-    map_a.clear_new();
-    let _ = mm.try_release_virtual_memory_buckets(a);
-
-    // Assert — A is empty after release
-    assert_eq!(mm.get(a).size(), 0, "sanity: no pages allocated");
-
-    // Act — allocate in B, should succeed and use a bucket
-    let mut map_b: BTreeMap<u64, u64, _> = BTreeMap::init(mm.get(b));
-    map_b.insert(2, 2);
-
-    // Assert
-    assert_eq!(
-        map_b.get(&2),
-        Some(2),
-        "sanity: map B contains the correct value"
+    // Verify: maps correct, stable memory unchanged (reuse)
+    assert_eq!(a_map.len(), 0);
+    assert_eq!(b_map.len(), 50);
+    assert!(
+        stable_after <= stable_before,
+        "Stable memory unchanged (reuse)"
     );
-    assert_eq!(mm.get(b).size(), 1, "sanity: one page allocated");
+}
+
+#[test]
+fn release_empty_memory_returns_zero() {
+    // Test: Releasing buckets from unused memory should return 0
+    let memory_id = MemoryId(0);
+    let mock_stable_memory = VectorMemory::default();
+    let mm = MemoryManager::init(mock_stable_memory);
+
+    // Try to release buckets from empty memory
+    let released_buckets = mm.try_release_virtual_memory_buckets(memory_id);
+
+    // Should return 0 since no buckets were allocated
+    assert_eq!(released_buckets, 0, "Empty memory should release 0 buckets");
+}
+
+#[test]
+fn double_release_returns_zero_second_time() {
+    // Test: Releasing the same memory twice should return 0 on second attempt
+    let memory_id = MemoryId(0);
+    let mock_stable_memory = VectorMemory::default();
+    let mm = MemoryManager::init(mock_stable_memory);
+
+    // Populate memory to create buckets
+    let mut map = BTreeMap::init(mm.get(memory_id));
+    for i in 0u64..50 {
+        map.insert(i, blob());
+    }
+
+    // Clear and release buckets
+    map.clear_new();
+    let first_release = mm.try_release_virtual_memory_buckets(memory_id);
+    assert!(first_release > 0, "First release should return >0 buckets");
+
+    // Try to release again
+    let second_release = mm.try_release_virtual_memory_buckets(memory_id);
+    assert_eq!(second_release, 0, "Second release should return 0 buckets");
+}
+
+#[test]
+fn release_only_affects_target_memory() {
+    // Test: Releasing memory A should not affect memory B's allocation ability
+    let (a, b) = (MemoryId(0), MemoryId(1));
+    let mock_stable_memory = VectorMemory::default();
+    let mm = MemoryManager::init(mock_stable_memory);
+
+    // Populate both memories
+    let mut a_map = BTreeMap::init(mm.get(a));
+    let mut b_map = BTreeMap::init(mm.get(b));
+    for i in 0u64..30 {
+        a_map.insert(i, blob());
+        b_map.insert(i, blob());
+    }
+
+    // Clear and release A's buckets
+    a_map.clear_new();
+    let released_buckets = mm.try_release_virtual_memory_buckets(a);
+    assert!(released_buckets > 0, "Should release A's buckets");
+
+    // Verify B can still allocate new data (its buckets weren't affected)
+    for i in 30u64..60 {
+        b_map.insert(i, blob());
+    }
+
+    // Verify final state
+    assert_eq!(a_map.len(), 0);
+    assert_eq!(b_map.len(), 60);
+}
+
+#[test]
+fn multiple_release_cycles() {
+    // Test: Multiple populate→clear→release cycles should work consistently
+    let memory_id = MemoryId(0);
+    let mock_stable_memory = VectorMemory::default();
+    let mm = MemoryManager::init(mock_stable_memory);
+
+    // Perform several cycles of populate→clear→release
+    for cycle in 0..27 {
+        // Populate memory
+        let mut map = BTreeMap::init(mm.get(memory_id));
+        for i in 0u64..40 {
+            map.insert(i, blob());
+        }
+
+        // Clear and release buckets
+        map.clear_new();
+        let released_buckets = mm.try_release_virtual_memory_buckets(memory_id);
+
+        assert!(
+            released_buckets > 0,
+            "Cycle {} should release >0 buckets, got {}",
+            cycle,
+            released_buckets
+        );
+    }
 }
