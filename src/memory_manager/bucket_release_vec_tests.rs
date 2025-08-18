@@ -77,7 +77,7 @@ fn migration_with_release_reuses_buckets() {
 
     // MANDATORY: Drop the Rust object before releasing buckets
     drop(vec_a_original);
-    
+
     // Release the buckets after dropping the object
     let released_buckets = mm.release_virtual_memory_buckets(a);
     assert!(released_buckets > 0);
@@ -126,10 +126,7 @@ fn data_corruption_without_mandatory_drop() {
     // First check if vec_a can see vec_b's data (shared memory corruption)
     if !vec_a.is_empty() {
         if let Some(corrupted_data) = vec_a.get(0) {
-            assert_eq!(
-                corrupted_data, 2u64,
-                "CORRUPTION: vec_a sees vec_b's data!"
-            );
+            assert_eq!(corrupted_data, 2u64, "CORRUPTION: vec_a sees vec_b's data!");
             return; // Corruption demonstrated through shared data
         }
     }
@@ -172,8 +169,8 @@ fn safe_usage_with_mandatory_drop() {
 
     // MANDATORY: Drop the Rust object before releasing buckets
     drop(vec_a);
-    
-    // Release the buckets after dropping the object  
+
+    // Release the buckets after dropping the object
     let released_buckets = mm.release_virtual_memory_buckets(a);
     assert!(released_buckets > 0);
 
