@@ -3,6 +3,11 @@
 //! These tests verify the basic memory management operations without dependency
 //! on specific data structures. They test the fundamental bucket allocation,
 //! release, and reuse mechanisms.
+//!
+//! **CRITICAL SAFETY REQUIREMENTS**:
+//! All bucket release operations require mandatory Rust object drop BEFORE release.
+//! Using original data structures after bucket release causes data corruption.
+//! See MemoryManager documentation for proper usage patterns.
 
 use super::{MemoryId, MemoryManager};
 use crate::{btreemap::BTreeMap, vec_mem::VectorMemory, Memory};
@@ -17,7 +22,7 @@ fn allocate_buckets_via_btreemap(
     for i in 0..count {
         map.insert(i, vec![42u8; 2000]); // 2KB blob to trigger bucket allocation
     }
-    map.clear_new(); // Clear the structure but keep buckets allocated
+    drop(map); // Drop the structure before bucket release
 }
 
 #[test]

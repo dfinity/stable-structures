@@ -128,11 +128,13 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
 /// ```
 ///
-/// # Current Limitations
+/// # Current Limitations & Safety Requirements
 ///
-/// - Bucket release is manual - call `release_virtual_memory_buckets()` after clearing
-/// - No safety verification - user must ensure memory is empty before releasing
-/// - Incorrect usage leads to data corruption and undefined behavior
+/// - **Manual bucket release** - call `release_virtual_memory_buckets()` after dropping structures
+/// - **Structure invalidation** - original structures become invalid after bucket release
+/// - **Mandatory drop** - you MUST drop original structures BEFORE releasing buckets
+/// - **No safety verification** - user discipline required to prevent data corruption
+/// - **Incorrect usage** - using structures after bucket release causes data corruption
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
@@ -164,16 +166,23 @@ impl<M: Memory> MemoryManager<M> {
 
     /// Releases buckets allocated to the specified virtual memory for reuse.
     ///
-    /// **Warning**: No verification performed. User must clear data structures first
-    /// to avoid data corruption. Released buckets are automatically reused by other memories.
+    /// **CRITICAL SAFETY REQUIREMENT**: Before calling this method:
+    /// 1. You MUST drop the original structure object first
+    ///
+    /// **After calling this method**:
+    /// 2. The data structure using this memory ID becomes INVALID
+    /// 3. You MUST create a new structure if you want to reuse the memory ID
+    ///
+    /// **Correct Usage Pattern:**
+    /// ```rust,ignore
+    /// drop(map);  // 1. MANDATORY: Drop the structure object first
+    /// let count = memory_manager.release_virtual_memory_buckets(memory_id);  // 2. Release buckets
+    /// let new_map = BTreeMap::new(memory_manager.get(memory_id));  // 3. Create fresh structure
+    /// ```
+    ///
+    /// **DANGER**: Using the original structure after bucket release causes data corruption.
     ///
     /// Returns the number of buckets released and added to the free pool (0 if none allocated).
-    ///
-    /// # Example
-    /// ```rust,ignore
-    /// map.clear_new();  // MANDATORY: Clear all data before releasing buckets
-    /// let count = memory_manager.release_virtual_memory_buckets(memory_id);
-    /// ```
     pub fn release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
         self.inner.borrow_mut().release_virtual_memory_buckets(id)
     }
@@ -433,8 +442,10 @@ impl<M: Memory> MemoryManagerInner<M> {
     /// Releases buckets for the specified memory, marking them unallocated in stable storage
     /// and adding them to the free pool. Resets memory size to 0.
     ///
-    /// **Warning**: No verification performed - caller must ensure data is cleared first
-    /// to avoid data corruption.
+    /// **CRITICAL**: This invalidates any data structures using this memory ID.
+    /// Caller must ensure:
+    /// 1. Original structure object is dropped BEFORE calling this
+    /// 2. New structure is created if memory ID needs to be reused
     ///
     /// Returns the number of buckets released and added to the free pool (0 if none allocated).
     fn release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
@@ -1249,6 +1260,9 @@ mod test {
         let released_count = mem_mgr.release_virtual_memory_buckets(MemoryId::new(0));
         assert_eq!(released_count, 1, "Should release exactly 1 bucket");
 
+        // CRITICAL: Drop the memory_0 after bucket release as it's now invalid
+        drop(memory_0);
+
         // Verify memory size didn't change (buckets marked free, not deallocated)
         assert_eq!(mem.size(), size_after_allocation);
 
@@ -1332,3 +1346,6 @@ mod bucket_release_core_tests;
 
 #[cfg(test)]
 mod bucket_release_btreemap_tests;
+
+#[cfg(test)]
+mod bucket_release_vec_tests;
