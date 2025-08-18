@@ -355,12 +355,12 @@ where
     ///
     /// # Safety Note for Bucket Release
     /// If using manual bucket release via `MemoryManager::release_virtual_memory_buckets()`:
-    /// 1. Call `clear()` first to clear all data
+    /// 1. **MANDATORY**: Drop this BTreeSet object first (let it go out of scope)
     /// 2. Call `release_virtual_memory_buckets()` on the memory manager
-    /// 3. **MANDATORY**: Drop this BTreeSet object (let it go out of scope)
-    /// 4. Create new structures as needed
+    /// 3. Create new structures as needed
     ///
     /// Using this BTreeSet after bucket release causes data corruption.
+    /// Note: You can still call `clear()` if you need to clear data without bucket release.
     pub fn clear(&mut self) {
         self.map.clear_new();
     }

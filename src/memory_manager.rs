@@ -130,9 +130,9 @@ const HEADER_RESERVED_BYTES: usize = 32;
 ///
 /// # Current Limitations & Safety Requirements
 ///
-/// - **Manual bucket release** - call `release_virtual_memory_buckets()` after clearing
+/// - **Manual bucket release** - call `release_virtual_memory_buckets()` after dropping structures
 /// - **Structure invalidation** - original structures become invalid after bucket release
-/// - **Mandatory drop** - you MUST drop original structures and create new ones
+/// - **Mandatory drop** - you MUST drop original structures BEFORE releasing buckets
 /// - **No safety verification** - user discipline required to prevent data corruption
 /// - **Incorrect usage** - using structures after bucket release causes data corruption
 pub struct MemoryManager<M: Memory> {
@@ -167,16 +167,15 @@ impl<M: Memory> MemoryManager<M> {
     /// Releases buckets allocated to the specified virtual memory for reuse.
     ///
     /// **CRITICAL SAFETY REQUIREMENT**: After calling this method:
-    /// 1. The data structure using this memory ID becomes INVALID
-    /// 2. You MUST drop the original structure object  
+    /// 1. You MUST drop the original structure object first
+    /// 2. The data structure using this memory ID becomes INVALID after release
     /// 3. You MUST create a new structure if you want to reuse the memory ID
     ///
     /// **Correct Usage Pattern:**
     /// ```rust,ignore
-    /// map.clear_new();  // 1. Clear all data first
+    /// drop(map);  // 1. MANDATORY: Drop the structure object first
     /// let count = memory_manager.release_virtual_memory_buckets(memory_id);  // 2. Release buckets
-    /// drop(map);  // 3. MANDATORY: Drop the invalid structure
-    /// let new_map = BTreeMap::new(memory_manager.get(memory_id));  // 4. Create fresh structure
+    /// let new_map = BTreeMap::new(memory_manager.get(memory_id));  // 3. Create fresh structure
     /// ```
     ///
     /// **DANGER**: Using the original structure after bucket release causes data corruption.
@@ -1346,3 +1345,6 @@ mod bucket_release_core_tests;
 
 #[cfg(test)]
 mod bucket_release_btreemap_tests;
+
+#[cfg(test)]
+mod bucket_release_vec_tests;
