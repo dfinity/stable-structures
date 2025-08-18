@@ -3,6 +3,11 @@
 //! These tests verify the basic memory management operations without dependency
 //! on specific data structures. They test the fundamental bucket allocation,
 //! release, and reuse mechanisms.
+//!
+//! **CRITICAL SAFETY REQUIREMENTS**:
+//! All bucket release operations require mandatory Rust object drop after release.
+//! Using original data structures after bucket release causes data corruption.
+//! See MemoryManager documentation for proper usage patterns.
 
 use super::{MemoryId, MemoryManager};
 use crate::{btreemap::BTreeMap, vec_mem::VectorMemory, Memory};

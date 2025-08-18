@@ -709,6 +709,15 @@ where
     /// Removes all elements from the map.
     // TODO: In next major release (v1.0), rename this method to `clear` to follow
     // standard Rust collection naming conventions.
+    ///
+    /// # Safety Note for Bucket Release
+    /// If using manual bucket release via `MemoryManager::release_virtual_memory_buckets()`:
+    /// 1. Call `clear_new()` first to clear all data
+    /// 2. Call `release_virtual_memory_buckets()` on the memory manager
+    /// 3. **MANDATORY**: Drop this BTreeMap object (let it go out of scope)
+    /// 4. Create new structures as needed
+    ///
+    /// Using this BTreeMap after bucket release causes data corruption.
     pub fn clear_new(&mut self) {
         self.root_addr = NULL;
         self.length = 0;
