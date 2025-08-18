@@ -1182,4 +1182,7 @@ mod test {
 }
 
 #[cfg(test)]
-mod bucket_release_tests;
+mod bucket_release_core_tests;
+
+#[cfg(test)]
+mod bucket_release_btreemap_tests;
