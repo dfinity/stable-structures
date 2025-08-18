@@ -445,7 +445,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             return 0;
         }
 
-        // Mark all buckets as unallocated in stable storage and collect them for sorting
+        // Mark all buckets as unallocated in stable storage and collect them
         let mut released_buckets = Vec::new();
         for &bucket_id in memory_buckets.iter() {
             write(
@@ -456,15 +456,11 @@ impl<M: Memory> MemoryManagerInner<M> {
             released_buckets.push(bucket_id);
         }
 
-        // Sort released buckets in increasing order
-        released_buckets.sort_by_key(|bucket| bucket.0);
-
-        // Add sorted buckets to the free pool, maintaining order
-        // We need to merge with existing free buckets to maintain global sort order
-        let mut all_free_buckets: Vec<BucketId> = self.free_buckets.iter().copied().collect();
-        all_free_buckets.extend(released_buckets);
-        all_free_buckets.sort_by_key(|bucket| bucket.0);
-        self.free_buckets = VecDeque::from(all_free_buckets);
+        // Add released buckets to free pool and sort to maintain increasing order
+        self.free_buckets.extend(released_buckets);
+        let mut sorted_buckets: Vec<_> = self.free_buckets.drain(..).collect();
+        sorted_buckets.sort_by_key(|bucket| bucket.0);
+        self.free_buckets = VecDeque::from(sorted_buckets);
 
         // Clear the memory's bucket list
         memory_buckets.clear();
