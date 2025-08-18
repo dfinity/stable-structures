@@ -43,7 +43,7 @@ fn migration_without_release_wastes_buckets() {
     assert_eq!(vec_a.len(), 50);
 
     // "Clear" A by creating new instance (overwrites data) without releasing buckets
-    let vec_a: StableVec<[u8; 1024], _> = StableVec::new(mm.get(a)); // Overwrites existing data
+    let vec_a: StableVec<[u8; 1024], _> = StableVec::new(mm.get(a));
     assert_eq!(vec_a.len(), 0);
     let stable_before = mock_stable_memory.size();
 
@@ -111,7 +111,7 @@ fn data_corruption_without_mandatory_drop() {
     assert_eq!(vec_a.get(0).unwrap(), 1u64);
 
     // "Clear" by creating new instance, but keep vec_a alive (DANGEROUS!)
-    let vec_a: StableVec<u64, _> = StableVec::new(mm.get(a)); // Overwrites data
+    let vec_a: StableVec<u64, _> = StableVec::new(mm.get(a));
     assert_eq!(vec_a.len(), 0);
     mm.release_virtual_memory_buckets(a);
 
