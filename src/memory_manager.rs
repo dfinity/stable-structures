@@ -166,9 +166,11 @@ impl<M: Memory> MemoryManager<M> {
 
     /// Releases buckets allocated to the specified virtual memory for reuse.
     ///
-    /// **CRITICAL SAFETY REQUIREMENT**: After calling this method:
+    /// **CRITICAL SAFETY REQUIREMENT**: Before calling this method:
     /// 1. You MUST drop the original structure object first
-    /// 2. The data structure using this memory ID becomes INVALID after release
+    ///
+    /// **After calling this method**:
+    /// 2. The data structure using this memory ID becomes INVALID
     /// 3. You MUST create a new structure if you want to reuse the memory ID
     ///
     /// **Correct Usage Pattern:**
@@ -442,9 +444,8 @@ impl<M: Memory> MemoryManagerInner<M> {
     ///
     /// **CRITICAL**: This invalidates any data structures using this memory ID.
     /// Caller must ensure:
-    /// 1. Data structure is cleared first to avoid data corruption
-    /// 2. Original structure object is dropped after calling this
-    /// 3. New structure is created if memory ID needs to be reused
+    /// 1. Original structure object is dropped BEFORE calling this
+    /// 2. New structure is created if memory ID needs to be reused
     ///
     /// Returns the number of buckets released and added to the free pool (0 if none allocated).
     fn release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
