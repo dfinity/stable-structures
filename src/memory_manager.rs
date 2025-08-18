@@ -46,6 +46,7 @@ use crate::{
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
 use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::rc::Rc;
 
 const MAGIC: &[u8; 3] = b"MGR";
@@ -127,12 +128,11 @@ const HEADER_RESERVED_BYTES: usize = 32;
 /// Bucket MAX_NUM_BUCKETS                ↕ N pages
 /// ```
 ///
-/// # Current Limitations and Future Improvements
+/// # Current Limitations
 ///
-/// - Buckets are never deallocated once assigned to a memory ID, even when the memory becomes empty
-/// - Clearing data structures (BTreeMap, Vec) does not reclaim underlying bucket allocations
-/// - Long-running canisters may accumulate unused buckets, increasing storage costs
-/// - Future versions may consider automatic bucket reclamation and memory compaction features
+/// - Bucket release is manual - call `release_virtual_memory_buckets()` after clearing
+/// - No safety verification - user must ensure memory is empty before releasing
+/// - Incorrect usage leads to data corruption and undefined behavior
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
@@ -160,6 +160,22 @@ impl<M: Memory> MemoryManager<M> {
             memory_manager: self.inner.clone(),
             cache: BucketCache::new(),
         }
+    }
+
+    /// Releases buckets allocated to the specified virtual memory for reuse.
+    ///
+    /// **Warning**: No verification performed. User must clear data structures first
+    /// to avoid data corruption. Released buckets are automatically reused by other memories.
+    ///
+    /// Returns the number of buckets released and added to the free pool (0 if none allocated).
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// map.clear_new();  // MANDATORY: Clear all data before releasing buckets
+    /// let count = memory_manager.release_virtual_memory_buckets(memory_id);
+    /// ```
+    pub fn release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
+        self.inner.borrow_mut().release_virtual_memory_buckets(id)
     }
 
     /// Returns the underlying memory.
@@ -246,6 +262,11 @@ struct MemoryManagerInner<M: Memory> {
 
     /// A map mapping each managed memory to the bucket ids that are allocated to it.
     memory_buckets: Vec<Vec<BucketId>>,
+
+    /// A pool of free buckets that can be reused by any memory.
+    /// Maintained in increasing order (lowest bucket IDs at the front)
+    /// to ensure optimal memory locality when reusing buckets.
+    free_buckets: VecDeque<BucketId>,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -274,6 +295,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: vec![vec![]; MAX_NUM_MEMORIES as usize],
             bucket_size_in_pages,
+            free_buckets: VecDeque::new(),
         };
 
         mem_mgr.save_header();
@@ -303,11 +325,21 @@ impl<M: Memory> MemoryManagerInner<M> {
         );
 
         let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
-        for (bucket_idx, memory) in buckets.into_iter().enumerate() {
-            if memory != UNALLOCATED_BUCKET_MARKER {
-                memory_buckets[memory as usize].push(BucketId(bucket_idx as u16));
+        let mut free_buckets_vec = Vec::new();
+        for (bucket_idx, memory_id) in buckets.into_iter().enumerate() {
+            let bucket_id = BucketId(bucket_idx as u16);
+            if memory_id != UNALLOCATED_BUCKET_MARKER {
+                memory_buckets[memory_id as usize].push(bucket_id);
+            } else if bucket_id.0 < header.num_allocated_buckets {
+                // Only buckets with indices less than `num_allocated_buckets` were ever allocated.
+                // If such a bucket is now marked as unallocated, it is free to reuse.
+                free_buckets_vec.push(bucket_id);
             }
         }
+
+        // Sort free buckets in increasing order for optimal memory locality
+        free_buckets_vec.sort_by_key(|bucket| bucket.0);
+        let free_buckets = VecDeque::from(free_buckets_vec);
 
         Self {
             memory,
@@ -315,6 +347,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             bucket_size_in_pages: header.bucket_size_in_pages,
             memory_sizes_in_pages: header.memory_sizes_in_pages,
             memory_buckets,
+            free_buckets,
         }
     }
 
@@ -345,7 +378,11 @@ impl<M: Memory> MemoryManagerInner<M> {
         let required_buckets = self.num_buckets_needed(new_size);
         let new_buckets_needed = required_buckets - current_buckets;
 
-        if new_buckets_needed + self.allocated_buckets as u64 > MAX_NUM_BUCKETS {
+        // Check if we have enough buckets available (either already allocated or can allocate new ones)
+        let free_bucket_count = self.free_buckets.len() as u64;
+        let new_buckets_to_allocate = new_buckets_needed.saturating_sub(free_bucket_count);
+
+        if self.allocated_buckets as u64 + new_buckets_to_allocate > MAX_NUM_BUCKETS {
             // Exceeded the memory that can be managed.
             return -1;
         }
@@ -354,7 +391,16 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Allocate new buckets as needed.
         memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = BucketId(self.allocated_buckets);
+            let new_bucket_id = if let Some(free_bucket) = self.free_buckets.pop_front() {
+                // Reuse a bucket from the free pool (lowest bucket ID first)
+                free_bucket
+            } else {
+                // Allocate a new bucket
+                let bucket = BucketId(self.allocated_buckets);
+                self.allocated_buckets += 1;
+                bucket
+            };
+
             memory_bucket.push(new_bucket_id);
 
             // Write in stable store that this bucket belongs to the memory with the provided `id`.
@@ -363,8 +409,6 @@ impl<M: Memory> MemoryManagerInner<M> {
                 bucket_allocations_address(new_bucket_id).get(),
                 &[id.0],
             );
-
-            self.allocated_buckets += 1;
         }
 
         // Grow the underlying memory if necessary.
@@ -384,6 +428,49 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Update the header and return the old size.
         self.save_header();
         old_size as i64
+    }
+
+    /// Releases buckets for the specified memory, marking them unallocated in stable storage
+    /// and adding them to the free pool. Resets memory size to 0.
+    ///
+    /// **Warning**: No verification performed - caller must ensure data is cleared first
+    /// to avoid data corruption.
+    ///
+    /// Returns the number of buckets released and added to the free pool (0 if none allocated).
+    fn release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
+        let memory_buckets = &mut self.memory_buckets[id.0 as usize];
+        let bucket_count = memory_buckets.len();
+
+        if bucket_count == 0 {
+            return 0;
+        }
+
+        // Mark all buckets as unallocated in stable storage and collect them
+        let mut released_buckets = Vec::new();
+        for &bucket_id in memory_buckets.iter() {
+            write(
+                &self.memory,
+                bucket_allocations_address(bucket_id).get(),
+                &[UNALLOCATED_BUCKET_MARKER],
+            );
+            released_buckets.push(bucket_id);
+        }
+
+        // Add released buckets to free pool and sort to maintain increasing order
+        self.free_buckets.extend(released_buckets);
+        let mut sorted_buckets: Vec<_> = self.free_buckets.drain(..).collect();
+        sorted_buckets.sort_by_key(|bucket| bucket.0);
+        self.free_buckets = VecDeque::from(sorted_buckets);
+
+        // Clear the memory's bucket list
+        memory_buckets.clear();
+
+        // Reset the memory size to 0
+        self.memory_sizes_in_pages[id.0 as usize] = 0;
+
+        self.save_header();
+
+        bucket_count
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8], bucket_cache: &BucketCache) {
@@ -1109,4 +1196,139 @@ mod test {
             None
         );
     }
+
+    #[test]
+    fn memory_grows_without_manual_release() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init(mem.clone());
+        let initial_size = mem.size();
+
+        // Create first memory and allocate bucket 0
+        let memory_0 = mem_mgr.get(MemoryId::new(0));
+        memory_0.grow(BUCKET_SIZE_IN_PAGES);
+        memory_0.write(0, b"bucket_id_0");
+        let size_after_first = mem.size();
+
+        // Verify first allocation grew memory
+        assert_eq!(size_after_first, initial_size + BUCKET_SIZE_IN_PAGES);
+
+        // Create second memory WITHOUT releasing first - should allocate bucket 1
+        let memory_1 = mem_mgr.get(MemoryId::new(1));
+        memory_1.grow(BUCKET_SIZE_IN_PAGES);
+        memory_1.write(0, b"bucket_id_1");
+
+        // Verify memory grew again (no bucket reuse - new bucket allocated)
+        assert_eq!(mem.size(), size_after_first + BUCKET_SIZE_IN_PAGES);
+
+        // Verify both memories have their expected content (different buckets)
+        let mut buf = vec![0u8; 11];
+        memory_0.read(0, &mut buf);
+        assert_eq!(
+            &buf, b"bucket_id_0",
+            "Memory 0 should have bucket 0 content"
+        );
+        memory_1.read(0, &mut buf);
+        assert_eq!(
+            &buf, b"bucket_id_1",
+            "Memory 1 should have bucket 1 content"
+        );
+    }
+
+    #[test]
+    fn memory_reuses_buckets_with_manual_release() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init(mem.clone());
+
+        // Create first memory and allocate bucket 0
+        let memory_0 = mem_mgr.get(MemoryId::new(0));
+        memory_0.grow(BUCKET_SIZE_IN_PAGES);
+        memory_0.write(0, b"bucket_id_0");
+        let size_after_allocation = mem.size();
+
+        // Manually release first memory's buckets
+        let released_count = mem_mgr.release_virtual_memory_buckets(MemoryId::new(0));
+        assert_eq!(released_count, 1, "Should release exactly 1 bucket");
+
+        // Verify memory size didn't change (buckets marked free, not deallocated)
+        assert_eq!(mem.size(), size_after_allocation);
+
+        // Create second memory AFTER manual release - should reuse bucket 0
+        let memory_1 = mem_mgr.get(MemoryId::new(1));
+        memory_1.grow(BUCKET_SIZE_IN_PAGES);
+
+        // Verify memory did NOT grow (bucket reuse - no new allocation)
+        assert_eq!(
+            mem.size(),
+            size_after_allocation,
+            "Memory should not grow when reusing buckets"
+        );
+
+        // Verify bucket reuse by reading original content from bucket 0
+        let mut buf = vec![0u8; 11];
+        memory_1.read(0, &mut buf);
+        assert_eq!(
+            &buf, b"bucket_id_0",
+            "Memory 1 should see original bucket 0 content, proving reuse"
+        );
+    }
+
+    #[test]
+    fn free_buckets_reused_in_increasing_order() {
+        let mem_mgr = MemoryManager::init(make_memory());
+
+        // Allocate multiple buckets in sequence (0, 1, 2, 3, 4)
+        let memory_0 = mem_mgr.get(MemoryId::new(0));
+        let memory_1 = mem_mgr.get(MemoryId::new(1));
+
+        memory_0.grow(BUCKET_SIZE_IN_PAGES * 3); // allocates buckets 0, 1, 2
+        memory_1.grow(BUCKET_SIZE_IN_PAGES * 2); // allocates buckets 3, 4
+
+        // Write bucket identifiers to prove allocation order
+        memory_0.write(0, b"bucket_id_0");
+        memory_0.write(BUCKET_SIZE_IN_PAGES * WASM_PAGE_SIZE, b"bucket_id_1");
+        memory_0.write(BUCKET_SIZE_IN_PAGES * WASM_PAGE_SIZE * 2, b"bucket_id_2");
+        memory_1.write(0, b"bucket_id_3");
+        memory_1.write(BUCKET_SIZE_IN_PAGES * WASM_PAGE_SIZE, b"bucket_id_4");
+
+        // Release all buckets in reverse order to test sorting
+        let released_1 = mem_mgr.release_virtual_memory_buckets(MemoryId::new(1)); // releases 3, 4
+        let released_0 = mem_mgr.release_virtual_memory_buckets(MemoryId::new(0)); // releases 0, 1, 2
+        assert_eq!(released_1, 2, "Should release 2 buckets from memory 1");
+        assert_eq!(released_0, 3, "Should release 3 buckets from memory 0");
+
+        // Allocate new memories - should reuse buckets in increasing order (0, 1, then 2)
+        let memory_2 = mem_mgr.get(MemoryId::new(2));
+        let memory_3 = mem_mgr.get(MemoryId::new(3));
+        let memory_4 = mem_mgr.get(MemoryId::new(4));
+
+        memory_2.grow(BUCKET_SIZE_IN_PAGES); // should get bucket 0 (lowest available)
+        memory_3.grow(BUCKET_SIZE_IN_PAGES); // should get bucket 1 (next lowest)
+        memory_4.grow(BUCKET_SIZE_IN_PAGES); // should get bucket 2 (next lowest)
+
+        // Verify buckets were reused in increasing order by reading original content
+        let mut buf = vec![0u8; 11];
+        memory_2.read(0, &mut buf);
+        assert_eq!(
+            &buf, b"bucket_id_0",
+            "Memory 2 should reuse bucket 0 (lowest)"
+        );
+
+        memory_3.read(0, &mut buf);
+        assert_eq!(
+            &buf, b"bucket_id_1",
+            "Memory 3 should reuse bucket 1 (next lowest)"
+        );
+
+        memory_4.read(0, &mut buf);
+        assert_eq!(
+            &buf, b"bucket_id_2",
+            "Memory 4 should reuse bucket 2 (next lowest)"
+        );
+    }
 }
+
+#[cfg(test)]
+mod bucket_release_core_tests;
+
+#[cfg(test)]
+mod bucket_release_btreemap_tests;
