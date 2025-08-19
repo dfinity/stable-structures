@@ -130,11 +130,11 @@ const HEADER_RESERVED_BYTES: usize = 32;
 ///
 /// # Current Limitations & Safety Requirements
 ///
-/// - **Manual bucket release** - call `release_virtual_memory_buckets()` after dropping structures
-/// - **Structure invalidation** - original structures become invalid after bucket release
-/// - **Mandatory drop** - you MUST drop original structures BEFORE releasing buckets
+/// - **Manual memory reclamation** - call `reclaim_memory()` after dropping structures
+/// - **Structure invalidation** - original structures become invalid after memory reclamation
+/// - **Mandatory drop** - you MUST drop original structures BEFORE reclaiming memory
 /// - **No safety verification** - user discipline required to prevent data corruption
-/// - **Incorrect usage** - using structures after bucket release causes data corruption
+/// - **Incorrect usage** - using structures after memory reclamation causes data corruption
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
@@ -164,7 +164,7 @@ impl<M: Memory> MemoryManager<M> {
         }
     }
 
-    /// Releases buckets allocated to the specified virtual memory for reuse.
+    /// Reclaims memory allocated to the specified virtual memory for reuse.
     ///
     /// **CRITICAL SAFETY REQUIREMENT**: Before calling this method:
     /// 1. You MUST drop the original structure object first
@@ -176,15 +176,15 @@ impl<M: Memory> MemoryManager<M> {
     /// **Correct Usage Pattern:**
     /// ```rust,ignore
     /// drop(map);  // 1. MANDATORY: Drop the structure object first
-    /// let count = memory_manager.release_virtual_memory_buckets(memory_id);  // 2. Release buckets
+    /// let pages_reclaimed = memory_manager.reclaim_memory(memory_id);  // 2. Reclaim memory
     /// let new_map = BTreeMap::new(memory_manager.get(memory_id));  // 3. Create fresh structure
     /// ```
     ///
-    /// **DANGER**: Using the original structure after bucket release causes data corruption.
+    /// **DANGER**: Using the original structure after memory reclamation causes data corruption.
     ///
-    /// Returns the number of buckets released and added to the free pool (0 if none allocated).
-    pub fn release_virtual_memory_buckets(&self, id: MemoryId) -> usize {
-        self.inner.borrow_mut().release_virtual_memory_buckets(id)
+    /// Returns the number of pages reclaimed and made available for reuse (0 if none allocated).
+    pub fn reclaim_memory(&self, id: MemoryId) -> u64 {
+        self.inner.borrow_mut().reclaim_memory(id)
     }
 
     /// Returns the underlying memory.
@@ -439,7 +439,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         old_size as i64
     }
 
-    /// Releases buckets for the specified memory, marking them unallocated in stable storage
+    /// Reclaims memory for the specified virtual memory, marking buckets unallocated in stable storage
     /// and adding them to the free pool. Resets memory size to 0.
     ///
     /// **CRITICAL**: This invalidates any data structures using this memory ID.
@@ -447,8 +447,8 @@ impl<M: Memory> MemoryManagerInner<M> {
     /// 1. Original structure object is dropped BEFORE calling this
     /// 2. New structure is created if memory ID needs to be reused
     ///
-    /// Returns the number of buckets released and added to the free pool (0 if none allocated).
-    fn release_virtual_memory_buckets(&mut self, id: MemoryId) -> usize {
+    /// Returns the number of pages reclaimed and made available for reuse (0 if none allocated).
+    fn reclaim_memory(&mut self, id: MemoryId) -> u64 {
         let memory_buckets = &mut self.memory_buckets[id.0 as usize];
         let bucket_count = memory_buckets.len();
 
@@ -481,7 +481,8 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         self.save_header();
 
-        bucket_count
+        // Return pages reclaimed (bucket count * pages per bucket)
+        bucket_count as u64 * self.bucket_size_in_pages as u64
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8], bucket_cache: &BucketCache) {
@@ -1257,16 +1258,20 @@ mod test {
         let size_after_allocation = mem.size();
 
         // Manually release first memory's buckets
-        let released_count = mem_mgr.release_virtual_memory_buckets(MemoryId::new(0));
-        assert_eq!(released_count, 1, "Should release exactly 1 bucket");
+        let pages_reclaimed = mem_mgr.reclaim_memory(MemoryId::new(0));
+        assert_eq!(
+            pages_reclaimed, BUCKET_SIZE_IN_PAGES,
+            "Should reclaim exactly {} pages",
+            BUCKET_SIZE_IN_PAGES
+        );
 
-        // CRITICAL: Drop the memory_0 after bucket release as it's now invalid
+        // CRITICAL: Drop the memory_0 after memory reclamation as it's now invalid
         drop(memory_0);
 
         // Verify memory size didn't change (buckets marked free, not deallocated)
         assert_eq!(mem.size(), size_after_allocation);
 
-        // Create second memory AFTER manual release - should reuse bucket 0
+        // Create second memory AFTER manual memory reclamation - should reuse bucket 0
         let memory_1 = mem_mgr.get(MemoryId::new(1));
         memory_1.grow(BUCKET_SIZE_IN_PAGES);
 
@@ -1305,10 +1310,20 @@ mod test {
         memory_1.write(BUCKET_SIZE_IN_PAGES * WASM_PAGE_SIZE, b"bucket_id_4");
 
         // Release all buckets in reverse order to test sorting
-        let released_1 = mem_mgr.release_virtual_memory_buckets(MemoryId::new(1)); // releases 3, 4
-        let released_0 = mem_mgr.release_virtual_memory_buckets(MemoryId::new(0)); // releases 0, 1, 2
-        assert_eq!(released_1, 2, "Should release 2 buckets from memory 1");
-        assert_eq!(released_0, 3, "Should release 3 buckets from memory 0");
+        let pages_reclaimed_1 = mem_mgr.reclaim_memory(MemoryId::new(1)); // releases 3, 4
+        let pages_reclaimed_0 = mem_mgr.reclaim_memory(MemoryId::new(0)); // releases 0, 1, 2
+        assert_eq!(
+            pages_reclaimed_1,
+            BUCKET_SIZE_IN_PAGES * 2,
+            "Should reclaim {} pages from memory 1",
+            BUCKET_SIZE_IN_PAGES * 2
+        );
+        assert_eq!(
+            pages_reclaimed_0,
+            BUCKET_SIZE_IN_PAGES * 3,
+            "Should reclaim {} pages from memory 0",
+            BUCKET_SIZE_IN_PAGES * 3
+        );
 
         // Allocate new memories - should reuse buckets in increasing order (0, 1, then 2)
         let memory_2 = mem_mgr.get(MemoryId::new(2));

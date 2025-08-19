@@ -710,14 +710,14 @@ where
     // TODO: In next major release (v1.0), rename this method to `clear` to follow
     // standard Rust collection naming conventions.
     ///
-    /// # Safety Note for Bucket Release
-    /// If using manual bucket release via `MemoryManager::release_virtual_memory_buckets()`:
+    /// # Safety Note for Memory Reclamation
+    /// If using manual memory reclamation via `MemoryManager::reclaim_memory()`:
     /// 1. **MANDATORY**: Drop this BTreeMap object first (let it go out of scope)
-    /// 2. Call `release_virtual_memory_buckets()` on the memory manager
+    /// 2. Call `reclaim_memory()` on the memory manager
     /// 3. Create new structures as needed
     ///
-    /// Using this BTreeMap after bucket release causes data corruption.
-    /// Note: You can still call `clear_new()` if you need to clear data without bucket release.
+    /// Using this BTreeMap after memory reclamation causes data corruption.
+    /// Note: You can still call `clear_new()` if you need to clear data without memory reclamation.
     pub fn clear_new(&mut self) {
         self.root_addr = NULL;
         self.length = 0;

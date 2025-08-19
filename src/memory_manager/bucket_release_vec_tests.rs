@@ -1,17 +1,17 @@
-//! Migration scenario tests for Vec with bucket release.
+//! Migration scenario tests for Vec with memory reclamation.
 //!
 //! These tests demonstrate real-world migration patterns where users move data
-//! from one structure to another. They show how bucket release prevents memory
+//! from one structure to another. They show how memory reclamation prevents memory
 //! waste during common migration scenarios, and most importantly, demonstrate
 //! the data corruption bug and its safe usage solution for Vec structures.
 //!
 //! **CRITICAL SAFETY REQUIREMENTS**:
-//! All bucket release operations require mandatory Rust object drop BEFORE release.
-//! Using original data structures after bucket release causes data corruption.
+//! All memory reclamation operations require mandatory Rust object drop BEFORE reclamation.
+//! Using original data structures after memory reclamation causes data corruption.
 //! See MemoryManager documentation for proper usage patterns.
 //!
 //! **Vec-Specific Notes**:
-//! Vec doesn't have a clear() method. Since we drop the object before bucket release,
+//! Vec doesn't have a clear() method. Since we drop the object before memory reclamation,
 //! there's no need to clear the data first.
 
 use super::{MemoryId, MemoryManager};
@@ -75,15 +75,15 @@ fn migration_with_release_reuses_buckets() {
     }
     assert_eq!(vec_a_original.len(), 50);
 
-    // MANDATORY: Drop the Rust object before releasing buckets
+    // MANDATORY: Drop the Rust object before reclaiming memory
     drop(vec_a_original);
 
-    // Release the buckets after dropping the object
-    let released_buckets = mm.release_virtual_memory_buckets(a);
-    assert!(released_buckets > 0);
+    // Reclaim the memory after dropping the object
+    let pages_reclaimed = mm.reclaim_memory(a);
+    assert!(pages_reclaimed > 0);
     let stable_before = mock_stable_memory.size();
 
-    // Allocate in B → should reuse A's released buckets
+    // Allocate in B → should reuse A's reclaimed buckets
     let vec_b = StableVec::init(mm.get(b));
     for i in 0u64..50 {
         vec_b.push(&large_data(i + 100));
@@ -113,9 +113,9 @@ fn data_corruption_without_mandatory_drop() {
     // "Clear" by creating new instance, but keep vec_a alive (DANGEROUS!)
     let vec_a: StableVec<u64, _> = StableVec::new(mm.get(a));
     assert_eq!(vec_a.len(), 0);
-    mm.release_virtual_memory_buckets(a);
+    mm.reclaim_memory(a);
 
-    // Create Vec B - reuses A's released buckets
+    // Create Vec B - reuses A's reclaimed buckets
     let vec_b = StableVec::init(mm.get(b));
     vec_b.push(&2u64);
     assert_eq!(vec_b.get(0).unwrap(), 2u64);
@@ -167,14 +167,14 @@ fn safe_usage_with_mandatory_drop() {
     vec_a.push(&1u64);
     assert_eq!(vec_a.get(0).unwrap(), 1u64);
 
-    // MANDATORY: Drop the Rust object before releasing buckets
+    // MANDATORY: Drop the Rust object before reclaiming memory
     drop(vec_a);
 
-    // Release the buckets after dropping the object
-    let released_buckets = mm.release_virtual_memory_buckets(a);
-    assert!(released_buckets > 0);
+    // Reclaim the memory after dropping the object
+    let pages_reclaimed = mm.reclaim_memory(a);
+    assert!(pages_reclaimed > 0);
 
-    // Create Vec B - safely reuses A's released buckets
+    // Create Vec B - safely reuses A's reclaimed buckets
     let vec_b = StableVec::init(mm.get(b));
     vec_b.push(&2u64);
     assert_eq!(vec_b.get(0).unwrap(), 2u64);
