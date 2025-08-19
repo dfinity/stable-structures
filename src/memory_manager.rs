@@ -166,23 +166,18 @@ impl<M: Memory> MemoryManager<M> {
 
     /// Reclaims memory allocated to the specified virtual memory for reuse.
     ///
-    /// **CRITICAL SAFETY REQUIREMENT**: Before calling this method:
-    /// 1. You MUST drop the original structure object first
+    /// **CRITICAL SAFETY REQUIREMENT**: Drop the original structure object first!
     ///
-    /// **After calling this method**:
-    /// 2. The data structure using this memory ID becomes INVALID
-    /// 3. You MUST create a new structure if you want to reuse the memory ID
-    ///
-    /// **Correct Usage Pattern:**
+    /// **Usage Pattern:**
     /// ```rust,ignore
-    /// drop(map);  // 1. MANDATORY: Drop the structure object first
-    /// let pages_reclaimed = memory_manager.reclaim_memory(memory_id);  // 2. Reclaim memory
-    /// let new_map = BTreeMap::new(memory_manager.get(memory_id));  // 3. Create fresh structure
+    /// drop(map);                                                   // 1. Drop the structure object first
+    /// let pages = memory_manager.reclaim_memory(memory_id);        // 2. Reclaim memory
+    /// let new_map = BTreeMap::new(memory_manager.get(memory_id));  // 3. Create new structure
     /// ```
     ///
-    /// **DANGER**: Using the original structure after memory reclamation causes data corruption.
+    /// **DANGER**: Using the original structure after reclamation causes data corruption.
     ///
-    /// Returns the number of pages reclaimed and made available for reuse (0 if none allocated).
+    /// Returns the number of pages reclaimed (0 if none allocated).
     pub fn reclaim_memory(&self, id: MemoryId) -> u64 {
         self.inner.borrow_mut().reclaim_memory(id)
     }
@@ -439,15 +434,13 @@ impl<M: Memory> MemoryManagerInner<M> {
         old_size as i64
     }
 
-    /// Reclaims memory for the specified virtual memory, marking buckets unallocated in stable storage
+    /// Reclaims memory for the specified virtual memory, marking buckets unallocated
     /// and adding them to the free pool. Resets memory size to 0.
     ///
     /// **CRITICAL**: This invalidates any data structures using this memory ID.
-    /// Caller must ensure:
-    /// 1. Original structure object is dropped BEFORE calling this
-    /// 2. New structure is created if memory ID needs to be reused
+    /// Drop the original structure object BEFORE calling this method.
     ///
-    /// Returns the number of pages reclaimed and made available for reuse (0 if none allocated).
+    /// Returns the number of pages reclaimed (0 if none allocated).
     fn reclaim_memory(&mut self, id: MemoryId) -> u64 {
         let memory_buckets = &mut self.memory_buckets[id.0 as usize];
         let bucket_count = memory_buckets.len();
@@ -1357,10 +1350,10 @@ mod test {
 }
 
 #[cfg(test)]
-mod bucket_release_core_tests;
+mod memory_reclaim_core_tests;
 
 #[cfg(test)]
-mod bucket_release_btreemap_tests;
+mod memory_reclaim_btreemap_tests;
 
 #[cfg(test)]
-mod bucket_release_vec_tests;
+mod memory_reclaim_vec_tests;
