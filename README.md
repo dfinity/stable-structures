@@ -89,8 +89,9 @@ use ic_stable_structures::{
    BTreeMap, DefaultMemoryImpl,
 };
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
-let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(1)));
+let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
+let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
 
 map_a.insert(1, b'A');
 map_b.insert(1, b'B');

@@ -22,22 +22,22 @@
 //! let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
 //!
 //! // Create different memories, each with a unique ID.
-//! let memory_0 = mem_mgr.get(MemoryId::new(0));
-//! let memory_1 = mem_mgr.get(MemoryId::new(1));
+//! let memory_a = mem_mgr.get(MemoryId::new(0));
+//! let memory_b = mem_mgr.get(MemoryId::new(1));
 //!
 //! // Each memory can be used independently.
-//! memory_0.grow(1);
-//! memory_0.write(0, &[1, 2, 3]);
+//! memory_a.grow(1);
+//! memory_a.write(0, &[1, 2, 3]);
 //!
-//! memory_1.grow(1);
-//! memory_1.write(0, &[4, 5, 6]);
+//! memory_b.grow(1);
+//! memory_b.write(0, &[4, 5, 6]);
 //!
 //! let mut bytes = vec![0; 3];
-//! memory_0.read(0, &mut bytes);
+//! memory_a.read(0, &mut bytes);
 //! assert_eq!(bytes, vec![1, 2, 3]);
 //!
 //! let mut bytes = vec![0; 3];
-//! memory_1.read(0, &mut bytes);
+//! memory_b.read(0, &mut bytes);
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 use crate::{
@@ -170,9 +170,9 @@ impl<M: Memory> MemoryManager<M> {
     ///
     /// **Usage Pattern:**
     /// ```rust,ignore
-    /// drop(map);                                                   // 1. Drop the structure object first
-    /// let pages = memory_manager.reclaim_memory(memory_id);        // 2. Reclaim memory
-    /// let new_map = BTreeMap::new(memory_manager.get(memory_id));  // 3. Create new structure
+    /// drop(map);                                              // 1. Drop the structure object first
+    /// let pages = mem_mgr.reclaim_memory(memory_id);          // 2. Reclaim memory
+    /// let new_map = BTreeMap::new(mem_mgr.get(memory_id));    // 3. Create new structure
     /// ```
     ///
     /// **DANGER**: Using the original structure after reclamation causes data corruption.
