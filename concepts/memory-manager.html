@@ -178,8 +178,9 @@ When used with stable memory, this allows you to maintain up to 255 separate sta
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
 
 // Create two separate BTreeMaps, each with its own virtual memory
-let mut map_a: BTreeMap&lt;u64, u8, _&gt; = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
-let mut map_b: BTreeMap&lt;u64, u8, _&gt; = BTreeMap::init(mem_mgr.get(MemoryId::new(1)));
+let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
+let mut map_a: BTreeMap&lt;u64, u8, _&gt; = BTreeMap::init(mem_mgr.get(mem_id_a));
+let mut map_b: BTreeMap&lt;u64, u8, _&gt; = BTreeMap::init(mem_mgr.get(mem_id_b));
 
 // Demonstrate independent operation of the two maps
 map_a.insert(1, b'A');
