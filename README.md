@@ -60,8 +60,8 @@ The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which map
 
 ### Memory Isolation Requirement
 
-Note that **stable structures cannot share memories.**
-Each memory must belong to only one stable structure.
+> **⚠️ CRITICAL:** Stable structures **MUST NOT** share memories!
+> Each memory must belong to only one stable structure.
 For example, this fails when run in a canister:
 
 ```rust,ignore
