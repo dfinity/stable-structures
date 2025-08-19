@@ -28,8 +28,8 @@ fn large_data(id: u64) -> [u8; 1024] {
 }
 
 #[test]
-fn migration_without_release_wastes_buckets() {
-    // Scenario: Populate A → Clear A without bucket release → Populate B
+fn migration_without_reclaim_wastes_buckets() {
+    // Scenario: Populate A → Clear A without memory reclamation → Populate B
     // Result: B cannot reuse A's buckets, causing memory waste (growth)
     let (a, b) = (MemoryId::new(0), MemoryId::new(1));
     let mock_stable_memory = VectorMemory::default();
@@ -47,7 +47,7 @@ fn migration_without_release_wastes_buckets() {
     assert_eq!(vec_a.len(), 0);
     let stable_before = mock_stable_memory.size();
 
-    // Allocate in B → should need new buckets since A's aren't released
+    // Allocate in B → should need new buckets since A's aren't reclaimed
     let vec_b = StableVec::init(mm.get(b));
     for i in 0u64..50 {
         vec_b.push(&large_data(i + 100));
@@ -61,9 +61,9 @@ fn migration_without_release_wastes_buckets() {
 }
 
 #[test]
-fn migration_with_release_reuses_buckets() {
-    // Scenario: Populate A → Clear A with bucket release → Populate B
-    // Result: B reuses A's released buckets, preventing memory waste (no growth)
+fn migration_with_reclaim_reuses_buckets() {
+    // Scenario: Populate A → Clear A with memory reclamation → Populate B
+    // Result: B reuses A's reclaimed buckets, preventing memory waste (no growth)
     let (a, b) = (MemoryId::new(0), MemoryId::new(1));
     let mock_stable_memory = VectorMemory::default();
     let mm = MemoryManager::init(mock_stable_memory.clone());
@@ -98,8 +98,8 @@ fn migration_with_release_reuses_buckets() {
     );
 }
 
-/// **DANGER**: This test demonstrates data corruption from unsafe bucket release usage.
-/// This shows what happens when you DON'T drop the original object after bucket release.
+/// **DANGER**: This test demonstrates data corruption from unsafe memory reclamation usage.
+/// This shows what happens when you DON'T drop the original object after memory reclamation.
 #[test]
 fn data_corruption_without_mandatory_drop() {
     let (a, b) = (MemoryId::new(0), MemoryId::new(1));
@@ -143,7 +143,7 @@ fn data_corruption_without_mandatory_drop() {
             // If it succeeds, check if vec_b can see the new data (shared allocation)
             if !vec_a.is_empty() && vec_b.len() > vec_a.len() {
                 // Check if data appears in unexpected places
-                println!("CORRUPTION: Both vecs operating on the same released memory space");
+                println!("CORRUPTION: Both vecs operating on the same reclaimed memory space");
             }
         }
         Err(_) => {
@@ -152,10 +152,10 @@ fn data_corruption_without_mandatory_drop() {
         }
     }
 
-    // This test proves why objects MUST be dropped after bucket release
+    // This test proves why objects MUST be dropped after memory reclamation
 }
 
-/// **SAFE**: This test demonstrates the correct way to use bucket release.
+/// **SAFE**: This test demonstrates the correct way to use memory reclamation.
 /// This shows how mandatory drop prevents data corruption.
 #[test]
 fn safe_usage_with_mandatory_drop() {

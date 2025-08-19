@@ -49,13 +49,13 @@ fn double_reclaim_returns_zero_second_time() {
     // Allocate buckets and clear structure
     allocate_buckets_via_btreemap(&mm, memory_id, 50);
 
-    // First release should return non-zero
-    let first_release = mm.reclaim_memory(memory_id);
-    assert!(first_release > 0, "First reclaim should return pages > 0");
+    // First reclamation should return non-zero
+    let first_reclaim = mm.reclaim_memory(memory_id);
+    assert!(first_reclaim > 0, "First reclaim should return pages > 0");
 
-    // Second release should return 0 (nothing left to release)
-    let second_release = mm.reclaim_memory(memory_id);
-    assert_eq!(second_release, 0, "Second reclaim should return 0 pages");
+    // Second reclamation should return 0 (nothing left to reclaim)
+    let second_reclaim = mm.reclaim_memory(memory_id);
+    assert_eq!(second_reclaim, 0, "Second reclaim should return 0 pages");
 }
 
 #[test]

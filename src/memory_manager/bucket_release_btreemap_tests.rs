@@ -42,7 +42,7 @@ fn migration_without_reclaim_wastes_buckets() {
     drop(a_map);
     let stable_before = mock_stable_memory.size();
 
-    // Allocate in B → should need new buckets since A's aren't released
+    // Allocate in B → should need new buckets since A's aren't reclaimed
     let mut b_map = BTreeMap::init(mm.get(b));
     for i in 0u64..50 {
         b_map.insert(i, large_value(i + 100));
@@ -55,9 +55,9 @@ fn migration_without_reclaim_wastes_buckets() {
 }
 
 #[test]
-fn migration_with_release_reuses_buckets() {
-    // Scenario: Populate A → Drop A with bucket release → Populate B
-    // Result: B reuses A's released buckets, preventing memory waste (no growth)
+fn migration_with_reclaim_reuses_buckets() {
+    // Scenario: Populate A → Drop A with memory reclamation → Populate B
+    // Result: B reuses A's reclaimed buckets, preventing memory waste (no growth)
     let (a, b) = (MemoryId::new(0), MemoryId::new(1));
     let mock_stable_memory = VectorMemory::default();
     let mm = MemoryManager::init(mock_stable_memory.clone());
@@ -92,8 +92,8 @@ fn migration_with_release_reuses_buckets() {
     );
 }
 
-/// **DANGER**: This test demonstrates data corruption from unsafe bucket release usage.
-/// This shows what happens when you DON'T drop the original object before bucket release.
+/// **DANGER**: This test demonstrates data corruption from unsafe memory reclamation usage.
+/// This shows what happens when you DON'T drop the original object before memory reclamation.
 #[test]
 fn data_corruption_without_mandatory_drop() {
     let (a, b) = (MemoryId::new(0), MemoryId::new(1));
@@ -135,7 +135,7 @@ fn data_corruption_without_mandatory_drop() {
         Ok(_) => {
             // If it succeeds, check if map_b can see the new data (shared allocation)
             if map_b.get(&3u64).is_some() {
-                println!("CORRUPTION: Both maps operating on the same released memory space");
+                println!("CORRUPTION: Both maps operating on the same reclaimed memory space");
             }
         }
         Err(_) => {
@@ -144,10 +144,10 @@ fn data_corruption_without_mandatory_drop() {
         }
     }
 
-    // This test proves why objects MUST be dropped before bucket release
+    // This test proves why objects MUST be dropped before memory reclamation
 }
 
-/// **SAFE**: This test demonstrates the correct way to use bucket release.
+/// **SAFE**: This test demonstrates the correct way to use memory reclamation.
 /// This shows how mandatory drop prevents data corruption.
 #[test]
 fn safe_usage_with_mandatory_drop() {

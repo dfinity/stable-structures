@@ -457,18 +457,18 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         // Mark all buckets as unallocated in stable storage and collect them
-        let mut released_buckets = Vec::new();
+        let mut reclaimed_buckets = Vec::new();
         for &bucket_id in memory_buckets.iter() {
             write(
                 &self.memory,
                 bucket_allocations_address(bucket_id).get(),
                 &[UNALLOCATED_BUCKET_MARKER],
             );
-            released_buckets.push(bucket_id);
+            reclaimed_buckets.push(bucket_id);
         }
 
-        // Add released buckets to free pool and sort to maintain increasing order
-        self.free_buckets.extend(released_buckets);
+        // Add reclaimed buckets to free pool and sort to maintain increasing order
+        self.free_buckets.extend(reclaimed_buckets);
         let mut sorted_buckets: Vec<_> = self.free_buckets.drain(..).collect();
         sorted_buckets.sort_by_key(|bucket| bucket.0);
         self.free_buckets = VecDeque::from(sorted_buckets);
@@ -1210,7 +1210,7 @@ mod test {
     }
 
     #[test]
-    fn memory_grows_without_manual_release() {
+    fn memory_grows_without_manual_reclaim() {
         let mem = make_memory();
         let mem_mgr = MemoryManager::init(mem.clone());
         let initial_size = mem.size();
@@ -1224,7 +1224,7 @@ mod test {
         // Verify first allocation grew memory
         assert_eq!(size_after_first, initial_size + BUCKET_SIZE_IN_PAGES);
 
-        // Create second memory WITHOUT releasing first - should allocate bucket 1
+        // Create second memory WITHOUT reclaiming first - should allocate bucket 1
         let memory_1 = mem_mgr.get(MemoryId::new(1));
         memory_1.grow(BUCKET_SIZE_IN_PAGES);
         memory_1.write(0, b"bucket_id_1");
@@ -1247,7 +1247,7 @@ mod test {
     }
 
     #[test]
-    fn memory_reuses_buckets_with_manual_release() {
+    fn memory_reuses_buckets_with_manual_reclaim() {
         let mem = make_memory();
         let mem_mgr = MemoryManager::init(mem.clone());
 
@@ -1257,7 +1257,7 @@ mod test {
         memory_0.write(0, b"bucket_id_0");
         let size_after_allocation = mem.size();
 
-        // Manually release first memory's buckets
+        // Manually reclaim first memory
         let pages_reclaimed = mem_mgr.reclaim_memory(MemoryId::new(0));
         assert_eq!(
             pages_reclaimed, BUCKET_SIZE_IN_PAGES,
@@ -1309,9 +1309,9 @@ mod test {
         memory_1.write(0, b"bucket_id_3");
         memory_1.write(BUCKET_SIZE_IN_PAGES * WASM_PAGE_SIZE, b"bucket_id_4");
 
-        // Release all buckets in reverse order to test sorting
-        let pages_reclaimed_1 = mem_mgr.reclaim_memory(MemoryId::new(1)); // releases 3, 4
-        let pages_reclaimed_0 = mem_mgr.reclaim_memory(MemoryId::new(0)); // releases 0, 1, 2
+        // Reclaim all buckets in reverse order to test sorting
+        let pages_reclaimed_1 = mem_mgr.reclaim_memory(MemoryId::new(1)); // reclaims 3, 4
+        let pages_reclaimed_0 = mem_mgr.reclaim_memory(MemoryId::new(0)); // reclaims 0, 1, 2
         assert_eq!(
             pages_reclaimed_1,
             BUCKET_SIZE_IN_PAGES * 2,
