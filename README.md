@@ -84,7 +84,8 @@ let mut map_b: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::defa
 
 map_a.insert(1, "value_a".to_string());
 map_b.insert(1, "value_b".to_string());
-assert_eq!(map_a.get(&1), Some("value_a".to_string())); // This assertion fails.
+assert_eq!(map_a.get(&1), Some("value_a".to_string())); // ❌ FAILS: Returns "value_b" due to shared memory!
+assert_eq!(map_b.get(&1), Some("value_b".to_string())); // ✅ Succeeds, but corrupted map_a
 ```
 
 It fails because both `map_a` and `map_b` are using the same stable memory under the hood, and so changes in `map_a` end up changing or corrupting `map_b`.
@@ -103,7 +104,8 @@ let mut map_b: BTreeMap<u64, String, _> = BTreeMap::init(mem_mgr.get(MemoryId::n
 
 map_a.insert(1, "value_a".to_string());
 map_b.insert(1, "value_b".to_string());
-assert_eq!(map_a.get(&1), Some("value_a".to_string())); // Succeeds, as expected.
+assert_eq!(map_a.get(&1), Some("value_a".to_string())); // ✅ Succeeds: Each map has its own memory
+assert_eq!(map_b.get(&1), Some("value_b".to_string())); // ✅ Succeeds: No data corruption
 ```
 
 ## Example Canister
