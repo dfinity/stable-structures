@@ -95,9 +95,8 @@ assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds: No data corruption
 
 ### Memory Reclamation
 
-Virtual memories remain assigned to their memory IDs even after the data structure is dropped. This can cause memory waste during data migration scenarios. For example, when migrating from structure A to structure B using different memory IDs, the underlying memory grows 2x even though only one structure contains data.
+Virtual memories remain assigned to their memory IDs even after structures are dropped, which can waste memory during data migrations. For example:
 
-**Without memory reclamation (memory waste):**
 ```rust
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
@@ -105,42 +104,23 @@ use ic_stable_structures::{
 };
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
 
-// Structure A uses memory
+// Without reclamation: migrating A→B doubles memory usage
 let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
 map_a.insert(1, b'A');
-
-// Migrate data and create structure B with different ID
 let data = map_a.get(&1);
-drop(map_a); // A's memory remains allocated to ID 0
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(1))); // Allocates NEW memory
-map_b.insert(1, data.unwrap());
-// Result: 2x memory usage (A's unused memory + B's new memory)
-```
+drop(map_a); // Memory stays allocated to ID 0
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(1))); // Uses NEW memory
 
-**With memory reclamation (memory reuse):**
-```rust
-use ic_stable_structures::{
-    memory_manager::{MemoryId, MemoryManager},
-    BTreeMap, DefaultMemoryImpl,
-};
-let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
-
-// Structure A uses memory
+// With reclamation: B reuses A's memory
 let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
 map_a.insert(1, b'A');
-
-// Migrate data, drop structure, and reclaim memory
 let data = map_a.get(&1);
 drop(map_a);
-mem_mgr.reclaim_memory(MemoryId::new(0)); // Free A's memory for reuse
-
-// Structure B reuses A's memory
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0))); // Reuses A's memory
-map_b.insert(1, data.unwrap());
-// Result: Same memory usage (B reuses A's memory)
+mem_mgr.reclaim_memory(MemoryId::new(0)); // Free memory for reuse
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0))); // Reuses memory
 ```
 
-**Important**: Always ensure the original structure is dropped before calling `reclaim_memory`.
+**Important**: Always drop the original structure before calling `reclaim_memory`.
 
 ## Example Canister
 
