@@ -170,9 +170,9 @@ impl<M: Memory> MemoryManager<M> {
     ///
     /// **Usage Pattern:**
     /// ```rust,ignore
-    /// drop(map);                                                   // 1. Drop the structure object first
-    /// let pages = memory_manager.reclaim_memory(memory_id);        // 2. Reclaim memory
-    /// let new_map = BTreeMap::new(memory_manager.get(memory_id));  // 3. Create new structure
+    /// drop(map);                                              // 1. Drop the structure object first
+    /// let pages = mem_mgr.reclaim_memory(memory_id);          // 2. Reclaim memory
+    /// let new_map = BTreeMap::new(mem_mgr.get(memory_id));    // 3. Create new structure
     /// ```
     ///
     /// **DANGER**: Using the original structure after reclamation causes data corruption.
