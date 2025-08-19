@@ -79,13 +79,13 @@ For example, this fails when run in a canister:
 
 ```rust,ignore
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
-let mut map_a: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
-let mut map_b: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
+let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(DefaultMemoryImpl::default());
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(DefaultMemoryImpl::default());
 
-map_a.insert(1, "value_a".to_string());
-map_b.insert(1, "value_b".to_string());
-assert_eq!(map_a.get(&1), Some("value_a".to_string())); // ❌ FAILS: Returns "value_b" due to shared memory!
-assert_eq!(map_b.get(&1), Some("value_b".to_string())); // ✅ Succeeds, but corrupted map_a
+map_a.insert(1, b'A');
+map_b.insert(1, b'B');
+assert_eq!(map_a.get(&1), Some(b'A')); // ❌ FAILS: Returns b'B' due to shared memory!
+assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds, but corrupted map_a
 ```
 
 It fails because both `map_a` and `map_b` are using the same stable memory under the hood, and so changes in `map_a` end up changing or corrupting `map_b`.
@@ -99,13 +99,13 @@ use ic_stable_structures::{
    BTreeMap, DefaultMemoryImpl,
 };
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
-let mut map_a: BTreeMap<u64, String, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
-let mut map_b: BTreeMap<u64, String, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(1)));
+let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(1)));
 
-map_a.insert(1, "value_a".to_string());
-map_b.insert(1, "value_b".to_string());
-assert_eq!(map_a.get(&1), Some("value_a".to_string())); // ✅ Succeeds: Each map has its own memory
-assert_eq!(map_b.get(&1), Some("value_b".to_string())); // ✅ Succeeds: No data corruption
+map_a.insert(1, b'A');
+map_b.insert(1, b'B');
+assert_eq!(map_a.get(&1), Some(b'A')); // ✅ Succeeds: Each map has its own memory
+assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds: No data corruption
 ```
 
 ## Example Canister
