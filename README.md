@@ -76,7 +76,7 @@ assert_eq!(map_a.get(&1), Some(b'A')); // ❌ FAILS: Returns b'B' due to shared 
 assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds, but corrupted map_a
 ```
 
-It fails because both `map_a` and `map_b` are using the same stable memory under the hood, and so changes in `map_a` end up changing or corrupting `map_b`.
+It fails because both `map_a` and `map_b` are using the same stable memory under the hood, and so changes in `map_b` end up changing or corrupting `map_a`.
 
 ### Using MemoryManager
 
