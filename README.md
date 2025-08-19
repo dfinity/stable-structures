@@ -58,21 +58,6 @@ This includes stable memory, a vector ([VectorMemory]), or even a flat file ([Fi
 
 The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which maps to stable memory when used in a canister and to a [VectorMemory] otherwise.
 
-### Example: BTreeSet
-
-The `BTreeSet` is a stable set implementation based on a B-Tree. It allows efficient insertion, deletion, and lookup of unique elements.
-
-```rust
-use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
-let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
-
-set.insert(42);
-assert!(set.contains(&42));
-assert_eq!(set.pop_first(), Some(42));
-assert!(set.is_empty());
-```
-
-
 Note that **stable structures cannot share memories.**
 Each memory must belong to only one stable structure.
 For example, this fails when run in a canister:
@@ -107,6 +92,47 @@ map_b.insert(1, b'B');
 assert_eq!(map_a.get(&1), Some(b'A')); // ✅ Succeeds: Each map has its own memory
 assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds: No data corruption
 ```
+
+### Memory Reclamation
+
+Virtual memories remain assigned to their memory IDs even after the data structure is dropped. This can cause memory waste during data migration scenarios. For example, when migrating from structure A to structure B using different memory IDs, the underlying memory grows 2x even though only one structure contains data.
+
+**Without memory reclamation (memory waste):**
+```rust
+let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+
+// Structure A uses memory
+let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
+map_a.insert(1, b'A');
+
+// Migrate data and create structure B with different ID
+let data = map_a.get(&1);
+drop(map_a); // A's memory remains allocated to ID 0
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(1))); // Allocates NEW memory
+map_b.insert(1, data.unwrap());
+// Result: 2x memory usage (A's unused memory + B's new memory)
+```
+
+**With memory reclamation (memory reuse):**
+```rust
+let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+
+// Structure A uses memory
+let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
+map_a.insert(1, b'A');
+
+// Migrate data, drop structure, and reclaim memory
+let data = map_a.get(&1);
+drop(map_a);
+mem_mgr.reclaim_memory(MemoryId::new(0)); // Free A's memory for reuse
+
+// Structure B reuses A's memory
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0))); // Reuses A's memory
+map_b.insert(1, data.unwrap());
+// Result: Same memory usage (B reuses A's memory)
+```
+
+**Important**: Always ensure the original structure is dropped before calling `reclaim_memory`.
 
 ## Example Canister
 
