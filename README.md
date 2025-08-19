@@ -40,9 +40,9 @@ Stable structures are able to work directly in stable memory because each data s
 its own memory.
 When initializing a stable structure, a memory is provided that the data structure can use to store its data.
 
-Here's a basic example:
+### Basic Usage
 
-### Example: BTreeMap
+Here's a basic example:
 
 ```rust
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
@@ -57,6 +57,8 @@ backend that implements this trait.
 This includes stable memory, a vector ([VectorMemory]), or even a flat file ([FileMemory]).
 
 The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which maps to stable memory when used in a canister and to a [VectorMemory] otherwise.
+
+### Memory Isolation Requirement
 
 Note that **stable structures cannot share memories.**
 Each memory must belong to only one stable structure.
@@ -74,6 +76,8 @@ assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds, but corrupted map_a
 ```
 
 It fails because both `map_a` and `map_b` are using the same stable memory under the hood, and so changes in `map_a` end up changing or corrupting `map_b`.
+
+### Using MemoryManager
 
 To address this issue, we use the [MemoryManager](memory_manager::MemoryManager), which takes a single memory and creates up to 255 virtual memories for our use.
 Here's the above failing example, but fixed:
