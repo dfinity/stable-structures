@@ -104,31 +104,35 @@ use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
     BTreeMap, DefaultMemoryImpl,
 };
+
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
 let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
 
-// Scenario 1: WITHOUT reclamation - doubles memory usage
+// ========================================
+// Scenario 1: WITHOUT reclamation
+// ========================================
 let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
-map_a.insert(1, b'A'); // A is populated with data
-let data = map_a.get(&1); // Extract data for migration
-map_a.clear_new(); // A is now empty
-drop(map_a); // but still holds allocated memory, even after drop.
+map_a.insert(1, b'A');              // Populate map A with data
+let data = map_a.get(&1);           // Extract data for migration
+map_a.clear_new();                  // A is now empty
+drop(map_a);                        // Memory stays allocated to mem_id_a
 
 let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
-map_b.insert(1, data.unwrap()); // B gets new memory allocation
-// Result: 2x memory usage (A's unused memory + B's new memory)
+map_b.insert(1, data.unwrap());     // B allocates NEW memory
+                                    // Result: 2x memory usage
 
-// Scenario 2: WITH reclamation - reuses memory efficiently
+// ========================================
+// Scenario 2: WITH reclamation
+// ========================================
 let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
-map_a.insert(1, b'A'); // A is populated with data
-let data = map_a.get(&1); // Extract data for migration
-map_a.clear_new(); // A is now empty
-drop(map_a); // Drop A completely
-mem_mgr.reclaim_memory(mem_id_a); // Free A's memory buckets for reuse
+map_a.insert(1, b'A');              // Populate map A with data
+let data = map_a.get(&1);           // Extract data for migration
+drop(map_a);                        // Drop A completely
+mem_mgr.reclaim_memory(mem_id_a);   // Free A's memory buckets for reuse
 
 let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
-map_b.insert(1, data.unwrap()); // B reuses A's reclaimed memory buckets
-// Result: 1x memory usage (B reuses A's freed memory)
+map_b.insert(1, data.unwrap());     // B reuses A's reclaimed memory buckets
+                                    // Result: 1x memory usage
 ```
 
 **Important**: Always drop the original structure before calling `reclaim_memory`.
