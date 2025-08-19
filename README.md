@@ -95,7 +95,9 @@ assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds: No data corruption
 
 ### Memory Reclamation
 
-Virtual memories remain assigned to their memory IDs even after structures are dropped, which can waste memory during data migrations. For example:
+During data migration scenarios, you often need to create a new data structure (B) and populate it with data from an existing structure (A). Without memory reclamation, this process doubles memory usage even after A is no longer needed.
+
+Consider this migration scenario:
 
 ```rust
 use ic_stable_structures::{
@@ -103,21 +105,30 @@ use ic_stable_structures::{
     BTreeMap, DefaultMemoryImpl,
 };
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
 
-// Without reclamation: migrating A→B doubles memory usage
-let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
-map_a.insert(1, b'A');
-let data = map_a.get(&1);
-drop(map_a); // Memory stays allocated to ID 0
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(1))); // Uses NEW memory
+// Scenario 1: WITHOUT reclamation - doubles memory usage
+let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
+map_a.insert(1, b'A'); // A is populated with data
+let data = map_a.get(&1); // Extract data for migration
+map_a.clear_new(); // A is now empty
+drop(map_a); // but still holds allocated memory, even after drop.
 
-// With reclamation: B reuses A's memory
-let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
-map_a.insert(1, b'A');
-let data = map_a.get(&1);
-drop(map_a);
-mem_mgr.reclaim_memory(MemoryId::new(0)); // Free memory for reuse
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0))); // Reuses memory
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
+map_b.insert(1, data.unwrap()); // B gets new memory allocation
+// Result: 2x memory usage (A's unused memory + B's new memory)
+
+// Scenario 2: WITH reclamation - reuses memory efficiently
+let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
+map_a.insert(1, b'A'); // A is populated with data
+let data = map_a.get(&1); // Extract data for migration
+map_a.clear_new(); // A is now empty
+drop(map_a); // Drop A completely
+mem_mgr.reclaim_memory(mem_id_a); // Free A's memory buckets for reuse
+
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
+map_b.insert(1, data.unwrap()); // B reuses A's reclaimed memory buckets
+// Result: 1x memory usage (B reuses A's freed memory)
 ```
 
 **Important**: Always drop the original structure before calling `reclaim_memory`.
