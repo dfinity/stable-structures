@@ -40,7 +40,7 @@ Stable structures are able to work directly in stable memory because each data s
 its own memory.
 When initializing a stable structure, a memory is provided that the data structure can use to store its data.
 
-Here are some basic examples:
+Here's a basic example:
 
 ### Example: BTreeMap
 
@@ -75,8 +75,8 @@ assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds, but corrupted map_a
 
 It fails because both `map_a` and `map_b` are using the same stable memory under the hood, and so changes in `map_a` end up changing or corrupting `map_b`.
 
-To address this issue, we make use of the [MemoryManager](memory_manager::MemoryManager), which takes a single memory and creates up to 255 virtual memories for our disposal.
-Here's the above failing example, but fixed by using the [MemoryManager](memory_manager::MemoryManager):
+To address this issue, we use the [MemoryManager](memory_manager::MemoryManager), which takes a single memory and creates up to 255 virtual memories for our use.
+Here's the above failing example, but fixed:
 
 ```rust
 use ic_stable_structures::{
@@ -99,6 +99,10 @@ Virtual memories remain assigned to their memory IDs even after the data structu
 
 **Without memory reclamation (memory waste):**
 ```rust
+use ic_stable_structures::{
+    memory_manager::{MemoryId, MemoryManager},
+    BTreeMap, DefaultMemoryImpl,
+};
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
 
 // Structure A uses memory
@@ -115,6 +119,10 @@ map_b.insert(1, data.unwrap());
 
 **With memory reclamation (memory reuse):**
 ```rust
+use ic_stable_structures::{
+    memory_manager::{MemoryId, MemoryManager},
+    BTreeMap, DefaultMemoryImpl,
+};
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
 
 // Structure A uses memory
@@ -144,7 +152,7 @@ Dependencies:
 [dependencies]
 ic-cdk = "0.18.3"
 ic-cdk-macros = "0.18.3"
-ic-stable-structures = "0.5.6"
+ic-stable-structures = "0.7.0"
 ```
 
 Code:
@@ -185,19 +193,19 @@ fn insert(key: u64, value: String) -> Option<String> {
 
 ### More Examples
 
-- [Basic Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/basic_example) (the one above)
+- [Basic Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/basic_example): Simple usage patterns
 - [Quickstart Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/quick_start): Ideal as a template when developing a new canister
 - [Custom Types Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/custom_types_example): Showcases storing your own custom types
 
 ## Combined Persistence
 
-If your project exclusively relies on stable structures, the memory can expand in size without the requirement of `pre_upgrade`/`post_upgrade` hooks.
+If your project uses only stable structures, memory can expand in size without requiring `pre_upgrade`/`post_upgrade` hooks.
 
-However, it's important to note that if you also intend to perform serialization/deserialization of the heap data, utilizing the memory manager becomes necessary. To effectively combine both approaches, refer to the [Quickstart Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/quick_start) for guidance.
+However, if you also need to serialize/deserialize heap data, you must use the memory manager to avoid conflicts. To combine both approaches effectively, refer to the [Quickstart Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/quick_start) for guidance.
 
 ## Fuzzing
 
-Stable structures requires strong guarantees to work reliably and scale over millions of operations. To that extent, we use fuzzing to emulate such operations on the available data structures.
+Stable structures require strong guarantees to work reliably and scale over millions of operations. To that extent, we use fuzzing to emulate such operations on the available data structures.
 
 To run a fuzzer locally, 
 ```sh
