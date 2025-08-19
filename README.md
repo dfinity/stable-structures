@@ -62,6 +62,7 @@ The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which map
 
 > **⚠️ CRITICAL:** Stable structures **MUST NOT** share memories!
 > Each memory must belong to only one stable structure.
+
 For example, this fails when run in a canister:
 
 ```rust,ignore
