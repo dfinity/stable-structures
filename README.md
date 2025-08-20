@@ -108,10 +108,11 @@ Consider this migration scenario:
 ```rust
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
-    BTreeMap, DefaultMemoryImpl,
+    BTreeMap, DefaultMemoryImpl, Memory,
 };
 
-let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+let mem = DefaultMemoryImpl::default();
+let mem_mgr = MemoryManager::init(mem.clone());
 let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
 
 // ========================================
@@ -122,10 +123,13 @@ map_a.insert(1, b'A');              // Populate map A with data
 let data = map_a.get(&1);           // Extract data for migration
 map_a.clear_new();                  // A is now empty
 drop(map_a);                        // Memory stays allocated to mem_id_a
+let size_before_migration = mem.size();
 
 let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
 map_b.insert(1, data.unwrap());     // B allocates NEW memory
+let size_after_migration = mem.size();
                                     // Result: 2x memory usage
+assert!(size_before_migration < size_after_migration);
 
 // ========================================
 // Scenario 2: WITH reclamation
@@ -133,12 +137,16 @@ map_b.insert(1, data.unwrap());     // B allocates NEW memory
 let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
 map_a.insert(1, b'A');              // Populate map A with data
 let data = map_a.get(&1);           // Extract data for migration
+map_a.clear_new();                  // A is now empty
 drop(map_a);                        // Drop A completely
+let size_before_migration = mem.size();
 mem_mgr.reclaim_memory(mem_id_a);   // Free A's memory buckets for reuse
 
 let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
 map_b.insert(1, data.unwrap());     // B reuses A's reclaimed memory buckets
+let size_after_migration = mem.size();
                                     // Result: 1x memory usage
+assert!(size_before_migration == size_after_migration);
 ```
 
 **Important**: Always drop the original structure before calling `reclaim_memory`.
