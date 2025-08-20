@@ -395,11 +395,27 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Allocate new buckets as needed.
         memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = if let Some(free_bucket) = self.free_buckets.pop_front() {
-                // Reuse a bucket from the free pool (lowest bucket ID first)
-                free_bucket
+            let new_bucket_id = if let Some(free_bucket) = self.free_buckets.front() {
+                // Only reuse free bucket if its ID is higher than current max for this memory
+                // This ensures bucket ordering is preserved across memory manager reloads
+                // For fresh memories (no buckets), allow reusing any free bucket
+                let can_reuse = if memory_bucket.is_empty() {
+                    true // Fresh memory can reuse any bucket
+                } else {
+                    let current_max_bucket = memory_bucket.iter().map(|b| b.0).max().unwrap();
+                    free_bucket.0 > current_max_bucket
+                };
+
+                if can_reuse {
+                    self.free_buckets.pop_front().unwrap()
+                } else {
+                    // Can't reuse this bucket, allocate a new one
+                    let bucket = BucketId(self.allocated_buckets);
+                    self.allocated_buckets += 1;
+                    bucket
+                }
             } else {
-                // Allocate a new bucket
+                // No free buckets available, allocate a new one
                 let bucket = BucketId(self.allocated_buckets);
                 self.allocated_buckets += 1;
                 bucket
@@ -1313,6 +1329,7 @@ mod test {
         mm.get(b).read(0, &mut out);
         assert_eq!(&out, &[2]);
 
+        // Reload memory manager, eg. after upgrade.
         let mm = MemoryManager::init_with_bucket_size(mock_stable_memory.clone(), 1);
         mm.get(b).read(0, &mut out);
         assert_eq!(&out, &[2]); // This assert fails because buckets were loaded in a different order.
