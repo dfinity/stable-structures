@@ -63,16 +63,16 @@ map_a.insert(1, b'A');              // Populate map A with data
 let data = map_a.get(&1);           // Extract data for migration
 map_a.clear_new();                  // A is now empty
 drop(map_a);                        // Memory stays allocated to mem_id_a
-let size_before_migration = mem.size();
+let actual_size_before_migration = mem.size();
 
 let virtual_memory_b = mem_mgr.get(mem_id_b);
 let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(virtual_memory_b.clone());
 map_b.insert(1, data.unwrap());     // B allocates NEW memory
-let size_after_migration = mem.size();
+let actual_size_after_migration = mem.size();
                                     // Result: ~2x memory usage
 assert_eq!(virtual_memory_a.size(), virtual_memory_b.size());
-assert!(virtual_memory_a.size() <= size_before_migration);
-assert!(virtual_memory_a.size() + virtual_memory_b.size() <= size_after_migration);
+assert!(virtual_memory_a.size() <= actual_size_before_migration);
+assert!(virtual_memory_a.size() + virtual_memory_b.size() <= actual_size_after_migration);
 
 // ========================================
 // Scenario 2: WITH reclamation
@@ -83,18 +83,18 @@ map_a.insert(1, b'A');              // Populate map A with data
 let data = map_a.get(&1);           // Extract data for migration
 map_a.clear_new();                  // A is now empty
 drop(map_a);                        // Drop A completely
-let size_before_migration = mem.size();
+let actual_size_before_migration = mem.size();
 mem_mgr.reclaim_memory(mem_id_a);   // Free A's memory buckets for reuse
 
 let virtual_memory_b = mem_mgr.get(mem_id_b);
 let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(virtual_memory_b.clone());
 map_b.insert(1, data.unwrap());     // B reuses A's reclaimed memory buckets
-let size_after_migration = mem.size();
+let actual_size_after_migration = mem.size();
                                     // Result: 1x memory usage
 assert_eq!(virtual_memory_a.size(), 0);
 assert!(virtual_memory_a.size() < virtual_memory_b.size());
-assert!(virtual_memory_b.size() <= size_before_migration);
-assert!(size_before_migration == size_after_migration);
+assert!(virtual_memory_b.size() <= actual_size_before_migration);
+assert!(actual_size_before_migration == actual_size_after_migration);
 ```
 
 ```admonish info ""
