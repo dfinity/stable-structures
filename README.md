@@ -101,11 +101,17 @@ assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds: No data corruption
 
 ### Memory Reclamation
 
-During data migration scenarios, you often need to create a new data structure (B) and populate it with data from an existing structure (A). Without memory reclamation, this process doubles memory usage even after A is no longer needed.
+During migrations you often create a new structure (B) and copy data from an existing one (A). Without reclamation, this can double memory usage even after A is no longer needed.
 
-> **⚠️ CRITICAL SAFETY REQUIREMENT:** 
-> - **MUST** drop the original structure object before calling `reclaim_memory`
-> - **NEVER** use the original structure after reclamation - causes data corruption
+Bucket IDs are an internal implementation detail — hidden and not user-controllable — and each virtual memory must receive bucket IDs in strictly ascending order. Because of this, reuse of freed buckets is guaranteed when allocating into a newly created (empty) structure. For existing structures, reuse may or may not work: it succeeds only if there is a free bucket with an ID greater than the structure’s current maximum; otherwise a new bucket is allocated.
+
+Example: A = `[0, 4, 5]`, B = `[1, 2, 3]`. After releasing A, `free = [0, 4, 5]`. When B grows, it can’t take `0` (must be `> 3`) but can take `4` → `B = [1, 2, 3, 4]`, `free = [0, 5]`.
+
+**Recommendation:** for predictable reuse migrate into a newly created structure rather than relying on reuse with a populated one.
+
+> **⚠️ CRITICAL SAFETY REQUIREMENT:**
+> - **MUST** drop the original structure object before calling `reclaim_memory`.
+> - **NEVER** use the original structure after reclamation — doing so corrupts data.
 
 Consider this migration scenario:
 
@@ -129,7 +135,7 @@ map_a.clear_new();                  // A is now empty
 drop(map_a);                        // Memory stays allocated to mem_id_a
 let actual_size_before_migration = mem.size();
 
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::new(mem_mgr.get(mem_id_b));
 map_b.insert(1, data.unwrap());     // B allocates NEW memory
 let actual_size_after_migration = mem.size();
                                     // Result: ~2x memory usage
@@ -147,15 +153,14 @@ drop(map_a);                        // Drop A completely
 let actual_size_before_migration = mem.size();
 mem_mgr.reclaim_memory(mem_id_a);   // Free A's memory buckets for reuse
 
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
+// Reusing free memory buckets works best on newly created structures
+let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::new(mem_mgr.get(mem_id_b));
 map_b.insert(1, data.unwrap());     // B reuses A's reclaimed memory buckets
 let actual_size_after_migration = mem.size();
                                     // Result: 1x memory usage
                                     // Memory allocation stayed the same (no waste)
 assert!(actual_size_before_migration == actual_size_after_migration);
 ```
-
-**Important**: Always drop the original structure before calling `reclaim_memory`.
 
 ## Example Canister
 
