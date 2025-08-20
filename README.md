@@ -106,7 +106,6 @@ During data migration scenarios, you often need to create a new data structure (
 > **⚠️ CRITICAL SAFETY REQUIREMENT:** 
 > - **MUST** drop the original structure object before calling `reclaim_memory`
 > - **NEVER** use the original structure after reclamation - causes data corruption
-> - Only reclaim memory for completely finished structures, not active ones
 
 Consider this migration scenario:
 
@@ -138,15 +137,15 @@ let actual_size_after_migration = mem.size();
 assert!(actual_size_before_migration < actual_size_after_migration);
 
 // ========================================
-// Scenario 2: WITH reclamation (SAFE)
+// Scenario 2: WITH reclamation
 // ========================================
 let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
 map_a.insert(1, b'A');              // Populate map A with data
 let data = map_a.get(&1);           // Extract data for migration
 map_a.clear_new();                  // A is now empty
-drop(map_a);                        // 1. Drop A FIRST (critical!)
+drop(map_a);                        // Drop A completely
 let actual_size_before_migration = mem.size();
-mem_mgr.reclaim_memory(mem_id_a);   // 2. Reclaim A's memory safely
+mem_mgr.reclaim_memory(mem_id_a);   // Free A's memory buckets for reuse
 
 let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
 map_b.insert(1, data.unwrap());     // B reuses A's reclaimed memory buckets
