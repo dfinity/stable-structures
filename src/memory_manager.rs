@@ -395,30 +395,39 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Allocate new buckets as needed.
         memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = if let Some(free_bucket) = self.free_buckets.front() {
-                // Only reuse free bucket if its ID is higher than current max for this memory
-                // This ensures bucket ordering is preserved across memory manager reloads
-                // For fresh memories (no buckets), allow reusing any free bucket
-                let can_reuse = if memory_bucket.is_empty() {
-                    true // Fresh memory can reuse any bucket
+            let new_bucket_id = if memory_bucket.is_empty() {
+                // Fresh memory can reuse any free bucket (prefer lowest ID for locality)
+                if let Some(free_bucket) = self.free_buckets.pop_front() {
+                    free_bucket
                 } else {
-                    let current_max_bucket = memory_bucket.iter().map(|b| b.0).max().unwrap();
-                    free_bucket.0 > current_max_bucket
-                };
-
-                if can_reuse {
-                    self.free_buckets.pop_front().unwrap()
-                } else {
-                    // Can't reuse this bucket, allocate a new one
+                    // No free buckets available, allocate a new one
                     let bucket = BucketId(self.allocated_buckets);
                     self.allocated_buckets += 1;
                     bucket
                 }
             } else {
-                // No free buckets available, allocate a new one
-                let bucket = BucketId(self.allocated_buckets);
-                self.allocated_buckets += 1;
-                bucket
+                // Find the first free bucket with ID higher than current max for this memory
+                // This ensures bucket ordering is preserved across memory manager reloads
+                let current_max_bucket = memory_bucket.iter().map(|b| b.0).max().unwrap();
+
+                // Search through all free buckets to find the first one with ID > current_max_bucket
+                let mut reusable_bucket_index = None;
+                for (i, free_bucket) in self.free_buckets.iter().enumerate() {
+                    if free_bucket.0 > current_max_bucket {
+                        reusable_bucket_index = Some(i);
+                        break;
+                    }
+                }
+
+                if let Some(index) = reusable_bucket_index {
+                    // Remove and return the found bucket
+                    self.free_buckets.remove(index).unwrap()
+                } else {
+                    // No suitable free bucket found, allocate a new one
+                    let bucket = BucketId(self.allocated_buckets);
+                    self.allocated_buckets += 1;
+                    bucket
+                }
             };
 
             memory_bucket.push(new_bucket_id);
@@ -1336,6 +1345,32 @@ mod test {
         let initial_size = mem_mgr.inner.borrow().memory.size();
         memory_1.grow(BUCKET_SIZE_IN_PAGES);
         assert!(mem_mgr.inner.borrow().memory.size() > initial_size);
+
+        // Verify conservative reuse persists after reload
+        let mem_mgr_reloaded = MemoryManager::init(mem);
+        let memory_1_reloaded = mem_mgr_reloaded.get(MemoryId::new(1));
+        assert_eq!(memory_1_reloaded.size(), BUCKET_SIZE_IN_PAGES * 2);
+    }
+
+    #[test]
+    fn optimal_match_conservative_bucket_reuse_prevents_corruption() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init(mem.clone());
+
+        // Create memories with buckets [0, 2] and [1]
+        let memory_0 = mem_mgr.get(MemoryId::new(0));
+        let memory_1 = mem_mgr.get(MemoryId::new(1));
+        memory_0.grow(BUCKET_SIZE_IN_PAGES); // 0
+        memory_1.grow(BUCKET_SIZE_IN_PAGES); // 1
+        memory_0.grow(BUCKET_SIZE_IN_PAGES); // 2
+
+        // Reclaim memory 0 (frees buckets 0 and 2)
+        mem_mgr.reclaim_memory(MemoryId::new(0));
+
+        // Memory 1 cannot reuse lower-ID bucket 0, but can reuse bucket 2 -- no waste
+        let initial_size = mem_mgr.inner.borrow().memory.size();
+        memory_1.grow(BUCKET_SIZE_IN_PAGES);
+        assert!(mem_mgr.inner.borrow().memory.size() == initial_size);
 
         // Verify conservative reuse persists after reload
         let mem_mgr_reloaded = MemoryManager::init(mem);
