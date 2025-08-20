@@ -347,10 +347,11 @@ Each memory instance must be assigned to exactly one stable structure.</p>
 </span><span class="boring">fn main() {
 </span>use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
-    BTreeMap, DefaultMemoryImpl,
+    BTreeMap, DefaultMemoryImpl, Memory,
 };
 
-let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
+let mem = DefaultMemoryImpl::default();
+let mem_mgr = MemoryManager::init(mem.clone());
 let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
 
 // ========================================
@@ -361,10 +362,14 @@ map_a.insert(1, b'A');              // Populate map A with data
 let data = map_a.get(&amp;1);           // Extract data for migration
 map_a.clear_new();                  // A is now empty
 drop(map_a);                        // Memory stays allocated to mem_id_a
+let actual_size_before_migration = mem.size();
 
 let mut map_b: BTreeMap&lt;u64, u8, _&gt; = BTreeMap::init(mem_mgr.get(mem_id_b));
 map_b.insert(1, data.unwrap());     // B allocates NEW memory
-                                    // Result: 2x memory usage
+let actual_size_after_migration = mem.size();
+                                    // Result: ~2x memory usage
+                                    // Memory allocation grew (waste)
+assert!(actual_size_before_migration &lt; actual_size_after_migration);
 
 // ========================================
 // Scenario 2: WITH reclamation
@@ -372,12 +377,17 @@ map_b.insert(1, data.unwrap());     // B allocates NEW memory
 let mut map_a: BTreeMap&lt;u64, u8, _&gt; = BTreeMap::init(mem_mgr.get(mem_id_a));
 map_a.insert(1, b'A');              // Populate map A with data
 let data = map_a.get(&amp;1);           // Extract data for migration
+map_a.clear_new();                  // A is now empty
 drop(map_a);                        // Drop A completely
+let actual_size_before_migration = mem.size();
 mem_mgr.reclaim_memory(mem_id_a);   // Free A's memory buckets for reuse
 
 let mut map_b: BTreeMap&lt;u64, u8, _&gt; = BTreeMap::init(mem_mgr.get(mem_id_b));
 map_b.insert(1, data.unwrap());     // B reuses A's reclaimed memory buckets
+let actual_size_after_migration = mem.size();
                                     // Result: 1x memory usage
+                                    // Memory allocation stayed the same (no waste)
+assert!(actual_size_before_migration == actual_size_after_migration);
 <span class="boring">}</span></code></pre></pre>
 <div id="admonition-default-1" class="admonition admonish-info" role="note">
 <div>
