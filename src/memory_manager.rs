@@ -1285,6 +1285,40 @@ mod test {
     }
 
     #[test]
+    fn bucket_ordering() {
+        let mock_stable_memory = make_memory();
+        let mm = MemoryManager::init_with_bucket_size(mock_stable_memory.clone(), 1);
+
+        let (a, b) = (MemoryId::new(0), MemoryId::new(1));
+
+        mm.get(a).grow(1);
+        mm.get(a).write(0, &[1]);
+
+        mm.get(b).grow(1);
+        mm.get(b).write(0, &[2]);
+
+        let mut out = [0; 1];
+        mm.get(a).read(0, &mut out);
+        assert_eq!(&out, &[1]);
+        mm.get(b).read(0, &mut out);
+        assert_eq!(&out, &[2]);
+
+        mm.reclaim_memory(a);
+
+        mm.get(b).read(0, &mut out);
+        assert_eq!(&out, &[2]);
+
+        mm.get(b).grow(1);
+
+        mm.get(b).read(0, &mut out);
+        assert_eq!(&out, &[2]);
+
+        let mm = MemoryManager::init_with_bucket_size(mock_stable_memory.clone(), 1);
+        mm.get(b).read(0, &mut out);
+        assert_eq!(&out, &[2]); // This assert fails because buckets were loaded in a different order.
+    }
+
+    #[test]
     fn free_buckets_reused_in_increasing_order() {
         let mem_mgr = MemoryManager::init(make_memory());
 
