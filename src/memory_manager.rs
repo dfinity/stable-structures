@@ -1259,11 +1259,12 @@ mod test {
     }
 
     #[test]
-    fn memory_grows_without_reclaim() {
+    fn memory_growth_without_reclaim_uses_new_buckets() {
         let mem = make_memory();
         let mem_mgr = MemoryManager::init(mem.clone());
 
-        // Allocate two memories without reclaiming - should use separate buckets
+        // Baseline test: allocate two memories without reclaiming - should use separate buckets
+        // This contrasts with reclaim tests where buckets can be reused
         let memory_0 = mem_mgr.get(MemoryId::new(0));
         let memory_1 = mem_mgr.get(MemoryId::new(1));
 
@@ -1343,7 +1344,7 @@ mod test {
     }
 
     #[test]
-    fn free_buckets_reused_in_order() {
+    fn reclaim_frees_buckets_for_reuse_in_order() {
         let mem_mgr = MemoryManager::init(make_memory());
 
         // Allocate buckets 0, 1, 2
@@ -1358,11 +1359,11 @@ mod test {
         memory_2.grow(BUCKET_SIZE_IN_PAGES);
         memory_2.write(0, b"bucket_2");
 
-        // Reclaim buckets 2 and 0 (out of order)
+        // Reclaim buckets 2 and 0 (out of order) to test free bucket sorting
         mem_mgr.reclaim_memory(MemoryId::new(2));
         mem_mgr.reclaim_memory(MemoryId::new(0));
 
-        // New allocations should reuse buckets 0, 2 in increasing order
+        // New allocations should reuse reclaimed buckets 0, 2 in increasing order
         let memory_3 = mem_mgr.get(MemoryId::new(3));
         let memory_4 = mem_mgr.get(MemoryId::new(4));
         memory_3.grow(BUCKET_SIZE_IN_PAGES);
