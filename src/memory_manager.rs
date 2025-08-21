@@ -46,7 +46,8 @@ use crate::{
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
 use std::cell::{Cell, RefCell};
-use std::collections::VecDeque;
+use std::collections::BTreeSet;
+use std::ops::Bound::{Excluded, Unbounded};
 use std::rc::Rc;
 
 const MAGIC: &[u8; 3] = b"MGR";
@@ -270,7 +271,7 @@ struct MemoryManagerInner<M: Memory> {
     /// A pool of free buckets that can be reused by any memory.
     /// Maintained in increasing order (lowest bucket IDs at the front)
     /// to ensure optimal memory locality when reusing buckets.
-    free_buckets: VecDeque<BucketId>,
+    free_buckets: BTreeSet<BucketId>,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -299,7 +300,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: vec![vec![]; MAX_NUM_MEMORIES as usize],
             bucket_size_in_pages,
-            free_buckets: VecDeque::new(),
+            free_buckets: BTreeSet::new(),
         };
 
         mem_mgr.save_header();
@@ -329,7 +330,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         );
 
         let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
-        let mut free_buckets_vec = Vec::new();
+        let mut free_buckets = BTreeSet::new();
         for (bucket_idx, memory_id) in buckets.into_iter().enumerate() {
             let bucket_id = BucketId(bucket_idx as u16);
             if memory_id != UNALLOCATED_BUCKET_MARKER {
@@ -337,13 +338,9 @@ impl<M: Memory> MemoryManagerInner<M> {
             } else if bucket_id.0 < header.num_allocated_buckets {
                 // Only buckets with indices less than `num_allocated_buckets` were ever allocated.
                 // If such a bucket is now marked as unallocated, it is free to reuse.
-                free_buckets_vec.push(bucket_id);
+                free_buckets.insert(bucket_id);
             }
         }
-
-        // Sort free buckets in increasing order for optimal memory locality
-        free_buckets_vec.sort_by_key(|bucket| bucket.0);
-        let free_buckets = VecDeque::from(free_buckets_vec);
 
         Self {
             memory,
@@ -392,38 +389,30 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         let memory_bucket = &mut self.memory_buckets[id.0 as usize];
-        // Allocate new buckets as needed.
         memory_bucket.reserve(new_buckets_needed as usize);
+
         for _ in 0..new_buckets_needed {
             let new_bucket_id = if memory_bucket.is_empty() {
                 // Fresh memory can reuse any free bucket (prefer lowest ID for locality)
-                if let Some(free_bucket) = self.free_buckets.pop_front() {
+                if let Some(free_bucket) = self.free_buckets.pop_first() {
                     free_bucket
                 } else {
-                    // No free buckets available, allocate a new one
                     let bucket = BucketId(self.allocated_buckets);
                     self.allocated_buckets += 1;
                     bucket
                 }
             } else {
-                // Find the first free bucket with ID higher than current max for this memory
-                // This ensures bucket ordering is preserved across memory manager reloads
-                let current_max_bucket = memory_bucket.iter().map(|b| b.0).max().unwrap();
+                // Buckets are sorted — last element is the max
+                let current_max_bucket = memory_bucket.last().unwrap().0;
 
-                // Search through all free buckets to find the first one with ID > current_max_bucket
-                let mut reusable_bucket_index = None;
-                for (i, free_bucket) in self.free_buckets.iter().enumerate() {
-                    if free_bucket.0 > current_max_bucket {
-                        reusable_bucket_index = Some(i);
-                        break;
-                    }
-                }
-
-                if let Some(index) = reusable_bucket_index {
-                    // Remove and return the found bucket
-                    self.free_buckets.remove(index).unwrap()
+                // Find the smallest free bucket with ID > current_max_bucket
+                if let Some(&candidate) = self
+                    .free_buckets
+                    .range((Excluded(BucketId(current_max_bucket)), Unbounded))
+                    .next()
+                {
+                    self.free_buckets.take(&candidate).unwrap()
                 } else {
-                    // No suitable free bucket found, allocate a new one
                     let bucket = BucketId(self.allocated_buckets);
                     self.allocated_buckets += 1;
                     bucket
@@ -475,21 +464,14 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         // Mark all buckets as unallocated in stable storage and collect them
-        let mut reclaimed_buckets = Vec::new();
         for &bucket_id in memory_buckets.iter() {
             write(
                 &self.memory,
                 bucket_allocations_address(bucket_id).get(),
                 &[UNALLOCATED_BUCKET_MARKER],
             );
-            reclaimed_buckets.push(bucket_id);
+            self.free_buckets.insert(bucket_id);
         }
-
-        // Add reclaimed buckets to free pool and sort to maintain increasing order
-        self.free_buckets.extend(reclaimed_buckets);
-        let mut sorted_buckets: Vec<_> = self.free_buckets.drain(..).collect();
-        sorted_buckets.sort_by_key(|bucket| bucket.0);
-        self.free_buckets = VecDeque::from(sorted_buckets);
 
         // Clear the memory's bucket list
         memory_buckets.clear();
@@ -715,7 +697,7 @@ impl MemoryId {
 }
 
 // Referring to a bucket.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 struct BucketId(u16);
 
 fn bucket_allocations_address(id: BucketId) -> Address {
