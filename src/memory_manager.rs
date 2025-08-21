@@ -419,6 +419,11 @@ impl<M: Memory> MemoryManagerInner<M> {
                 bucket
             });
 
+            // Assert ascending order (strictly increasing).
+            if let Some(prev_max) = memory_bucket.last().copied() {
+                debug_assert!(prev_max < new_bucket_id);
+            }
+
             memory_bucket.push(new_bucket_id);
             write(
                 &self.memory,
