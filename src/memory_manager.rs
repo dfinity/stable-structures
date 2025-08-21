@@ -46,7 +46,8 @@ use crate::{
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
 use std::cell::{Cell, RefCell};
-use std::collections::VecDeque;
+use std::collections::BTreeSet;
+use std::ops::Bound::{Excluded, Unbounded};
 use std::rc::Rc;
 
 const MAGIC: &[u8; 3] = b"MGR";
@@ -270,7 +271,7 @@ struct MemoryManagerInner<M: Memory> {
     /// A pool of free buckets that can be reused by any memory.
     /// Maintained in increasing order (lowest bucket IDs at the front)
     /// to ensure optimal memory locality when reusing buckets.
-    free_buckets: VecDeque<BucketId>,
+    free_buckets: BTreeSet<BucketId>,
 }
 
 impl<M: Memory> MemoryManagerInner<M> {
@@ -299,7 +300,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             memory_sizes_in_pages: [0; MAX_NUM_MEMORIES as usize],
             memory_buckets: vec![vec![]; MAX_NUM_MEMORIES as usize],
             bucket_size_in_pages,
-            free_buckets: VecDeque::new(),
+            free_buckets: BTreeSet::new(),
         };
 
         mem_mgr.save_header();
@@ -329,7 +330,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         );
 
         let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
-        let mut free_buckets_vec = Vec::new();
+        let mut free_buckets = BTreeSet::new();
         for (bucket_idx, memory_id) in buckets.into_iter().enumerate() {
             let bucket_id = BucketId(bucket_idx as u16);
             if memory_id != UNALLOCATED_BUCKET_MARKER {
@@ -337,13 +338,9 @@ impl<M: Memory> MemoryManagerInner<M> {
             } else if bucket_id.0 < header.num_allocated_buckets {
                 // Only buckets with indices less than `num_allocated_buckets` were ever allocated.
                 // If such a bucket is now marked as unallocated, it is free to reuse.
-                free_buckets_vec.push(bucket_id);
+                free_buckets.insert(bucket_id);
             }
         }
-
-        // Sort free buckets in increasing order for optimal memory locality
-        free_buckets_vec.sort_by_key(|bucket| bucket.0);
-        let free_buckets = VecDeque::from(free_buckets_vec);
 
         Self {
             memory,
@@ -395,19 +392,39 @@ impl<M: Memory> MemoryManagerInner<M> {
         // Allocate new buckets as needed.
         memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = if let Some(free_bucket) = self.free_buckets.pop_front() {
-                // Reuse a bucket from the free pool (lowest bucket ID first)
-                free_bucket
-            } else {
-                // Allocate a new bucket
+            // Try to reuse a free bucket.
+            let maybe_free_bucket = match memory_bucket.last() {
+                // Fresh memory — smallest free bucket.
+                None => self.free_buckets.pop_first(),
+
+                // Existing memory — smallest free bucket > current max.
+                Some(max_b) => {
+                    if let Some(candidate) = self
+                        .free_buckets
+                        .range((Excluded(max_b), Unbounded))
+                        .next()
+                        .copied()
+                    {
+                        self.free_buckets.take(&candidate)
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            // If there is no free bucket available, allocate a new one.
+            let new_bucket_id = maybe_free_bucket.unwrap_or_else(|| {
                 let bucket = BucketId(self.allocated_buckets);
                 self.allocated_buckets += 1;
                 bucket
-            };
+            });
+
+            // Assert ascending order (strictly increasing).
+            if let Some(prev_max) = memory_bucket.last().copied() {
+                debug_assert!(prev_max < new_bucket_id);
+            }
 
             memory_bucket.push(new_bucket_id);
-
-            // Write in stable store that this bucket belongs to the memory with the provided `id`.
             write(
                 &self.memory,
                 bucket_allocations_address(new_bucket_id).get(),
@@ -450,21 +467,14 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         // Mark all buckets as unallocated in stable storage and collect them
-        let mut reclaimed_buckets = Vec::new();
         for &bucket_id in memory_buckets.iter() {
             write(
                 &self.memory,
                 bucket_allocations_address(bucket_id).get(),
                 &[UNALLOCATED_BUCKET_MARKER],
             );
-            reclaimed_buckets.push(bucket_id);
+            self.free_buckets.insert(bucket_id);
         }
-
-        // Add reclaimed buckets to free pool and sort to maintain increasing order
-        self.free_buckets.extend(reclaimed_buckets);
-        let mut sorted_buckets: Vec<_> = self.free_buckets.drain(..).collect();
-        sorted_buckets.sort_by_key(|bucket| bucket.0);
-        self.free_buckets = VecDeque::from(sorted_buckets);
 
         // Clear the memory's bucket list
         memory_buckets.clear();
@@ -690,7 +700,7 @@ impl MemoryId {
 }
 
 // Referring to a bucket.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 struct BucketId(u16);
 
 fn bucket_allocations_address(id: BucketId) -> Address {
@@ -1203,149 +1213,218 @@ mod test {
     }
 
     #[test]
-    fn memory_grows_without_manual_reclaim() {
+    fn reclaim_empty_memory_returns_zero() {
+        let mem_mgr = MemoryManager::init(make_memory());
+        let memory = mem_mgr.get(MemoryId::new(0));
+
+        assert_eq!(memory.size(), 0);
+        assert_eq!(mem_mgr.reclaim_memory(MemoryId::new(0)), 0);
+        assert_eq!(memory.size(), 0);
+    }
+
+    #[test]
+    fn reclaim_returns_correct_page_count() {
+        let mem_mgr = MemoryManager::init(make_memory());
+        let memory = mem_mgr.get(MemoryId::new(0));
+
+        let pages_allocated = BUCKET_SIZE_IN_PAGES * 2;
+        memory.grow(pages_allocated);
+
+        let pages_reclaimed = mem_mgr.reclaim_memory(MemoryId::new(0));
+        assert_eq!(pages_reclaimed, pages_allocated);
+    }
+
+    #[test]
+    fn reclaim_resets_memory_size_to_zero() {
         let mem = make_memory();
         let mem_mgr = MemoryManager::init(mem.clone());
-        let initial_size = mem.size();
+        let memory = mem_mgr.get(MemoryId::new(0));
 
-        // Create first memory and allocate bucket 0
+        memory.grow(BUCKET_SIZE_IN_PAGES * 2);
+        assert_eq!(memory.size(), BUCKET_SIZE_IN_PAGES * 2);
+
+        mem_mgr.reclaim_memory(MemoryId::new(0));
+        assert_eq!(memory.size(), 0);
+
+        // Verify state persists after reload
+        let mem_mgr_reloaded = MemoryManager::init(mem);
+        let memory_reloaded = mem_mgr_reloaded.get(MemoryId::new(0));
+        assert_eq!(memory_reloaded.size(), 0);
+    }
+
+    #[test]
+    fn memory_growth_without_reclaim_uses_new_buckets() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init(mem.clone());
+
+        // Baseline test: allocate two memories without reclaiming - should use separate buckets
+        // This contrasts with reclaim tests where buckets can be reused
         let memory_0 = mem_mgr.get(MemoryId::new(0));
+        let memory_1 = mem_mgr.get(MemoryId::new(1));
+
         memory_0.grow(BUCKET_SIZE_IN_PAGES);
-        memory_0.write(0, b"bucket_id_0");
+        memory_0.write(0, b"data_0");
         let size_after_first = mem.size();
 
-        // Verify first allocation grew memory
-        assert_eq!(size_after_first, initial_size + BUCKET_SIZE_IN_PAGES);
-
-        // Create second memory WITHOUT reclaiming first - should allocate bucket 1
-        let memory_1 = mem_mgr.get(MemoryId::new(1));
         memory_1.grow(BUCKET_SIZE_IN_PAGES);
-        memory_1.write(0, b"bucket_id_1");
+        memory_1.write(0, b"data_1");
 
-        // Verify memory grew again (no bucket reuse - new bucket allocated)
-        assert_eq!(mem.size(), size_after_first + BUCKET_SIZE_IN_PAGES);
+        // Second allocation should grow underlying memory
+        assert!(mem.size() > size_after_first);
 
-        // Verify both memories have their expected content (different buckets)
-        let mut buf = vec![0u8; 11];
+        // Verify distinct data in separate buckets
+        let mut buf = vec![0u8; 6];
         memory_0.read(0, &mut buf);
-        assert_eq!(
-            &buf, b"bucket_id_0",
-            "Memory 0 should have bucket 0 content"
-        );
+        assert_eq!(&buf, b"data_0");
         memory_1.read(0, &mut buf);
-        assert_eq!(
-            &buf, b"bucket_id_1",
-            "Memory 1 should have bucket 1 content"
-        );
+        assert_eq!(&buf, b"data_1");
     }
 
     #[test]
-    fn memory_reuses_buckets_with_manual_reclaim() {
+    fn memory_reuses_buckets_after_reclaim() {
         let mem = make_memory();
         let mem_mgr = MemoryManager::init(mem.clone());
 
-        // Create first memory and allocate bucket 0
+        // Allocate and reclaim first memory
         let memory_0 = mem_mgr.get(MemoryId::new(0));
         memory_0.grow(BUCKET_SIZE_IN_PAGES);
-        memory_0.write(0, b"bucket_id_0");
+        memory_0.write(0, b"original");
         let size_after_allocation = mem.size();
 
-        // Manually reclaim first memory
-        let pages_reclaimed = mem_mgr.reclaim_memory(MemoryId::new(0));
-        assert_eq!(
-            pages_reclaimed, BUCKET_SIZE_IN_PAGES,
-            "Should reclaim exactly {} pages",
-            BUCKET_SIZE_IN_PAGES
-        );
+        mem_mgr.reclaim_memory(MemoryId::new(0));
+        drop(memory_0); // Drop invalidated memory
 
-        // CRITICAL: Drop the memory_0 after memory reclamation as it's now invalid
-        drop(memory_0);
-
-        // Verify memory size didn't change (buckets marked free, not deallocated)
-        assert_eq!(mem.size(), size_after_allocation);
-
-        // Create second memory AFTER manual memory reclamation - should reuse bucket 0
+        // Allocate second memory - should reuse bucket without growing
         let memory_1 = mem_mgr.get(MemoryId::new(1));
         memory_1.grow(BUCKET_SIZE_IN_PAGES);
+        assert_eq!(mem.size(), size_after_allocation);
 
-        // Verify memory did NOT grow (bucket reuse - no new allocation)
-        assert_eq!(
-            mem.size(),
-            size_after_allocation,
-            "Memory should not grow when reusing buckets"
-        );
-
-        // Verify bucket reuse by reading original content from bucket 0
-        let mut buf = vec![0u8; 11];
+        // Verify bucket reuse by reading original data
+        let mut buf = vec![0u8; 8];
         memory_1.read(0, &mut buf);
-        assert_eq!(
-            &buf, b"bucket_id_0",
-            "Memory 1 should see original bucket 0 content, proving reuse"
-        );
+        assert_eq!(&buf, b"original");
+
+        // Verify state persists after reload
+        let mem_mgr_reloaded = MemoryManager::init(mem);
+        let memory_1_reloaded = mem_mgr_reloaded.get(MemoryId::new(1));
+        assert_eq!(memory_1_reloaded.size(), BUCKET_SIZE_IN_PAGES);
+        memory_1_reloaded.read(0, &mut buf);
+        assert_eq!(&buf, b"original");
     }
 
     #[test]
-    fn free_buckets_reused_in_increasing_order() {
-        let mem_mgr = MemoryManager::init(make_memory());
+    fn conservative_bucket_reuse_prevents_corruption() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init(mem.clone());
 
-        // Allocate multiple buckets in sequence (0, 1, 2, 3, 4)
+        // Create memories with buckets 0 and 1
         let memory_0 = mem_mgr.get(MemoryId::new(0));
         let memory_1 = mem_mgr.get(MemoryId::new(1));
+        memory_0.grow(BUCKET_SIZE_IN_PAGES);
+        memory_1.grow(BUCKET_SIZE_IN_PAGES);
 
-        memory_0.grow(BUCKET_SIZE_IN_PAGES * 3); // allocates buckets 0, 1, 2
-        memory_1.grow(BUCKET_SIZE_IN_PAGES * 2); // allocates buckets 3, 4
+        // Reclaim memory 0 (frees bucket 0)
+        mem_mgr.reclaim_memory(MemoryId::new(0));
 
-        // Write bucket identifiers to prove allocation order
-        memory_0.write(0, b"bucket_id_0");
-        memory_0.write(BUCKET_SIZE_IN_PAGES * WASM_PAGE_SIZE, b"bucket_id_1");
-        memory_0.write(BUCKET_SIZE_IN_PAGES * WASM_PAGE_SIZE * 2, b"bucket_id_2");
-        memory_1.write(0, b"bucket_id_3");
-        memory_1.write(BUCKET_SIZE_IN_PAGES * WASM_PAGE_SIZE, b"bucket_id_4");
+        // Memory 1 cannot reuse lower-ID bucket 0 - must allocate bucket 2
+        let initial_size = mem_mgr.inner.borrow().memory.size();
+        memory_1.grow(BUCKET_SIZE_IN_PAGES);
+        assert!(mem_mgr.inner.borrow().memory.size() > initial_size);
 
-        // Reclaim all buckets in reverse order to test sorting
-        let pages_reclaimed_1 = mem_mgr.reclaim_memory(MemoryId::new(1)); // reclaims 3, 4
-        let pages_reclaimed_0 = mem_mgr.reclaim_memory(MemoryId::new(0)); // reclaims 0, 1, 2
-        assert_eq!(
-            pages_reclaimed_1,
-            BUCKET_SIZE_IN_PAGES * 2,
-            "Should reclaim {} pages from memory 1",
-            BUCKET_SIZE_IN_PAGES * 2
-        );
-        assert_eq!(
-            pages_reclaimed_0,
-            BUCKET_SIZE_IN_PAGES * 3,
-            "Should reclaim {} pages from memory 0",
-            BUCKET_SIZE_IN_PAGES * 3
-        );
+        // Verify conservative reuse persists after reload
+        let mem_mgr_reloaded = MemoryManager::init(mem);
+        let memory_1_reloaded = mem_mgr_reloaded.get(MemoryId::new(1));
+        assert_eq!(memory_1_reloaded.size(), BUCKET_SIZE_IN_PAGES * 2);
+    }
 
-        // Allocate new memories - should reuse buckets in increasing order (0, 1, then 2)
+    #[test]
+    fn optimal_match_conservative_bucket_reuse_prevents_corruption() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init(mem.clone());
+
+        // Create memories with buckets [0, 2] and [1]
+        let memory_0 = mem_mgr.get(MemoryId::new(0));
+        let memory_1 = mem_mgr.get(MemoryId::new(1));
+        memory_0.grow(BUCKET_SIZE_IN_PAGES); // 0
+        memory_1.grow(BUCKET_SIZE_IN_PAGES); // 1
+        memory_0.grow(BUCKET_SIZE_IN_PAGES); // 2
+
+        // Reclaim memory 0 (frees buckets 0 and 2)
+        mem_mgr.reclaim_memory(MemoryId::new(0));
+
+        // Memory 1 cannot reuse lower-ID bucket 0, but can reuse bucket 2 -- no waste
+        let initial_size = mem_mgr.inner.borrow().memory.size();
+        memory_1.grow(BUCKET_SIZE_IN_PAGES);
+        assert!(mem_mgr.inner.borrow().memory.size() == initial_size);
+
+        // Verify conservative reuse persists after reload
+        let mem_mgr_reloaded = MemoryManager::init(mem);
+        let memory_1_reloaded = mem_mgr_reloaded.get(MemoryId::new(1));
+        assert_eq!(memory_1_reloaded.size(), BUCKET_SIZE_IN_PAGES * 2);
+    }
+
+    #[test]
+    fn reclaim_frees_buckets_for_reuse_in_order() {
+        let mem_mgr = MemoryManager::init(make_memory());
+
+        // Allocate buckets 0, 1, 2
+        let memory_0 = mem_mgr.get(MemoryId::new(0));
+        let memory_1 = mem_mgr.get(MemoryId::new(1));
         let memory_2 = mem_mgr.get(MemoryId::new(2));
+
+        memory_0.grow(BUCKET_SIZE_IN_PAGES);
+        memory_0.write(0, b"bucket_0");
+        memory_1.grow(BUCKET_SIZE_IN_PAGES);
+        memory_1.write(0, b"bucket_1");
+        memory_2.grow(BUCKET_SIZE_IN_PAGES);
+        memory_2.write(0, b"bucket_2");
+
+        // Reclaim buckets 2 and 0 (out of order) to test free bucket sorting
+        mem_mgr.reclaim_memory(MemoryId::new(2));
+        mem_mgr.reclaim_memory(MemoryId::new(0));
+
+        // New allocations should reuse reclaimed buckets 0, 2 in increasing order
         let memory_3 = mem_mgr.get(MemoryId::new(3));
         let memory_4 = mem_mgr.get(MemoryId::new(4));
+        memory_3.grow(BUCKET_SIZE_IN_PAGES);
+        memory_4.grow(BUCKET_SIZE_IN_PAGES);
 
-        memory_2.grow(BUCKET_SIZE_IN_PAGES); // should get bucket 0 (lowest available)
-        memory_3.grow(BUCKET_SIZE_IN_PAGES); // should get bucket 1 (next lowest)
-        memory_4.grow(BUCKET_SIZE_IN_PAGES); // should get bucket 2 (next lowest)
-
-        // Verify buckets were reused in increasing order by reading original content
-        let mut buf = vec![0u8; 11];
-        memory_2.read(0, &mut buf);
-        assert_eq!(
-            &buf, b"bucket_id_0",
-            "Memory 2 should reuse bucket 0 (lowest)"
-        );
-
+        let mut buf = vec![0u8; 8];
         memory_3.read(0, &mut buf);
-        assert_eq!(
-            &buf, b"bucket_id_1",
-            "Memory 3 should reuse bucket 1 (next lowest)"
-        );
-
+        assert_eq!(&buf, b"bucket_0"); // Reused bucket 0 first
         memory_4.read(0, &mut buf);
-        assert_eq!(
-            &buf, b"bucket_id_2",
-            "Memory 4 should reuse bucket 2 (next lowest)"
-        );
+        assert_eq!(&buf, b"bucket_2"); // Reused bucket 2 second
+    }
+
+    #[test]
+    fn bucket_ordering_preserved_across_reload() {
+        let mem = make_memory();
+        let mem_mgr = MemoryManager::init_with_bucket_size(mem.clone(), 1);
+
+        // Create memories with buckets 0 and 1
+        let memory_a = mem_mgr.get(MemoryId::new(0));
+        let memory_b = mem_mgr.get(MemoryId::new(1));
+        memory_a.grow(1);
+        memory_a.write(0, b"a_data");
+        memory_b.grow(1);
+        memory_b.write(0, b"b_data");
+
+        // Reclaim memory A and grow memory B
+        // Note: Conservative reuse prevents Memory B from getting bucket 0 (since 0 < 1)
+        // So Memory B gets a new bucket 2, resulting in buckets [1, 2]
+        mem_mgr.reclaim_memory(MemoryId::new(0));
+        memory_b.grow(1);
+
+        // Verify memory B still reads from its first bucket
+        let mut buf = vec![0u8; 6];
+        memory_b.read(0, &mut buf);
+        assert_eq!(&buf, b"b_data");
+
+        // Critical: After reload, memory B should still read same data
+        let mem_mgr_reloaded = MemoryManager::init_with_bucket_size(mem, 1);
+        let memory_b_reloaded = mem_mgr_reloaded.get(MemoryId::new(1));
+        memory_b_reloaded.read(0, &mut buf);
+        assert_eq!(&buf, b"b_data");
     }
 }
 
