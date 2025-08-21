@@ -396,6 +396,7 @@ impl<M: Memory> MemoryManagerInner<M> {
             let maybe_free_bucket: Option<BucketId> = match memory_bucket.last() {
                 // Fresh memory -- use smallest free bucket.
                 None => self.free_buckets.pop_first(),
+
                 // Existing memory -- use smallest free bucket greater than current max.
                 Some(max_b) => {
                     let next_gt = {
