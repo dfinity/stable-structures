@@ -113,7 +113,7 @@ Example: A = `[0, 4, 5]`, B = `[1, 2, 3]`. After releasing A, `free = [0, 4, 5]`
 > - **MUST** drop the original structure object before calling `reclaim_memory`.
 > - **NEVER** use the original structure after reclamation — doing so corrupts data.
 
-Consider this migration scenario:
+The `MemoryManager` provides a `reclaim_memory` method to efficiently handle these scenarios:
 
 ```rust
 use ic_stable_structures::{
