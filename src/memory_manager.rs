@@ -393,19 +393,22 @@ impl<M: Memory> MemoryManagerInner<M> {
         memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
             // Try to reuse a free bucket.
-            let maybe_free_bucket: Option<BucketId> = match memory_bucket.last() {
-                // Fresh memory -- use smallest free bucket.
+            let maybe_free_bucket = match memory_bucket.last() {
+                // Fresh memory — smallest free bucket.
                 None => self.free_buckets.pop_first(),
 
-                // Existing memory -- use smallest free bucket greater than current max.
+                // Existing memory — smallest free bucket > current max.
                 Some(max_b) => {
-                    let next_gt = {
-                        let mut it = self
-                            .free_buckets
-                            .range((Excluded(BucketId(max_b.0)), Unbounded));
-                        it.next().copied()
-                    };
-                    next_gt.and_then(|b| self.free_buckets.take(&b))
+                    if let Some(candidate) = self
+                        .free_buckets
+                        .range((Excluded(max_b), Unbounded))
+                        .next()
+                        .copied()
+                    {
+                        self.free_buckets.take(&candidate)
+                    } else {
+                        None
+                    }
                 }
             };
 
