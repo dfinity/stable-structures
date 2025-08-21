@@ -389,6 +389,7 @@ impl<M: Memory> MemoryManagerInner<M> {
         }
 
         let memory_bucket = &mut self.memory_buckets[id.0 as usize];
+        // Allocate new buckets as needed.
         memory_bucket.reserve(new_buckets_needed as usize);
         for _ in 0..new_buckets_needed {
             // Try to reuse a free bucket.
