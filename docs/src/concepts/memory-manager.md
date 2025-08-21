@@ -102,8 +102,3 @@ let actual_size_after_migration = mem.size();
                                     // Memory allocation stayed the same (no waste)
 assert!(actual_size_before_migration == actual_size_after_migration);
 ```
-
-```admonish info ""
-**Important**: Always drop the original structure before calling `reclaim_memory`.
-The method returns the number of pages that were reclaimed and made available for reuse.
-```
