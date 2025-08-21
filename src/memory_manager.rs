@@ -390,38 +390,31 @@ impl<M: Memory> MemoryManagerInner<M> {
 
         let memory_bucket = &mut self.memory_buckets[id.0 as usize];
         memory_bucket.reserve(new_buckets_needed as usize);
-
         for _ in 0..new_buckets_needed {
-            let new_bucket_id = if memory_bucket.is_empty() {
-                // Fresh memory can reuse any free bucket (prefer lowest ID for locality)
-                if let Some(free_bucket) = self.free_buckets.pop_first() {
-                    free_bucket
-                } else {
-                    let bucket = BucketId(self.allocated_buckets);
-                    self.allocated_buckets += 1;
-                    bucket
-                }
-            } else {
-                // Buckets are sorted — last element is the max
-                let current_max_bucket = memory_bucket.last().unwrap().0;
-
-                // Find the smallest free bucket with ID > current_max_bucket
-                if let Some(&candidate) = self
-                    .free_buckets
-                    .range((Excluded(BucketId(current_max_bucket)), Unbounded))
-                    .next()
-                {
-                    self.free_buckets.take(&candidate).unwrap()
-                } else {
-                    let bucket = BucketId(self.allocated_buckets);
-                    self.allocated_buckets += 1;
-                    bucket
+            // Try to reuse a free bucket.
+            let maybe_free_bucket: Option<BucketId> = match memory_bucket.last() {
+                // Fresh memory -- use smallest free bucket.
+                None => self.free_buckets.pop_first(),
+                // Existing memory -- use smallest free bucket greater than current max.
+                Some(max_b) => {
+                    let next_gt = {
+                        let mut it = self
+                            .free_buckets
+                            .range((Excluded(BucketId(max_b.0)), Unbounded));
+                        it.next().copied()
+                    };
+                    next_gt.and_then(|b| self.free_buckets.take(&b))
                 }
             };
 
-            memory_bucket.push(new_bucket_id);
+            // If there is no free bucket available, allocate a new one.
+            let new_bucket_id = maybe_free_bucket.unwrap_or_else(|| {
+                let bucket = BucketId(self.allocated_buckets);
+                self.allocated_buckets += 1;
+                bucket
+            });
 
-            // Write in stable store that this bucket belongs to the memory with the provided `id`.
+            memory_bucket.push(new_bucket_id);
             write(
                 &self.memory,
                 bucket_allocations_address(new_bucket_id).get(),
