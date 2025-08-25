@@ -40,16 +40,16 @@ Stable structures are able to work directly in stable memory because each data s
 its own memory.
 When initializing a stable structure, a memory is provided that the data structure can use to store its data.
 
-### Basic Usage
+Here are some basic examples:
 
-Here's a basic example:
+### Example: BTreeMap
 
 ```rust
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
-let mut map: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
+let mut map: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
 
-map.insert(1, "hello".to_string());
-assert_eq!(map.get(&1), Some("hello".to_string()));
+map.insert(1, 2);
+assert_eq!(map.get(&1), Some(2));
 ```
 
 Memories are abstracted with the [Memory] trait, and stable structures can work with any storage
@@ -58,30 +58,39 @@ This includes stable memory, a vector ([VectorMemory]), or even a flat file ([Fi
 
 The example above initializes a [BTreeMap] with a [DefaultMemoryImpl], which maps to stable memory when used in a canister and to a [VectorMemory] otherwise.
 
-### Memory Isolation Requirement
+### Example: BTreeSet
 
-> **⚠️ CRITICAL:** Stable structures **MUST NOT** share memories!
-> Each memory must belong to only one stable structure.
+The `BTreeSet` is a stable set implementation based on a B-Tree. It allows efficient insertion, deletion, and lookup of unique elements.
 
-For example, this fails when run in a canister:
+```rust
+use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
 
-```rust,ignore
-use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
-let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(DefaultMemoryImpl::default());
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(DefaultMemoryImpl::default());
-
-map_a.insert(1, b'A');
-map_b.insert(1, b'B');
-assert_eq!(map_a.get(&1), Some(b'A')); // ❌ FAILS: Returns b'B' due to shared memory!
-assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds, but corrupted map_a
+set.insert(42);
+assert!(set.contains(&42));
+assert_eq!(set.pop_first(), Some(42));
+assert!(set.is_empty());
 ```
 
-It fails because both `map_a` and `map_b` are using the same stable memory under the hood, and so changes in `map_b` end up changing or corrupting `map_a`.
 
-### Using MemoryManager
+Note that **stable structures cannot share memories.**
+Each memory must belong to only one stable structure.
+For example, this fails when run in a canister:
 
-To address this issue, we use the [MemoryManager](memory_manager::MemoryManager), which takes a single memory and creates up to 255 virtual memories for our use.
-Here's the above failing example, but fixed:
+```no_run
+use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+let mut map_1: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
+let mut map_2: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
+
+map_1.insert(1, 2);
+map_2.insert(1, 3);
+assert_eq!(map_1.get(&1), Some(2)); // This assertion fails.
+```
+
+It fails because both `map_1` and `map_2` are using the same stable memory under the hood, and so changes in `map_1` end up changing or corrupting `map_2`.
+
+To address this issue, we make use of the [MemoryManager](memory_manager::MemoryManager), which takes a single memory and creates up to 255 virtual memories for our disposal.
+Here's the above failing example, but fixed by using the [MemoryManager](memory_manager::MemoryManager):
 
 ```rust
 use ic_stable_structures::{
@@ -89,77 +98,12 @@ use ic_stable_structures::{
    BTreeMap, DefaultMemoryImpl,
 };
 let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
-let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
-let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
+let mut map_1: BTreeMap<u64, u64, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(0)));
+let mut map_2: BTreeMap<u64, u64, _> = BTreeMap::init(mem_mgr.get(MemoryId::new(1)));
 
-map_a.insert(1, b'A');
-map_b.insert(1, b'B');
-assert_eq!(map_a.get(&1), Some(b'A')); // ✅ Succeeds: Each map has its own memory
-assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds: No data corruption
-```
-
-### Memory Reclamation
-
-During migrations you often create a new structure (B) and copy data from an existing one (A). Without reclamation, this can double memory usage even after A is no longer needed.
-
-Bucket IDs are an internal implementation detail — hidden and not user-controllable — and each virtual memory must receive bucket IDs in strictly ascending order. Because of this, reuse of freed buckets is guaranteed when allocating into a newly created (empty) structure. For existing structures, reuse may or may not work: it succeeds only if there is a free bucket with an ID greater than the structure’s current maximum; otherwise a new bucket is allocated.
-
-Example: A = `[0, 4, 5]`, B = `[1, 2, 3]`. After releasing A, `free = [0, 4, 5]`. When B grows, it can’t take `0` (must be `> 3`) but can take `4` → `B = [1, 2, 3, 4]`, `free = [0, 5]`.
-
-**Recommendation:** for predictable reuse migrate into a newly created structure rather than relying on reuse with a populated one.
-
-> **⚠️ CRITICAL SAFETY REQUIREMENT:**
-> - **MUST** drop the original structure object before calling `reclaim_memory`.
-> - **NEVER** use the original structure after reclamation — doing so corrupts data.
-
-The `MemoryManager` provides a `reclaim_memory` method to efficiently handle these scenarios:
-
-```rust
-use ic_stable_structures::{
-    memory_manager::{MemoryId, MemoryManager},
-    BTreeMap, DefaultMemoryImpl, Memory,
-};
-
-let mem = DefaultMemoryImpl::default();
-let mem_mgr = MemoryManager::init(mem.clone());
-let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
-
-// ========================================
-// Scenario 1: WITHOUT reclamation
-// ========================================
-let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
-map_a.insert(1, b'A');              // Populate map A with data
-let data = map_a.get(&1);           // Extract data for migration
-map_a.clear_new();                  // A is now empty
-drop(map_a);                        // Memory stays allocated to mem_id_a
-let actual_size_before_migration = mem.size();
-
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::new(mem_mgr.get(mem_id_b));
-map_b.insert(1, data.unwrap());     // B allocates NEW memory
-let actual_size_after_migration = mem.size();
-                                    // Result: ~2x memory usage
-                                    // Memory allocation grew (waste)
-assert!(actual_size_before_migration < actual_size_after_migration);
-
-// ========================================
-// Scenario 2: WITH reclamation
-// ========================================
-let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
-map_a.insert(1, b'A');              // Populate map A with data
-let data = map_a.get(&1);           // Extract data for migration
-map_a.clear_new();                  // A is now empty
-drop(map_a);                        // Drop A completely
-let actual_size_before_migration = mem.size();
-mem_mgr.reclaim_memory(mem_id_a);   // Free A's memory buckets for reuse
-
-// Reusing free memory buckets works best on newly created structures
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::new(mem_mgr.get(mem_id_b));
-map_b.insert(1, data.unwrap());     // B reuses A's reclaimed memory buckets
-let actual_size_after_migration = mem.size();
-                                    // Result: 1x memory usage
-                                    // Memory allocation stayed the same (no waste)
-assert!(actual_size_before_migration == actual_size_after_migration);
+map_1.insert(1, 2);
+map_2.insert(1, 3);
+assert_eq!(map_1.get(&1), Some(2)); // Succeeds, as expected.
 ```
 
 ## Example Canister
@@ -191,7 +135,7 @@ thread_local! {
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 
     // Initialize a `StableBTreeMap` with `MemoryId(0)`.
-    static MAP: RefCell<StableBTreeMap<u64, String, Memory>> = RefCell::new(
+    static MAP: RefCell<StableBTreeMap<u128, u128, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
         )
@@ -200,32 +144,32 @@ thread_local! {
 
 // Retrieves the value associated with the given key if it exists.
 #[ic_cdk_macros::query]
-fn get(key: u64) -> Option<String> {
+fn get(key: u128) -> Option<u128> {
     MAP.with(|p| p.borrow().get(&key))
 }
 
 // Inserts an entry into the map and returns the previous value of the key if it exists.
 #[ic_cdk_macros::update]
-fn insert(key: u64, value: String) -> Option<String> {
+fn insert(key: u128, value: u128) -> Option<u128> {
     MAP.with(|p| p.borrow_mut().insert(key, value))
 }
 ```
 
 ### More Examples
 
-- [Basic Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/basic_example): Simple usage patterns
+- [Basic Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/basic_example) (the one above)
 - [Quickstart Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/quick_start): Ideal as a template when developing a new canister
 - [Custom Types Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/custom_types_example): Showcases storing your own custom types
 
 ## Combined Persistence
 
-If your project uses only stable structures, memory can expand in size without requiring `pre_upgrade`/`post_upgrade` hooks.
+If your project exclusively relies on stable structures, the memory can expand in size without the requirement of `pre_upgrade`/`post_upgrade` hooks.
 
-However, if you also need to serialize/deserialize heap data, you must use the memory manager to avoid conflicts. To combine both approaches effectively, refer to the [Quickstart Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/quick_start) for guidance.
+However, it's important to note that if you also intend to perform serialization/deserialization of the heap data, utilizing the memory manager becomes necessary. To effectively combine both approaches, refer to the [Quickstart Example](https://github.com/dfinity/stable-structures/tree/main/examples/src/quick_start) for guidance.
 
 ## Fuzzing
 
-Stable structures require strong guarantees to work reliably and scale over millions of operations. To that extent, we use fuzzing to emulate such operations on the available data structures.
+Stable structures requires strong guarantees to work reliably and scale over millions of operations. To that extent, we use fuzzing to emulate such operations on the available data structures.
 
 To run a fuzzer locally, 
 ```sh

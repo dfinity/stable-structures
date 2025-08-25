@@ -112,8 +112,8 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 ///
 /// ## Multiple BTreeMaps and Memory Management
 ///
-/// > **⚠️ CRITICAL:** Stable structures **MUST NOT** share memories!
-/// > Each memory must belong to only one stable structure.
+/// **Important**: Each stable structure requires its own designated memory region. Attempting to
+/// initialize multiple structures with the same memory will lead to data corruption.
 ///
 /// ### What NOT to do:
 ///
@@ -121,14 +121,13 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
 ///
 /// // ERROR: Using the same memory for multiple BTreeMaps will corrupt data
-/// let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(DefaultMemoryImpl::default());
-/// let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(DefaultMemoryImpl::default());
+/// let mut map_1: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
+/// let mut map_2: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
 ///
-/// map_a.insert(1, b'A');
-/// map_b.insert(1, b'B');
-/// // This assertion would fail: changes to map_b corrupt map_a's data
-/// assert_eq!(map_a.get(&1), Some(b'A')); // ❌ FAILS: Returns b'B' due to shared memory!
-/// assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds, but corrupted map_a
+/// map_1.insert(1, "two".to_string());
+/// map_2.insert(1, "three".to_string());
+/// // This assertion would fail: changes to map_2 corrupt map_1's data
+/// assert_eq!(map_1.get(&1), Some("two".to_string()));
 /// ```
 ///
 /// ### Correct approach using MemoryManager:
@@ -138,15 +137,18 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 ///    memory_manager::{MemoryId, MemoryManager},
 ///    BTreeMap, DefaultMemoryImpl,
 /// };
-/// let mem_mgr = MemoryManager::init(DefaultMemoryImpl::default());
-/// let (mem_id_a, mem_id_b) = (MemoryId::new(0), MemoryId::new(1));
-/// let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_a));
-/// let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(mem_mgr.get(mem_id_b));
 ///
-/// map_a.insert(1, b'A');
-/// map_b.insert(1, b'B');
-/// assert_eq!(map_a.get(&1), Some(b'A')); // ✅ Succeeds: Each map has its own memory
-/// assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds: No data corruption
+/// // Initialize the memory manager with a single memory
+/// let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
+///
+/// // Get separate virtual memories for each BTreeMap
+/// let mut map_1: BTreeMap<u64, String, _> = BTreeMap::init(memory_manager.get(MemoryId::new(0)));
+/// let mut map_2: BTreeMap<u64, String, _> = BTreeMap::init(memory_manager.get(MemoryId::new(1)));
+///
+/// map_1.insert(1, "two".to_string());
+/// map_2.insert(1, "three".to_string());
+/// // Now this works as expected
+/// assert_eq!(map_1.get(&1), Some("two".to_string()));
 /// ```
 ///
 /// The [`MemoryManager`](crate::memory_manager::MemoryManager) creates up to 255 virtual memories
@@ -708,14 +710,14 @@ where
     // TODO: In next major release (v1.0), rename this method to `clear` to follow
     // standard Rust collection naming conventions.
     ///
-    /// # Safety Note for Memory Reclamation
-    /// If using manual memory reclamation via `MemoryManager::reclaim_memory()`:
+    /// # Safety Note for Bucket Release
+    /// If using manual bucket release via `MemoryManager::release_virtual_memory_buckets()`:
     /// 1. **MANDATORY**: Drop this BTreeMap object first (let it go out of scope)
-    /// 2. Call `reclaim_memory()` on the memory manager
+    /// 2. Call `release_virtual_memory_buckets()` on the memory manager
     /// 3. Create new structures as needed
     ///
-    /// Using this BTreeMap after memory reclamation causes data corruption.
-    /// Note: You can still call `clear_new()` if you need to clear data without memory reclamation.
+    /// Using this BTreeMap after bucket release causes data corruption.
+    /// Note: You can still call `clear_new()` if you need to clear data without bucket release.
     pub fn clear_new(&mut self) {
         self.root_addr = NULL;
         self.length = 0;

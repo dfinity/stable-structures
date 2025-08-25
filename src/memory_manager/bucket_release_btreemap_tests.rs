@@ -1,13 +1,13 @@
-//! Migration scenario tests for BTreeMap with memory reclamation.
+//! Migration scenario tests for BTreeMap with bucket release.
 //!
 //! These tests demonstrate real-world migration patterns where users move data
-//! from one structure to another. They show how memory reclamation prevents memory
+//! from one structure to another. They show how bucket release prevents memory
 //! waste during common migration scenarios, and most importantly, demonstrate
 //! the data corruption bug and its safe usage solution.
 //!
 //! **CRITICAL SAFETY REQUIREMENTS**:
-//! All memory reclamation operations require mandatory Rust object drop BEFORE reclamation.
-//! Using original data structures after memory reclamation causes data corruption.
+//! All bucket release operations require mandatory Rust object drop BEFORE release.
+//! Using original data structures after bucket release causes data corruption.
 //! See MemoryManager documentation for proper usage patterns.
 
 use super::{MemoryId, MemoryManager};
@@ -24,8 +24,8 @@ fn large_value(id: u64) -> Vec<u8> {
 }
 
 #[test]
-fn migration_without_reclaim_wastes_buckets() {
-    // Scenario: Populate A → Drop A without memory reclamation → Populate B
+fn migration_without_release_wastes_buckets() {
+    // Scenario: Populate A → Drop A without bucket release → Populate B
     // Result: B cannot reuse A's buckets, causing memory waste (growth)
     let (a, b) = (MemoryId::new(0), MemoryId::new(1));
     let mock_stable_memory = VectorMemory::default();
@@ -42,7 +42,7 @@ fn migration_without_reclaim_wastes_buckets() {
     drop(a_map);
     let stable_before = mock_stable_memory.size();
 
-    // Allocate in B → should need new buckets since A's aren't reclaimed
+    // Allocate in B → should need new buckets since A's aren't released
     let mut b_map = BTreeMap::init(mm.get(b));
     for i in 0u64..50 {
         b_map.insert(i, large_value(i + 100));
@@ -55,9 +55,9 @@ fn migration_without_reclaim_wastes_buckets() {
 }
 
 #[test]
-fn migration_with_reclaim_reuses_buckets() {
-    // Scenario: Populate A → Drop A with memory reclamation → Populate B
-    // Result: B reuses A's reclaimed buckets, preventing memory waste (no growth)
+fn migration_with_release_reuses_buckets() {
+    // Scenario: Populate A → Drop A with bucket release → Populate B
+    // Result: B reuses A's released buckets, preventing memory waste (no growth)
     let (a, b) = (MemoryId::new(0), MemoryId::new(1));
     let mock_stable_memory = VectorMemory::default();
     let mm = MemoryManager::init(mock_stable_memory.clone());
@@ -69,15 +69,15 @@ fn migration_with_reclaim_reuses_buckets() {
     }
     assert_eq!(a_map.len(), 50);
 
-    // MANDATORY: Drop the Rust object before reclaiming memory
+    // MANDATORY: Drop the Rust object before releasing buckets
     drop(a_map);
 
-    // Reclaim the memory after dropping the object
-    let pages_reclaimed = mm.reclaim_memory(a);
-    assert!(pages_reclaimed > 0);
+    // Release the buckets after dropping the object
+    let released_buckets = mm.release_virtual_memory_buckets(a);
+    assert!(released_buckets > 0);
     let stable_before = mock_stable_memory.size();
 
-    // Allocate in B → should reuse A's reclaimed buckets
+    // Allocate in B → should reuse A's released buckets
     let mut b_map = BTreeMap::init(mm.get(b));
     for i in 0u64..50 {
         b_map.insert(i, large_value(i + 100));
@@ -92,8 +92,8 @@ fn migration_with_reclaim_reuses_buckets() {
     );
 }
 
-/// **DANGER**: This test demonstrates data corruption from unsafe memory reclamation usage.
-/// This shows what happens when you DON'T drop the original object before memory reclamation.
+/// **DANGER**: This test demonstrates data corruption from unsafe bucket release usage.
+/// This shows what happens when you DON'T drop the original object before bucket release.
 #[test]
 fn data_corruption_without_mandatory_drop() {
     let (a, b) = (MemoryId::new(0), MemoryId::new(1));
@@ -104,10 +104,10 @@ fn data_corruption_without_mandatory_drop() {
     map_a.insert(1u64, 100u64);
     assert_eq!(map_a.get(&1u64).unwrap(), 100u64);
 
-    // DANGEROUS: Reclaim memory but keep map_a alive
-    mm.reclaim_memory(a);
+    // DANGEROUS: Release buckets but keep map_a alive
+    mm.release_virtual_memory_buckets(a);
 
-    // Create BTreeMap B - reuses A's reclaimed buckets
+    // Create BTreeMap B - reuses A's released buckets
     let mut map_b = BTreeMap::init(mm.get(b));
     map_b.insert(2u64, 200u64);
     assert_eq!(map_b.get(&2u64).unwrap(), 200u64);
@@ -135,7 +135,7 @@ fn data_corruption_without_mandatory_drop() {
         Ok(_) => {
             // If it succeeds, check if map_b can see the new data (shared allocation)
             if map_b.get(&3u64).is_some() {
-                println!("CORRUPTION: Both maps operating on the same reclaimed memory space");
+                println!("CORRUPTION: Both maps operating on the same released memory space");
             }
         }
         Err(_) => {
@@ -144,10 +144,10 @@ fn data_corruption_without_mandatory_drop() {
         }
     }
 
-    // This test proves why objects MUST be dropped before memory reclamation
+    // This test proves why objects MUST be dropped before bucket release
 }
 
-/// **SAFE**: This test demonstrates the correct way to use memory reclamation.
+/// **SAFE**: This test demonstrates the correct way to use bucket release.
 /// This shows how mandatory drop prevents data corruption.
 #[test]
 fn safe_usage_with_mandatory_drop() {
@@ -159,14 +159,14 @@ fn safe_usage_with_mandatory_drop() {
     map_a.insert(1u64, 100u64);
     assert_eq!(map_a.get(&1u64).unwrap(), 100u64);
 
-    // MANDATORY: Drop the Rust object before reclaiming memory
+    // MANDATORY: Drop the Rust object before releasing buckets
     drop(map_a);
 
-    // Reclaim the memory after dropping the object
-    let pages_reclaimed = mm.reclaim_memory(a);
-    assert!(pages_reclaimed > 0);
+    // Release the buckets after dropping the object
+    let released_buckets = mm.release_virtual_memory_buckets(a);
+    assert!(released_buckets > 0);
 
-    // Create BTreeMap B - safely reuses A's reclaimed buckets
+    // Create BTreeMap B - safely reuses A's released buckets
     let mut map_b = BTreeMap::init(mm.get(b));
     map_b.insert(2u64, 200u64);
     assert_eq!(map_b.get(&2u64).unwrap(), 200u64);
