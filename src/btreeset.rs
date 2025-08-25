@@ -352,15 +352,6 @@ where
     /// set.clear();
     /// assert!(set.is_empty());
     /// ```
-    ///
-    /// # Safety Note for Memory Reclamation
-    /// If using manual memory reclamation via `MemoryManager::reclaim_memory()`:
-    /// 1. **MANDATORY**: Drop this BTreeSet object first (let it go out of scope)
-    /// 2. Call `reclaim_memory()` on the memory manager
-    /// 3. Create new structures as needed
-    ///
-    /// Using this BTreeSet after memory reclamation causes data corruption.
-    /// Note: You can still call `clear()` if you need to clear data without memory reclamation.
     pub fn clear(&mut self) {
         self.map.clear_new();
     }

@@ -55,15 +55,12 @@ Here's how to initialize a stable `BTreeMap` using `DefaultMemoryImpl`:
 
 ```rust
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
-let mut map: BTreeMap<u64, String, _> = BTreeMap::init(DefaultMemoryImpl::default());
-
-map.insert(1, "hello".to_string());
-assert_eq!(map.get(&1), Some("hello".to_string()));
+let mut map: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
 ```
 
 ```admonish warning ""
-**⚠️ CRITICAL:** Stable structures **MUST NOT** share memories!
-Each memory must belong to only one stable structure.
+**Important**: Stable structures cannot share memories.
+Each memory must be dedicated to a single stable structure.
 ```
 
 While the above example works correctly, it demonstrates a potential issue: the `BTreeMap` will use the entire stable memory.
@@ -72,16 +69,15 @@ For example, the following code will fail in a canister:
 
 ```rust
 use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
-let mut map_a: BTreeMap<u64, u8, _> = BTreeMap::init(DefaultMemoryImpl::default());
-let mut map_b: BTreeMap<u64, u8, _> = BTreeMap::init(DefaultMemoryImpl::default());
+let mut map_1: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
+let mut map_2: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
 
-map_a.insert(1, b'A');
-map_b.insert(1, b'B');
-assert_eq!(map_a.get(&1), Some(b'A')); // ❌ FAILS: Returns b'B' due to shared memory!
-assert_eq!(map_b.get(&1), Some(b'B')); // ✅ Succeeds, but corrupted map_a
+map_1.insert(1, 2);
+map_2.insert(1, 3);
+assert_eq!(map_1.get(&1), Some(2)); // This assertion fails.
 ```
 
-The code fails because both `map_a` and `map_b` are using the same stable memory.
+The code fails because both `map_1` and `map_2` are using the same stable memory.
 This causes changes in one map to affect or corrupt the other.
 
 To solve this problem, the library provides the [MemoryManager](./memory-manager.md), which creates up to 255 virtual memories from a single memory instance.
