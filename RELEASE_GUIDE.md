@@ -1,6 +1,6 @@
 # Release Guide (stable-structures)
 
-This guide describes how to cut releases and publish them to [crates.io](https://crates.io) for `ic-stable-structures`.
+This guide describes how to cut releases and publish them to [crates.io](https://crates.io/crates/ic-stable-structures) for `ic-stable-structures`.
 
 ## Goals
 
