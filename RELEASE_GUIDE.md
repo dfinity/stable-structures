@@ -38,6 +38,11 @@ Cargo won’t auto-pick pre-releases; users must pin them explicitly.
 - **Processing-only changes** (no layout change)  
   - Compatible algorithmic updates → minor bump  
   - High risk → feature flag and/or pre-release
+  - Examples
+    - Changing default values, coercions, or type conversions  
+    - Altering validation rules  
+    - Updating how parsing, ordering, deduplication, or filtering logic is applied  
+    - Modifying error handling or recovery behavior when reading/writing to stable memory  
 
 - **Hidden layout migrations** (auto-migrate on load)  
   - If old data won’t load without migration → treat as breaking  
