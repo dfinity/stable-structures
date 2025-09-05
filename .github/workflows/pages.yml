@@ -25,7 +25,7 @@ jobs:
       MDBOOK_LINKCHECK_VERSION: 0.7.7
       RUST_VERSION: 1.84.0 # Use the same version as in `rust-toolchain.toml`
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust
         run: |

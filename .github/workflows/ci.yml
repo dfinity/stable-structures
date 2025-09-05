@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cache Cargo
         uses: actions/cache@v4
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/cache@v4
         with:
           path: |
@@ -114,10 +114,10 @@ jobs:
 
     steps:
       - name: Checkout current PR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout baseline branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
           path: _canbench_baseline_branch
@@ -163,7 +163,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Save PR number
         run: |
