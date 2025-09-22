@@ -221,6 +221,25 @@ fn test_iter() {
     assert_eq!(log.iter().skip(usize::MAX).count(), 0);
 }
 
+#[test]
+fn test_first_last() {
+    let log = Log::<String, _, _>::new(VectorMemory::default(), VectorMemory::default());
+    assert_eq!(log.first(), None);
+    assert_eq!(log.last(), None);
+
+    log.append(&"apple".to_string()).unwrap();
+    assert_eq!(log.first(), Some("apple".to_string()));
+    assert_eq!(log.last(), Some("apple".to_string()));
+
+    log.append(&"banana".to_string()).unwrap();
+    assert_eq!(log.first(), Some("apple".to_string()));
+    assert_eq!(log.last(), Some("banana".to_string()));
+
+    log.append(&"cider".to_string()).unwrap();
+    assert_eq!(log.first(), Some("apple".to_string()));
+    assert_eq!(log.last(), Some("cider".to_string()));
+}
+
 #[allow(clippy::iter_nth_zero)]
 #[test]
 fn test_thread_local_iter() {

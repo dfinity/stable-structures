@@ -180,6 +180,26 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
         log
     }
 
+    /// Returns the first entry in the log, if any.
+    ///
+    /// Complexity: O(1)
+    #[inline]
+    pub fn first(&self) -> Option<T> {
+        self.get(0)
+    }
+
+    /// Returns the last entry in the log, if any.
+    ///
+    /// Complexity: O(1)
+    #[inline]
+    pub fn last(&self) -> Option<T> {
+        let len = self.len();
+        if len == 0 {
+            return None;
+        }
+        self.get(len - 1)
+    }
+
     /// Initializes the log based on the contents of the provided memory trait objects.
     /// If the memory trait objects already contain a stable log, this function recovers it from the stable
     /// memory. Otherwise, this function allocates a new empty log.
