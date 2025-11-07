@@ -26,6 +26,7 @@ CANBENCH_RESULTS_CSV_FILE="/tmp/canbench_results_${CANBENCH_JOB_NAME}.csv"
 
 # Install canbench.
 cargo install --version 0.2.0 --locked canbench
+#cargo install --git https://github.com/dfinity/canbench canbench --branch maksym/order --locked
 
 # Verify that the canbench results file exists.
 if [ ! -f "$CANBENCH_RESULTS_FILE" ]; then
