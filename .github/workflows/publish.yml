@@ -1,0 +1,39 @@
+name: Publish stable-structures to crates.io
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish-ic-stable-structures:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write # Required for OIDC token exchange
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      - name: Set Cargo.toml versions
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref }}
+        run: |
+          sed -i -e "s/0\\.0\\.0-git/${RELEASE_TAG##*\/v}/" Cargo.toml
+
+      - run: cargo publish -p ic-stable-structures
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Post to a Slack channel
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_API_TOKEN }}
+          payload: |
+            channel: eng-dsm-alerts
+            text: "New `stable-structures` crate (version `${{ github.ref_name }}`) has been published to crates.io"
