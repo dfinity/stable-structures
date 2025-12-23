@@ -25,7 +25,7 @@ jobs:
         run: |
           sed -i '' -e "s/0\\.0\\.0-git/${RELEASE_TAG##*\/v}/" Cargo.toml
 
-      - run: cargo publish -p ic-stable-structures
+      - run: cargo publish -p ic-stable-structures --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
