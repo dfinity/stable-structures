@@ -285,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "ic-stable-structures"
-version = "0.7.2"
+version = "0.0.0-git"
 dependencies = [
  "ic_principal",
 ]
