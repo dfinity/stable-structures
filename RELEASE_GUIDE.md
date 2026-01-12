@@ -85,25 +85,9 @@ Adding a `reclaim()` method to free unused memory without changing layout, only 
 
 ### Publish to crates.io
 
-1. Generate an API token:  
-   - Log in to crates.io → **Account Settings** → **API Tokens** → generate a new token.  
-2. Authenticate:  
-   ```bash
-   cargo login
-   ```
-   Enter the token when prompted.  
-3. Check out the repo at the release tag:  
-   ```bash
-   git checkout vX.Y.Z
-   ```
-4. Dry-run publish (mandatory):  
-   ```bash
-   cargo publish -p ic-stable-structures --dry-run
-   ```
-5. Publish:  
-   ```bash
-   cargo publish -p ic-stable-structures
-   ```
+1. On the repository main page, navigate to the `Actions` tab.
+2. Click on the workflow to publish to crates.io
+3. Click on `run workflow` and select the version tag created above for the workflow to run on.
 
 ### Verify
 
