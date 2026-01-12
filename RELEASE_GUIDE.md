@@ -71,7 +71,7 @@ Adding a `reclaim()` method to free unused memory without changing layout, only 
 2. Ensure CI is green.  
 3. Preferable commit & PR name: `chore(release): vX.Y.Z` ([example PR](https://github.com/dfinity/stable-structures/pull/379)).  
 
-### Publish Release to GitHub and crates.io
+### Publish Release to GitHub
 
 1. Identify the commit to release.  
 2. Draft a new release:  
@@ -81,7 +81,29 @@ Adding a `reclaim()` method to free unused memory without changing layout, only 
    - Set the release title to `vX.Y.Z`.  
    - Choose the previous tag as the last release.  
    - Add release notes (GitHub can auto-generate, adjust as needed).  
-3. Click **Publish release**, which will also trigger publication to crates.io
+3. Click **Publish release**.  
+
+### Publish to crates.io
+
+1. Generate an API token:  
+   - Log in to crates.io → **Account Settings** → **API Tokens** → generate a new token.  
+2. Authenticate:  
+   ```bash
+   cargo login
+   ```
+   Enter the token when prompted.  
+3. Check out the repo at the release tag:  
+   ```bash
+   git checkout vX.Y.Z
+   ```
+4. Dry-run publish (mandatory):  
+   ```bash
+   cargo publish -p ic-stable-structures --dry-run
+   ```
+5. Publish:  
+   ```bash
+   cargo publish -p ic-stable-structures
+   ```
 
 ### Verify
 

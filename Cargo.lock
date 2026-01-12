@@ -302,7 +302,7 @@ dependencies = [
 
 [[package]]
 name = "ic-stable-structures"
-version = "0.0.0-git"
+version = "0.7.2"
 dependencies = [
  "canbench-rs",
  "candid",
