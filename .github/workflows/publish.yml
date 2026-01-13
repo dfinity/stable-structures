@@ -34,4 +34,4 @@ jobs:
           token: ${{ secrets.SLACK_API_TOKEN }}
           payload: |
             channel: eng-dsm-alerts
-            text: "${{ inputs.dryRun == true && 'DRY RUN: ' || '' }}New `stable-structures` crate (version `${{ github.ref_name }}`) has been published to crates.io"
+            text: "${{ inputs.dryRun == true && 'DRY RUN: ' || '' }}Cargo publish attempted for `stable-structures` (ref `${{ github.ref_name }}`). <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow run>."
