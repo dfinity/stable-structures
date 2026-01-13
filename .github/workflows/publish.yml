@@ -1,0 +1,37 @@
+name: Publish stable-structures to crates.io
+
+on:
+  workflow_dispatch:
+    inputs:
+      dryRun:
+        description: "If true, runs cargo publish with --dry-run"
+        required: false
+        type: boolean
+
+jobs:
+  publish-ic-stable-structures:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write # Required for OIDC token exchange
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      - run: echo "Preparing to cargo publish ${{ github.ref_name }}."
+
+      - run: cargo publish -p ic-stable-structures ${{ inputs.dryRun == true && '--dry-run' || '' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Post to a Slack channel
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_API_TOKEN }}
+          payload: |
+            channel: eng-dsm-alerts
+            text: "${{ inputs.dryRun == true && 'DRY RUN: ' || '' }}New `stable-structures` crate (version `${{ github.ref_name }}`) has been published to crates.io"
