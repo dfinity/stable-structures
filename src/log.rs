@@ -300,6 +300,16 @@ impl<T: Storable, INDEX: Memory, DATA: Memory> Log<T, INDEX, DATA> {
         (self.index_memory, self.data_memory)
     }
 
+    /// Removes all entries from the log.
+    ///
+    /// After clearing, `len()` returns 0 and the next `append` writes at
+    /// data offset 0, overwriting old data naturally. Headers are preserved.
+    ///
+    /// Complexity: O(1)
+    pub fn clear(&self) {
+        write_u64(&self.index_memory, Address::from(HEADER_OFFSET), 0);
+    }
+
     /// Returns true iff this log does not have any entries.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
