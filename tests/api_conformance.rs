@@ -293,7 +293,6 @@ fn api_conformance_min_heap() {
         std.push(Reverse(i));
     }
     stable.clear();
-    // BinaryHeap has no clear that returns nothing — use .clear()
     std.clear();
     assert_eq!(stable.len(), std.len() as u64);
     assert_eq!(stable.is_empty(), std.is_empty());
