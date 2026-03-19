@@ -27,6 +27,56 @@ fn test_log_construct() {
 }
 
 #[test]
+fn test_log_clear() {
+    let log = Log::<Vec<u8>, _, _>::new(VectorMemory::default(), VectorMemory::default());
+    log.append(&b"DEADBEEF".to_vec())
+        .expect("failed to append entry");
+    log.append(&b"FEEDBAD".to_vec())
+        .expect("failed to append entry");
+    assert_eq!(log.len(), 2);
+
+    log.clear();
+
+    assert_eq!(log.len(), 0);
+    assert!(log.is_empty());
+    assert_eq!(log.get(0), None);
+    assert_eq!(log.iter().count(), 0);
+    assert_eq!(log.log_size_bytes(), 0);
+}
+
+#[test]
+fn test_log_clear_then_append() {
+    let log = Log::<Vec<u8>, _, _>::new(VectorMemory::default(), VectorMemory::default());
+    log.append(&b"old_entry".to_vec()).unwrap();
+    log.clear();
+
+    let idx = log.append(&b"new_entry".to_vec()).unwrap();
+    assert_eq!(idx, 0);
+    assert_eq!(log.len(), 1);
+    assert_eq!(log.get(0).unwrap(), b"new_entry".to_vec());
+}
+
+#[test]
+fn test_log_clear_empty() {
+    let log = Log::<Vec<u8>, _, _>::new(VectorMemory::default(), VectorMemory::default());
+    log.clear();
+    assert_eq!(log.len(), 0);
+    assert!(log.is_empty());
+}
+
+#[test]
+fn test_log_clear_persistence() {
+    let log = Log::<Vec<u8>, _, _>::new(VectorMemory::default(), VectorMemory::default());
+    log.append(&b"entry".to_vec()).unwrap();
+    log.clear();
+
+    let (index_memory, data_memory) = log.into_memories();
+    let log = Log::<Vec<u8>, _, _>::init(index_memory, data_memory);
+    assert_eq!(log.len(), 0);
+    assert!(log.is_empty());
+}
+
+#[test]
 fn test_new_overwrites() {
     let log = Log::<Vec<u8>, _, _>::new(VectorMemory::default(), VectorMemory::default());
     log.append(&b"DEADBEEF".to_vec())
