@@ -43,6 +43,13 @@ impl<T: Storable, M: Memory> Vec<T, M> {
         self.0.into_memory()
     }
 
+    /// Removes all items from the vector.
+    ///
+    /// Complexity: O(1)
+    pub fn clear(&self) {
+        self.0.clear();
+    }
+
     /// Returns true if the vector is empty.
     ///
     /// Complexity: O(1)

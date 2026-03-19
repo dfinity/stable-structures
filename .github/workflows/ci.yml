@@ -47,7 +47,7 @@ jobs:
 
       - name: Build Fuzzers
         run: |
-          cargo install cargo-fuzz
+          cargo +nightly install cargo-fuzz
           cargo +nightly fuzz build
 
   examples:
