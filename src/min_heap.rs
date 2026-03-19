@@ -55,6 +55,13 @@ where
         self.0.len()
     }
 
+    /// Removes all items from the heap.
+    ///
+    /// Complexity: O(1)
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+
     /// Returns true if the heap is empty.
     ///
     /// Complexity: O(1)

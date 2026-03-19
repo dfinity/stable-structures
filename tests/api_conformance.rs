@@ -286,6 +286,16 @@ fn api_conformance_min_heap() {
     assert_eq!(stable.len(), 0);
     assert!(stable.is_empty());
     assert!(std.is_empty());
+
+    // Clear.
+    for i in 0..n {
+        stable.push(&i);
+        std.push(Reverse(i));
+    }
+    stable.clear();
+    std.clear();
+    assert_eq!(stable.len(), std.len() as u64);
+    assert_eq!(stable.is_empty(), std.is_empty());
 }
 
 #[test]
@@ -332,6 +342,16 @@ fn api_conformance_vec() {
     }
 
     // After popping everything, both should be empty.
+    assert_eq!(stable.len(), std.len() as u64);
+    assert_eq!(stable.is_empty(), std.is_empty());
+
+    // Clear.
+    for i in 0..n {
+        stable.push(&i);
+        std.push(i);
+    }
+    stable.clear();
+    std.clear();
     assert_eq!(stable.len(), std.len() as u64);
     assert_eq!(stable.is_empty(), std.is_empty());
 }
@@ -391,4 +411,10 @@ fn api_conformance_log() {
     // Iteration
     let log_items: Vec<_> = log.iter().collect();
     assert_eq!(log_items, std);
+
+    // Clear.
+    log.clear();
+    std.clear();
+    assert_eq!(log.len(), std.len() as u64);
+    assert_eq!(log.is_empty(), std.is_empty());
 }

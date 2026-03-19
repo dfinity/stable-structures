@@ -157,6 +157,16 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         self.memory
     }
 
+    /// Removes all items from the vector.
+    ///
+    /// The next `push` will write at slot 0, overwriting old data naturally.
+    /// Headers are preserved.
+    ///
+    /// Complexity: O(1)
+    pub fn clear(&self) {
+        self.set_len(0);
+    }
+
     /// Returns true if the vector is empty.
     ///
     /// Complexity: O(1)

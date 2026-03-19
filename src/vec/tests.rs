@@ -273,6 +273,54 @@ impl crate::Storable for BuggyStruct {
 }
 
 #[test]
+fn clear() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.push(&1);
+    sv.push(&2);
+    sv.push(&3);
+    assert_eq!(sv.len(), 3);
+
+    sv.clear();
+
+    assert_eq!(sv.len(), 0);
+    assert!(sv.is_empty());
+    assert_eq!(sv.get(0), None);
+    assert_eq!(sv.iter().count(), 0);
+}
+
+#[test]
+fn clear_then_push() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.push(&1);
+    sv.push(&2);
+    sv.clear();
+
+    sv.push(&42);
+    assert_eq!(sv.len(), 1);
+    assert_eq!(sv.get(0), Some(42));
+}
+
+#[test]
+fn clear_empty() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.clear();
+    assert_eq!(sv.len(), 0);
+    assert!(sv.is_empty());
+}
+
+#[test]
+fn clear_persistence() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.push(&1);
+    sv.clear();
+
+    let mem = sv.into_memory();
+    let sv = StableVec::<u64, M>::init(mem);
+    assert_eq!(sv.len(), 0);
+    assert!(sv.is_empty());
+}
+
+#[test]
 #[should_panic(expected = "expected an element with length <= 1 bytes, but found 4")]
 fn push_element_bigger_than_max_size_panics() {
     let sv = StableVec::<BuggyStruct, M>::new(M::default());

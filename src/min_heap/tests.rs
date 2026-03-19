@@ -93,6 +93,44 @@ impl Memory for EmptyMem {
 }
 
 #[test]
+fn test_clear() {
+    let mut heap = StableMinHeap::<u64, M>::new(M::default());
+    heap.push(&3);
+    heap.push(&1);
+    heap.push(&2);
+    assert_eq!(heap.len(), 3);
+
+    heap.clear();
+
+    assert_eq!(heap.len(), 0);
+    assert!(heap.is_empty());
+    assert_eq!(heap.peek(), None);
+    assert_eq!(heap.iter().count(), 0);
+}
+
+#[test]
+fn test_clear_then_push() {
+    let mut heap = StableMinHeap::<u64, M>::new(M::default());
+    heap.push(&10);
+    heap.push(&5);
+    heap.clear();
+
+    heap.push(&42);
+    assert_eq!(heap.len(), 1);
+    assert_eq!(heap.peek(), Some(42));
+    assert_eq!(heap.pop(), Some(42));
+    assert!(heap.is_empty());
+}
+
+#[test]
+fn test_clear_empty() {
+    let mut heap = StableMinHeap::<u64, M>::new(M::default());
+    heap.clear();
+    assert_eq!(heap.len(), 0);
+    assert!(heap.is_empty());
+}
+
+#[test]
 #[should_panic(expected = "GrowFailed { current_size: 0, delta: 1 }")]
 fn test_failure_new() {
     StableMinHeap::<u64, EmptyMem>::new(EmptyMem);
