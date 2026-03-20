@@ -714,7 +714,7 @@ where
             return None;
         }
         self.traverse(self.root_addr, key, |node, idx| {
-            node.value(idx, self.memory()).to_vec()
+            node.read_value_uncached(idx, self.memory())
         })
         .map(Cow::Owned)
         .map(V::from_bytes)

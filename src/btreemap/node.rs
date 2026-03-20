@@ -205,6 +205,15 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.get_value(&self.entries[idx], memory)
     }
 
+    /// Reads the value at `idx` without storing it in the node's lazy cache.
+    /// Avoids inflating cached nodes with large value buffers.
+    #[inline(always)]
+    pub fn read_value_uncached<M: Memory>(&self, idx: usize, memory: &M) -> Vec<u8> {
+        self.entries[idx]
+            .1
+            .read_uncached(|offset, size| self.load_value_from_memory(offset, size, memory))
+    }
+
     /// Extracts the contents of key (by loading it first if it's not loaded yet).
     fn extract_key<M: Memory>(&self, key: LazyKey<K>, memory: &M) -> K {
         key.take_or_load(|offset, size| self.load_key_from_memory(offset, size, memory))
@@ -592,6 +601,24 @@ impl LazyValue {
     #[inline(always)]
     pub fn take_or_load(self, load: impl FnOnce(Bytes, u32) -> Blob) -> Blob {
         self.0.take_or_load(load)
+    }
+
+    /// Reads the value without populating the OnceCell.
+    /// Returns the already-loaded value if present, otherwise reads from memory
+    /// into a fresh buffer without storing it in the node.
+    #[inline(always)]
+    fn read_uncached(&self, load: impl FnOnce(Bytes, u32) -> Blob) -> Blob {
+        match &self.0 {
+            LazyObject::ByVal(v) => v.clone(),
+            LazyObject::ByRef {
+                offset,
+                size,
+                loaded,
+            } => loaded
+                .get()
+                .cloned()
+                .unwrap_or_else(|| load(*offset, *size)),
+        }
     }
 }
 
