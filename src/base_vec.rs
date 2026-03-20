@@ -37,6 +37,7 @@ use crate::{
     Memory, Storable,
 };
 use std::borrow::{Borrow, Cow};
+use std::cell::Cell;
 use std::cmp::min;
 use std::fmt;
 use std::marker::PhantomData;
@@ -95,6 +96,7 @@ impl std::error::Error for InitError {}
 
 pub struct BaseVec<T: Storable, M: Memory> {
     memory: M,
+    cached_len: Cell<u64>,
     _marker: PhantomData<T>,
 }
 
@@ -117,6 +119,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         Self::write_header(&header, &memory)?;
         Ok(Self {
             memory,
+            cached_len: Cell::new(0),
             _marker: PhantomData,
         })
     }
@@ -148,6 +151,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
 
         Ok(Self {
             memory,
+            cached_len: Cell::new(header.len),
             _marker: PhantomData,
         })
     }
@@ -178,7 +182,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     ///
     /// Complexity: O(1)
     pub fn len(&self) -> u64 {
-        read_u64(&self.memory, Address::from(LEN_OFFSET))
+        self.cached_len.get()
     }
 
     /// Sets the item at the specified index to the specified value.
@@ -264,6 +268,7 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
     /// Sets the vector's length.
     fn set_len(&self, new_len: u64) {
         write_u64(&self.memory, Address::from(LEN_OFFSET), new_len);
+        self.cached_len.set(new_len);
     }
 
     /// Writes the size of the item at the specified offset.
