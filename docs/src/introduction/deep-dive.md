@@ -184,8 +184,10 @@ Always use `init` in a canister. Because stable memory survives upgrades, callin
 
 `BTreeMap` is currently the only structure that has shipped two layout versions, and its migration is a concrete example of the backward-compatibility principle above:
 
-- **V1** supports only `Bound::Bounded` types. Page size is derived from `max_key_size` and `max_value_size` stored in the header.
-- **V2** adds support for `Bound::Unbounded` types via explicit page sizes and overflow pages — nodes can chain multiple pages when a value exceeds the page size.
+The term "node page" here refers to the fixed-size byte buffer the internal allocator assigns to each B-tree node — not a Wasm page (64 KiB) and not a MemoryManager bucket.
+
+- **V1** supports only `Bound::Bounded` types. The node page size is derived at load time from `max_key_size` and `max_value_size` stored in the header, so it is implicit rather than stored explicitly.
+- **V2** adds support for `Bound::Unbounded` types by storing the node page size explicitly in the header and introducing overflow pages — when a node's data exceeds one page, it chains additional pages.
 
 Migration from V1 to V2 is **transparent and non-breaking**: calling `BTreeMap::init()` on an existing V1 map automatically upgrades it to V2 on first load — existing data is preserved, no user action required. Under the hood, `init()` calls `load_helper(memory, migrate_to_v2: true)`, which re-interprets the stored `max_key_size`/`max_value_size` as a `DerivedPageSize` for the V2 allocator. Loading a V2 map as V1 is rejected at startup.
 
@@ -241,151 +243,84 @@ The redesign also removes the current 32,768-bucket cap (`MAX_NUM_BUCKETS`), rai
 
 The tradeoff: this is a **breaking change**. The on-disk header format is incompatible with the current layout, so existing canisters will need a one-time migration when the new MemoryManager ships.
 
-## Segment 4 — Code walkthrough: BTreeMap::insert (25 min)
+## Segment 4 — StableBTreeMap (25 min)
 
-`StableBTreeMap` is the most complex and most commonly used structure. Walking an insert from the public API down to raw byte writes shows every major mechanism.
+`StableBTreeMap` is the most commonly used structure in this library, and its design is a direct response to the IC's per-round instruction limits.
 
-### 4a. File layout
+A hash map must rehash — copying all entries — when it grows, which is prohibitive at scale. A red-black tree avoids bulk copies but stores one key per node, so a lookup requires many scattered reads. A B-tree avoids both: it stores multiple keys per node in a single contiguous chunk, so each read fetches an entire node at once, and growth allocates exactly one new node at a time.
+
+The remaining challenge is fragmentation: B-tree splits, merges, and deletes free nodes at arbitrary positions, leaving holes. The internal free-list allocator reclaims those holes immediately, so stable memory stays compact and every byte is either actively used or available for the next allocation.
+
+### 4a. How BTreeMap works
+
+A `BTreeMap` is a tree of fixed-size nodes, each holding up to 11 key-value entries sorted by key. Lookups and inserts walk from the root down to a leaf, binary-searching within each node. Splits and merges keep the tree balanced.
+
+Each node is stored as a contiguous byte chunk allocated by the internal free-list allocator. Only the nodes touched by an operation are read or written — the rest of the tree is never loaded.
+
+### 4b. Performance-critical design decisions
+
+Because every read and write costs instructions, several optimizations keep the per-operation cost low:
+
+**Lazy key and value loading** (`src/btreemap/node.rs`) — each entry holds a `LazyObject`: either an already-decoded value or an `(offset, size)` reference into the node's raw bytes, resolved on first access via `OnceCell`. Values are always deferred — they are never touched during a tree traversal. 
+
+For keys, the strategy depends on size: small key bytes are decoded eagerly on node load (cheaper than storing a reference for tiny payloads), while larger keys are kept as byte references and decoded only when the binary search actually reaches them.
+
+**Zero-copy writes** — `insert` receives the value by value and calls `into_bytes()` rather than `to_bytes()`. For types whose serialized form is their internal buffer (e.g. `Vec<u8>`, `String`), this moves the buffer directly into the write path with no allocation.
+
+**Lazy range iteration** (`src/btreemap/iter.rs`) — the iterator advances one entry at a time. Values are only decoded when the caller actually dereferences the iterator, so ranging over keys without touching values incurs no deserialization cost.
+
+### 4c. Key files
 
 | File | Purpose |
 |---|---|
-| `src/btreemap.rs` | Public API, header format, `init`/`load`, `insert`/`get`/`remove` |
-| `src/btreemap/allocator.rs` | Free-list chunk allocator for node pages |
-| `src/btreemap/node.rs` | In-memory `Node` representation, load/save dispatch |
-| `src/btreemap/node/v1.rs` | Node serialization for bounded types (legacy) |
-| `src/btreemap/node/v2.rs` | Node serialization for bounded and unbounded types |
-| `src/btreemap/iter.rs` | Range iteration |
-
-### 4b. Memory layout on disk (`src/btreemap.rs:1-50`)
-
-Address 0 in the memory given to `BTreeMap`:
-
-```
-"BTR" magic                    ↕ 3 bytes
-layout version                 ↕ 1 byte      (1 = V1, 2 = V2)
-max_key_size or page_size      ↕ 4 bytes
-max_value_size or marker       ↕ 4 bytes
-root node address              ↕ 8 bytes
-length / element count         ↕ 8 bytes
-reserved                       ↕ 24 bytes
-Allocator header               ↕ starts at offset 52 (ALLOCATOR_OFFSET)
-Node pages                     ...
-```
-
-### 4c. The Allocator (`src/btreemap/allocator.rs`)
-
-The allocator is a free-list of same-size chunks. The chunk size is determined at `BTreeMap::new()` time:
-
-- If both `K` and `V` are `Bounded`: `page_size = max_node_size * 3/4` (covers ~70% of real-world nodes at 8/11 capacity)
-- Otherwise: `page_size = 1024` bytes (`DEFAULT_PAGE_SIZE`)
-
-Each chunk on the free list contains a `ChunkHeader` (magic `"CHK"`, next-free pointer) followed by the usable data area. Allocation pops from the head; deallocation pushes back.
-
-### 4d. BTreeMap::init (`src/btreemap.rs:274-290`)
-
-```
-if memory.size() == 0  →  BTreeMap::new (writes a fresh header)
-else                   →  check for "BTR" magic and call BTreeMap::load
-```
-
-`BTreeMap::load` reads the header, detects the layout version (V1 or V2), and can transparently migrate V1 to V2 on first load.
-
-### 4e. BTreeMap::insert — the critical path
-
-Trace in `src/btreemap.rs` around line 500:
-
-1. Call `insert(key, value)` on `BTreeMap<K, V, M>`
-2. If `root_addr == NULL`: allocate a new leaf node via `allocator.allocate()`, save an empty `Node`, set `root_addr`
-3. Otherwise: load the root `Node` from memory (`Node::load` reads the node header to detect V1/V2, then deserializes keys, values, and children addresses)
-4. Walk down the tree: at each internal node, binary-search entries to find the child pointer, load that child
-5. At the leaf: insert the `(key, value)` entry, keeping entries sorted by key
-6. If the leaf now has `CAPACITY` (11) entries: split — allocate a new node, distribute entries, push the median key up to the parent
-7. Splits propagate up; if the root splits, a new root node is allocated
-8. Every modified node is saved: `Node::save` serializes back to raw bytes in the allocated chunk via `memory.write()`
-
-### 4f. V2 node serialization (`src/btreemap/node/v2.rs`)
-
-Initial page layout:
-
-```
-magic "BTN"             ↕ 3 bytes
-layout version (2)      ↕ 1 byte
-node type               ↕ 1 byte
-entry count (k)         ↕ 2 bytes
-overflow address        ↕ 8 bytes
-child addresses         ↕ 8 bytes each, up to k + 1
-key blobs               with 1/2/4-byte length prefix if not fixed-size
-value blobs             with 1/2/4-byte length prefix if not fixed-size
-```
-
-If the serialized content exceeds the page size, overflow pages are chained. Each overflow page has a `"NOF"` magic, a next-overflow pointer, and continuation data.
-
-### 4g. The Storable round-trip
-
-```
-save:  value.into_bytes_checked()  →  write length prefix if needed  →  write bytes
-load:  read length prefix if needed  →  read bytes  →  V::from_bytes(bytes)
-```
-
-`insert` receives the value by value, so the library calls `into_bytes_checked()` rather than `to_bytes_checked()` — the value is consumed directly into a `Vec<u8>` with no intermediate clone for owned types.
-
-This is where `BOUND` matters in practice. A fixed-size key writes 0 bytes of overhead per entry. An unbounded value always writes a length prefix and can use as many bytes as needed.
+| `src/btreemap.rs` | Public API, header, `init`/`insert`/`get`/`remove` |
+| `src/btreemap/allocator.rs` | Free-list chunk allocator |
+| `src/btreemap/node.rs` | In-memory `Node`, lazy entry loading |
+| `src/btreemap/node/v2.rs` | Node serialization (current format) |
+| `src/btreemap/iter.rs` | Lazy range iteration |
 
 ## Segment 5 — Local development loop (10 min)
 
-### Building and testing
+### Testing
 
 ```sh
-cargo build
-cargo test                          # runs all unit and property tests
-cargo test -p ic-stable-structures  # library tests only
+cargo test
 ```
 
-The `btreemap` module has property-based tests in `src/btreemap/proptests.rs` using `proptest`. They generate random sequences of inserts, removes, and gets and compare the stable `BTreeMap` against `std::collections::BTreeMap`.
+Tests fall into two categories:
+
+**Unit tests** live inside each module and check specific behaviors. See `src/btreemap/node/tests.rs` as a model.
+
+**Property-based tests** (`src/btreemap/proptests.rs`) use `proptest` to generate random sequences of inserts, removes, and gets, then verify results against `std::collections::BTreeMap`. This is the primary correctness check — if a stable structure diverges from the standard library equivalent under any sequence of operations, the test fails. Running `cargo test` covers both.
 
 ### Fuzzing (requires nightly)
 
 ```sh
-rustup toolchain install nightly
-cargo install cargo-fuzz
-cargo +nightly fuzz list
 cargo +nightly fuzz run stable_btreemap_multiple_ops_persistent
 ```
 
-The fuzz targets in `fuzz/fuzz_targets/` run random multi-operation sequences and check for crashes and invariant violations. The `_persistent` variants reuse a single in-memory structure across iterations, which finds bugs from state accumulation.
+Fuzz targets in `fuzz/fuzz_targets/` run random operation sequences and check for crashes and invariant violations. The `_persistent` variants reuse a single structure across iterations, which is effective at finding bugs that only appear after accumulated state changes.
 
-### Benchmarks
+### Benchmarks and CI regression checks
 
-Benchmarks use `canbench-rs` (`benchmarks/btreemap/src/main.rs`). They measure **instruction counts**, not wall time, because instructions are the actual cost unit on the IC.
+Benchmarks measure **instruction counts**, not wall time — instructions are the actual cost unit on the IC. Benchmarks exist for all performance-critical structures (`benchmarks/btreemap`, `btreeset`, `vec`, `memory-manager`, `nns`, `io_chunks`).
 
 ```sh
 cargo install canbench
 cd benchmarks/btreemap && canbench
 ```
 
-Key benchmark families:
+Every PR runs all benchmarks in CI and compares results against the `main` branch baseline. If any benchmark regresses or improves, **the CI job fails** until the results are explicitly acknowledged:
 
-- `btreemap_insert_blob_*` — inserts with different key/value sizes (4 to 1024 bytes)
-- `btreemap_get_blob_*` — random lookups at scale
-- `btreemap_iter_*` — full iteration cost
+```sh
+canbench --persist   # update canbench_results.yml with new baseline
+```
+
+This means `canbench_results.yml` in each benchmark directory is a committed, reviewed record of expected performance. Any change to a hot path must either stay within the existing baseline or ship with an updated `canbench_results.yml` that explains the change.
 
 ### Checklist for new contributions
 
-1. Write unit tests inside the module (see `src/btreemap/node/tests.rs` as a model)
-2. Add or extend a proptest suite to catch invariant violations
-3. Add a benchmark if the change affects hot paths
+1. Add unit tests inside the module
+2. Add or extend a proptest suite if the change affects insert/get/remove behavior
+3. Run benchmarks locally and update `canbench_results.yml` if instruction counts change
 4. If the on-disk format changes, bump the version constant and add a load path for the old version — **never break backward compatibility**
-
-## Key files to bookmark
-
-| File | What's there |
-|---|---|
-| `src/lib.rs` | `Memory` trait, `safe_write`, `RestrictedMemory` |
-| `src/storable.rs` | `Storable` trait, `Bound` enum, primitive impls |
-| `src/memory_manager.rs` | `MemoryManager`, `VirtualMemory`, bucket layout |
-| `src/btreemap.rs` | `BTreeMap` header, `init`, `insert`, `get`, `remove` |
-| `src/btreemap/allocator.rs` | Chunk allocator |
-| `src/btreemap/node/v2.rs` | Node V2 on-disk format |
-| `examples/src/basic_example/src/lib.rs` | Minimal canister template |
-| `docs/src/schema-upgrades.md` | How to evolve types safely |
-| `benchmarks/btreemap/src/main.rs` | Benchmark structure to copy |
