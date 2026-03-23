@@ -32,7 +32,12 @@ The six structures the library ships:
 
 ### The Memory Trait
 
-Everything in the library is generic over a single four-method trait (`src/lib.rs:52-93`):
+The `Memory` trait is the decoupling layer at the heart of the library.
+Every stable structure is generic over it, so any structure works unchanged with IC stable memory on-chain, `VectorMemory` in tests, or `FileMemory` locally — with no code changes to the structure itself (`src/lib.rs:52-93`).
+
+The four methods deliberately mirror the WebAssembly linear memory API.
+One thing is notably absent: there is no `free` or `shrink`. 
+WebAssembly memory can only grow, and this constraint propagates through the entire library — every design decision around memory reuse traces back to it.
 
 ```rust
 /// Abstraction over a WebAssembly-style linear memory.
@@ -235,7 +240,7 @@ This makes safe reuse impossible in the typical migration layout. When structure
 
 A partial fix, **conservative bucket reuse**, was implemented and then [reverted](https://github.com/dfinity/stable-structures/pull/396). It allowed reuse only of freed buckets with IDs *higher* than the growing virtual memory's current maximum — a constraint that is almost never satisfied in practice, since A allocates first and therefore always has lower IDs than B.
 
-#### Alternative design: explicit linked list of buckets
+#### Alternative design: explicit linked list of buckets (not implemented)
 
 The proper solution requires a new header layout. The alternative design replaces implicit ID ordering with an **explicit linked list**: each bucket stores a 4-byte pointer to the next bucket in its virtual memory's chain. Freeing a virtual memory then simply nulls out its head pointer, making all its buckets immediately available for any new allocation regardless of their IDs.
 
@@ -261,7 +266,7 @@ Each node is stored as a contiguous byte chunk allocated by the internal free-li
 
 Because every read and write costs instructions, several optimizations keep the per-operation cost low:
 
-**Lazy key and value loading** (`src/btreemap/node.rs`) — each entry holds a `LazyObject`: either an already-decoded value or an `(offset, size)` reference into the node's raw bytes, resolved on first access via `OnceCell`. Values are always deferred — they are never touched during a tree traversal. 
+**Lazy key and value loading** (`src/btreemap/node.rs`) — each entry holds a `LazyObject`: either an already-decoded value or an `(offset, size)` reference into the node's raw bytes, resolved on first access via `OnceCell`. Values are always deferred — they are never touched during a tree traversal.
 
 For keys, the strategy depends on size: keys ≤ 16 bytes are decoded eagerly on node load (cheaper than storing a reference for tiny payloads), while larger keys are kept as byte references and decoded only when the binary search actually reaches them.
 
