@@ -101,7 +101,8 @@ Each stable structure requires exclusive ownership of its memory — sharing cau
 `MemoryManager` eliminates both problems. It presents each structure with a `VirtualMemory` that has no upfront size limit and grows on demand. Underneath, it divides the real stable memory into 128-page buckets allocated as needed and interleaved freely across virtual memories — so total stable memory usage stays proportional to actual data, not declared limits.
 
 ```
-1) NAIVE (RestrictedMemory) — limits declared upfront, full region allocated immediately
+1) NAIVE (RestrictedMemory)
+   limits declared upfront, full region allocated immediately
 
   Stable memory
   ┌──────────────────────────────┬──────────────────────────────┐
