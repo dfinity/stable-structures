@@ -1,6 +1,8 @@
 # Stable Structures Deep Dive
 
-## Segment 1 — Why this library exists (10 min)
+This document is for contributors who want to work on the `stable-structures` library itself. It covers the design reasoning, internal architecture, and implementation patterns that are not visible from the public API — the kind of context you need before making a meaningful change. It is not a usage guide; for that, see the [README](../../../README.md).
+
+## Background and Motivation
 
 The Internet Computer (IC) runs canister smart contracts. When a canister is upgraded, its heap is wiped. The conventional fix is to serialize all state to stable memory in a `pre_upgrade` hook and deserialize it in `post_upgrade`. This works for small state but does not scale: the serialization itself costs cycles, and a bug in either hook can make the canister permanently non-upgradable.
 
@@ -26,11 +28,11 @@ The six structures the library ships:
 | `Log`      | Append-only variable-size entries | Bounded + Unbounded | 2 (index + data) |
 | `MinHeap`  | Priority queue                    | Bounded only        | 1                |
 
-## Segment 2 — Core abstractions (15 min)
+## Core Abstractions
 
-### 2a. The Memory trait (`src/lib.rs:52-93`)
+### The Memory Trait
 
-Everything in the library is generic over a single four-method trait:
+Everything in the library is generic over a single four-method trait (`src/lib.rs:52-93`):
 
 ```rust
 /// Abstraction over a WebAssembly-style linear memory.
@@ -56,11 +58,11 @@ Concrete implementations:
 - `FileMemory` — file-backed memory using standard file I/O, useful for offline development and persistence
 - `DefaultMemoryImpl` — resolves to `Ic0StableMemory` in `wasm32`, `VectorMemory` otherwise
 
-`RestrictedMemory` (`src/lib.rs:243-308`) is a public `Memory` adapter that exposes a fixed page range of a larger memory as its own address space starting at 0. It is the simpler alternative to `MemoryManager` for cases where each structure's maximum size is known upfront — covered in more detail in section 2c.
+`RestrictedMemory` (`src/lib.rs:243-308`) is a public `Memory` adapter that exposes a fixed page range of a larger memory as its own address space starting at 0. It is the simpler alternative to `MemoryManager` for cases where each structure's maximum size is known upfront — covered in the MemoryManager section below.
 
-### 2b. The Storable trait (`src/storable.rs:13-72`)
+### The Storable Trait
 
-Stable structures are generic and work only with raw bytes — they have no knowledge of the types stored in them. `Storable` is the bridge: it tells a structure how to convert a value to and from bytes. Any type you want to store must implement it. The library already provides implementations for the most common types; custom types require a manual implementation:
+Stable structures are generic and work only with raw bytes — they have no knowledge of the types stored in them. `Storable` (`src/storable.rs:13-72`) is the bridge: it tells a structure how to convert a value to and from bytes. Any type you want to store must implement it. The library already provides implementations for the most common types; custom types require a manual implementation:
 
 ```rust
 pub trait Storable {
@@ -83,11 +85,11 @@ The `BOUND` constant is the key design decision a user must make:
 - **`Bound::Unbounded`** — no size constraints; the structure stores a length prefix before each value. Safest default for types with `String`s or `Vec`s.
 - **`Bound::Bounded { max_size: u32, is_fixed_size: bool }`** — `max_size` is enforced at runtime via `to_bytes_checked()`. Setting `is_fixed_size: true` eliminates the length prefix, saving bytes per entry. **You cannot increase `max_size` after deployment without corrupting data.**
 
-The library ships `Storable` implementations for all primitives (`u8` through `u128`, `f32`/`f64`, `bool`, `[u8; N]`), `String`, `Vec<u8>`, `Principal`, `Option<T>`, and tuples.
+The library ships `Storable` implementations for all primitives (`u8` through `u128`, `f32`/`f64`, `bool`), `[u8; N]`, `Blob<N>` (a fixed-size byte array wrapper type), `String`, `Vec<u8>`, `Principal`, `Option<T>`, and tuples.
 
 Note: `Storable` says nothing about the serialization format. Users commonly use CBOR (`ciborium`), protobuf, or Candid inside `to_bytes`/`from_bytes`. See `docs/src/schema-upgrades.md` for patterns for adding fields safely.
 
-### 2c. The MemoryManager (`src/memory_manager.rs`)
+### The MemoryManager
 
 Each stable structure requires exclusive ownership of its memory — sharing causes corruption. The naive alternative, carving stable memory into static regions via `RestrictedMemory`, has two problems: you must know the size limit upfront, and the full region is paid for even when mostly empty.
 
@@ -146,7 +148,7 @@ thread_local! {
 
 See `examples/src/basic_example/src/lib.rs` for the minimal working canister.
 
-### 2d. Internal allocators (contributor-level)
+### Internal Allocators
 
 Memory allocation is invisible to users of stable-structures — structures interact only through the `Memory` trait and have no way to express "free this region." It is only relevant when working on the internals of a specific structure, where the choice of allocation strategy directly shapes the implementation.
 
@@ -169,9 +171,9 @@ The key question that drives each structure's strategy: can holes appear in its 
 The allocator divides remaining memory into equal-size chunks. Free chunks form a singly-linked list: allocation pops the head, deallocation pushes back onto it — both O(1). When the free list is empty, the memory grows and a new chunk is appended.
 
 
-## Segment 3 — Lifecycle, schema upgrades, and migrations (10 min)
+## Lifecycle, Schema Upgrades, and Migrations
 
-### 3a. Lifecycle across upgrades
+### Lifecycle Across Upgrades
 
 Every stable structure has two constructors:
 
@@ -180,18 +182,16 @@ Every stable structure has two constructors:
 
 Always use `init` in a canister. Because stable memory survives upgrades, calling `init` on next deployment finds the existing data and resumes from it — no `pre_upgrade`/`post_upgrade` needed. The magic header also carries a layout version, so new library versions can always read data written by older ones.
 
-### 3b. Layout versioning in practice: BTreeMap V1 → V2
+### Layout Versioning: BTreeMap V1 → V2
 
-`BTreeMap` is currently the only structure that has shipped two layout versions, and its migration is a concrete example of the backward-compatibility principle above:
-
-The term "node page" here refers to the fixed-size byte buffer the internal allocator assigns to each B-tree node — not a Wasm page (64 KiB) and not a MemoryManager bucket.
+`BTreeMap` is currently the only structure that has shipped two layout versions. Each version uses "node pages" — the fixed-size byte buffers the internal allocator assigns to each B-tree node (distinct from Wasm pages and MemoryManager buckets):
 
 - **V1** supports only `Bound::Bounded` types. The node page size is derived at load time from `max_key_size` and `max_value_size` stored in the header, so it is implicit rather than stored explicitly.
 - **V2** adds support for `Bound::Unbounded` types by storing the node page size explicitly in the header and introducing overflow pages — when a node's data exceeds one page, it chains additional pages.
 
-Migration from V1 to V2 is **transparent and non-breaking**: calling `BTreeMap::init()` on an existing V1 map automatically upgrades it to V2 on first load — existing data is preserved, no user action required. Under the hood, `init()` calls `load_helper(memory, migrate_to_v2: true)`, which re-interprets the stored `max_key_size`/`max_value_size` as a `DerivedPageSize` for the V2 allocator. Loading a V2 map as V1 is rejected at startup.
+Migration from V1 to V2 is **transparent and non-breaking**: calling `BTreeMap::init()` on an existing V1 map automatically upgrades it to V2 on first load — existing data is preserved, no user action required. Any unrecognized layout version causes a panic at startup.
 
-### 3c. Schema upgrades
+### Schema Upgrades
 
 Stable structures don't enforce a serialization format. The recommended pattern for evolving types is to use a flexible format (e.g. CBOR via `ciborium`) and `Bound::Unbounded`:
 
@@ -208,7 +208,7 @@ Adding a field is then safe with `#[serde(default)]` — old records decode with
 
 **Warning:** if you used `Bound::Bounded`, never increase `max_size` after deployment — existing node pages were sized to the old value and enlarging it corrupts them. Migrating from `Bounded` to `Unbounded` is safe; the reverse is not.
 
-### 3d. Data migrations
+### Data Migrations
 
 When an in-place field addition isn't enough — e.g. changing the key type or restructuring the value layout entirely — data must be migrated from one structure to another.
 
@@ -225,7 +225,7 @@ This is the pattern NNS-dapp used when migrating accounts to stable memory: two 
 
 The cost to be aware of: both structures occupy stable memory simultaneously (~2× peak usage), and after the old structure is cleared its buckets remain permanently assigned to its `MemoryId` — they cannot be reclaimed or reused. Budget for this when planning large schema changes.
 
-### 3e. MemoryManager limitations and the path to bucket reclamation
+### MemoryManager Limitations and Bucket Reclamation
 
 The inability to reuse freed buckets is a known limitation rooted in a structural invariant of the current MemoryManager: **buckets within each virtual memory must be stored in ascending order by ID**. Because the header encodes only the owning `MemoryId` per bucket (1 byte), there is no room to store an explicit ordering — the order is implied by bucket position. To load a virtual memory correctly, the runtime simply scans for all buckets belonging to that `MemoryId` and traverses them in ID order.
 
@@ -243,7 +243,7 @@ The redesign also removes the current 32,768-bucket cap (`MAX_NUM_BUCKETS`), rai
 
 The tradeoff: this is a **breaking change**. The on-disk header format is incompatible with the current layout, so existing canisters will need a one-time migration when the new MemoryManager ships.
 
-## Segment 4 — StableBTreeMap (25 min)
+## StableBTreeMap Internals
 
 `StableBTreeMap` is the most commonly used structure in this library, and its design is a direct response to the IC's per-round instruction limits.
 
@@ -251,35 +251,36 @@ A hash map must rehash — copying all entries — when it grows, which is prohi
 
 The remaining challenge is fragmentation: B-tree splits, merges, and deletes free nodes at arbitrary positions, leaving holes. The internal free-list allocator reclaims those holes immediately, so stable memory stays compact and every byte is either actively used or available for the next allocation.
 
-### 4a. How BTreeMap works
+### How BTreeMap Works
 
 A `BTreeMap` is a tree of fixed-size nodes, each holding up to 11 key-value entries sorted by key. Lookups and inserts walk from the root down to a leaf, binary-searching within each node. Splits and merges keep the tree balanced.
 
 Each node is stored as a contiguous byte chunk allocated by the internal free-list allocator. Only the nodes touched by an operation are read or written — the rest of the tree is never loaded.
 
-### 4b. Performance-critical design decisions
+### Performance-Critical Design Decisions
 
 Because every read and write costs instructions, several optimizations keep the per-operation cost low:
 
 **Lazy key and value loading** (`src/btreemap/node.rs`) — each entry holds a `LazyObject`: either an already-decoded value or an `(offset, size)` reference into the node's raw bytes, resolved on first access via `OnceCell`. Values are always deferred — they are never touched during a tree traversal. 
 
-For keys, the strategy depends on size: small key bytes are decoded eagerly on node load (cheaper than storing a reference for tiny payloads), while larger keys are kept as byte references and decoded only when the binary search actually reaches them.
+For keys, the strategy depends on size: keys ≤ 16 bytes are decoded eagerly on node load (cheaper than storing a reference for tiny payloads), while larger keys are kept as byte references and decoded only when the binary search actually reaches them.
 
-**Zero-copy writes** — `insert` receives the value by value and calls `into_bytes()` rather than `to_bytes()`. For types whose serialized form is their internal buffer (e.g. `Vec<u8>`, `String`), this moves the buffer directly into the write path with no allocation.
+**Zero-copy writes** — `insert` calls `into_bytes()` rather than `to_bytes()`, moving the value's buffer directly into the write path for types like `Vec<u8>` and `String` with no extra allocation. (See the Storable Trait section for why the trait has both methods.)
 
 **Lazy range iteration** (`src/btreemap/iter.rs`) — the iterator advances one entry at a time. Values are only decoded when the caller actually dereferences the iterator, so ranging over keys without touching values incurs no deserialization cost.
 
-### 4c. Key files
+### Key Files
 
 | File | Purpose |
 |---|---|
 | `src/btreemap.rs` | Public API, header, `init`/`insert`/`get`/`remove` |
 | `src/btreemap/allocator.rs` | Free-list chunk allocator |
 | `src/btreemap/node.rs` | In-memory `Node`, lazy entry loading |
+| `src/btreemap/node/v1.rs` | Node serialization (old format) |
 | `src/btreemap/node/v2.rs` | Node serialization (current format) |
 | `src/btreemap/iter.rs` | Lazy range iteration |
 
-## Segment 5 — Local development loop (10 min)
+## Contributor Development Loop
 
 ### Testing
 
@@ -317,10 +318,3 @@ canbench --persist   # update canbench_results.yml with new baseline
 ```
 
 This means `canbench_results.yml` in each benchmark directory is a committed, reviewed record of expected performance. Any change to a hot path must either stay within the existing baseline or ship with an updated `canbench_results.yml` that explains the change.
-
-### Checklist for new contributions
-
-1. Add unit tests inside the module
-2. Add or extend a proptest suite if the change affects insert/get/remove behavior
-3. Run benchmarks locally and update `canbench_results.yml` if instruction counts change
-4. If the on-disk format changes, bump the version constant and add a load path for the old version — **never break backward compatibility**
