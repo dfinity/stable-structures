@@ -17,16 +17,17 @@ The Internet Computer (IC) runs canister smart contracts. When a canister is upg
 - **No reallocation** — moving data in bulk is too expensive in cycles; all growth happens in place
 - **Multi-memory compatibility** — the design works with multiple stable memories, ensuring forward compatibility with upcoming IC features
 
-The six structures the library ships:
+The structures library ships:
 
-| Structure  | Description                       | Type support        | Memories needed  |
-|------------|-----------------------------------|---------------------|------------------|
-| `Cell`     | Single serializable value         | Bounded + Unbounded | 1                |
-| `BTreeMap` | Ordered key-value store           | Bounded + Unbounded | 1                |
-| `BTreeSet` | Ordered set of unique keys        | Bounded + Unbounded | 1                |
-| `Vec`      | Growable array                    | Bounded only        | 1                |
-| `Log`      | Append-only variable-size entries | Bounded + Unbounded | 2 (index + data) |
-| `MinHeap`  | Priority queue                    | Bounded only        | 1                |
+| Structure       | Description                       | Container Type      | Memories needed  |
+|-----------------|-----------------------------------|---------------------|------------------|
+| `Cell`          | Single serializable value         | Bounded + Unbounded | 1                |
+| `BTreeMap`      | Ordered key-value store           | Bounded + Unbounded | 1                |
+| `BTreeSet`      | Ordered set of unique keys        | Bounded + Unbounded | 1                |
+| `Vec`           | Growable array                    | Bounded only        | 1                |
+| `Log`           | Append-only variable-size entries | Bounded + Unbounded | 2 (index + data) |
+| `MinHeap`       | Priority queue                    | Bounded only        | 1                |
+| `MemoryManager` | Manages on-demand virtual memory  | n/a                 | 1                |
 
 ## Core Abstractions
 
