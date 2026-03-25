@@ -939,7 +939,8 @@ where
         self.root_addr = NULL;
         self.length = 0;
         self.allocator.clear();
-        *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), self.cache_num_slots);
+        *self.cache.get_mut() =
+            NodeCache::new(self.version.page_size().get(), self.cache_num_slots);
         self.save_header();
     }
 
