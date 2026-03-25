@@ -19,7 +19,7 @@ pub mod vec;
 pub mod vec_mem;
 pub mod writer;
 
-pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap};
+pub use btreemap::{BTreeMap, BTreeMap as StableBTreeMap, CacheStats};
 pub use btreeset::{BTreeSet, BTreeSet as StableBTreeSet};
 pub use file_mem::FileMemory;
 #[cfg(target_arch = "wasm32")]

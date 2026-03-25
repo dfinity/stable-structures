@@ -82,11 +82,34 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
-const NODE_CACHE_NUM_SLOTS: usize = 32;
+/// Default number of slots in the direct-mapped node cache.
+///
+/// The B-tree has a branching factor of ~11 (max entries per node), so each
+/// tree level contains roughly 11× more nodes than the one above:
+///
+/// | Level | Nodes | Cumulative |
+/// |-------|-------|------------|
+/// | 0 (root) | 1 | 1 |
+/// | 1 | ~11 | ~12 |
+/// | 2 | ~121 | ~133 |
+/// | 3 | ~1 331 | ~1 464 |
+///
+/// With 32 slots the top 2 levels (≤12 nodes) stay cached with zero
+/// collisions because nodes are allocated at sequential addresses that map
+/// to distinct slots. Every lookup traverses root → one level-1 child, so
+/// those 2 cache hits save 2 stable-memory reads per operation regardless
+/// of total tree size.
+///
+/// * 64 slots would add partial level-2 coverage but doubles heap cost for
+///   diminishing returns.
+/// * 16 slots risks collisions among the 12 top-level nodes.
+///
+/// 32 is the smallest power of two that fits levels 0 + 1 comfortably.
+const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 32;
 
 /// A direct-mapped node cache modeled after CPU caches.
 ///
-/// Each slot is indexed by `(node_address / page_size) % NUM_SLOTS`. Lookup
+/// Each slot is indexed by `(node_address / page_size) % num_slots`. Lookup
 /// is O(1) with ~5 instructions overhead. Collision = eviction (no LRU
 /// tracking needed).
 ///
@@ -95,40 +118,91 @@ const NODE_CACHE_NUM_SLOTS: usize = 32;
 struct NodeCache<K: Storable + Ord + Clone> {
     slots: Vec<(Address, Option<Node<K>>)>,
     page_size: u32,
+    hits: u64,
+    misses: u64,
+}
+
+/// Cache performance counters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CacheStats {
+    pub hits: u64,
+    pub misses: u64,
+}
+
+impl CacheStats {
+    /// Returns the hit ratio as a value between 0.0 and 1.0.
+    /// Returns 0.0 if no lookups have been performed.
+    pub fn hit_ratio(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
+    }
 }
 
 impl<K: Storable + Ord + Clone> NodeCache<K> {
-    fn new(page_size: u32) -> Self {
-        let mut slots = Vec::with_capacity(NODE_CACHE_NUM_SLOTS);
-        for _ in 0..NODE_CACHE_NUM_SLOTS {
+    fn new(page_size: u32, num_slots: usize) -> Self {
+        let mut slots = Vec::with_capacity(num_slots);
+        for _ in 0..num_slots {
             slots.push((NULL, None));
         }
-        Self { slots, page_size }
+        Self {
+            slots,
+            page_size,
+            hits: 0,
+            misses: 0,
+        }
+    }
+
+    fn is_enabled(&self) -> bool {
+        !self.slots.is_empty()
     }
 
     fn slot_index(&self, addr: Address) -> usize {
-        (addr.get() / self.page_size as u64) as usize % NODE_CACHE_NUM_SLOTS
+        debug_assert!(self.is_enabled());
+        (addr.get() / self.page_size as u64) as usize % self.slots.len()
     }
 
     fn take(&mut self, addr: Address) -> Option<Node<K>> {
+        if !self.is_enabled() {
+            self.misses += 1;
+            return None;
+        }
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
             self.slots[idx].0 = NULL;
+            self.hits += 1;
             self.slots[idx].1.take()
         } else {
+            self.misses += 1;
             None
         }
     }
 
     fn put(&mut self, addr: Address, node: Node<K>) {
+        if !self.is_enabled() {
+            return;
+        }
         let idx = self.slot_index(addr);
         self.slots[idx] = (addr, Some(node));
     }
 
     fn invalidate(&mut self, addr: Address) {
+        if !self.is_enabled() {
+            return;
+        }
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
             self.slots[idx] = (NULL, None);
+        }
+    }
+
+    fn stats(&self) -> CacheStats {
+        CacheStats {
+            hits: self.hits,
+            misses: self.misses,
         }
     }
 }
@@ -300,6 +374,10 @@ where
     // The number of elements in the map.
     length: u64,
 
+    // Number of slots in the direct-mapped node cache.
+    // Stored so we can recreate the cache with the same configuration on clear().
+    cache_num_slots: usize,
+
     // Direct-mapped node cache to avoid re-loading hot nodes from stable memory.
     cache: RefCell<NodeCache<K>>,
 
@@ -342,6 +420,71 @@ where
             // The memory already contains a BTreeMap. Load it.
             BTreeMap::load(memory)
         }
+    }
+
+    /// Configures the size of the node cache in bytes.
+    ///
+    /// The cache is a direct-mapped cache that keeps frequently accessed
+    /// B-tree nodes in heap memory to avoid repeated stable-memory reads.
+    /// The byte budget is converted to a number of cache slots by dividing
+    /// by the node page size and rounding to the nearest power of two.
+    ///
+    /// Pass `0` to disable the cache entirely.
+    ///
+    /// # Default
+    ///
+    /// The default cache holds 32 slots.
+    /// This is the smallest power of two that fits the top 2 levels of the
+    /// B-tree (root + its ~11 children) with no collisions, giving 2 cache
+    /// hits per lookup regardless of tree size.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// // 10 MB cache
+    /// let map: BTreeMap<u64, u64, _> =
+    ///     BTreeMap::init(DefaultMemoryImpl::default())
+    ///         .with_cache_size(10 * 1024 * 1024);
+    ///
+    /// // Disable the cache
+    /// let map: BTreeMap<u64, u64, _> =
+    ///     BTreeMap::init(DefaultMemoryImpl::default())
+    ///         .with_cache_size(0);
+    /// ```
+    pub fn with_cache_size(mut self, bytes: u64) -> Self {
+        let page_size = self.version.page_size().get() as u64;
+        let num_slots = if bytes == 0 {
+            0
+        } else {
+            (bytes / page_size).max(1).next_power_of_two() as usize
+        };
+        self.cache_num_slots = num_slots;
+        *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
+        self
+    }
+
+    /// Returns cache performance counters.
+    ///
+    /// Use these to monitor cache effectiveness and tune the cache size
+    /// via [`with_cache_size`](Self::with_cache_size).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u64, u64, _> =
+    ///     BTreeMap::init(DefaultMemoryImpl::default());
+    /// map.insert(1, 100);
+    /// let _ = map.get(&1);
+    ///
+    /// let stats = map.cache_stats();
+    /// println!("hit ratio: {:.1}%", stats.hit_ratio() * 100.0);
+    /// ```
+    pub fn cache_stats(&self) -> CacheStats {
+        self.cache.borrow().stats()
     }
 
     /// Initializes a v1 `BTreeMap`.
@@ -413,7 +556,11 @@ where
             ),
             version: Version::V2(page_size),
             length: 0,
-            cache: RefCell::new(NodeCache::new(page_size.get())),
+            cache_num_slots: DEFAULT_NODE_CACHE_NUM_SLOTS,
+            cache: RefCell::new(NodeCache::new(
+                page_size.get(),
+                DEFAULT_NODE_CACHE_NUM_SLOTS,
+            )),
             _phantom: PhantomData,
         };
 
@@ -443,7 +590,11 @@ where
             ),
             version,
             length: 0,
-            cache: RefCell::new(NodeCache::new(version.page_size().get())),
+            cache_num_slots: DEFAULT_NODE_CACHE_NUM_SLOTS,
+            cache: RefCell::new(NodeCache::new(
+                version.page_size().get(),
+                DEFAULT_NODE_CACHE_NUM_SLOTS,
+            )),
             _phantom: PhantomData,
         };
 
@@ -493,7 +644,11 @@ where
             allocator: Allocator::load(memory, allocator_addr),
             version,
             length: header.length,
-            cache: RefCell::new(NodeCache::new(version.page_size().get())),
+            cache_num_slots: DEFAULT_NODE_CACHE_NUM_SLOTS,
+            cache: RefCell::new(NodeCache::new(
+                version.page_size().get(),
+                DEFAULT_NODE_CACHE_NUM_SLOTS,
+            )),
             _phantom: PhantomData,
         }
     }
@@ -784,7 +939,7 @@ where
         self.root_addr = NULL;
         self.length = 0;
         self.allocator.clear();
-        *self.cache.get_mut() = NodeCache::new(self.version.page_size().get());
+        *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), self.cache_num_slots);
         self.save_header();
     }
 
