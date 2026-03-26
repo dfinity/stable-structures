@@ -84,28 +84,14 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
 /// Default number of slots in the direct-mapped node cache.
 ///
-/// The B-tree has a branching factor of ~11 (max entries per node), so each
-/// tree level contains roughly 11× more nodes than the one above:
+/// The cache is disabled by default (0 slots) to avoid unexpected heap
+/// usage. Users can opt in via [`BTreeMap::with_cache_entries`] or
+/// [`BTreeMap::set_cache_entries`].
 ///
-/// | Level | Nodes | Cumulative |
-/// |-------|-------|------------|
-/// | 0 (root) | 1 | 1 |
-/// | 1 | ~11 | ~12 |
-/// | 2 | ~121 | ~133 |
-/// | 3 | ~1 331 | ~1 464 |
-///
-/// With 32 slots the top 2 levels (≤12 nodes) stay cached with zero
-/// collisions because nodes are allocated at sequential addresses that map
-/// to distinct slots. Every lookup traverses root → one level-1 child, so
-/// those 2 cache hits save 2 stable-memory reads per operation regardless
-/// of total tree size.
-///
-/// * 64 slots would add partial level-2 coverage but doubles heap cost for
-///   diminishing returns.
-/// * 16 slots risks collisions among the 12 top-level nodes.
-///
-/// 32 is the smallest power of two that fits levels 0 + 1 comfortably.
-const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 32;
+/// A good starting point is **32 slots** — the smallest power of two that
+/// fits the top 2 levels of the B-tree (root + its ~11 children) with no
+/// collisions, giving 2 cache hits per operation regardless of tree size.
+const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 0;
 
 /// A direct-mapped node cache modeled after CPU caches.
 ///
@@ -127,6 +113,12 @@ struct NodeCache<K: Storable + Ord + Clone> {
 pub struct CacheStats {
     pub hits: u64,
     pub misses: u64,
+    /// Heap memory reserved for cache slots: `num_slots × page_size` bytes.
+    ///
+    /// This is the allocated budget, not the number of slots currently
+    /// occupied.  Use it to understand how much heap the cache consumes
+    /// without having to know the page size up-front.
+    pub size_bytes: u64,
 }
 
 impl CacheStats {
@@ -203,6 +195,7 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         CacheStats {
             hits: self.hits,
             misses: self.misses,
+            size_bytes: self.slots.len() as u64 * self.page_size as u64,
         }
     }
 }
@@ -427,16 +420,9 @@ where
     /// The cache is a direct-mapped cache that keeps frequently accessed
     /// B-tree nodes in heap memory to avoid repeated stable-memory reads.
     /// The byte budget is converted to a number of cache slots by dividing
-    /// by the node page size and rounding to the nearest power of two.
+    /// by the node page size and rounding up to the nearest power of two.
     ///
-    /// Pass `0` to disable the cache entirely.
-    ///
-    /// # Default
-    ///
-    /// The default cache holds 32 slots.
-    /// This is the smallest power of two that fits the top 2 levels of the
-    /// B-tree (root + its ~11 children) with no collisions, giving 2 cache
-    /// hits per lookup regardless of tree size.
+    /// Pass `0` to disable the cache (the default).
     ///
     /// # Examples
     ///
@@ -447,13 +433,38 @@ where
     /// let map: BTreeMap<u64, u64, _> =
     ///     BTreeMap::init(DefaultMemoryImpl::default())
     ///         .with_cache_size(10 * 1024 * 1024);
-    ///
-    /// // Disable the cache
-    /// let map: BTreeMap<u64, u64, _> =
-    ///     BTreeMap::init(DefaultMemoryImpl::default())
-    ///         .with_cache_size(0);
     /// ```
     pub fn with_cache_size(mut self, bytes: u64) -> Self {
+        self.set_cache_size(bytes);
+        self
+    }
+
+    /// Resizes the node cache at runtime.
+    ///
+    /// Unlike [`with_cache_size`](Self::with_cache_size), this method operates
+    /// on an already-initialised map, allowing the cache to be tuned in
+    /// response to observed [`cache_stats`](Self::cache_stats).
+    ///
+    /// The byte budget is converted to a number of cache slots by dividing by
+    /// the node page size and rounding up to the nearest power of two.
+    /// Existing cache contents and performance counters are discarded.
+    ///
+    /// Pass `0` to disable the cache entirely.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
+    ///
+    /// // After observing poor hit ratio, double the cache.
+    /// let stats = map.cache_stats();
+    /// if stats.hit_ratio() < 0.5 {
+    ///     map.set_cache_size(stats.size_bytes * 2);
+    /// }
+    /// ```
+    pub fn set_cache_size(&mut self, bytes: u64) {
         let page_size = self.version.page_size().get() as u64;
         let num_slots = if bytes == 0 {
             0
@@ -462,13 +473,63 @@ where
         };
         self.cache_num_slots = num_slots;
         *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
+    }
+
+    /// Configures the cache size by number of entries (nodes) rather than bytes.
+    ///
+    /// The count is rounded up to the nearest power of two. A direct-mapped
+    /// cache requires a power-of-two slot count so that the slot index can be
+    /// computed with a bitwise AND rather than integer division.
+    ///
+    /// Pass `0` to disable the cache entirely.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// // Cache for 64 nodes
+    /// let map: BTreeMap<u64, u64, _> =
+    ///     BTreeMap::init(DefaultMemoryImpl::default())
+    ///         .with_cache_entries(64);
+    /// ```
+    pub fn with_cache_entries(mut self, entries: usize) -> Self {
+        self.set_cache_entries(entries);
         self
+    }
+
+    /// Resizes the node cache at runtime by number of entries.
+    ///
+    /// Equivalent to [`set_cache_size`](Self::set_cache_size) but accepts an
+    /// entry count rather than bytes. The count is rounded up to the nearest
+    /// power of two. Existing cache contents and performance counters are
+    /// discarded.
+    ///
+    /// Pass `0` to disable the cache entirely.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u64, u64, _> = BTreeMap::init(DefaultMemoryImpl::default());
+    /// map.set_cache_entries(128);
+    /// ```
+    pub fn set_cache_entries(&mut self, entries: usize) {
+        let num_slots = if entries == 0 {
+            0
+        } else {
+            entries.next_power_of_two()
+        };
+        self.cache_num_slots = num_slots;
+        *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
     }
 
     /// Returns cache performance counters.
     ///
     /// Use these to monitor cache effectiveness and tune the cache size
-    /// via [`with_cache_size`](Self::with_cache_size).
+    /// via [`set_cache_size`](Self::set_cache_size) or
+    /// [`set_cache_entries`](Self::set_cache_entries).
     ///
     /// # Examples
     ///
@@ -3632,5 +3693,85 @@ mod test {
         }
 
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn cache_stats_size_bytes() {
+        let mem = make_memory();
+        let map: BTreeMap<u64, u64, _> = BTreeMap::new(mem);
+        let stats = map.cache_stats();
+        let page_size = map.version.page_size().get() as u64;
+        assert_eq!(
+            stats.size_bytes,
+            DEFAULT_NODE_CACHE_NUM_SLOTS as u64 * page_size
+        );
+    }
+
+    #[test]
+    fn set_cache_size_resizes_at_runtime() {
+        let mem = make_memory();
+        let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_cache_entries(32);
+        let page_size = map.version.page_size().get() as u64;
+
+        for i in 0..100u64 {
+            map.insert(i, i);
+        }
+        for i in 0..100u64 {
+            let _ = map.get(&i);
+        }
+        let before = map.cache_stats();
+        assert!(before.hits > 0, "expected cache hits before resize");
+
+        // Resize to 64 slots – counters and entries are discarded.
+        map.set_cache_size(page_size * 64);
+
+        let after = map.cache_stats();
+        assert_eq!(after.hits, 0, "resize should reset counters");
+        assert_eq!(after.misses, 0, "resize should reset counters");
+        assert_eq!(after.size_bytes, page_size * 64);
+
+        // Map must still be correct after resize.
+        for i in 0..100u64 {
+            assert_eq!(map.get(&i), Some(i));
+        }
+    }
+
+    #[test]
+    fn set_cache_size_disable_then_reenable() {
+        let mem = make_memory();
+        let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(mem);
+        map.insert(42, 99);
+
+        map.set_cache_size(0);
+        assert_eq!(map.cache_stats().size_bytes, 0);
+        assert_eq!(map.get(&42), Some(99));
+
+        // Re-enable cache.
+        let page_size = map.version.page_size().get() as u64;
+        map.set_cache_size(page_size * 32);
+        assert_eq!(map.cache_stats().size_bytes, page_size * 32);
+        assert_eq!(map.get(&42), Some(99));
+    }
+
+    #[test]
+    fn with_cache_entries_rounds_to_power_of_two() {
+        let mem = make_memory();
+        // Request 50 entries → should round up to 64.
+        let map: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_cache_entries(50);
+        let page_size = map.version.page_size().get() as u64;
+        assert_eq!(map.cache_stats().size_bytes, page_size * 64);
+    }
+
+    #[test]
+    fn set_cache_entries_resizes_at_runtime() {
+        let mem = make_memory();
+        let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(mem);
+        let page_size = map.version.page_size().get() as u64;
+
+        map.set_cache_entries(100); // rounds to 128
+        assert_eq!(map.cache_stats().size_bytes, page_size * 128);
+
+        map.set_cache_entries(0); // disable
+        assert_eq!(map.cache_stats().size_bytes, 0);
     }
 }
