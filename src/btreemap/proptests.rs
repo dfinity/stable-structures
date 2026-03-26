@@ -1,3 +1,4 @@
+use crate::btreemap::entry::Entry;
 use crate::{
     btreemap::{
         test::{b, make_memory, run_btree_test},
@@ -9,7 +10,8 @@ use crate::{
 use proptest::collection::btree_set as pset;
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
-use std::collections::{BTreeMap as StdBTreeMap, BTreeSet};
+use std::collections::{btree_map, BTreeMap as StdBTreeMap, BTreeSet};
+use std::ops::BitXor;
 use test_strategy::proptest;
 
 #[derive(Debug, Clone)]
@@ -21,6 +23,7 @@ enum Operation {
     Values { from: usize, len: usize },
     Get(usize),
     Remove(usize),
+    EntryInsertOrXor { key: Vec<u8>, value: Vec<u8> },
     Range { from: usize, len: usize },
     PopLast,
     PopFirst,
@@ -43,6 +46,8 @@ fn operation_strategy() -> impl Strategy<Value = Operation> {
             .prop_map(|(from, len)| Operation::Values { from, len }),
         50 => (any::<usize>()).prop_map(Operation::Get),
         15 => (any::<usize>()).prop_map(Operation::Remove),
+        10 => (any::<Vec<u8>>(), any::<Vec<u8>>())
+            .prop_map(|(key, value)| Operation::EntryInsertOrXor { key, value }),
         5 => (any::<usize>(), any::<usize>())
             .prop_map(|(from, len)| Operation::Range { from, len }),
         2 =>  Just(Operation::PopFirst),
@@ -320,6 +325,40 @@ fn execute_operation<M: Memory>(
                 assert_eq!(btree.remove(&k), Some(v));
             }
         }
+        Operation::EntryInsertOrXor { key, value } => {
+            match std_btree.entry(key.clone()) {
+                btree_map::Entry::Occupied(mut entry) => {
+                    let existing = entry.get().clone();
+                    let xor = existing
+                        .into_iter()
+                        .zip(value.clone())
+                        .map(|(l, r)| l.bitxor(r))
+                        .collect::<Vec<_>>();
+                    entry.insert(xor);
+                }
+                btree_map::Entry::Vacant(entry) => {
+                    entry.insert(value.clone());
+                }
+            };
+
+            match btree.entry(key.clone()) {
+                Entry::Occupied(entry) => {
+                    let existing = entry.get();
+                    let xor = existing
+                        .into_iter()
+                        .zip(value.clone())
+                        .map(|(l, r)| l.bitxor(r))
+                        .collect::<Vec<_>>();
+                    entry.insert(xor);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(value.clone());
+                }
+            }
+
+            assert_eq!(btree.get(&key).as_ref(), std_btree.get(&key));
+        }
+
         Operation::Range { from, len } => {
             assert_eq!(std_btree.len(), btree.len() as usize);
             if std_btree.is_empty() {
