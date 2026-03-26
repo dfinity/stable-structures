@@ -551,7 +551,7 @@ where
         let mut root = self.load_node(self.root_addr);
 
         // Check if the key already exists in the root.
-        if let Ok(idx) = root.search(&key, self.memory()) {
+        if let Ok(idx) = root.search(key, self.memory()) {
             // Key found
             return (root, Ok(idx));
         }
