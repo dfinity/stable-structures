@@ -546,7 +546,7 @@ impl NodeHeader {
 
 /// A lazily-loaded object, which can be either an immediate value or a deferred reference.
 #[derive(Debug)]
-enum LazyObject<T> {
+enum LazyObject<T: Storable> {
     ByVal(T),
     ByRef {
         offset: Bytes,
@@ -555,20 +555,28 @@ enum LazyObject<T> {
     },
 }
 
-impl<T: MemSize> MemSize for LazyObject<T> {
+impl<T: Storable> LazyObject<T> {
     fn mem_size(&self) -> usize {
         match self {
-            LazyObject::ByVal(value) => value.mem_size(),
+            LazyObject::ByVal(value) => value.to_bytes().len(),
             LazyObject::ByRef {
                 offset,
                 size,
                 loaded,
-            } => offset.mem_size() + size.mem_size() + loaded.mem_size(),
+            } => {
+                offset.mem_size()
+                    + size.mem_size()
+                    + if loaded.get().is_some() {
+                        *size as usize
+                    } else {
+                        0
+                    }
+            }
         }
     }
 }
 
-impl<T> LazyObject<T> {
+impl<T: Storable> LazyObject<T> {
     #[inline(always)]
     pub fn by_value(value: T) -> Self {
         LazyObject::ByVal(value)
@@ -642,15 +650,15 @@ impl LazyValue {
 }
 
 #[derive(Debug)]
-struct LazyKey<K>(LazyObject<K>);
+struct LazyKey<K: Storable>(LazyObject<K>);
 
-impl<K: MemSize> MemSize for LazyKey<K> {
+impl<K: Storable> MemSize for LazyKey<K> {
     fn mem_size(&self) -> usize {
         self.0.mem_size()
     }
 }
 
-impl<K> LazyKey<K> {
+impl<K: Storable> LazyKey<K> {
     #[inline(always)]
     pub fn by_value(value: K) -> Self {
         Self(LazyObject::by_value(value))
