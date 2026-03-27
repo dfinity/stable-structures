@@ -419,8 +419,8 @@ where
 
     /// Returns the approximate amount of stable memory actually used in bytes.
     pub fn stable_memory_used(&self) -> usize {
-        // A fast approximation of the used stable memory without having
-        // to iterate through all the nodes is to check allocator chunk usage.
+        // BTreeMap header + allocator header + allocated chunks.
+        // O(1): uses the cached chunk count, no node traversal.
         (ALLOCATOR_OFFSET as u64
             + Allocator::<M>::header_size().get()
             + self.allocator.num_allocated_chunks() * self.allocator.chunk_size().get())
