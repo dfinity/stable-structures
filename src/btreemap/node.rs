@@ -1,5 +1,6 @@
 use crate::{
     btreemap::Allocator,
+    data_size::DataSize,
     read_address_vec, read_struct, read_to_vec, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
@@ -647,6 +648,15 @@ impl Version {
     }
 }
 
+impl DataSize for Version {
+    fn data_size(&self) -> usize {
+        match self {
+            Version::V1(page_size) => page_size.data_size(),
+            Version::V2(page_size) => page_size.data_size(),
+        }
+    }
+}
+
 /// The size of an individual page in the memory where nodes are stored.
 /// A node, if it's bigger than a single page, overflows into multiple pages.
 #[allow(dead_code)]
@@ -669,6 +679,15 @@ impl PageSize {
     }
 }
 
+impl DataSize for PageSize {
+    fn data_size(&self) -> usize {
+        match self {
+            Self::Value(page_size) => page_size.data_size(),
+            Self::Derived(derived) => derived.data_size(),
+        }
+    }
+}
+
 /// A page size derived from the maximum sizes of the keys and values.
 #[derive(Debug, PartialEq, Copy, Clone, Eq)]
 pub struct DerivedPageSize {
@@ -680,5 +699,11 @@ impl DerivedPageSize {
     /// Returns the page size derived from the max key/value sizes.
     fn get(&self) -> u32 {
         v1::size_v1(self.max_key_size, self.max_value_size).get() as u32
+    }
+}
+
+impl DataSize for DerivedPageSize {
+    fn data_size(&self) -> usize {
+        self.max_key_size.data_size() + self.max_value_size.data_size()
     }
 }

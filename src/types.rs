@@ -1,3 +1,4 @@
+use crate::data_size::DataSize;
 use core::ops::{Add, AddAssign, Div, Mul, Rem, Sub, SubAssign};
 
 pub const NULL: Address = Address(0);
@@ -50,6 +51,12 @@ impl Sub<Bytes> for Address {
 impl AddAssign<Bytes> for Address {
     fn add_assign(&mut self, other: Bytes) {
         *self = Self(self.0 + other.0);
+    }
+}
+
+impl DataSize for Address {
+    fn data_size(&self) -> usize {
+        self.0.data_size()
     }
 }
 

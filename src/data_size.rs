@@ -23,6 +23,12 @@ impl DataSize for [u8] {
     }
 }
 
+impl DataSize for u32 {
+    fn data_size(&self) -> usize {
+        std::mem::size_of::<u32>()
+    }
+}
+
 impl DataSize for u64 {
     fn data_size(&self) -> usize {
         std::mem::size_of::<u64>()
@@ -63,6 +69,12 @@ mod tests {
         assert_eq!(a.data_size(), 0);
         assert_eq!([1_u8].data_size(), 1);
         assert_eq!([1_u8, 2_u8].data_size(), 2);
+    }
+
+    #[test]
+    fn test_data_size_u32() {
+        assert_eq!(0_u32.data_size(), 4);
+        assert_eq!(42_u32.data_size(), 4);
     }
 
     #[test]

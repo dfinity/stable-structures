@@ -10,6 +10,7 @@ pub mod file_mem;
 mod ic0_memory; // Memory API for canisters.
 pub mod log;
 pub mod memory_manager;
+mod memory_usage;
 pub mod min_heap;
 pub mod reader;
 pub mod storable;
