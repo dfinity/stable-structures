@@ -13,12 +13,6 @@ pub trait DataSize {
     fn data_size(&self) -> usize;
 }
 
-impl DataSize for () {
-    fn data_size(&self) -> usize {
-        0
-    }
-}
-
 impl DataSize for u8 {
     fn data_size(&self) -> usize {
         std::mem::size_of::<u8>()
