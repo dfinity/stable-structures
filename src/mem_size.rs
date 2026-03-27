@@ -1,20 +1,23 @@
 use std::cell::OnceCell;
 
-/// Trait to estimate the total memory footprint of a value in bytes,
-/// including both stack and heap usage.
+/// Estimates the in-process memory footprint of a value in bytes.
 ///
-/// For primitives, this returns the stack size.
-/// For containers like `Vec` or `String`, this returns the stack size
-/// (pointer + length + capacity) plus the size of the heap-allocated contents.
-/// For borrowed types like `&str` and `[u8]`, this returns only the content
-/// size, since the container overhead is accounted for by the owner.
+/// - Primitives return `size_of::<Self>()`. Always O(1).
+/// - Containers (`Vec`, `String`) return their inline size plus
+///   the size of the heap-allocated buffer. `Vec<T>` is O(1) when
+///   `T::ELEMENT_SIZE` is `Some` (uses `len * element_size`), but
+///   O(n) when `ELEMENT_SIZE` is `None` (falls back to per-element
+///   iteration). Set `ELEMENT_SIZE` for fixed-size types to avoid this.
+/// - Wrappers (`Option`, `OnceCell`) return their inline size plus
+///   the inner value's `mem_size()` when populated. O(1) if the
+///   inner type is O(1).
 pub trait MemSize {
-    /// The fixed size of a single element, if known at compile time.
-    /// Used by `Vec<T>` to compute `len * ELEMENT_SIZE` instead of iterating.
-    /// Types with heap allocations or variable size should leave this as `None`.
+    /// Fixed per-element size, if known at compile time.
+    /// When `Some`, `Vec<T>::mem_size()` uses `len * ELEMENT_SIZE` (O(1))
+    /// instead of iterating (O(n)). Defaults to `None`.
     const ELEMENT_SIZE: Option<usize> = None;
 
-    /// Returns the estimated total memory footprint of this value in bytes.
+    /// Returns the estimated memory footprint of this value in bytes.
     fn mem_size(&self) -> usize;
 }
 
