@@ -3422,6 +3422,7 @@ mod test {
 
         // BTreeMap holds Address(8) + Version(16) + Allocator fields(20) + u64(8) = 52 bytes.
         // No heap allocations, so heap_memory_used == sum of inline field sizes.
+        // Update this value if the struct layout changes.
         assert_eq!(btree.heap_memory_used(), 52);
 
         // One WASM page (64 KiB) is allocated on init.
