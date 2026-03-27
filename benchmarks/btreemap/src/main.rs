@@ -822,22 +822,22 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
 // compared against the default (cache disabled) results above.
 
 fn insert_helper_v2_cached_32entry<K: TestKey, V: TestValue>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_cache_entries(32);
+    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(32);
     insert_helper::<K, V>(btree)
 }
 
 fn get_helper_v2_cached_32entry<K: TestKey, V: TestValue>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_cache_entries(32);
+    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(32);
     get_helper::<K, V>(btree)
 }
 
 fn remove_helper_v2_cached_32entry<K: TestKey, V: TestValue>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_cache_entries(32);
+    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(32);
     remove_helper::<K, V>(btree)
 }
 
 fn contains_helper_v2_cached_32entry<K: TestKey, V: TestValue>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_cache_entries(32);
+    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(32);
     contains_helper::<K, V>(btree)
 }
 
