@@ -55,6 +55,9 @@ impl AddAssign<Bytes> for Address {
 }
 
 impl DataSize for Address {
+    const ELEMENT_SIZE: Option<usize> = Some(std::mem::size_of::<Self>());
+
+    #[inline]
     fn data_size(&self) -> usize {
         let val = self.0;
         val.data_size()
@@ -149,6 +152,9 @@ impl SubAssign<Bytes> for Bytes {
 }
 
 impl DataSize for Bytes {
+    const ELEMENT_SIZE: Option<usize> = Some(std::mem::size_of::<Self>());
+
+    #[inline]
     fn data_size(&self) -> usize {
         let val = self.0;
         val.data_size()

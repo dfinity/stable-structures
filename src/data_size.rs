@@ -9,65 +9,99 @@ use std::cell::OnceCell;
 /// For borrowed types like `&str` and `[u8]`, this returns only the content
 /// size, since the container overhead is accounted for by the owner.
 pub trait DataSize {
+    /// The fixed size of a single element, if known at compile time.
+    /// Used by `Vec<T>` to compute `len * ELEMENT_SIZE` instead of iterating.
+    /// Types with heap allocations or variable size should leave this as `None`.
+    const ELEMENT_SIZE: Option<usize> = None;
+
     /// Returns the estimated total memory footprint of this value in bytes.
     fn data_size(&self) -> usize;
 }
 
+impl DataSize for () {
+    const ELEMENT_SIZE: Option<usize> = Some(0);
+
+    #[inline]
+    fn data_size(&self) -> usize {
+        0
+    }
+}
+
 impl DataSize for u8 {
+    const ELEMENT_SIZE: Option<usize> = Some(std::mem::size_of::<u8>());
+
+    #[inline]
     fn data_size(&self) -> usize {
         std::mem::size_of::<u8>()
     }
 }
 
 impl DataSize for [u8] {
+    #[inline]
     fn data_size(&self) -> usize {
         std::mem::size_of_val(self)
     }
 }
 
 impl DataSize for u32 {
+    const ELEMENT_SIZE: Option<usize> = Some(std::mem::size_of::<u32>());
+
+    #[inline]
     fn data_size(&self) -> usize {
         std::mem::size_of::<u32>()
     }
 }
 
 impl DataSize for u64 {
+    const ELEMENT_SIZE: Option<usize> = Some(std::mem::size_of::<u64>());
+
+    #[inline]
     fn data_size(&self) -> usize {
         std::mem::size_of::<u64>()
     }
 }
 
 impl DataSize for &str {
+    #[inline]
     fn data_size(&self) -> usize {
         self.as_bytes().data_size()
     }
 }
 
 impl DataSize for String {
+    #[inline]
     fn data_size(&self) -> usize {
         std::mem::size_of::<Self>() + self.as_bytes().data_size()
     }
 }
 
 impl<T: DataSize> DataSize for Vec<T> {
+    #[inline]
     fn data_size(&self) -> usize {
-        std::mem::size_of::<Self>() + self.iter().map(|x| x.data_size()).sum::<usize>()
+        let elements_size = match T::ELEMENT_SIZE {
+            Some(el_size) => self.len() * el_size,
+            None => self.iter().map(|x| x.data_size()).sum::<usize>(),
+        };
+        std::mem::size_of::<Self>() + elements_size
     }
 }
 
 impl<T: DataSize> DataSize for Option<T> {
+    #[inline]
     fn data_size(&self) -> usize {
         std::mem::size_of::<Self>() + self.as_ref().map_or(0, |x| x.data_size())
     }
 }
 
 impl<T: DataSize> DataSize for OnceCell<T> {
+    #[inline]
     fn data_size(&self) -> usize {
         std::mem::size_of::<Self>() + self.get().map_or(0, |x| x.data_size())
     }
 }
 
 impl<A: DataSize, B: DataSize> DataSize for (A, B) {
+    #[inline]
     fn data_size(&self) -> usize {
         self.0.data_size() + self.1.data_size()
     }
