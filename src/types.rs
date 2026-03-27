@@ -56,7 +56,8 @@ impl AddAssign<Bytes> for Address {
 
 impl DataSize for Address {
     fn data_size(&self) -> usize {
-        self.0.data_size()
+        let val = self.0;
+        val.data_size()
     }
 }
 
