@@ -52,6 +52,10 @@ impl<M: Memory> MemSize for Allocator<M> {
             + self.allocation_size.mem_size()
             + self.num_allocated_chunks.mem_size()
             + self.free_list_head.mem_size()
+        // Don't include memory since it's not actually storing any data itself,
+        // just providing an interface to the underlying memory. This is
+        // especially important for VectorMemory which is used in tests
+        // and can make memory reporting inconsistent to IC stable memory.
     }
 }
 
@@ -235,18 +239,18 @@ impl<M: Memory> Allocator<M> {
         write_struct(&header, self.header_addr, &self.memory);
     }
 
-    pub fn num_allocated_chunks(&self) -> u64 {
+    pub(crate) fn num_allocated_chunks(&self) -> u64 {
         self.num_allocated_chunks
     }
 
     /// The full size of a chunk, which is the size of the header + the `allocation_size` that's
     /// available to the user.
-    pub fn chunk_size(&self) -> Bytes {
+    pub(crate) fn chunk_size(&self) -> Bytes {
         self.allocation_size + ChunkHeader::size()
     }
 
     /// Returns the size of the allocator header in bytes.
-    pub fn header_size() -> Bytes {
+    pub(crate) fn header_size() -> Bytes {
         AllocatorHeader::size()
     }
 

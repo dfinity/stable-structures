@@ -264,6 +264,7 @@ where
             + self.version.mem_size()
             + self.allocator.mem_size()
             + self.length.mem_size()
+        // Don't include _phantom since it doesn't actually store any data
     }
 }
 
