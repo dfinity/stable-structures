@@ -1,9 +1,9 @@
-use crate::data_size::DataSize;
+use crate::mem_size::MemSize;
 
-pub trait ReportMemoryUsage: DataSize {
+pub trait ReportMemoryUsage: MemSize {
     /// Estimates the total memory usage including heap and stack in bytes.
     fn heap_memory_usage(&self) -> usize {
-        self.data_size()
+        self.mem_size()
     }
 
     /// Estimates the size of allocated stable memory in bytes.

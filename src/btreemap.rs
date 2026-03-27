@@ -53,7 +53,7 @@ mod iter;
 mod node;
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
-    data_size::DataSize,
+    mem_size::MemSize,
     memory_usage::ReportMemoryUsage,
     storable::Bound as StorableBound,
     types::{Address, NULL},
@@ -254,17 +254,17 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
-impl<K, V, M> DataSize for BTreeMap<K, V, M>
+impl<K, V, M> MemSize for BTreeMap<K, V, M>
 where
     K: Storable + Ord + Clone,
     V: Storable,
     M: Memory,
 {
-    fn data_size(&self) -> usize {
-        self.root_addr.data_size()
-            + self.version.data_size()
-            + self.allocator.data_size()
-            + self.length.data_size()
+    fn mem_size(&self) -> usize {
+        self.root_addr.mem_size()
+            + self.version.mem_size()
+            + self.allocator.mem_size()
+            + self.length.mem_size()
     }
 }
 

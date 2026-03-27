@@ -1,4 +1,4 @@
-use crate::data_size::DataSize;
+use crate::mem_size::MemSize;
 use core::ops::{Add, AddAssign, Div, Mul, Rem, Sub, SubAssign};
 
 pub const NULL: Address = Address(0);
@@ -54,13 +54,13 @@ impl AddAssign<Bytes> for Address {
     }
 }
 
-impl DataSize for Address {
+impl MemSize for Address {
     const ELEMENT_SIZE: Option<usize> = Some(std::mem::size_of::<Self>());
 
     #[inline]
-    fn data_size(&self) -> usize {
+    fn mem_size(&self) -> usize {
         let val = self.0;
-        val.data_size()
+        val.mem_size()
     }
 }
 
@@ -151,13 +151,13 @@ impl SubAssign<Bytes> for Bytes {
     }
 }
 
-impl DataSize for Bytes {
+impl MemSize for Bytes {
     const ELEMENT_SIZE: Option<usize> = Some(std::mem::size_of::<Self>());
 
     #[inline]
-    fn data_size(&self) -> usize {
+    fn mem_size(&self) -> usize {
         let val = self.0;
-        val.data_size()
+        val.mem_size()
     }
 }
 
