@@ -1839,6 +1839,11 @@ mod test {
         let mem = make_memory();
         let tree_v2 = BTreeMap::new(mem);
         f(tree_v2);
+
+        // Test with V2 and node cache enabled.
+        let mem = make_memory();
+        let tree_v2_cached = BTreeMap::new(mem).with_node_cache(32);
+        f(tree_v2_cached);
     }
 
     /// Checks that objects from boundary u32 values are strictly increasing.

@@ -168,7 +168,7 @@ fn set_up_worst_case<NS: NeuronStore>(
     for neuron_id in num_followees..num_neurons {
         let previous_neuron_ids = (neuron_id - num_half_followees - 1)..neuron_id;
         let followee_neuron_ids = previous_neuron_ids
-            .map(|id| NeuronId::from(id))
+            .map(NeuronId::from)
             .chain(not_voting_neuron_ids.clone().into_iter())
             .collect::<Vec<_>>();
         neuron_store.set_followees(
