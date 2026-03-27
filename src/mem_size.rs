@@ -1,16 +1,18 @@
 use std::cell::OnceCell;
 
-/// Estimates the in-process memory footprint of a value in bytes.
+/// Estimates the in-process memory footprint of a value in bytes,
+/// covering both inline (stack) and heap-allocated data.
 ///
-/// - Primitives return `size_of::<Self>()`. Always O(1).
-/// - Containers (`Vec`, `String`) return their inline size plus
-///   the size of the heap-allocated buffer. `Vec<T>` is O(1) when
-///   `T::ELEMENT_SIZE` is `Some` (uses `len * element_size`), but
-///   O(n) when `ELEMENT_SIZE` is `None` (falls back to per-element
-///   iteration). Set `ELEMENT_SIZE` for fixed-size types to avoid this.
-/// - Wrappers (`Option`, `OnceCell`) return their inline size plus
-///   the inner value's `mem_size()` when populated. O(1) if the
-///   inner type is O(1).
+/// ## Performance
+///
+/// Primitives, strings, and fixed-size containers are always O(1).
+///
+/// Vectors of types with a known `ELEMENT_SIZE` are also O(1),
+/// using simple multiplication instead of traversal.
+///
+/// Types with a variable or unknown element size fall back to
+/// per-element iteration, which is O(n). Implement `ELEMENT_SIZE`
+/// for your fixed-size types to stay on the fast path.
 pub trait MemSize {
     /// Fixed per-element size, if known at compile time.
     /// When `Some`, `Vec<T>::mem_size()` uses `len * ELEMENT_SIZE` (O(1))
