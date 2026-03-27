@@ -407,14 +407,17 @@ where
         btree
     }
 
+    /// Returns the amount of heap and stack memory used in bytes.
     pub fn heap_memory_used(&self) -> usize {
         self.mem_size()
     }
 
+    /// Returns the amount of stable memory allocated in bytes.
     pub fn stable_memory_size(&self) -> usize {
         (self.allocator.memory().size() * WASM_PAGE_SIZE) as usize
     }
 
+    /// Returns the amount of stable memory actually used in bytes.
     pub fn stable_memory_used(&self) -> usize {
         (ALLOCATOR_OFFSET as u64
             + Allocator::<M>::header_size().get()
