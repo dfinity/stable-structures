@@ -91,6 +91,56 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 /// See [`BTreeMap::with_node_cache`] for guidance on choosing a size.
 const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 0;
 
+/// Node-cache performance metrics.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct NodeCacheMetrics {
+    hits: u64,
+    misses: u64,
+}
+
+impl NodeCacheMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Resets all counters to zero.
+    pub fn clear(&mut self) {
+        self.hits = 0;
+        self.misses = 0;
+    }
+
+    pub fn hits(&self) -> u64 {
+        self.hits
+    }
+
+    pub fn misses(&self) -> u64 {
+        self.misses
+    }
+
+    pub fn total(&self) -> u64 {
+        self.hits + self.misses
+    }
+
+    /// Returns the hit ratio as a value between 0.0 and 1.0.
+    /// Returns 0.0 if no lookups have been performed.
+    pub fn hit_ratio(&self) -> f64 {
+        let total = self.total();
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
+    }
+
+    pub(crate) fn observe_hit(&mut self) {
+        self.hits += 1;
+    }
+
+    pub(crate) fn observe_miss(&mut self) {
+        self.misses += 1;
+    }
+}
+
 /// A direct-mapped node cache.
 ///
 /// Each slot is indexed by `(node_address / page_size) % num_slots`.
@@ -101,28 +151,7 @@ const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 0;
 struct NodeCache<K: Storable + Ord + Clone> {
     slots: Vec<(Address, Option<Node<K>>)>,
     page_size: u32,
-    hits: u64,
-    misses: u64,
-}
-
-/// Node-cache performance counters.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NodeCacheStats {
-    pub hits: u64,
-    pub misses: u64,
-}
-
-impl NodeCacheStats {
-    /// Returns the hit ratio as a value between 0.0 and 1.0.
-    /// Returns 0.0 if no lookups have been performed.
-    pub fn hit_ratio(&self) -> f64 {
-        let total = self.hits + self.misses;
-        if total == 0 {
-            0.0
-        } else {
-            self.hits as f64 / total as f64
-        }
-    }
+    metrics: NodeCacheMetrics,
 }
 
 impl<K: Storable + Ord + Clone> NodeCache<K> {
@@ -134,8 +163,7 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         Self {
             slots,
             page_size,
-            hits: 0,
-            misses: 0,
+            metrics: NodeCacheMetrics::new(),
         }
     }
 
@@ -153,10 +181,10 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
             self.slots[idx].0 = NULL;
-            self.hits += 1;
+            self.metrics.observe_hit();
             self.slots[idx].1.take()
         } else {
-            self.misses += 1;
+            self.metrics.observe_miss();
             None
         }
     }
@@ -175,19 +203,19 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         }
     }
 
-    fn stats(&self) -> NodeCacheStats {
-        NodeCacheStats {
-            hits: self.hits,
-            misses: self.misses,
-        }
+    fn metrics(&self) -> NodeCacheMetrics {
+        self.metrics
+    }
+
+    fn clear_metrics(&mut self) {
+        self.metrics.clear();
     }
 
     fn clear(&mut self) {
         for slot in &mut self.slots {
             *slot = (NULL, None);
         }
-        self.hits = 0;
-        self.misses = 0;
+        self.metrics.clear();
     }
 }
 
@@ -459,7 +487,7 @@ where
     ///         .with_node_cache(32);
     ///
     /// // After observing a poor hit ratio, grow the cache.
-    /// if map.node_cache_stats().hit_ratio() < 0.5 {
+    /// if map.node_cache_metrics().hit_ratio() < 0.5 {
     ///     map.node_cache_resize(64);
     /// }
     /// ```
@@ -468,13 +496,19 @@ where
         *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
     }
 
-    /// Evicts all cached nodes and resets hit/miss counters, keeping the
+    /// Evicts all cached nodes and resets metrics, keeping the
     /// current cache capacity.
     pub fn node_cache_clear(&mut self) {
         self.cache.get_mut().clear();
     }
 
-    /// Returns node-cache performance counters.
+    /// Resets cache metrics (hit/miss counters) without evicting
+    /// cached nodes.
+    pub fn node_cache_clear_metrics(&mut self) {
+        self.cache.get_mut().clear_metrics();
+    }
+
+    /// Returns node-cache performance metrics.
     ///
     /// # Examples
     ///
@@ -487,11 +521,11 @@ where
     /// map.insert(1, 100);
     /// let _ = map.get(&1);
     ///
-    /// let stats = map.node_cache_stats();
-    /// println!("hit ratio: {:.1}%", stats.hit_ratio() * 100.0);
+    /// let metrics = map.node_cache_metrics();
+    /// println!("hit ratio: {:.1}%", metrics.hit_ratio() * 100.0);
     /// ```
-    pub fn node_cache_stats(&self) -> NodeCacheStats {
-        self.cache.borrow().stats()
+    pub fn node_cache_metrics(&self) -> NodeCacheMetrics {
+        self.cache.borrow().metrics()
     }
 
     /// Initializes a v1 `BTreeMap`.
@@ -3654,19 +3688,18 @@ mod test {
     }
 
     #[test]
-    fn node_cache_stats_default() {
+    fn node_cache_metrics_default() {
         let mem = make_memory();
         let map: BTreeMap<u64, u64, _> = BTreeMap::new(mem);
-        let stats = map.node_cache_stats();
-        assert_eq!(stats.hits, 0);
-        assert_eq!(stats.misses, 0);
+        let metrics = map.node_cache_metrics();
+        assert_eq!(metrics.hits(), 0);
+        assert_eq!(metrics.misses(), 0);
     }
 
     #[test]
     fn node_cache_resize_at_runtime() {
         let mem = make_memory();
-        let mut map: BTreeMap<u64, u64, _> =
-            BTreeMap::new(mem).with_node_cache(32);
+        let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(32);
 
         for i in 0..100u64 {
             map.insert(i, i);
@@ -3674,14 +3707,14 @@ mod test {
         for i in 0..100u64 {
             let _ = map.get(&i);
         }
-        let before = map.node_cache_stats();
-        assert!(before.hits > 0, "expected cache hits before resize");
+        let before = map.node_cache_metrics();
+        assert!(before.hits() > 0, "expected cache hits before resize");
 
         map.node_cache_resize(64);
 
-        let after = map.node_cache_stats();
-        assert_eq!(after.hits, 0, "resize should reset counters");
-        assert_eq!(after.misses, 0, "resize should reset counters");
+        let after = map.node_cache_metrics();
+        assert_eq!(after.hits(), 0, "resize should reset counters");
+        assert_eq!(after.misses(), 0, "resize should reset counters");
 
         for i in 0..100u64 {
             assert_eq!(map.get(&i), Some(i));
@@ -3704,22 +3737,20 @@ mod test {
     #[test]
     fn node_cache_non_power_of_two() {
         let mem = make_memory();
-        let mut map: BTreeMap<u64, u64, _> =
-            BTreeMap::new(mem).with_node_cache(50);
+        let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(50);
 
         for i in 0..100u64 {
             map.insert(i, i);
         }
         let _ = map.get(&50);
         let _ = map.get(&50);
-        assert!(map.node_cache_stats().hits > 0);
+        assert!(map.node_cache_metrics().hits() > 0);
     }
 
     #[test]
     fn node_cache_clear_resets_counters() {
         let mem = make_memory();
-        let mut map: BTreeMap<u64, u64, _> =
-            BTreeMap::new(mem).with_node_cache(32);
+        let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(32);
 
         for i in 0..50u64 {
             map.insert(i, i);
@@ -3727,17 +3758,50 @@ mod test {
         for i in 0..50u64 {
             let _ = map.get(&i);
         }
-        let before = map.node_cache_stats();
-        assert!(before.hits + before.misses > 0);
+        let before = map.node_cache_metrics();
+        assert!(before.total() > 0);
 
         map.node_cache_clear();
 
-        let after = map.node_cache_stats();
-        assert_eq!(after.hits, 0);
-        assert_eq!(after.misses, 0);
+        let after = map.node_cache_metrics();
+        assert_eq!(after.hits(), 0);
+        assert_eq!(after.misses(), 0);
 
         for i in 0..50u64 {
             assert_eq!(map.get(&i), Some(i));
         }
+    }
+
+    #[test]
+    fn node_cache_clear_metrics_preserves_cache() {
+        let mem = make_memory();
+        let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(32);
+
+        for i in 0..50u64 {
+            map.insert(i, i);
+        }
+        // Populate cache with reads.
+        for i in 0..50u64 {
+            let _ = map.get(&i);
+        }
+        let before = map.node_cache_metrics();
+        assert!(before.total() > 0);
+
+        // Clear only metrics, not the cached nodes.
+        map.node_cache_clear_metrics();
+
+        let after = map.node_cache_metrics();
+        assert_eq!(after.hits(), 0);
+        assert_eq!(after.misses(), 0);
+
+        // Reads should still hit the cache since nodes weren't evicted.
+        for i in 0..50u64 {
+            assert_eq!(map.get(&i), Some(i));
+        }
+        let final_metrics = map.node_cache_metrics();
+        assert!(
+            final_metrics.hits() > 0,
+            "cached nodes should still be present"
+        );
     }
 }
