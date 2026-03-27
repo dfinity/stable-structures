@@ -54,7 +54,6 @@ mod node;
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
     mem_size::MemSize,
-    memory_usage::ReportMemoryUsage,
     storable::Bound as StorableBound,
     types::{Address, NULL},
     Memory, Storable,
@@ -265,23 +264,6 @@ where
             + self.version.mem_size()
             + self.allocator.mem_size()
             + self.length.mem_size()
-    }
-}
-
-impl<K, V, M> ReportMemoryUsage for BTreeMap<K, V, M>
-where
-    K: Storable + Ord + Clone,
-    V: Storable,
-    M: Memory,
-{
-    /// Estimates the size of allocated stable memory in bytes.
-    fn stable_memory_allocation(&self) -> usize {
-        todo!("Implement stable_memory_allocation for BTreeMap");
-    }
-
-    /// Estimates the actual memory usage in stable memory in bytes.
-    fn stable_memory_usage(&self) -> usize {
-        todo!("Implement stable_memory_usage for BTreeMap");
     }
 }
 

@@ -4,13 +4,12 @@ pub mod btreemap;
 pub mod cell;
 pub use cell::{Cell as StableCell, Cell};
 pub mod btreeset;
-mod mem_size;
 pub mod file_mem;
 #[cfg(target_arch = "wasm32")]
 mod ic0_memory; // Memory API for canisters.
 pub mod log;
+mod mem_size;
 pub mod memory_manager;
-mod memory_usage;
 pub mod min_heap;
 pub mod reader;
 pub mod storable;
