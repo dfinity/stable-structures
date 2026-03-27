@@ -53,9 +53,10 @@ mod iter;
 mod node;
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
+    mem_size::MemSize,
     storable::Bound as StorableBound,
     types::{Address, NULL},
-    Memory, Storable,
+    Memory, Storable, WASM_PAGE_SIZE,
 };
 use allocator::Allocator;
 pub use iter::Iter;
@@ -252,6 +253,22 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
+impl<K, V, M> MemSize for BTreeMap<K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    fn mem_size(&self) -> usize {
+        // Excludes _phantom (zero-size) and the Memory handle
+        // (reported separately via stable_memory_size).
+        self.root_addr.mem_size()
+            + self.version.mem_size()
+            + self.allocator.mem_size()
+            + self.length.mem_size()
+    }
+}
+
 #[derive(PartialEq, Debug)]
 /// The packed header size must be <= ALLOCATOR_OFFSET.
 struct BTreeHeader {
@@ -390,6 +407,60 @@ where
 
         btree.save_header();
         btree
+    }
+
+    /// Returns the amount of heap and stack memory used in bytes.
+    pub fn heap_memory_used(&self) -> usize {
+        self.mem_size()
+    }
+
+    /// Returns the amount of stable memory allocated in bytes.
+    pub fn stable_memory_size(&self) -> usize {
+        (self.allocator.memory().size() * WASM_PAGE_SIZE) as usize
+    }
+
+    /// Returns the exact height of the tree by walking from root to a leaf.
+    ///
+    /// Returns 0 for an empty tree. Requires O(height) stable memory reads,
+    /// which is typically 3–5 for millions of entries.
+    #[cfg(test)]
+    fn height(&self) -> u32 {
+        if self.root_addr == NULL {
+            return 0;
+        }
+        let mut height = 1;
+        let mut node = self.load_node(self.root_addr);
+        while node.node_type() == NodeType::Internal {
+            node = self.load_node(node.child(0));
+            height += 1;
+        }
+        height
+    }
+
+    /// Estimates the tree height from the number of entries. O(1).
+    ///
+    /// Uses `ceil(log_B(n))` with an occupancy correction factor.
+    /// May differ from the actual height by ±1 in some cases.
+    pub fn height_approx(&self) -> u32 {
+        let n = self.length;
+        if n == 0 {
+            return 0;
+        }
+        // Average node occupancy after random inserts is ~69% (ln 2).
+        // Use B * 1.3 ≈ effective fan-out (conservative: slightly under ln 2).
+        let effective_b = (node::B as f64) * 1.3;
+        // max(1, ...) because a non-empty tree always has at least height 1.
+        std::cmp::max(1, (n as f64).log(effective_b).ceil() as u32)
+    }
+
+    /// Returns the approximate amount of stable memory actually used in bytes.
+    pub fn stable_memory_used(&self) -> usize {
+        // BTreeMap header + allocator header + allocated chunks.
+        // O(1): uses the cached chunk count, no node traversal.
+        (ALLOCATOR_OFFSET as u64
+            + Allocator::<M>::header_size().get()
+            + self.allocator.num_allocated_chunks() * self.allocator.chunk_size().get())
+            as usize
     }
 
     /// Loads the map from memory.
@@ -3377,5 +3448,162 @@ mod test {
         }
 
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn memory_reporting_empty() {
+        let mem = make_memory();
+        let btree = BTreeMap::<u32, u32, _>::new(mem);
+
+        // BTreeMap holds Address(8) + Version(16) + Allocator fields(20) + u64(8) = 52 bytes.
+        // No heap allocations, so heap_memory_used == sum of inline field sizes.
+        // Update this value if the struct layout changes.
+        assert_eq!(btree.heap_memory_used(), 52);
+
+        // One WASM page (64 KiB) is allocated on init.
+        assert_eq!(btree.stable_memory_size(), WASM_PAGE_SIZE as usize);
+
+        // Only the BTreeMap header (52 bytes) + AllocatorHeader (48 bytes) = 100 bytes used.
+        let base_used = ALLOCATOR_OFFSET + Allocator::<VectorMemory>::header_size().get() as usize;
+        assert_eq!(base_used, 100);
+        assert_eq!(btree.stable_memory_used(), base_used);
+    }
+
+    #[test]
+    fn memory_reporting_insert_and_remove() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::<u32, u32, _>::new(mem);
+
+        let base_used = btree.stable_memory_used();
+        let chunk_size = btree.allocator.chunk_size().get() as usize;
+
+        for i in 0..100u32 {
+            btree.insert(i, i);
+        }
+
+        // 100 entries in a V2 BTreeMap<u32, u32> produce 19 nodes (chunks).
+        let chunks = btree.allocator.num_allocated_chunks();
+        assert_eq!(chunks, 19);
+        assert_eq!(
+            btree.stable_memory_used(),
+            base_used + chunks as usize * chunk_size
+        );
+        assert!(btree.stable_memory_used() <= btree.stable_memory_size());
+
+        // After removing all entries, used drops back to base (0 allocated chunks).
+        for i in 0..100u32 {
+            btree.remove(&i);
+        }
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        assert_eq!(btree.stable_memory_used(), base_used);
+
+        // Stable memory size never shrinks — still one page.
+        assert_eq!(btree.stable_memory_size(), WASM_PAGE_SIZE as usize);
+    }
+
+    /// Verifies memory reporting invariants for a given K/V combination:
+    /// - heap_memory_used is consistent across types (same struct layout)
+    /// - stable_memory_used grows after inserts and returns to base after removal
+    /// - stable_memory_used <= stable_memory_size always
+    fn memory_reporting_for_type<K: TestKey, V: TestValue>() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::<K, V, _>::new(mem);
+
+        // All BTreeMap instances have the same struct layout regardless of K/V.
+        // Update this value if the struct layout changes.
+        assert_eq!(btree.heap_memory_used(), 52);
+
+        let base_used = btree.stable_memory_used();
+        let chunk_size = btree.allocator.chunk_size().get() as usize;
+
+        // Insert entries.
+        for i in 0..50_u32 {
+            btree.insert(K::build(i), V::build(i));
+        }
+        let chunks_after_insert = btree.allocator.num_allocated_chunks();
+        assert!(chunks_after_insert > 0);
+        assert_eq!(
+            btree.stable_memory_used(),
+            base_used + chunks_after_insert as usize * chunk_size
+        );
+        assert!(btree.stable_memory_used() <= btree.stable_memory_size());
+
+        // Remove all entries.
+        for i in 0..50_u32 {
+            btree.remove(&K::build(i));
+        }
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        assert_eq!(btree.stable_memory_used(), base_used);
+    }
+
+    #[test]
+    fn memory_reporting_u32_u32() {
+        memory_reporting_for_type::<u32, u32>();
+    }
+
+    #[test]
+    fn memory_reporting_blob10_blob20() {
+        memory_reporting_for_type::<Blob<10>, Blob<20>>();
+    }
+
+    #[test]
+    fn memory_reporting_u32_unit() {
+        memory_reporting_for_type::<u32, ()>();
+    }
+
+    #[test]
+    fn memory_reporting_vec_u8_vec_u8() {
+        memory_reporting_for_type::<MonotonicVec32, MonotonicVec32>();
+    }
+
+    #[test]
+    fn memory_reporting_string_string() {
+        memory_reporting_for_type::<MonotonicString32, MonotonicString32>();
+    }
+
+    #[test]
+    fn memory_reporting_blob10_vec_u8() {
+        memory_reporting_for_type::<Blob<10>, MonotonicVec32>();
+    }
+
+    #[test]
+    fn height_empty() {
+        let mem = make_memory();
+        let btree = BTreeMap::<u32, (), _>::new(mem);
+        assert_eq!(btree.height(), 0);
+        assert_eq!(btree.height_approx(), 0);
+    }
+
+    #[test]
+    fn height_exact_vs_approx() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::<u32, (), _>::new(mem);
+
+        // Insert items in batches and compare exact vs approximate height.
+        let test_sizes = [1, 5, 11, 12, 50, 100, 500, 1_000, 5_000, 10_000, 50_000, 100_000];
+
+        for &target in &test_sizes {
+            while btree.len() < target {
+                let i = btree.len() as u32;
+                btree.insert(i, ());
+            }
+
+            let exact = btree.height();
+            let approx = btree.height_approx();
+            let diff = (approx as i32) - (exact as i32);
+
+            assert!(
+                exact > 0,
+                "n={target}: exact height should be > 0 after inserts"
+            );
+            assert!(
+                diff.unsigned_abs() <= 1,
+                "n={target}: height_approx ({approx}) differs from \
+                 height ({exact}) by more than 1"
+            );
+        }
+
+        // Sanity: at 100k entries the tree should be reasonably short.
+        assert!(btree.height() <= 7);
     }
 }

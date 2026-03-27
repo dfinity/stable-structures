@@ -815,4 +815,52 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
     })
 }
 
+// Benchmarks for memory reporting methods.
+
+fn populate_btree_v2<K: TestKey, V: TestValue>() -> BTreeMap<K, V, DefaultMemoryImpl> {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(10_000, &mut rng);
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+    btree
+}
+
+fn heap_memory_used_helper<K: TestKey, V: TestValue>() -> BenchResult {
+    let btree = populate_btree_v2::<K, V>();
+    bench_fn(|| {
+        let _ = btree.heap_memory_used();
+    })
+}
+
+fn stable_memory_size_helper<K: TestKey, V: TestValue>() -> BenchResult {
+    let btree = populate_btree_v2::<K, V>();
+    bench_fn(|| {
+        let _ = btree.stable_memory_size();
+    })
+}
+
+fn stable_memory_used_helper<K: TestKey, V: TestValue>() -> BenchResult {
+    let btree = populate_btree_v2::<K, V>();
+    bench_fn(|| {
+        let _ = btree.stable_memory_used();
+    })
+}
+
+bench_tests! {
+    // Small bounded, large bounded, unbounded.
+    btreemap_v2_heap_memory_used_blob_4_128,    heap_memory_used_helper,          Blob4, Blob128;
+    btreemap_v2_heap_memory_used_blob_1024_128, heap_memory_used_helper,       Blob1024, Blob128;
+    btreemap_v2_heap_memory_used_vec_32_128,    heap_memory_used_helper,  UnboundedVecN32, UnboundedVecN128;
+
+    btreemap_v2_stable_memory_size_blob_4_128,    stable_memory_size_helper,          Blob4, Blob128;
+    btreemap_v2_stable_memory_size_blob_1024_128, stable_memory_size_helper,       Blob1024, Blob128;
+    btreemap_v2_stable_memory_size_vec_32_128,    stable_memory_size_helper,  UnboundedVecN32, UnboundedVecN128;
+
+    btreemap_v2_stable_memory_used_blob_4_128,    stable_memory_used_helper,          Blob4, Blob128;
+    btreemap_v2_stable_memory_used_blob_1024_128, stable_memory_used_helper,       Blob1024, Blob128;
+    btreemap_v2_stable_memory_used_vec_32_128,    stable_memory_used_helper,  UnboundedVecN32, UnboundedVecN128;
+}
+
 fn main() {}
