@@ -528,6 +528,31 @@ where
         self.cache.borrow().metrics()
     }
 
+    /// Returns an estimate of the cache's heap usage in bytes.
+    ///
+    /// The estimate is `num_slots * (page_size + per_slot_overhead)`.
+    /// Actual usage depends on key size and access patterns:
+    ///
+    /// - **Small keys** (≤ 16 bytes, e.g. `u64`): the estimate is roughly
+    ///   **2×** actual usage, because cached nodes only hold compact keys
+    ///   and child pointers — values are not cached.
+    /// - **Large keys** (> 16 bytes, e.g. 100-byte `String`): keys are
+    ///   lazily loaded into an `OnceCell` during search and remain
+    ///   materialized in the cache, so actual usage can **exceed** this
+    ///   estimate.
+    ///
+    /// For example, with 32 slots and the default 1024-byte page size:
+    /// ~35 KB estimated vs ~17 KB actual (`u64` keys) or ~50 KB actual
+    /// (100-byte `String` keys).
+    ///
+    /// Use this as a rough order-of-magnitude guide, not a precise budget.
+    /// For exact heap profiling, use platform-specific tools.
+    pub fn node_cache_size_bytes_approx(&self) -> usize {
+        self.cache_num_slots
+            * (self.version.page_size().get() as usize
+                + std::mem::size_of::<(Address, Option<Node<K>>)>())
+    }
+
     /// Initializes a v1 `BTreeMap`.
     ///
     /// This is exposed only in testing.
