@@ -56,7 +56,7 @@ use crate::{
     mem_size::MemSize,
     storable::Bound as StorableBound,
     types::{Address, NULL},
-    Memory, Storable,
+    Memory, Storable, WASM_PAGE_SIZE,
 };
 use allocator::Allocator;
 pub use iter::Iter;
@@ -405,6 +405,21 @@ where
 
         btree.save_header();
         btree
+    }
+
+    pub fn heap_memory_used(&self) -> usize {
+        self.mem_size()
+    }
+
+    pub fn stable_memory_size(&self) -> usize {
+        (self.allocator.memory().size() * WASM_PAGE_SIZE) as usize
+    }
+
+    pub fn stable_memory_used(&self) -> usize {
+        (ALLOCATOR_OFFSET as u64
+            + Allocator::<M>::header_size().get()
+            + self.allocator.num_allocated_chunks() * self.allocator.chunk_size().get())
+            as usize
     }
 
     /// Loads the map from memory.

@@ -235,15 +235,19 @@ impl<M: Memory> Allocator<M> {
         write_struct(&header, self.header_addr, &self.memory);
     }
 
-    #[cfg(test)]
     pub fn num_allocated_chunks(&self) -> u64 {
         self.num_allocated_chunks
     }
 
-    // The full size of a chunk, which is the size of the header + the `allocation_size` that's
-    // available to the user.
-    fn chunk_size(&self) -> Bytes {
+    /// The full size of a chunk, which is the size of the header + the `allocation_size` that's
+    /// available to the user.
+    pub fn chunk_size(&self) -> Bytes {
         self.allocation_size + ChunkHeader::size()
+    }
+
+    /// Returns the size of the allocator header in bytes.
+    pub fn header_size() -> Bytes {
+        AllocatorHeader::size()
     }
 
     /// Destroys the allocator and returns the underlying memory.
