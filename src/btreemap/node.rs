@@ -556,6 +556,9 @@ enum LazyObject<T: Storable> {
 }
 
 impl<T: Storable> LazyObject<T> {
+    /// Reports the serialized data size for loaded values, or just the
+    /// fixed fields for unloaded references. Uses `Storable::to_bytes()`
+    /// to measure ByVal — avoids requiring `T: MemSize`.
     fn mem_size(&self) -> usize {
         match self {
             LazyObject::ByVal(value) => value.to_bytes().len(),

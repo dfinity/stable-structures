@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_mem_size_vec_without_element_size() {
         type Blob = Vec<u8>;
-        // Vec<Blob> does not know the element size at compile time (None),
+        // Vec<Blob> has ELEMENT_SIZE = None, falls back to per-element iteration.
         let base = std::mem::size_of::<Vec<Blob>>();
         let blob_base = std::mem::size_of::<Blob>();
         assert_eq!(Vec::<Blob>::new().mem_size(), base);

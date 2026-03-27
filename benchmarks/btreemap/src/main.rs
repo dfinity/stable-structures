@@ -849,26 +849,18 @@ fn stable_memory_used_helper<K: TestKey, V: TestValue>() -> BenchResult {
 }
 
 bench_tests! {
-    // heap_memory_used: bounded small, bounded large, unbounded, empty value
-    btreemap_v2_heap_memory_used_blob_4_128,     heap_memory_used_helper,    Blob4, Blob128;
-    btreemap_v2_heap_memory_used_blob_32_128,    heap_memory_used_helper,   Blob32, Blob128;
-    btreemap_v2_heap_memory_used_blob_1024_128,  heap_memory_used_helper, Blob1024, Blob128;
-    btreemap_v2_heap_memory_used_blob_32_0,      heap_memory_used_helper,   Blob32,   Empty;
-    btreemap_v2_heap_memory_used_vec_32_128,     heap_memory_used_helper, UnboundedVecN32, UnboundedVecN128;
+    // Small bounded, large bounded, unbounded.
+    btreemap_v2_heap_memory_used_blob_4_128,    heap_memory_used_helper,          Blob4, Blob128;
+    btreemap_v2_heap_memory_used_blob_1024_128, heap_memory_used_helper,       Blob1024, Blob128;
+    btreemap_v2_heap_memory_used_vec_32_128,    heap_memory_used_helper,  UnboundedVecN32, UnboundedVecN128;
 
-    // stable_memory_size
-    btreemap_v2_stable_memory_size_blob_4_128,    stable_memory_size_helper,    Blob4, Blob128;
-    btreemap_v2_stable_memory_size_blob_32_128,   stable_memory_size_helper,   Blob32, Blob128;
-    btreemap_v2_stable_memory_size_blob_1024_128, stable_memory_size_helper, Blob1024, Blob128;
-    btreemap_v2_stable_memory_size_blob_32_0,     stable_memory_size_helper,   Blob32,   Empty;
-    btreemap_v2_stable_memory_size_vec_32_128,    stable_memory_size_helper, UnboundedVecN32, UnboundedVecN128;
+    btreemap_v2_stable_memory_size_blob_4_128,    stable_memory_size_helper,          Blob4, Blob128;
+    btreemap_v2_stable_memory_size_blob_1024_128, stable_memory_size_helper,       Blob1024, Blob128;
+    btreemap_v2_stable_memory_size_vec_32_128,    stable_memory_size_helper,  UnboundedVecN32, UnboundedVecN128;
 
-    // stable_memory_used
-    btreemap_v2_stable_memory_used_blob_4_128,    stable_memory_used_helper,    Blob4, Blob128;
-    btreemap_v2_stable_memory_used_blob_32_128,   stable_memory_used_helper,   Blob32, Blob128;
-    btreemap_v2_stable_memory_used_blob_1024_128, stable_memory_used_helper, Blob1024, Blob128;
-    btreemap_v2_stable_memory_used_blob_32_0,     stable_memory_used_helper,   Blob32,   Empty;
-    btreemap_v2_stable_memory_used_vec_32_128,    stable_memory_used_helper, UnboundedVecN32, UnboundedVecN128;
+    btreemap_v2_stable_memory_used_blob_4_128,    stable_memory_used_helper,          Blob4, Blob128;
+    btreemap_v2_stable_memory_used_blob_1024_128, stable_memory_used_helper,       Blob1024, Blob128;
+    btreemap_v2_stable_memory_used_vec_32_128,    stable_memory_used_helper,  UnboundedVecN32, UnboundedVecN128;
 }
 
 fn main() {}

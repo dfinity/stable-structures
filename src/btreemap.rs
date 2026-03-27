@@ -260,11 +260,12 @@ where
     M: Memory,
 {
     fn mem_size(&self) -> usize {
+        // Excludes _phantom (zero-size) and the Memory handle
+        // (reported separately via stable_memory_size).
         self.root_addr.mem_size()
             + self.version.mem_size()
             + self.allocator.mem_size()
             + self.length.mem_size()
-        // Don't include _phantom since it doesn't actually store any data
     }
 }
 

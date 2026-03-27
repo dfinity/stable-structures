@@ -608,20 +608,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_v2_heap_memory_used_blob_32_0:
-    total:
-      calls: 1
-      instructions: 207
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_v2_heap_memory_used_blob_32_128:
-    total:
-      calls: 1
-      instructions: 207
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_v2_heap_memory_used_blob_4_128:
     total:
       calls: 1
@@ -2162,20 +2148,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_v2_stable_memory_size_blob_32_0:
-    total:
-      calls: 1
-      instructions: 207
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_v2_stable_memory_size_blob_32_128:
-    total:
-      calls: 1
-      instructions: 207
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_v2_stable_memory_size_blob_4_128:
     total:
       calls: 1
@@ -2191,20 +2163,6 @@ benches:
       stable_memory_increase: 0
     scopes: {}
   btreemap_v2_stable_memory_used_blob_1024_128:
-    total:
-      calls: 1
-      instructions: 207
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_v2_stable_memory_used_blob_32_0:
-    total:
-      calls: 1
-      instructions: 207
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_v2_stable_memory_used_blob_32_128:
     total:
       calls: 1
       instructions: 207

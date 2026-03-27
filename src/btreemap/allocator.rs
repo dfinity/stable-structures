@@ -48,14 +48,12 @@ pub struct Allocator<M: Memory> {
 
 impl<M: Memory> MemSize for Allocator<M> {
     fn mem_size(&self) -> usize {
+        // Excludes `memory: M` — it's a handle to the backing store,
+        // not data owned by the allocator.
         self.header_addr.mem_size()
             + self.allocation_size.mem_size()
             + self.num_allocated_chunks.mem_size()
             + self.free_list_head.mem_size()
-        // Don't include memory since it's not actually storing any data itself,
-        // just providing an interface to the underlying memory. This is
-        // especially important for VectorMemory which is used in tests
-        // and can make memory reporting inconsistent to IC stable memory.
     }
 }
 
