@@ -197,6 +197,58 @@ fn no_memory_leaks(#[strategy(pvec(pvec(0..u8::MAX, 100..10_000), 100))] keys: V
     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 }
 
+#[proptest]
+fn entry(
+    #[strategy(pvec(0..255u8, 10))] keys: Vec<u8>,
+    #[strategy(pvec(0..3u8, 10))] operations: Vec<u8>,
+) {
+    run_btree_test(|mut btree| {
+        let mut std_map = StdBTreeMap::new();
+
+        // Operations (if Occupied):
+        // 0 - insert
+        // 1 - increment
+        // 2 - remove
+        //
+        // Operations (if Vacant):
+        //   - always insert
+        for (key, operation) in keys.iter().copied().zip(operations.iter().copied()) {
+            let entry = btree.entry(key);
+            let std_entry = std_map.entry(key);
+            match (entry, std_entry) {
+                (Entry::Occupied(e), btree_map::Entry::Occupied(mut std_e)) => match operation {
+                    0 => {
+                        e.insert(key);
+                        std_e.insert(key);
+                    }
+                    1 => {
+                        let existing = e.get();
+                        let std_existing = *std_e.get();
+                        e.insert(existing.overflowing_add(1).0);
+                        std_e.insert(std_existing.overflowing_add(1).0);
+                    }
+                    2 => {
+                        e.remove();
+                        std_e.remove();
+                    }
+                    _ => unreachable!(),
+                },
+                (Entry::Vacant(e), btree_map::Entry::Vacant(std_e)) => {
+                    e.insert(key);
+                    std_e.insert(key);
+                }
+                _ => prop_assert!(false, "Map out of sync with std lib BTreeMap"),
+            }
+        }
+
+        let entries: Vec<_> = btree.iter().map(|e| (*e.key(), e.value())).collect();
+        let std_entries: Vec<_> = std_map.into_iter().collect();
+
+        prop_assert_eq!(entries, std_entries);
+        Ok(())
+    });
+}
+
 // Given an operation, executes it on the given stable btreemap and standard btreemap, verifying
 // that the result of the operation is equal in both btrees.
 fn execute_operation<M: Memory>(
