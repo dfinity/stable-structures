@@ -165,4 +165,76 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_mem_size_unit() {
+        assert_eq!(().mem_size(), 0);
+        assert_eq!(<() as MemSize>::ELEMENT_SIZE, Some(0));
+    }
+
+    #[test]
+    fn test_mem_size_vec_with_element_size() {
+        // Vec<u32> uses the ELEMENT_SIZE fast path (Some(4)).
+        let base = std::mem::size_of::<Vec<u32>>();
+        assert_eq!(Vec::<u32>::new().mem_size(), base);
+        assert_eq!(vec![1u32].mem_size(), base + 4);
+        assert_eq!(vec![1u32, 2, 3].mem_size(), base + 12);
+    }
+
+    #[test]
+    fn test_mem_size_vec_without_element_size() {
+        // Vec<String> has ELEMENT_SIZE = None, falls back to iteration.
+        let base = std::mem::size_of::<Vec<String>>();
+        let string_base = std::mem::size_of::<String>();
+        assert_eq!(Vec::<String>::new().mem_size(), base);
+        // Each String reports size_of::<String>() + content_len.
+        assert_eq!(
+            vec![String::from("ab")].mem_size(),
+            base + string_base + 2
+        );
+        assert_eq!(
+            vec![String::from("a"), String::from("bc")].mem_size(),
+            base + 2 * string_base + 3
+        );
+    }
+
+    #[test]
+    fn test_mem_size_option() {
+        let base = std::mem::size_of::<Option<u64>>();
+        // None: just the Option wrapper.
+        assert_eq!(None::<u64>.mem_size(), base);
+        // Some: wrapper + inner value.
+        assert_eq!(Some(42u64).mem_size(), base + 8);
+    }
+
+    #[test]
+    fn test_mem_size_once_cell() {
+        // Empty cell: just the OnceCell wrapper.
+        let base = std::mem::size_of::<OnceCell<Vec<u8>>>();
+        let cell = OnceCell::<Vec<u8>>::new();
+        assert_eq!(cell.mem_size(), base);
+
+        // Populated with a Vec<u8> of 100 bytes:
+        // OnceCell wrapper + Vec header (24) + 100 element bytes.
+        let vec_base = std::mem::size_of::<Vec<u8>>();
+        let cell = OnceCell::from(vec![0u8; 100]);
+        assert_eq!(cell.mem_size(), base + vec_base + 100);
+    }
+
+    #[test]
+    fn test_mem_size_tuple() {
+        // (u32, u64) = 4 + 8 = 12 bytes.
+        assert_eq!((1u32, 2u64).mem_size(), 4 + 8);
+        // ((), u8) = 0 + 1 = 1 byte.
+        assert_eq!(((), 0u8).mem_size(), 1);
+    }
+
+    #[test]
+    fn test_element_size_constants() {
+        assert_eq!(<u8 as MemSize>::ELEMENT_SIZE, Some(1));
+        assert_eq!(<u32 as MemSize>::ELEMENT_SIZE, Some(4));
+        assert_eq!(<u64 as MemSize>::ELEMENT_SIZE, Some(8));
+        // String has no fixed element size.
+        assert_eq!(<String as MemSize>::ELEMENT_SIZE, None);
+    }
 }
