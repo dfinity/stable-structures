@@ -1,3 +1,5 @@
+use std::cell::OnceCell;
+
 /// Trait to estimate the total memory footprint of a value in bytes,
 /// including both stack and heap usage.
 ///
@@ -9,6 +11,12 @@
 pub trait DataSize {
     /// Returns the estimated total memory footprint of this value in bytes.
     fn data_size(&self) -> usize;
+}
+
+impl DataSize for () {
+    fn data_size(&self) -> usize {
+        0
+    }
 }
 
 impl DataSize for u8 {
@@ -50,6 +58,24 @@ impl DataSize for String {
 impl<T: DataSize> DataSize for Vec<T> {
     fn data_size(&self) -> usize {
         std::mem::size_of::<Self>() + self.iter().map(|x| x.data_size()).sum::<usize>()
+    }
+}
+
+impl<T: DataSize> DataSize for Option<T> {
+    fn data_size(&self) -> usize {
+        std::mem::size_of::<Self>() + self.as_ref().map_or(0, |x| x.data_size())
+    }
+}
+
+impl<T: DataSize> DataSize for OnceCell<T> {
+    fn data_size(&self) -> usize {
+        std::mem::size_of::<Self>() + self.get().map_or(0, |x| x.data_size())
+    }
+}
+
+impl<A: DataSize, B: DataSize> DataSize for (A, B) {
+    fn data_size(&self) -> usize {
+        self.0.data_size() + self.1.data_size()
     }
 }
 

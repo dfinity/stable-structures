@@ -37,6 +37,12 @@ pub enum NodeType {
     Internal,
 }
 
+impl DataSize for NodeType {
+    fn data_size(&self) -> usize {
+        core::mem::size_of::<Self>()
+    }
+}
+
 pub type Entry<K> = (K, Vec<u8>);
 pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 
@@ -65,6 +71,17 @@ pub struct Node<K: Storable + Ord + Clone> {
     // The address of the overflow page.
     // In V2, a node can span multiple pages if it exceeds a certain size.
     overflows: Vec<Address>,
+}
+
+impl<K: Storable + Ord + Clone + DataSize> DataSize for Node<K> {
+    fn data_size(&self) -> usize {
+        self.address.data_size()
+            + self.entries.data_size()
+            + self.children.data_size()
+            + self.node_type.data_size()
+            + self.version.data_size()
+            + self.overflows.data_size()
+    }
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
@@ -538,6 +555,19 @@ enum LazyObject<T> {
     },
 }
 
+impl<T: DataSize> DataSize for LazyObject<T> {
+    fn data_size(&self) -> usize {
+        match self {
+            LazyObject::ByVal(value) => value.data_size(),
+            LazyObject::ByRef {
+                offset,
+                size,
+                loaded,
+            } => offset.data_size() + size.data_size() + loaded.data_size(),
+        }
+    }
+}
+
 impl<T> LazyObject<T> {
     #[inline(always)]
     pub fn by_value(value: T) -> Self {
@@ -583,6 +613,12 @@ type Blob = Vec<u8>;
 #[derive(Debug)]
 struct LazyValue(LazyObject<Blob>);
 
+impl DataSize for LazyValue {
+    fn data_size(&self) -> usize {
+        self.0.data_size()
+    }
+}
+
 impl LazyValue {
     #[inline(always)]
     pub fn by_value(value: Blob) -> Self {
@@ -607,6 +643,12 @@ impl LazyValue {
 
 #[derive(Debug)]
 struct LazyKey<K>(LazyObject<K>);
+
+impl<K: DataSize> DataSize for LazyKey<K> {
+    fn data_size(&self) -> usize {
+        self.0.data_size()
+    }
+}
 
 impl<K> LazyKey<K> {
     #[inline(always)]
