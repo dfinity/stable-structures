@@ -417,8 +417,10 @@ where
         (self.allocator.memory().size() * WASM_PAGE_SIZE) as usize
     }
 
-    /// Returns the amount of stable memory actually used in bytes.
+    /// Returns the approximate amount of stable memory actually used in bytes.
     pub fn stable_memory_used(&self) -> usize {
+        // A fast approximation of the used stable memory without having
+        // to iterate through all the nodes is to check allocator chunk usage.
         (ALLOCATOR_OFFSET as u64
             + Allocator::<M>::header_size().get()
             + self.allocator.num_allocated_chunks() * self.allocator.chunk_size().get())
@@ -3410,5 +3412,52 @@ mod test {
         }
 
         assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+    }
+
+    #[test]
+    fn memory_reporting_empty() {
+        let mem = make_memory();
+        let btree = BTreeMap::<u32, u32, _>::new(mem);
+
+        // BTreeMap holds Address(8) + Version(16) + Allocator fields(20) + u64(8) = 52 bytes.
+        // No heap allocations, so heap_memory_used == sum of inline field sizes.
+        assert_eq!(btree.heap_memory_used(), 52);
+
+        // One WASM page (64 KiB) is allocated on init.
+        assert_eq!(btree.stable_memory_size(), WASM_PAGE_SIZE as usize);
+
+        // Only the BTreeMap header (52 bytes) + AllocatorHeader (48 bytes) = 100 bytes used.
+        let base_used = ALLOCATOR_OFFSET + Allocator::<VectorMemory>::header_size().get() as usize;
+        assert_eq!(base_used, 100);
+        assert_eq!(btree.stable_memory_used(), base_used);
+    }
+
+    #[test]
+    fn memory_reporting_insert_and_remove() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::<u32, u32, _>::new(mem);
+
+        let base_used = btree.stable_memory_used();
+        let chunk_size = btree.allocator.chunk_size().get() as usize;
+
+        for i in 0..100u32 {
+            btree.insert(i, i);
+        }
+
+        // 100 entries in a V2 BTreeMap<u32, u32> produce 19 nodes (chunks).
+        let chunks = btree.allocator.num_allocated_chunks();
+        assert_eq!(chunks, 19);
+        assert_eq!(btree.stable_memory_used(), base_used + chunks as usize * chunk_size);
+        assert!(btree.stable_memory_used() <= btree.stable_memory_size());
+
+        // After removing all entries, used drops back to base (0 allocated chunks).
+        for i in 0..100u32 {
+            btree.remove(&i);
+        }
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        assert_eq!(btree.stable_memory_used(), base_used);
+
+        // Stable memory size never shrinks — still one page.
+        assert_eq!(btree.stable_memory_size(), WASM_PAGE_SIZE as usize);
     }
 }
