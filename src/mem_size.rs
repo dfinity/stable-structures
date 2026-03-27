@@ -191,10 +191,7 @@ mod tests {
         let string_base = std::mem::size_of::<String>();
         assert_eq!(Vec::<String>::new().mem_size(), base);
         // Each String reports size_of::<String>() + content_len.
-        assert_eq!(
-            vec![String::from("ab")].mem_size(),
-            base + string_base + 2
-        );
+        assert_eq!(vec![String::from("ab")].mem_size(), base + string_base + 2);
         assert_eq!(
             vec![String::from("a"), String::from("bc")].mem_size(),
             base + 2 * string_base + 3

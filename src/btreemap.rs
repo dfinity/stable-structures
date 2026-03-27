@@ -3447,7 +3447,10 @@ mod test {
         // 100 entries in a V2 BTreeMap<u32, u32> produce 19 nodes (chunks).
         let chunks = btree.allocator.num_allocated_chunks();
         assert_eq!(chunks, 19);
-        assert_eq!(btree.stable_memory_used(), base_used + chunks as usize * chunk_size);
+        assert_eq!(
+            btree.stable_memory_used(),
+            base_used + chunks as usize * chunk_size
+        );
         assert!(btree.stable_memory_used() <= btree.stable_memory_size());
 
         // After removing all entries, used drops back to base (0 allocated chunks).
