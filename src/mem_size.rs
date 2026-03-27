@@ -25,6 +25,13 @@ pub trait MemSize {
     fn mem_size(&self) -> usize;
 }
 
+impl MemSize for () {
+    #[inline]
+    fn mem_size(&self) -> usize {
+        0
+    }
+}
+
 impl MemSize for u8 {
     const ELEMENT_SIZE: Option<usize> = Some(std::mem::size_of::<u8>());
 
@@ -87,6 +94,11 @@ impl<A: MemSize, B: MemSize> MemSize for (A, B) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_mem_size_unit() {
+        assert_eq!(().mem_size(), 0);
+    }
 
     #[test]
     fn test_mem_size_u8() {
