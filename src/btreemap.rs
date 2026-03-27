@@ -1053,10 +1053,9 @@ where
 
     /// PRECONDITION
     ///   - `node` is a leaf node
-    ///   - `node.can_remove_entry_without_merging()` is true
+    ///   - `node.entries_len() > 1` or node is the root node
     fn remove_from_leaf_node(&mut self, mut node: Node<K>, idx: usize) -> Vec<u8> {
         debug_assert!(node.node_type() == NodeType::Leaf);
-        debug_assert!(node.can_remove_entry_without_merging());
 
         // Case 1: The node is a leaf node and the key exists in it.
         // This is the simplest case. The key is removed from the leaf.
@@ -1084,11 +1083,9 @@ where
     /// PRECONDITION
     ///   - `node` is an internal node
     ///   - `node` contains `key` at index `idx`
-    ///   - `node.can_remove_entry_without_merging()` is true
     fn remove_from_internal_node(&mut self, mut node: Node<K>, idx: usize, key: &K) -> Vec<u8> {
         debug_assert!(node.node_type() == NodeType::Internal);
         debug_assert!(node.search(key, self.memory()) == Ok(idx));
-        debug_assert!(node.can_remove_entry_without_merging());
 
         // Case 2: The node is an internal node and the key exists in it.
 
