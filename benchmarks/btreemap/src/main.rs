@@ -815,4 +815,40 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
     })
 }
 
+// Benchmarks for memory reporting methods.
+
+fn populate_btree_v2<K: TestKey, V: TestValue>() -> BTreeMap<K, V, DefaultMemoryImpl> {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(10_000, &mut rng);
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+    btree
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_heap_memory_used_blob_32_128() -> BenchResult {
+    let btree = populate_btree_v2::<Blob32, Blob128>();
+    bench_fn(|| {
+        let _ = btree.heap_memory_used();
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_stable_memory_size_blob_32_128() -> BenchResult {
+    let btree = populate_btree_v2::<Blob32, Blob128>();
+    bench_fn(|| {
+        let _ = btree.stable_memory_size();
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_stable_memory_used_blob_32_128() -> BenchResult {
+    let btree = populate_btree_v2::<Blob32, Blob128>();
+    bench_fn(|| {
+        let _ = btree.stable_memory_used();
+    })
+}
+
 fn main() {}
