@@ -3465,4 +3465,69 @@ mod test {
         // Stable memory size never shrinks — still one page.
         assert_eq!(btree.stable_memory_size(), WASM_PAGE_SIZE as usize);
     }
+
+    /// Verifies memory reporting invariants for a given K/V combination:
+    /// - heap_memory_used is consistent across types (same struct layout)
+    /// - stable_memory_used grows after inserts and returns to base after removal
+    /// - stable_memory_used <= stable_memory_size always
+    fn memory_reporting_for_type<K: TestKey, V: TestValue>() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::<K, V, _>::new(mem);
+
+        // All BTreeMap instances have the same struct layout regardless of K/V.
+        // Update this value if the struct layout changes.
+        assert_eq!(btree.heap_memory_used(), 52);
+
+        let base_used = btree.stable_memory_used();
+        let chunk_size = btree.allocator.chunk_size().get() as usize;
+
+        // Insert entries.
+        for i in 0..50_u32 {
+            btree.insert(K::build(i), V::build(i));
+        }
+        let chunks_after_insert = btree.allocator.num_allocated_chunks();
+        assert!(chunks_after_insert > 0);
+        assert_eq!(
+            btree.stable_memory_used(),
+            base_used + chunks_after_insert as usize * chunk_size
+        );
+        assert!(btree.stable_memory_used() <= btree.stable_memory_size());
+
+        // Remove all entries.
+        for i in 0..50_u32 {
+            btree.remove(&K::build(i));
+        }
+        assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+        assert_eq!(btree.stable_memory_used(), base_used);
+    }
+
+    #[test]
+    fn memory_reporting_u32_u32() {
+        memory_reporting_for_type::<u32, u32>();
+    }
+
+    #[test]
+    fn memory_reporting_blob10_blob20() {
+        memory_reporting_for_type::<Blob<10>, Blob<20>>();
+    }
+
+    #[test]
+    fn memory_reporting_u32_unit() {
+        memory_reporting_for_type::<u32, ()>();
+    }
+
+    #[test]
+    fn memory_reporting_vec_u8_vec_u8() {
+        memory_reporting_for_type::<MonotonicVec32, MonotonicVec32>();
+    }
+
+    #[test]
+    fn memory_reporting_string_string() {
+        memory_reporting_for_type::<MonotonicString32, MonotonicString32>();
+    }
+
+    #[test]
+    fn memory_reporting_blob10_vec_u8() {
+        memory_reporting_for_type::<Blob<10>, MonotonicVec32>();
+    }
 }
