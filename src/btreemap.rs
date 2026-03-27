@@ -419,6 +419,40 @@ where
         (self.allocator.memory().size() * WASM_PAGE_SIZE) as usize
     }
 
+    /// Returns the exact height of the tree by walking from root to a leaf.
+    ///
+    /// Returns 0 for an empty tree. Requires O(height) stable memory reads,
+    /// which is typically 3–5 for millions of entries.
+    #[cfg(test)]
+    fn height(&self) -> u32 {
+        if self.root_addr == NULL {
+            return 0;
+        }
+        let mut height = 1;
+        let mut node = self.load_node(self.root_addr);
+        while node.node_type() == NodeType::Internal {
+            node = self.load_node(node.child(0));
+            height += 1;
+        }
+        height
+    }
+
+    /// Estimates the tree height from the number of entries. O(1).
+    ///
+    /// Uses `ceil(log_B(n))` with an occupancy correction factor.
+    /// May differ from the actual height by ±1 in some cases.
+    pub fn height_approx(&self) -> u32 {
+        let n = self.length;
+        if n == 0 {
+            return 0;
+        }
+        // Average node occupancy after random inserts is ~69% (ln 2).
+        // Use B * 1.3 ≈ effective fan-out (conservative: slightly under ln 2).
+        let effective_b = (node::B as f64) * 1.3;
+        // max(1, ...) because a non-empty tree always has at least height 1.
+        std::cmp::max(1, (n as f64).log(effective_b).ceil() as u32)
+    }
+
     /// Returns the approximate amount of stable memory actually used in bytes.
     pub fn stable_memory_used(&self) -> usize {
         // BTreeMap header + allocator header + allocated chunks.
@@ -3530,5 +3564,46 @@ mod test {
     #[test]
     fn memory_reporting_blob10_vec_u8() {
         memory_reporting_for_type::<Blob<10>, MonotonicVec32>();
+    }
+
+    #[test]
+    fn height_empty() {
+        let mem = make_memory();
+        let btree = BTreeMap::<u32, (), _>::new(mem);
+        assert_eq!(btree.height(), 0);
+        assert_eq!(btree.height_approx(), 0);
+    }
+
+    #[test]
+    fn height_exact_vs_approx() {
+        let mem = make_memory();
+        let mut btree = BTreeMap::<u32, (), _>::new(mem);
+
+        // Insert items in batches and compare exact vs approximate height.
+        let test_sizes = [1, 5, 11, 12, 50, 100, 500, 1_000, 5_000, 10_000, 50_000, 100_000];
+
+        for &target in &test_sizes {
+            while btree.len() < target {
+                let i = btree.len() as u32;
+                btree.insert(i, ());
+            }
+
+            let exact = btree.height();
+            let approx = btree.height_approx();
+            let diff = (approx as i32) - (exact as i32);
+
+            assert!(
+                exact > 0,
+                "n={target}: exact height should be > 0 after inserts"
+            );
+            assert!(
+                diff.unsigned_abs() <= 1,
+                "n={target}: height_approx ({approx}) differs from \
+                 height ({exact}) by more than 1"
+            );
+        }
+
+        // Sanity: at 100k entries the tree should be reasonably short.
+        assert!(btree.height() <= 7);
     }
 }

@@ -19,7 +19,7 @@ use io::NodeReader;
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
-const B: usize = 6;
+pub(crate) const B: usize = 6;
 // The maximum number of entries per node.
 const CAPACITY: usize = 2 * B - 1;
 const LAYOUT_VERSION_1: u8 = 1;
