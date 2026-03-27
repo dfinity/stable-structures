@@ -829,17 +829,23 @@ fn populate_btree_v2<K: TestKey, V: TestValue>() -> BTreeMap<K, V, DefaultMemory
 
 fn heap_memory_used_helper<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = populate_btree_v2::<K, V>();
-    bench_fn(|| { let _ = btree.heap_memory_used(); })
+    bench_fn(|| {
+        let _ = btree.heap_memory_used();
+    })
 }
 
 fn stable_memory_size_helper<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = populate_btree_v2::<K, V>();
-    bench_fn(|| { let _ = btree.stable_memory_size(); })
+    bench_fn(|| {
+        let _ = btree.stable_memory_size();
+    })
 }
 
 fn stable_memory_used_helper<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = populate_btree_v2::<K, V>();
-    bench_fn(|| { let _ = btree.stable_memory_used(); })
+    bench_fn(|| {
+        let _ = btree.stable_memory_used();
+    })
 }
 
 bench_tests! {
