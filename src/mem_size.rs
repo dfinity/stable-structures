@@ -3,6 +3,10 @@ use std::cell::OnceCell;
 /// Estimates the in-process memory footprint of a value in bytes,
 /// covering both inline (stack) and heap-allocated data.
 ///
+/// Reports the logical data size, not the physical layout. Alignment
+/// padding and allocator overhead are intentionally excluded — the
+/// goal is to measure how much memory the data itself occupies.
+///
 /// ## Performance
 ///
 /// Primitives, strings, and fixed-size containers are always O(1).
@@ -94,14 +98,24 @@ impl<T: MemSize> MemSize for Vec<T> {
 impl<T: MemSize> MemSize for Option<T> {
     #[inline]
     fn mem_size(&self) -> usize {
-        std::mem::size_of::<Self>() + self.as_ref().map_or(0, |x| x.mem_size())
+        // size_of::<Option<T>>() already includes inline space for T.
+        // Only add the heap portion of the inner value when populated.
+        std::mem::size_of::<Self>()
+            + self
+                .as_ref()
+                .map_or(0, |x| x.mem_size() - std::mem::size_of::<T>())
     }
 }
 
 impl<T: MemSize> MemSize for OnceCell<T> {
     #[inline]
     fn mem_size(&self) -> usize {
-        std::mem::size_of::<Self>() + self.get().map_or(0, |x| x.mem_size())
+        // size_of::<OnceCell<T>>() already includes inline space for T.
+        // Only add the heap portion of the inner value when populated.
+        std::mem::size_of::<Self>()
+            + self
+                .get()
+                .map_or(0, |x| x.mem_size() - std::mem::size_of::<T>())
     }
 }
 
@@ -202,30 +216,38 @@ mod tests {
 
     #[test]
     fn test_mem_size_option() {
+        // Option<u64> stores u64 inline — no heap allocation.
+        // size_of::<Option<u64>>() already includes space for the u64.
         let base = std::mem::size_of::<Option<u64>>();
-        // None: just the Option wrapper.
         assert_eq!(None::<u64>.mem_size(), base);
-        // Some: wrapper + inner value.
-        assert_eq!(Some(42u64).mem_size(), base + 8);
+        // Some(u64) has no heap data, so same as None.
+        assert_eq!(Some(42u64).mem_size(), base);
+
+        // Option<String> stores String inline — heap portion is the content.
+        let base = std::mem::size_of::<Option<String>>();
+        assert_eq!(None::<String>.mem_size(), base);
+        // Some(String) adds only the heap-allocated content bytes.
+        assert_eq!(Some(String::from("12345")).mem_size(), base + 5);
     }
 
     #[test]
     fn test_mem_size_once_cell() {
-        // Empty cell: just the OnceCell wrapper.
+        // Empty cell: just the OnceCell wrapper (includes inline space for T).
         let base = std::mem::size_of::<OnceCell<Vec<u8>>>();
         let cell = OnceCell::<Vec<u8>>::new();
         assert_eq!(cell.mem_size(), base);
 
         // Populated with a Vec<u8> of 100 bytes:
-        // OnceCell wrapper + Vec header (24) + 100 element bytes.
-        let vec_base = std::mem::size_of::<Vec<u8>>();
+        // OnceCell wrapper already includes the Vec header inline.
+        // Only the heap-allocated element bytes (100) are added.
         let cell = OnceCell::from(vec![0u8; 100]);
-        assert_eq!(cell.mem_size(), base + vec_base + 100);
+        assert_eq!(cell.mem_size(), base + 100);
     }
 
     #[test]
     fn test_mem_size_tuple() {
-        // (u32, u64) = 4 + 8 = 12 bytes.
+        // Measures logical data size, not physical layout.
+        // (u32, u64) = 4 + 8 = 12 bytes (padding excluded).
         assert_eq!((1u32, 2u64).mem_size(), 4 + 8);
         // ((), u8) = 0 + 1 = 1 byte.
         assert_eq!(((), 0u8).mem_size(), 1);
