@@ -76,18 +76,20 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
     }
 
     pub fn remove(self) {
-        if self.node.can_remove_entry_without_merging() {
-            match self.node.node_type() {
-                NodeType::Leaf => self.map.remove_from_leaf_node(self.node, self.idx),
-                NodeType::Internal => self
-                    .map
-                    .remove_from_internal_node(self.node, self.idx, &self.key),
-            };
-        } else {
-            // TODO avoid using this slow path
-            let root = self.map.load_node(self.map.root_addr);
-            self.map.remove_helper(root, &self.key);
-        }
+        match self.node.node_type() {
+            NodeType::Leaf if self.node.can_remove_entry_without_merging() => {
+                self.map.remove_from_leaf_node(self.node, self.idx);
+            }
+            NodeType::Leaf => {
+                // TODO avoid using this slow path
+                let root = self.map.load_node(self.map.root_addr);
+                self.map.remove_helper(root, &self.key);
+            }
+            NodeType::Internal => {
+                self.map
+                    .remove_from_internal_node(self.node, self.idx, &self.key);
+            }
+        };
     }
 }
 
