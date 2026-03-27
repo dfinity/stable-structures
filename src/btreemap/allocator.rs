@@ -1,4 +1,5 @@
 use crate::{
+    data_size::DataSize,
     read_struct,
     types::{Address, Bytes, NULL},
     write_struct, Memory,
@@ -43,6 +44,15 @@ pub struct Allocator<M: Memory> {
     free_list_head: Address,
 
     memory: M,
+}
+
+impl<M: Memory> DataSize for Allocator<M> {
+    fn data_size(&self) -> usize {
+        self.header_addr.data_size()
+            + self.allocation_size.data_size()
+            + self.num_allocated_chunks.data_size()
+            + self.free_list_head.data_size()
+    }
 }
 
 #[repr(C, packed)]

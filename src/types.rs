@@ -148,6 +148,13 @@ impl SubAssign<Bytes> for Bytes {
     }
 }
 
+impl DataSize for Bytes {
+    fn data_size(&self) -> usize {
+        let val = self.0;
+        val.data_size()
+    }
+}
+
 impl Bytes {
     pub const fn new(val: u64) -> Self {
         Self(val)
