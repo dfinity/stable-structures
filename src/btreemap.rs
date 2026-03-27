@@ -519,6 +519,11 @@ where
         }
     }
 
+    /// Searches for the entry within the map where the key belongs.
+    /// The value returned is either a `VacantEntry` (if the key doesn't already exist), or an
+    /// `OccupiedEntry` (if the key does exist).
+    /// Once you have the entry you can `get` the value, `insert` a new value, or `remove`
+    /// the value.
     pub fn entry(&mut self, key: K) -> entry::Entry<K, V, M> {
         let (node, search_result) = self.find_node_for_insert(&key);
 
@@ -538,6 +543,10 @@ where
         }
     }
 
+    /// Finds the node the key (and its corresponding value) should be inserted into
+    /// Return value is a tuple, the first value is the node the key should be inserted into, the
+    /// seconds value is a `Result` which is `Ok` if the key exists in the node, or `Err` if not.
+    /// The value in either case is the index at which the key should be inserted.
     fn find_node_for_insert(&mut self, key: &K) -> (Node<K>, Result<usize, usize>) {
         if self.root_addr == NULL {
             // No root present. Allocate one.
