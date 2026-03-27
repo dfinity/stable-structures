@@ -149,10 +149,7 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     }
 
     fn take(&mut self, addr: Address) -> Option<Node<K>> {
-        if !self.is_enabled() {
-            self.misses += 1;
-            return None;
-        }
+        debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
             self.slots[idx].0 = NULL;
@@ -165,17 +162,13 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     }
 
     fn put(&mut self, addr: Address, node: Node<K>) {
-        if !self.is_enabled() {
-            return;
-        }
+        debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
         self.slots[idx] = (addr, Some(node));
     }
 
     fn invalidate(&mut self, addr: Address) {
-        if !self.is_enabled() {
-            return;
-        }
+        debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
             self.slots[idx] = (NULL, None);
@@ -1519,11 +1512,13 @@ where
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         let source_addr = source.address();
         into.merge(source, median, &mut self.allocator);
-        // Node::merge saves `into` and deallocates `source` directly through
-        // the allocator, so we must invalidate both cache slots here.
-        let cache = self.cache.get_mut();
-        cache.invalidate(into.address());
-        cache.invalidate(source_addr);
+        if self.cache_num_slots > 0 {
+            // Node::merge saves `into` and deallocates `source` directly through
+            // the allocator, so we must invalidate both cache slots here.
+            let cache = self.cache.get_mut();
+            cache.invalidate(into.address());
+            cache.invalidate(source_addr);
+        }
         into
     }
 
@@ -1540,23 +1535,31 @@ where
     fn deallocate_node(&mut self, node: Node<K>) {
         let addr = node.address();
         node.deallocate(self.allocator_mut());
-        self.cache.get_mut().invalidate(addr);
+        if self.cache_num_slots > 0 {
+            self.cache.get_mut().invalidate(addr);
+        }
     }
 
     /// Takes a node from the cache, or loads it from memory if not cached.
     ///
     /// Used by read paths (`&self`). The caller must call `return_node` when
     /// done to put the node back into the cache.
+    #[inline(always)]
     fn take_or_load_node(&self, address: Address) -> Node<K> {
-        if let Some(node) = self.cache.borrow_mut().take(address) {
-            return node;
+        if self.cache_num_slots > 0 {
+            if let Some(node) = self.cache.borrow_mut().take(address) {
+                return node;
+            }
         }
         Node::load(address, self.version.page_size(), self.memory())
     }
 
     /// Returns a node to the cache after use on a read path.
+    #[inline(always)]
     fn return_node(&self, node: Node<K>) {
-        self.cache.borrow_mut().put(node.address(), node);
+        if self.cache_num_slots > 0 {
+            self.cache.borrow_mut().put(node.address(), node);
+        }
     }
 
     /// Loads a node from memory, bypassing the cache.
@@ -1569,7 +1572,9 @@ where
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
         node.save(self.allocator_mut());
-        self.cache.get_mut().invalidate(node.address());
+        if self.cache_num_slots > 0 {
+            self.cache.get_mut().invalidate(node.address());
+        }
     }
 
     /// Replaces the value at `idx` in the node, saves the node, and returns the old value.
