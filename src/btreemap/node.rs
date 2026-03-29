@@ -120,48 +120,8 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.node_type
     }
 
-    /// Returns the entry with the max key in the subtree.
-    pub fn get_max<M: Memory>(&self, memory: &M) -> Entry<K> {
-        match self.node_type {
-            NodeType::Leaf => {
-                let last_entry = self.entries.last().expect("A node can never be empty");
-                (
-                    self.get_key(last_entry, memory).clone(),
-                    self.get_value(last_entry, memory).to_vec(),
-                )
-            }
-            NodeType::Internal => {
-                let last_child = Self::load(
-                    *self
-                        .children
-                        .last()
-                        .expect("An internal node must have children."),
-                    self.version.page_size(),
-                    memory,
-                );
-                last_child.get_max(memory)
-            }
-        }
-    }
-
-    /// Returns the entry with min key in the subtree.
-    pub fn get_min<M: Memory>(&self, memory: &M) -> Entry<K> {
-        match self.node_type {
-            NodeType::Leaf => {
-                // NOTE: a node can never be empty, so this access is safe.
-                let entry = self.entry(0, memory);
-                (entry.0.clone(), entry.1.to_vec())
-            }
-            NodeType::Internal => {
-                let first_child = Self::load(
-                    // NOTE: an internal node must have children, so this access is safe.
-                    self.children[0],
-                    self.version.page_size(),
-                    memory,
-                );
-                first_child.get_min(memory)
-            }
-        }
+    pub(crate) fn num_entries(&self) -> usize {
+        self.entries.len()
     }
 
     /// Returns true if the node cannot store anymore entries, false otherwise.
@@ -228,6 +188,12 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.entries[idx]
             .1
             .read_uncached(|offset, size| self.load_value_from_memory(offset, size, memory))
+    }
+
+    pub fn get_key_read_value_uncached<M: Memory>(&self, idx: usize, memory: &M) -> Entry<K> {
+        let key = self.get_key(&self.entries[idx], memory).clone();
+        let value = self.read_value_uncached(idx, memory);
+        (key, value)
     }
 
     /// Extracts the contents of key (by loading it first if it's not loaded yet).
