@@ -3936,4 +3936,135 @@ mod test {
             "cached nodes should still be present"
         );
     }
+
+    /// Temporary test: compare node_cache_size_bytes_approx vs node_cache_memory_used
+    /// across different key/value types, map sizes, and cache slot counts.
+    #[test]
+    fn compare_cache_size_estimates() {
+        struct Row {
+            label: &'static str,
+            num_entries: u64,
+            cache_slots: usize,
+            approx: usize,
+            actual: usize,
+        }
+
+        impl Row {
+            fn ratio(&self) -> f64 {
+                if self.actual == 0 {
+                    f64::NAN
+                } else {
+                    self.approx as f64 / self.actual as f64
+                }
+            }
+            fn diff(&self) -> isize {
+                self.approx as isize - self.actual as isize
+            }
+        }
+
+        fn measure<K: TestKey, V: TestValue>(
+            label: &'static str,
+            num_entries: u64,
+            cache_slots: usize,
+        ) -> Row {
+            let mem = make_memory();
+            let mut map: BTreeMap<K, V, _> = BTreeMap::new(mem).with_node_cache(cache_slots);
+
+            for i in 0..num_entries {
+                map.insert(K::build(i as u32), V::build(i as u32));
+            }
+            // Warm the cache with reads.
+            for i in 0..num_entries {
+                let _ = map.get(&K::build(i as u32));
+            }
+
+            Row {
+                label,
+                num_entries,
+                cache_slots,
+                approx: map.node_cache_size_bytes_approx(),
+                actual: map.node_cache_memory_used(),
+            }
+        }
+
+        let entries_counts = [1_000, 10_000, 100_000];
+        let cache_slots = [32];
+
+        let mut rows: Vec<Row> = Vec::new();
+
+        for &n in &entries_counts {
+            for &slots in &cache_slots {
+                rows.push(measure::<u32, u32>("u32, u32", n, slots));
+                rows.push(measure::<u32, Blob<20>>("u32, Blob<20>", n, slots));
+                rows.push(measure::<Blob<10>, u32>("Blob<10>, u32", n, slots));
+                rows.push(measure::<Blob<10>, Blob<20>>(
+                    "Blob<10>, Blob<20>",
+                    n,
+                    slots,
+                ));
+                rows.push(measure::<MonotonicVec32, u32>("Vec32, u32", n, slots));
+                rows.push(measure::<MonotonicVec32, MonotonicVec32>(
+                    "Vec32, Vec32",
+                    n,
+                    slots,
+                ));
+                rows.push(measure::<MonotonicString32, MonotonicString32>(
+                    "Str32, Str32",
+                    n,
+                    slots,
+                ));
+            }
+        }
+
+        // Print the comparison table.
+        println!();
+        println!(
+            "{:<18} {:>7} {:>6} {:>10} {:>10} {:>10} {:>7}",
+            "K, V", "entries", "slots", "approx", "actual", "diff", "ratio"
+        );
+        println!("{}", "-".repeat(75));
+        for r in &rows {
+            println!(
+                "{:<18} {:>7} {:>6} {:>10} {:>10} {:>+10} {:>7.2}",
+                r.label,
+                r.num_entries,
+                r.cache_slots,
+                r.approx,
+                r.actual,
+                r.diff(),
+                r.ratio(),
+            );
+        }
+        println!();
+
+        // Summary: group by label, show min/max ratio.
+        println!("=== Summary by key/value type ===");
+        println!(
+            "{:<18} {:>10} {:>10} {:>10}",
+            "K, V", "min ratio", "max ratio", "avg ratio"
+        );
+        println!("{}", "-".repeat(52));
+        let labels: Vec<&str> = rows
+            .iter()
+            .map(|r| r.label)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        for label in &labels {
+            let group: Vec<&Row> = rows.iter().filter(|r| r.label == *label).collect();
+            let ratios: Vec<f64> = group
+                .iter()
+                .filter(|r| r.actual > 0)
+                .map(|r| r.ratio())
+                .collect();
+            if ratios.is_empty() {
+                continue;
+            }
+            let min = ratios.iter().cloned().fold(f64::INFINITY, f64::min);
+            let max = ratios.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let avg = ratios.iter().sum::<f64>() / ratios.len() as f64;
+            println!("{:<18} {:>10.2} {:>10.2} {:>10.2}", label, min, max, avg);
+        }
+        println!();
+    }
 }
