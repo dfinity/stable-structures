@@ -682,7 +682,25 @@ where
         }
     }
 
-    fn get_min_or_max_child(&self, node: &Node<K>, is_min: bool) -> Entry<K> {
+    fn get_min_or_max_key(&self, node: &Node<K>, is_min: bool) -> K {
+        match node.node_type() {
+            NodeType::Leaf => {
+                let idx = if is_min { 0 } else { node.num_entries() - 1 };
+                node.key(idx, self.memory()).clone()
+            }
+            NodeType::Internal => {
+                let child_addr = if is_min {
+                    node.child(0)
+                } else {
+                    node.child(node.num_entries())
+                };
+                let child = self.load_node(child_addr);
+                self.get_min_or_max_key(&child, is_min)
+            }
+        }
+    }
+
+    fn get_min_or_max_entry(&self, node: &Node<K>, is_min: bool) -> Entry<K> {
         match node.node_type() {
             NodeType::Leaf => {
                 let idx = if is_min { 0 } else { node.num_entries() - 1 };
@@ -690,29 +708,39 @@ where
                 (key.clone(), value.to_vec())
             }
             NodeType::Internal => {
-                // An internal node with N entries has N+1 children.
-                // Min is child(0), max is child(N) — the rightmost child.
                 let child_addr = if is_min {
                     node.child(0)
                 } else {
                     node.child(node.num_entries())
                 };
                 let child = self.load_node(child_addr);
-                self.get_min_or_max_child(&child, is_min)
+                self.get_min_or_max_entry(&child, is_min)
             }
         }
     }
 
     /// Returns the entry with min key in the subtree.
     #[inline(always)]
-    fn get_min(&self, node: &Node<K>) -> Entry<K> {
-        self.get_min_or_max_child(node, true)
+    fn get_min_entry(&self, node: &Node<K>) -> Entry<K> {
+        self.get_min_or_max_entry(node, true)
     }
 
     /// Returns the entry with max key in the subtree.
     #[inline(always)]
-    fn get_max(&self, node: &Node<K>) -> Entry<K> {
-        self.get_min_or_max_child(node, false)
+    fn get_max_entry(&self, node: &Node<K>) -> Entry<K> {
+        self.get_min_or_max_entry(node, false)
+    }
+
+    /// Returns the min key in the subtree.
+    #[inline(always)]
+    fn get_min_key(&self, node: &Node<K>) -> K {
+        self.get_min_or_max_key(node, true)
+    }
+
+    /// Returns the max key in the subtree.
+    #[inline(always)]
+    fn get_max_key(&self, node: &Node<K>) -> K {
+        self.get_min_or_max_key(node, false)
     }
 
     /// Returns `true` if the map contains no elements.
@@ -756,7 +784,7 @@ where
             return None;
         }
         let root = self.load_node(self.root_addr);
-        let (k, encoded_v) = self.get_min(&root);
+        let (k, encoded_v) = self.get_min_entry(&root);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -767,7 +795,7 @@ where
             return None;
         }
         let root = self.load_node(self.root_addr);
-        let (k, encoded_v) = self.get_max(&root);
+        let (k, encoded_v) = self.get_max_entry(&root);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -798,7 +826,7 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let (max_key, _) = self.get_max(&root);
+        let max_key = self.get_max_key(&root);
         self.remove_helper(root, &max_key)
             .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -810,7 +838,7 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let (min_key, _) = self.get_min(&root);
+        let min_key = self.get_min_key(&root);
         self.remove_helper(root, &min_key)
             .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -882,7 +910,7 @@ where
 
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = self.get_max(&left_child);
+                            let predecessor = self.get_max_entry(&left_child);
                             self.remove_helper(left_child, &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
@@ -917,7 +945,7 @@ where
 
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let successor = self.get_min(&right_child);
+                            let successor = self.get_min_entry(&right_child);
                             self.remove_helper(right_child, &successor.0)?;
 
                             // Replace the `key` with its successor.
