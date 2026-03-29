@@ -682,65 +682,55 @@ where
         }
     }
 
-    fn get_min_or_max_key(&self, node: &Node<K>, is_min: bool) -> K {
+    fn get_min_or_max<R>(
+        &self,
+        node: &Node<K>,
+        is_min: bool,
+        extract: fn(&Node<K>, usize, &M) -> R,
+    ) -> R {
         match node.node_type() {
             NodeType::Leaf => {
                 let idx = if is_min { 0 } else { node.num_entries() - 1 };
-                node.key(idx, self.memory()).clone()
+                extract(node, idx, self.memory())
             }
             NodeType::Internal => {
+                // An internal node with N entries has N+1 children.
+                // Min is child(0), max is child(N) — the rightmost child.
                 let child_addr = if is_min {
                     node.child(0)
                 } else {
                     node.child(node.num_entries())
                 };
                 let child = self.load_node(child_addr);
-                self.get_min_or_max_key(&child, is_min)
+                self.get_min_or_max(&child, is_min, extract)
             }
         }
     }
 
-    fn get_min_or_max_entry(&self, node: &Node<K>, is_min: bool) -> Entry<K> {
-        match node.node_type() {
-            NodeType::Leaf => {
-                let idx = if is_min { 0 } else { node.num_entries() - 1 };
-                let (key, value) = node.entry(idx, self.memory());
-                (key.clone(), value.to_vec())
-            }
-            NodeType::Internal => {
-                let child_addr = if is_min {
-                    node.child(0)
-                } else {
-                    node.child(node.num_entries())
-                };
-                let child = self.load_node(child_addr);
-                self.get_min_or_max_entry(&child, is_min)
-            }
-        }
-    }
-
-    /// Returns the entry with min key in the subtree.
-    #[inline(always)]
-    fn get_min_entry(&self, node: &Node<K>) -> Entry<K> {
-        self.get_min_or_max_entry(node, true)
-    }
-
-    /// Returns the entry with max key in the subtree.
-    #[inline(always)]
-    fn get_max_entry(&self, node: &Node<K>) -> Entry<K> {
-        self.get_min_or_max_entry(node, false)
-    }
-
-    /// Returns the min key in the subtree.
     #[inline(always)]
     fn get_min_key(&self, node: &Node<K>) -> K {
-        self.get_min_or_max_key(node, true)
+        self.get_min_or_max(node, true, |n, i, m| n.key(i, m).clone())
     }
 
-    /// Returns the max key in the subtree.
     #[inline(always)]
     fn get_max_key(&self, node: &Node<K>) -> K {
-        self.get_min_or_max_key(node, false)
+        self.get_min_or_max(node, false, |n, i, m| n.key(i, m).clone())
+    }
+
+    #[inline(always)]
+    fn get_min_entry(&self, node: &Node<K>) -> Entry<K> {
+        self.get_min_or_max(node, true, |n, i, m| {
+            let (k, v) = n.entry(i, m);
+            (k.clone(), v.to_vec())
+        })
+    }
+
+    #[inline(always)]
+    fn get_max_entry(&self, node: &Node<K>) -> Entry<K> {
+        self.get_min_or_max(node, false, |n, i, m| {
+            let (k, v) = n.entry(i, m);
+            (k.clone(), v.to_vec())
+        })
     }
 
     /// Returns `true` if the map contains no elements.
