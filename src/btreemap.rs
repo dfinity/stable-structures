@@ -585,8 +585,7 @@ where
     /// For exact heap profiling, use platform-specific tools.
     pub fn node_cache_size_bytes_approx(&self) -> usize {
         self.cache_num_slots
-            * (self.version.page_size().get() as usize
-                + std::mem::size_of::<CacheSlot<K>>())
+            * (self.version.page_size().get() as usize + std::mem::size_of::<CacheSlot<K>>())
     }
 
     /// Initializes a v1 `BTreeMap`.
