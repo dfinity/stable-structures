@@ -559,7 +559,13 @@ impl<T: Storable> LazyObject<T> {
     /// to measure ByVal — avoids requiring `T: MemSize`.
     fn mem_size(&self) -> usize {
         match self {
-            LazyObject::ByVal(value) => value.to_bytes().len(),
+            LazyObject::ByVal(value) => {
+                if T::BOUND.is_fixed_size() {
+                    T::BOUND.max_size() as usize
+                } else {
+                    value.to_bytes().len()
+                }
+            }
             LazyObject::ByRef {
                 offset,
                 size,

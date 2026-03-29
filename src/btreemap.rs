@@ -195,11 +195,12 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
-            self.slots[idx].0 = NULL;
             self.metrics.observe_hit();
+            self.slots[idx].0 = NULL;
             let result = self.slots[idx].1.take();
-            if let Some(node) = &result {
-                self.metrics.subtract_memory_used(node.heap_memory_used());
+            if let Some(evicted_node) = &result {
+                self.metrics
+                    .subtract_memory_used(evicted_node.heap_memory_used());
             }
             result
         } else {
@@ -223,8 +224,9 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
-            if let Some(node) = &self.slots[idx].1 {
-                self.metrics.subtract_memory_used(node.heap_memory_used());
+            if let Some(evicted_node) = &self.slots[idx].1 {
+                self.metrics
+                    .subtract_memory_used(evicted_node.heap_memory_used());
             }
             self.slots[idx] = (NULL, None);
         }
