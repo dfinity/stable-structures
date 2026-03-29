@@ -1007,21 +1007,21 @@ where
         let node = self.take_or_load_node(node_addr);
         match node.search(key, self.memory()) {
             Ok(idx) => {
-                let result = f(&node, idx);
+                let result = f(&node, idx); // Key found: apply `f`.
                 self.return_node(node);
                 Some(result)
             }
-            Err(idx) => {
-                let child_addr = match node.node_type() {
-                    NodeType::Leaf => {
-                        self.return_node(node);
-                        return None;
-                    }
-                    NodeType::Internal => node.child(idx),
-                };
-                self.return_node(node);
-                self.traverse(child_addr, key, f)
-            }
+            Err(idx) => match node.node_type() {
+                NodeType::Leaf => {
+                    self.return_node(node);
+                    None // At a leaf: key not present.
+                }
+                NodeType::Internal => {
+                    let child_addr = node.child(idx);
+                    self.return_node(node);
+                    self.traverse(child_addr, key, f) // Continue search in child.
+                }
+            },
         }
     }
 
