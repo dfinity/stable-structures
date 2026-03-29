@@ -242,9 +242,9 @@ impl<M: Memory> Allocator<M> {
         self.num_allocated_chunks
     }
 
-    /// The full size of a chunk, which is the size of the header + the `allocation_size` that's
-    /// available to the user.
-    pub(crate) fn chunk_size(&self) -> Bytes {
+    // The full size of a chunk, which is the size of the header + the `allocation_size` that's
+    // available to the user.
+    fn chunk_size(&self) -> Bytes {
         self.allocation_size + ChunkHeader::size()
     }
 
