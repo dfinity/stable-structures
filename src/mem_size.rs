@@ -77,8 +77,14 @@ impl<T: MemSize> MemSize for Vec<T> {
     #[inline]
     fn mem_size(&self) -> usize {
         let elements_size = match T::ELEMENT_SIZE {
-            Some(el_size) => self.len() * el_size,
-            None => self.iter().map(|x| x.mem_size()).sum::<usize>(),
+            // For fixed-size elements, the allocator reserves capacity * element_size bytes.
+            Some(el_size) => self.capacity() * el_size,
+            // For variable-size elements, we can only measure initialized elements
+            // plus the slack from capacity - len (using size_of::<T>() per slack slot).
+            None => {
+                self.iter().map(|x| x.mem_size()).sum::<usize>()
+                    + (self.capacity() - self.len()) * std::mem::size_of::<T>()
+            }
         };
         std::mem::size_of::<Self>() + elements_size
     }
@@ -169,6 +175,40 @@ mod tests {
         // Measures logical data size, not physical layout.
         // (u32, u64) = 4 + 8 = 12 bytes (padding excluded).
         assert_eq!((1_u32, 2_u64).mem_size(), 4 + 8);
+    }
+
+    #[test]
+    fn test_mem_size_vec_measures_capacity_fixed_size() {
+        // Vec<u32> has ELEMENT_SIZE = Some(4), so capacity is measured directly.
+        let base = std::mem::size_of::<Vec<u32>>();
+        let mut v = Vec::<u32>::with_capacity(10);
+        // Empty but capacity = 10 → 10 * 4 = 40 bytes of heap.
+        assert_eq!(v.mem_size(), base + 10 * 4);
+
+        v.push(1);
+        v.push(2);
+        // len = 2, capacity = 10 → still 10 * 4 = 40.
+        assert_eq!(v.len(), 2);
+        assert_eq!(v.capacity(), 10);
+        assert_eq!(v.mem_size(), base + 10 * 4);
+    }
+
+    #[test]
+    fn test_mem_size_vec_measures_capacity_variable_size() {
+        // Vec<Vec<u8>> has ELEMENT_SIZE = None → per-element iteration + slack.
+        type Blob = Vec<u8>;
+        let base = std::mem::size_of::<Vec<Blob>>();
+        let blob_base = std::mem::size_of::<Blob>();
+
+        let mut v = Vec::<Blob>::with_capacity(5);
+        // Empty, capacity = 5 → 5 slack slots × size_of::<Blob>().
+        assert_eq!(v.mem_size(), base + 5 * blob_base);
+
+        v.push(Blob::from([1, 2, 3]));
+        // len = 1 (blob_base + 3), slack = 4 × blob_base.
+        assert_eq!(v.len(), 1);
+        assert_eq!(v.capacity(), 5);
+        assert_eq!(v.mem_size(), base + (blob_base + 3) + 4 * blob_base);
     }
 
     #[test]
