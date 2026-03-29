@@ -95,8 +95,9 @@ const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 0;
 /// Node-cache performance metrics.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct NodeCacheMetrics {
-    hits: u64,
-    misses: u64,
+    hits_counter: u64,
+    misses_counter: u64,
+    memory_used_gauge: u64,
 }
 
 impl NodeCacheMetrics {
@@ -105,21 +106,22 @@ impl NodeCacheMetrics {
     }
 
     /// Resets all counters to zero.
-    pub fn clear(&mut self) {
-        self.hits = 0;
-        self.misses = 0;
+    pub fn clear_counters(&mut self) {
+        self.hits_counter = 0;
+        self.misses_counter = 0;
+        // memory_used is not a counter but a gauge, so we don't reset it here.
     }
 
     pub fn hits(&self) -> u64 {
-        self.hits
+        self.hits_counter
     }
 
     pub fn misses(&self) -> u64 {
-        self.misses
+        self.misses_counter
     }
 
     pub fn total(&self) -> u64 {
-        self.hits + self.misses
+        self.hits_counter + self.misses_counter
     }
 
     /// Returns the hit ratio as a value between 0.0 and 1.0.
@@ -129,16 +131,28 @@ impl NodeCacheMetrics {
         if total == 0 {
             0.0
         } else {
-            self.hits as f64 / total as f64
+            self.hits_counter as f64 / total as f64
         }
     }
 
     pub(crate) fn observe_hit(&mut self) {
-        self.hits += 1;
+        self.hits_counter += 1;
     }
 
     pub(crate) fn observe_miss(&mut self) {
-        self.misses += 1;
+        self.misses_counter += 1;
+    }
+
+    pub fn memory_used(&self) -> usize {
+        self.memory_used_gauge as usize
+    }
+
+    pub(crate) fn add_memory_used(&mut self, bytes: usize) {
+        self.memory_used_gauge = self.memory_used_gauge.saturating_add(bytes as u64);
+    }
+
+    pub(crate) fn subtract_memory_used(&mut self, bytes: usize) {
+        self.memory_used_gauge = self.memory_used_gauge.saturating_sub(bytes as u64);
     }
 }
 
@@ -183,7 +197,11 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         if self.slots[idx].0 == addr {
             self.slots[idx].0 = NULL;
             self.metrics.observe_hit();
-            self.slots[idx].1.take()
+            let result = self.slots[idx].1.take();
+            if let Some(node) = &result {
+                self.metrics.subtract_memory_used(node.heap_memory_used());
+            }
+            result
         } else {
             self.metrics.observe_miss();
             None
@@ -192,6 +210,7 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
 
     fn put(&mut self, addr: Address, node: Node<K>) {
         debug_assert!(self.is_enabled());
+        self.metrics.add_memory_used(node.heap_memory_used());
         let idx = self.slot_index(addr);
         self.slots[idx] = (addr, Some(node));
     }
@@ -200,6 +219,9 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
+            if let Some(node) = &self.slots[idx].1 {
+                self.metrics.subtract_memory_used(node.heap_memory_used());
+            }
             self.slots[idx] = (NULL, None);
         }
     }
@@ -209,14 +231,15 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     }
 
     fn clear_metrics(&mut self) {
-        self.metrics.clear();
+        self.metrics.clear_counters();
     }
 
     fn clear(&mut self) {
         for slot in &mut self.slots {
             *slot = (NULL, None);
         }
-        self.metrics.clear();
+        self.metrics.clear_counters();
+        self.metrics.memory_used_gauge = 0;
     }
 }
 
@@ -411,6 +434,7 @@ where
             + self.version.mem_size()
             + self.allocator.mem_size()
             + self.length.mem_size()
+            + self.node_cache_memory_used()
     }
 }
 
@@ -568,6 +592,10 @@ where
         self.cache_num_slots
             * (self.version.page_size().get() as usize
                 + std::mem::size_of::<(Address, Option<Node<K>>)>())
+    }
+
+    pub fn node_cache_memory_used(&self) -> usize {
+        self.cache.borrow().metrics().memory_used()
     }
 
     /// Initializes a v1 `BTreeMap`.

@@ -73,8 +73,8 @@ pub struct Node<K: Storable + Ord + Clone> {
     overflows: Vec<Address>,
 }
 
-impl<K: Storable + Ord + Clone + MemSize> MemSize for Node<K> {
-    fn mem_size(&self) -> usize {
+impl<K: Storable + Ord + Clone> Node<K> {
+    pub fn heap_memory_used(&self) -> usize {
         self.address.mem_size()
             + self.entries.mem_size()
             + self.children.mem_size()
@@ -82,9 +82,7 @@ impl<K: Storable + Ord + Clone + MemSize> MemSize for Node<K> {
             + self.version.mem_size()
             + self.overflows.mem_size()
     }
-}
 
-impl<K: Storable + Ord + Clone> Node<K> {
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
         // Load the header to determine which version the node is, then load the node accordingly.
