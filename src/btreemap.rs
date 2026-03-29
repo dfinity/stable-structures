@@ -211,12 +211,12 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
 
     fn put(&mut self, addr: Address, node: Node<K>) {
         debug_assert!(self.is_enabled());
-        if let Some(evicted_node) = &self.slots[self.slot_index(addr)].1 {
+        let idx = self.slot_index(addr);
+        if let Some(evicted_node) = &self.slots[idx].1 {
             self.metrics
                 .subtract_memory_used(evicted_node.heap_memory_used());
         }
         self.metrics.add_memory_used(node.heap_memory_used());
-        let idx = self.slot_index(addr);
         self.slots[idx] = (addr, Some(node));
     }
 
