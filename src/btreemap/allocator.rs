@@ -1,4 +1,5 @@
 use crate::{
+    mem_size::MemSize,
     read_struct,
     types::{Address, Bytes, NULL},
     write_struct, Memory,
@@ -43,6 +44,17 @@ pub struct Allocator<M: Memory> {
     free_list_head: Address,
 
     memory: M,
+}
+
+impl<M: Memory> MemSize for Allocator<M> {
+    fn mem_size(&self) -> usize {
+        // Excludes `memory: M` — it's a handle to the backing store,
+        // not data owned by the allocator.
+        self.header_addr.mem_size()
+            + self.allocation_size.mem_size()
+            + self.num_allocated_chunks.mem_size()
+            + self.free_list_head.mem_size()
+    }
 }
 
 #[repr(C, packed)]
@@ -230,9 +242,9 @@ impl<M: Memory> Allocator<M> {
         self.num_allocated_chunks
     }
 
-    // The full size of a chunk, which is the size of the header + the `allocation_size` that's
-    // available to the user.
-    fn chunk_size(&self) -> Bytes {
+    /// The full size of a chunk, which is the size of the header + the `allocation_size` that's
+    /// available to the user.
+    pub(crate) fn chunk_size(&self) -> Bytes {
         self.allocation_size + ChunkHeader::size()
     }
 

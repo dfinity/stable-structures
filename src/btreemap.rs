@@ -53,6 +53,7 @@ mod iter;
 mod node;
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
+    mem_size::MemSize,
     storable::Bound as StorableBound,
     types::{Address, NULL},
     Memory, Storable,
@@ -395,6 +396,22 @@ where
 
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
+}
+
+impl<K, V, M> MemSize for BTreeMap<K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    fn mem_size(&self) -> usize {
+        // Excludes _phantom (zero-size) and the Memory handle
+        // (reported separately via stable_memory_size).
+        self.root_addr.mem_size()
+            + self.version.mem_size()
+            + self.allocator.mem_size()
+            + self.length.mem_size()
+    }
 }
 
 #[derive(PartialEq, Debug)]
