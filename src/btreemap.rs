@@ -689,6 +689,8 @@ where
                 node.extract_entry_at(idx, self.memory())
             }
             NodeType::Internal => {
+                // An internal node with N entries has N+1 children.
+                // Min is child(0), max is child(N) — the rightmost child.
                 let child_addr = if is_min {
                     node.child(0)
                 } else {
