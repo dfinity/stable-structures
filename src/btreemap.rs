@@ -3996,6 +3996,8 @@ mod test {
             for &slots in &cache_slots {
                 rows.push(measure::<u32, u32>("u32, u32", n, slots));
                 rows.push(measure::<u32, Blob<20>>("u32, Blob<20>", n, slots));
+                rows.push(measure::<u32, Blob<512>>("u32, Blob<512>", n, slots));
+                rows.push(measure::<u32, Blob<900>>("u32, Blob<900>", n, slots));
                 rows.push(measure::<Blob<10>, u32>("Blob<10>, u32", n, slots));
                 rows.push(measure::<Blob<10>, Blob<20>>(
                     "Blob<10>, Blob<20>",
