@@ -141,15 +141,38 @@ impl NodeCacheMetrics {
     }
 }
 
+/// A single slot in the direct-mapped node cache.
+struct CacheSlot<K: Storable + Ord + Clone> {
+    /// The stable-memory address of the cached node.
+    address: Address,
+    /// The cached node, or `None` if the slot is empty.
+    node: Option<Node<K>>,
+    /// Distance from the tree root (root = 0). Used to resolve
+    /// collisions: shallower nodes are kept over deeper ones.
+    depth: u8,
+}
+
+impl<K: Storable + Ord + Clone> CacheSlot<K> {
+    fn empty() -> Self {
+        Self {
+            address: NULL,
+            node: None,
+            depth: 0,
+        }
+    }
+}
+
 /// A direct-mapped node cache.
 ///
 /// Each slot is indexed by `(node_address / page_size) % num_slots`.
 /// Collision = eviction (no LRU tracking needed).
 ///
 /// Upper tree levels (root, depth-1) naturally stay cached because their
-/// addresses are stable and map to distinct slots.
+/// addresses are stable and map to distinct slots. The depth-aware
+/// eviction policy further guarantees that a deeper node can never
+/// displace a shallower one from a shared slot.
 struct NodeCache<K: Storable + Ord + Clone> {
-    slots: Vec<(Address, Option<Node<K>>)>,
+    slots: Vec<CacheSlot<K>>,
     page_size: u32,
     metrics: NodeCacheMetrics,
 }
@@ -158,7 +181,7 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     fn new(page_size: u32, num_slots: usize) -> Self {
         let mut slots = Vec::with_capacity(num_slots);
         for _ in 0..num_slots {
-            slots.push((NULL, None));
+            slots.push(CacheSlot::empty());
         }
         Self {
             slots,
@@ -179,27 +202,40 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     fn take(&mut self, addr: Address) -> Option<Node<K>> {
         debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
-        if self.slots[idx].0 == addr {
+        let slot = &mut self.slots[idx];
+        if slot.address == addr {
             self.metrics.observe_hit();
-            self.slots[idx].0 = NULL;
-            self.slots[idx].1.take()
+            slot.address = NULL;
+            slot.node.take()
         } else {
             self.metrics.observe_miss();
             None
         }
     }
 
-    fn put(&mut self, addr: Address, node: Node<K>) {
+    fn put(&mut self, addr: Address, node: Node<K>, depth: u8) {
         debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
-        self.slots[idx] = (addr, Some(node));
+        let slot = &mut self.slots[idx];
+        // Only evict an existing cached node if the new node is at the
+        // same depth or closer to the root (lower depth value).
+        // This keeps upper-level nodes cached even when a deeper node
+        // maps to the same slot.
+        if slot.node.is_none() || depth <= slot.depth {
+            *slot = CacheSlot {
+                address: addr,
+                node: Some(node),
+                depth,
+            };
+        }
     }
 
     fn invalidate(&mut self, addr: Address) {
         debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
-        if self.slots[idx].0 == addr {
-            self.slots[idx] = (NULL, None);
+        let slot = &mut self.slots[idx];
+        if slot.address == addr {
+            *slot = CacheSlot::empty();
         }
     }
 
@@ -213,7 +249,7 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
 
     fn clear(&mut self) {
         for slot in &mut self.slots {
-            *slot = (NULL, None);
+            *slot = CacheSlot::empty();
         }
         self.metrics.clear_counters();
     }
@@ -550,7 +586,7 @@ where
     pub fn node_cache_size_bytes_approx(&self) -> usize {
         self.cache_num_slots
             * (self.version.page_size().get() as usize
-                + std::mem::size_of::<(Address, Option<Node<K>>)>())
+                + std::mem::size_of::<CacheSlot<K>>())
     }
 
     /// Initializes a v1 `BTreeMap`.
@@ -934,7 +970,7 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        self.traverse(self.root_addr, key, |node, idx| {
+        self.traverse(self.root_addr, 0, key, |node, idx| {
             node.read_value_uncached(idx, self.memory())
         })
         .map(Cow::Owned)
@@ -943,13 +979,14 @@ where
 
     /// Returns true if the key exists.
     pub fn contains_key(&self, key: &K) -> bool {
-        self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
+        self.root_addr != NULL && self.traverse(self.root_addr, 0, key, |_, _| ()).is_some()
     }
 
     /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
     ///
     /// Uses the node cache: nodes are taken out before use and returned after.
-    fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
+    /// `depth` is the distance from the root (root = 0).
+    fn traverse<F, R>(&self, node_addr: Address, depth: u8, key: &K, f: F) -> Option<R>
     where
         F: Fn(&Node<K>, usize) -> R,
     {
@@ -957,18 +994,18 @@ where
         match node.search(key, self.memory()) {
             Ok(idx) => {
                 let result = f(&node, idx); // Key found: apply `f`.
-                self.return_node(node);
+                self.return_node(node, depth);
                 Some(result)
             }
             Err(idx) => match node.node_type() {
                 NodeType::Leaf => {
-                    self.return_node(node);
+                    self.return_node(node, depth);
                     None // At a leaf: key not present.
                 }
                 NodeType::Internal => {
                     let child_addr = node.child(idx);
-                    self.return_node(node);
-                    self.traverse(child_addr, key, f) // Continue search in child.
+                    self.return_node(node, depth);
+                    self.traverse(child_addr, depth.saturating_add(1), key, f)
                 }
             },
         }
@@ -1069,7 +1106,7 @@ where
         }
         let root = self.take_or_load_node(self.root_addr);
         let (k, encoded_v) = self.get_min_entry(&root);
-        self.return_node(root);
+        self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -1081,7 +1118,7 @@ where
         }
         let root = self.take_or_load_node(self.root_addr);
         let (k, encoded_v) = self.get_max_entry(&root);
-        self.return_node(root);
+        self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -1665,10 +1702,13 @@ where
     }
 
     /// Returns a node to the cache after use on a read path.
+    ///
+    /// `depth` is the distance from the root (root = 0). The cache uses
+    /// this to prefer keeping shallower nodes on slot collisions.
     #[inline(always)]
-    fn return_node(&self, node: Node<K>) {
+    fn return_node(&self, node: Node<K>, depth: u8) {
         if self.cache_num_slots > 0 {
-            self.cache.borrow_mut().put(node.address(), node);
+            self.cache.borrow_mut().put(node.address(), node, depth);
         }
     }
 
