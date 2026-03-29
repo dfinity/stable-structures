@@ -53,7 +53,6 @@ mod iter;
 mod node;
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
-    mem_size::MemSize,
     storable::Bound as StorableBound,
     types::{Address, NULL},
     Memory, Storable,
@@ -97,7 +96,6 @@ const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 0;
 pub struct NodeCacheMetrics {
     hits_counter: u64,
     misses_counter: u64,
-    memory_used_gauge: u64,
 }
 
 impl NodeCacheMetrics {
@@ -109,7 +107,6 @@ impl NodeCacheMetrics {
     pub fn clear_counters(&mut self) {
         self.hits_counter = 0;
         self.misses_counter = 0;
-        // memory_used is not a counter but a gauge, so we don't reset it here.
     }
 
     pub fn hits(&self) -> u64 {
@@ -141,18 +138,6 @@ impl NodeCacheMetrics {
 
     pub(crate) fn observe_miss(&mut self) {
         self.misses_counter += 1;
-    }
-
-    pub fn memory_used(&self) -> usize {
-        self.memory_used_gauge as usize
-    }
-
-    pub(crate) fn add_memory_used(&mut self, bytes: usize) {
-        self.memory_used_gauge = self.memory_used_gauge.saturating_add(bytes as u64);
-    }
-
-    pub(crate) fn subtract_memory_used(&mut self, bytes: usize) {
-        self.memory_used_gauge = self.memory_used_gauge.saturating_sub(bytes as u64);
     }
 }
 
@@ -197,12 +182,7 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         if self.slots[idx].0 == addr {
             self.metrics.observe_hit();
             self.slots[idx].0 = NULL;
-            let result = self.slots[idx].1.take();
-            if let Some(evicted_node) = &result {
-                self.metrics
-                    .subtract_memory_used(evicted_node.heap_memory_used());
-            }
-            result
+            self.slots[idx].1.take()
         } else {
             self.metrics.observe_miss();
             None
@@ -212,11 +192,6 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     fn put(&mut self, addr: Address, node: Node<K>) {
         debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
-        if let Some(evicted_node) = &self.slots[idx].1 {
-            self.metrics
-                .subtract_memory_used(evicted_node.heap_memory_used());
-        }
-        self.metrics.add_memory_used(node.heap_memory_used());
         self.slots[idx] = (addr, Some(node));
     }
 
@@ -224,10 +199,6 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         debug_assert!(self.is_enabled());
         let idx = self.slot_index(addr);
         if self.slots[idx].0 == addr {
-            if let Some(evicted_node) = &self.slots[idx].1 {
-                self.metrics
-                    .subtract_memory_used(evicted_node.heap_memory_used());
-            }
             self.slots[idx] = (NULL, None);
         }
     }
@@ -245,7 +216,6 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
             *slot = (NULL, None);
         }
         self.metrics.clear_counters();
-        self.metrics.memory_used_gauge = 0;
     }
 }
 
@@ -427,23 +397,6 @@ where
     _phantom: PhantomData<(K, V)>,
 }
 
-impl<K, V, M> MemSize for BTreeMap<K, V, M>
-where
-    K: Storable + Ord + Clone,
-    V: Storable,
-    M: Memory,
-{
-    fn mem_size(&self) -> usize {
-        // Excludes _phantom (zero-size) and the Memory handle
-        // (reported separately via stable_memory_size).
-        self.root_addr.mem_size()
-            + self.version.mem_size()
-            + self.allocator.mem_size()
-            + self.length.mem_size()
-            + self.node_cache_memory_used()
-    }
-}
-
 #[derive(PartialEq, Debug)]
 /// The packed header size must be <= ALLOCATOR_OFFSET.
 struct BTreeHeader {
@@ -598,10 +551,6 @@ where
         self.cache_num_slots
             * (self.version.page_size().get() as usize
                 + std::mem::size_of::<(Address, Option<Node<K>>)>())
-    }
-
-    pub fn node_cache_memory_used(&self) -> usize {
-        self.cache.borrow().metrics().memory_used()
     }
 
     /// Initializes a v1 `BTreeMap`.
@@ -3935,138 +3884,5 @@ mod test {
             final_metrics.hits() > 0,
             "cached nodes should still be present"
         );
-    }
-
-    /// Temporary test: compare node_cache_size_bytes_approx vs node_cache_memory_used
-    /// across different key/value types, map sizes, and cache slot counts.
-    #[test]
-    fn compare_cache_size_estimates() {
-        struct Row {
-            label: &'static str,
-            num_entries: u64,
-            cache_slots: usize,
-            approx: usize,
-            actual: usize,
-        }
-
-        impl Row {
-            fn ratio(&self) -> f64 {
-                if self.actual == 0 {
-                    f64::NAN
-                } else {
-                    self.approx as f64 / self.actual as f64
-                }
-            }
-            fn diff(&self) -> isize {
-                self.approx as isize - self.actual as isize
-            }
-        }
-
-        fn measure<K: TestKey, V: TestValue>(
-            label: &'static str,
-            num_entries: u64,
-            cache_slots: usize,
-        ) -> Row {
-            let mem = make_memory();
-            let mut map: BTreeMap<K, V, _> = BTreeMap::new(mem).with_node_cache(cache_slots);
-
-            for i in 0..num_entries {
-                map.insert(K::build(i as u32), V::build(i as u32));
-            }
-            // Warm the cache with reads.
-            for i in 0..num_entries {
-                let _ = map.get(&K::build(i as u32));
-            }
-
-            Row {
-                label,
-                num_entries,
-                cache_slots,
-                approx: map.node_cache_size_bytes_approx(),
-                actual: map.node_cache_memory_used(),
-            }
-        }
-
-        let entries_counts = [1_000, 10_000, 100_000];
-        let cache_slots = [32];
-
-        let mut rows: Vec<Row> = Vec::new();
-
-        for &n in &entries_counts {
-            for &slots in &cache_slots {
-                rows.push(measure::<u32, u32>("u32, u32", n, slots));
-                rows.push(measure::<u32, Blob<20>>("u32, Blob<20>", n, slots));
-                rows.push(measure::<u32, Blob<512>>("u32, Blob<512>", n, slots));
-                rows.push(measure::<u32, Blob<900>>("u32, Blob<900>", n, slots));
-                rows.push(measure::<Blob<10>, u32>("Blob<10>, u32", n, slots));
-                rows.push(measure::<Blob<10>, Blob<20>>(
-                    "Blob<10>, Blob<20>",
-                    n,
-                    slots,
-                ));
-                rows.push(measure::<MonotonicVec32, u32>("Vec32, u32", n, slots));
-                rows.push(measure::<MonotonicVec32, MonotonicVec32>(
-                    "Vec32, Vec32",
-                    n,
-                    slots,
-                ));
-                rows.push(measure::<MonotonicString32, MonotonicString32>(
-                    "Str32, Str32",
-                    n,
-                    slots,
-                ));
-            }
-        }
-
-        // Print the comparison table.
-        println!();
-        println!(
-            "{:<18} {:>7} {:>6} {:>10} {:>10} {:>10} {:>7}",
-            "K, V", "entries", "slots", "approx", "actual", "diff", "ratio"
-        );
-        println!("{}", "-".repeat(75));
-        for r in &rows {
-            println!(
-                "{:<18} {:>7} {:>6} {:>10} {:>10} {:>+10} {:>7.2}",
-                r.label,
-                r.num_entries,
-                r.cache_slots,
-                r.approx,
-                r.actual,
-                r.diff(),
-                r.ratio(),
-            );
-        }
-        println!();
-
-        // Summary: group by label, show min/max ratio.
-        println!("=== Summary by key/value type ===");
-        println!(
-            "{:<18} {:>10} {:>10} {:>10}",
-            "K, V", "min ratio", "max ratio", "avg ratio"
-        );
-        println!("{}", "-".repeat(52));
-        let labels: Vec<&str> = rows
-            .iter()
-            .map(|r| r.label)
-            .collect::<std::collections::BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        for label in &labels {
-            let group: Vec<&Row> = rows.iter().filter(|r| r.label == *label).collect();
-            let ratios: Vec<f64> = group
-                .iter()
-                .filter(|r| r.actual > 0)
-                .map(|r| r.ratio())
-                .collect();
-            if ratios.is_empty() {
-                continue;
-            }
-            let min = ratios.iter().cloned().fold(f64::INFINITY, f64::min);
-            let max = ratios.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let avg = ratios.iter().sum::<f64>() / ratios.len() as f64;
-            println!("{:<18} {:>10.2} {:>10.2} {:>10.2}", label, min, max, avg);
-        }
-        println!();
     }
 }

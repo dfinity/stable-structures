@@ -1,6 +1,5 @@
 use crate::{
     btreemap::Allocator,
-    mem_size::MemSize,
     read_address_vec, read_struct, read_to_vec, read_u32, read_u64,
     storable::Storable,
     types::{Address, Bytes},
@@ -37,12 +36,6 @@ pub enum NodeType {
     Internal,
 }
 
-impl MemSize for NodeType {
-    fn mem_size(&self) -> usize {
-        core::mem::size_of::<Self>()
-    }
-}
-
 pub type Entry<K> = (K, Vec<u8>);
 pub type EntryRef<'a, K> = (&'a K, &'a [u8]);
 
@@ -74,15 +67,6 @@ pub struct Node<K: Storable + Ord + Clone> {
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
-    pub fn heap_memory_used(&self) -> usize {
-        self.address.mem_size()
-            + self.entries.mem_size()
-            + self.children.mem_size()
-            + self.node_type.mem_size()
-            + self.version.mem_size()
-            + self.overflows.mem_size()
-    }
-
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
         // Load the header to determine which version the node is, then load the node accordingly.
@@ -510,7 +494,7 @@ impl NodeHeader {
 
 /// A lazily-loaded object, which can be either an immediate value or a deferred reference.
 #[derive(Debug)]
-enum LazyObject<T: Storable> {
+enum LazyObject<T> {
     ByVal(T),
     ByRef {
         offset: Bytes,
@@ -519,37 +503,7 @@ enum LazyObject<T: Storable> {
     },
 }
 
-impl<T: Storable> LazyObject<T> {
-    /// Reports the serialized data size for loaded values, or just the
-    /// fixed fields for unloaded references. Uses `Storable::to_bytes()`
-    /// to measure ByVal — avoids requiring `T: MemSize`.
-    fn mem_size(&self) -> usize {
-        match self {
-            LazyObject::ByVal(value) => {
-                if T::BOUND.is_fixed_size() {
-                    T::BOUND.max_size() as usize
-                } else {
-                    value.to_bytes().len()
-                }
-            }
-            LazyObject::ByRef {
-                offset,
-                size,
-                loaded,
-            } => {
-                offset.mem_size()
-                    + size.mem_size()
-                    + if loaded.get().is_some() {
-                        *size as usize
-                    } else {
-                        0
-                    }
-            }
-        }
-    }
-}
-
-impl<T: Storable> LazyObject<T> {
+impl<T> LazyObject<T> {
     #[inline(always)]
     pub fn by_value(value: T) -> Self {
         LazyObject::ByVal(value)
@@ -594,12 +548,6 @@ type Blob = Vec<u8>;
 #[derive(Debug)]
 struct LazyValue(LazyObject<Blob>);
 
-impl MemSize for LazyValue {
-    fn mem_size(&self) -> usize {
-        self.0.mem_size()
-    }
-}
-
 impl LazyValue {
     #[inline(always)]
     pub fn by_value(value: Blob) -> Self {
@@ -641,15 +589,9 @@ impl LazyValue {
 }
 
 #[derive(Debug)]
-struct LazyKey<K: Storable>(LazyObject<K>);
+struct LazyKey<K>(LazyObject<K>);
 
-impl<K: Storable> MemSize for LazyKey<K> {
-    fn mem_size(&self) -> usize {
-        self.0.mem_size()
-    }
-}
-
-impl<K: Storable> LazyKey<K> {
+impl<K> LazyKey<K> {
     #[inline(always)]
     pub fn by_value(value: K) -> Self {
         Self(LazyObject::by_value(value))
@@ -668,15 +610,6 @@ impl<K: Storable> LazyKey<K> {
     #[inline(always)]
     pub fn take_or_load(self, load: impl FnOnce(Bytes, u32) -> K) -> K {
         self.0.take_or_load(load)
-    }
-}
-
-impl MemSize for Version {
-    fn mem_size(&self) -> usize {
-        match self {
-            Version::V1(page_size) => page_size.mem_size(),
-            Version::V2(page_size) => page_size.mem_size(),
-        }
     }
 }
 
@@ -711,15 +644,6 @@ pub enum PageSize {
     Value(u32),
 }
 
-impl MemSize for PageSize {
-    fn mem_size(&self) -> usize {
-        match self {
-            Self::Value(page_size) => page_size.mem_size(),
-            Self::Derived(derived) => derived.mem_size(),
-        }
-    }
-}
-
 impl PageSize {
     pub fn get(&self) -> u32 {
         match self {
@@ -740,11 +664,5 @@ impl DerivedPageSize {
     /// Returns the page size derived from the max key/value sizes.
     fn get(&self) -> u32 {
         v1::size_v1(self.max_key_size, self.max_value_size).get() as u32
-    }
-}
-
-impl MemSize for DerivedPageSize {
-    fn mem_size(&self) -> usize {
-        self.max_key_size.mem_size() + self.max_value_size.mem_size()
     }
 }
