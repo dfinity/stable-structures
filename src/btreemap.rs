@@ -839,7 +839,7 @@ where
     }
 
     /// Traverses to the min or max leaf and extracts a result using the provided closure.
-    fn get_min_or_max<R, F>(&self, node: &Node<K>, is_min: bool, extract: F) -> R
+    fn find_first_or_last<R, F>(&self, node: &Node<K>, is_first: bool, extract: F) -> R
     where
         F: Fn(&Node<K>, usize, &M) -> R,
     {
@@ -848,7 +848,7 @@ where
         loop {
             match current_ref.node_type() {
                 NodeType::Leaf => {
-                    let idx = if is_min {
+                    let idx = if is_first {
                         0
                     } else {
                         // Last entry index in a 0-based array of entries.
@@ -857,7 +857,7 @@ where
                     return extract(current_ref, idx, self.memory());
                 }
                 NodeType::Internal => {
-                    let child_addr = if is_min {
+                    let child_addr = if is_first {
                         current_ref.child(0)
                     } else {
                         // Last child index in a 0-based array of children.
@@ -872,17 +872,17 @@ where
 
     #[inline(always)]
     fn first_key_inner(&self, node: &Node<K>) -> K {
-        self.get_min_or_max(node, true, |n, i, m| n.key(i, m).clone())
+        self.find_first_or_last(node, true, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
     fn last_key_inner(&self, node: &Node<K>) -> K {
-        self.get_min_or_max(node, false, |n, i, m| n.key(i, m).clone())
+        self.find_first_or_last(node, false, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
     fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.get_min_or_max(node, true, |n, i, m| {
+        self.find_first_or_last(node, true, |n, i, m| {
             let (k, v) = n.get_key_read_value_uncached(i, m);
             (k.clone(), v.to_vec())
         })
@@ -890,7 +890,7 @@ where
 
     #[inline(always)]
     fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.get_min_or_max(node, false, |n, i, m| {
+        self.find_first_or_last(node, false, |n, i, m| {
             let (k, v) = n.get_key_read_value_uncached(i, m);
             (k.clone(), v.to_vec())
         })
