@@ -838,43 +838,50 @@ where
         }
     }
 
-    fn get_min_or_max<R>(
-        &self,
-        node: &Node<K>,
-        is_min: bool,
-        extract: fn(&Node<K>, usize, &M) -> R,
-    ) -> R {
-        match node.node_type() {
-            NodeType::Leaf => {
-                let idx = if is_min { 0 } else { node.num_entries() - 1 };
-                extract(node, idx, self.memory())
-            }
-            NodeType::Internal => {
-                // An internal node with N entries has N+1 children.
-                // Min is child(0), max is child(N) — the rightmost child.
-                let child_addr = if is_min {
-                    node.child(0)
-                } else {
-                    node.child(node.num_entries())
-                };
-                let child = self.load_node(child_addr);
-                self.get_min_or_max(&child, is_min, extract)
+    /// Traverses to the min or max leaf and extracts a result using the provided closure.
+    fn get_min_or_max<R, F>(&self, node: &Node<K>, is_min: bool, extract: F) -> R
+    where
+        F: Fn(&Node<K>, usize, &M) -> R,
+    {
+        let mut current;
+        let mut current_ref = node;
+        loop {
+            match current_ref.node_type() {
+                NodeType::Leaf => {
+                    let idx = if is_min {
+                        0
+                    } else {
+                        // Last entry index in a 0-based array of entries.
+                        current_ref.num_entries() - 1
+                    };
+                    return extract(current_ref, idx, self.memory());
+                }
+                NodeType::Internal => {
+                    let child_addr = if is_min {
+                        current_ref.child(0)
+                    } else {
+                        // Last child index in a 0-based array of children.
+                        current_ref.child(current_ref.children_len() - 1)
+                    };
+                    current = self.load_node(child_addr);
+                    current_ref = &current;
+                }
             }
         }
     }
 
     #[inline(always)]
-    fn get_min_key(&self, node: &Node<K>) -> K {
+    fn first_key_inner(&self, node: &Node<K>) -> K {
         self.get_min_or_max(node, true, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
-    fn get_max_key(&self, node: &Node<K>) -> K {
+    fn last_key_inner(&self, node: &Node<K>) -> K {
         self.get_min_or_max(node, false, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
-    fn get_min_entry(&self, node: &Node<K>) -> Entry<K> {
+    fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
         self.get_min_or_max(node, true, |n, i, m| {
             let (k, v) = n.get_key_read_value_uncached(i, m);
             (k.clone(), v.to_vec())
@@ -882,7 +889,7 @@ where
     }
 
     #[inline(always)]
-    fn get_max_entry(&self, node: &Node<K>) -> Entry<K> {
+    fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
         self.get_min_or_max(node, false, |n, i, m| {
             let (k, v) = n.get_key_read_value_uncached(i, m);
             (k.clone(), v.to_vec())
@@ -932,7 +939,7 @@ where
             return None;
         }
         let root = self.take_or_load_node(self.root_addr);
-        let (k, encoded_v) = self.get_min_entry(&root);
+        let (k, encoded_v) = self.first_entry_inner(&root);
         self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
@@ -944,7 +951,7 @@ where
             return None;
         }
         let root = self.take_or_load_node(self.root_addr);
-        let (k, encoded_v) = self.get_max_entry(&root);
+        let (k, encoded_v) = self.last_entry_inner(&root);
         self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
@@ -976,9 +983,9 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let max_key = self.get_max_key(&root);
-        self.remove_helper(root, &max_key)
-            .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
+        let last_key = self.last_key_inner(&root);
+        self.remove_helper(root, &last_key)
+            .map(|v| (last_key, V::from_bytes(Cow::Owned(v))))
     }
 
     /// Removes and returns the first element in the map. The key of this element is the minimum key that was in the map
@@ -988,9 +995,9 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let min_key = self.get_min_key(&root);
-        self.remove_helper(root, &min_key)
-            .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
+        let first_key = self.first_key_inner(&root);
+        self.remove_helper(root, &first_key)
+            .map(|v| (first_key, V::from_bytes(Cow::Owned(v))))
     }
 
     /// A helper method for recursively removing a key from the B-tree.
@@ -1060,7 +1067,7 @@ where
 
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = self.get_max_entry(&left_child);
+                            let predecessor = self.last_entry_inner(&left_child);
                             self.remove_helper(left_child, &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
@@ -1095,7 +1102,7 @@ where
 
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let successor = self.get_min_entry(&right_child);
+                            let successor = self.first_entry_inner(&right_child);
                             self.remove_helper(right_child, &successor.0)?;
 
                             // Replace the `key` with its successor.
