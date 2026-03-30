@@ -694,12 +694,10 @@ where
                 extract(node, idx, self.memory())
             }
             NodeType::Internal => {
-                // An internal node with N entries has N+1 children.
-                // Min is child(0), max is child(N) — the rightmost child.
                 let child_addr = if is_min {
                     node.child(0)
                 } else {
-                    node.child(node.num_entries())
+                    node.child(node.children_len() - 1)
                 };
                 let child = self.load_node(child_addr);
                 self.get_min_or_max(&child, is_min, extract)
