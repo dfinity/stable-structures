@@ -843,29 +843,25 @@ where
     where
         F: Fn(&Node<K>, usize, &M) -> R,
     {
-        let mut current;
-        let mut current_ref = node;
-        loop {
-            match current_ref.node_type() {
-                NodeType::Leaf => {
-                    let idx = if is_first {
-                        0
-                    } else {
-                        // Last entry index in a 0-based array of entries.
-                        current_ref.num_entries() - 1
-                    };
-                    return extract(current_ref, idx, self.memory());
-                }
-                NodeType::Internal => {
-                    let child_addr = if is_first {
-                        current_ref.child(0)
-                    } else {
-                        // Last child index in a 0-based array of children.
-                        current_ref.child(current_ref.children_len() - 1)
-                    };
-                    current = self.load_node(child_addr);
-                    current_ref = &current;
-                }
+        match node.node_type() {
+            NodeType::Leaf => {
+                let idx = if is_first {
+                    0
+                } else {
+                    // Last entry index in a 0-based array of entries.
+                    node.num_entries() - 1
+                };
+                extract(node, idx, self.memory())
+            }
+            NodeType::Internal => {
+                let child_addr = if is_first {
+                    node.child(0)
+                } else {
+                    // Last child index in a 0-based array of children.
+                    node.child(node.children_len() - 1)
+                };
+                let child = self.load_node(child_addr);
+                self.find_first_or_last(&child, is_first, extract)
             }
         }
     }
