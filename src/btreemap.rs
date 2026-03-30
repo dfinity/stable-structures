@@ -715,17 +715,17 @@ where
     }
 
     #[inline(always)]
-    fn get_min_key(&self, node: &Node<K>) -> K {
+    fn first_key_inner(&self, node: &Node<K>) -> K {
         self.get_min_or_max(node, true, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
-    fn get_max_key(&self, node: &Node<K>) -> K {
+    fn last_key_inner(&self, node: &Node<K>) -> K {
         self.get_min_or_max(node, false, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
-    fn get_min_entry(&self, node: &Node<K>) -> Entry<K> {
+    fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
         self.get_min_or_max(node, true, |n, i, m| {
             let (k, v) = n.entry(i, m);
             (k.clone(), v.to_vec())
@@ -733,7 +733,7 @@ where
     }
 
     #[inline(always)]
-    fn get_max_entry(&self, node: &Node<K>) -> Entry<K> {
+    fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
         self.get_min_or_max(node, false, |n, i, m| {
             let (k, v) = n.entry(i, m);
             (k.clone(), v.to_vec())
@@ -781,7 +781,7 @@ where
             return None;
         }
         let root = self.load_node(self.root_addr);
-        let (k, encoded_v) = self.get_min_entry(&root);
+        let (k, encoded_v) = self.first_entry_inner(&root);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -792,7 +792,7 @@ where
             return None;
         }
         let root = self.load_node(self.root_addr);
-        let (k, encoded_v) = self.get_max_entry(&root);
+        let (k, encoded_v) = self.last_entry_inner(&root);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -823,7 +823,7 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let max_key = self.get_max_key(&root);
+        let max_key = self.last_key_inner(&root);
         self.remove_helper(root, &max_key)
             .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -835,7 +835,7 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let min_key = self.get_min_key(&root);
+        let min_key = self.first_key_inner(&root);
         self.remove_helper(root, &min_key)
             .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -907,7 +907,7 @@ where
 
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = self.get_max_entry(&left_child);
+                            let predecessor = self.last_entry_inner(&left_child);
                             self.remove_helper(left_child, &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
@@ -942,7 +942,7 @@ where
 
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let successor = self.get_min_entry(&right_child);
+                            let successor = self.first_entry_inner(&right_child);
                             self.remove_helper(right_child, &successor.0)?;
 
                             // Replace the `key` with its successor.
