@@ -882,17 +882,13 @@ where
 
     #[inline(always)]
     fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.find_first_or_last(node, true, 0, |n, i, m| {
-            let (k, v) = n.get_key_read_value_uncached(i, m);
-            (k.clone(), v.to_vec())
-        })
+        self.find_first_or_last(node, true, 0, |n, i, m| n.get_key_read_value_uncached(i, m))
     }
 
     #[inline(always)]
     fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
         self.find_first_or_last(node, false, 0, |n, i, m| {
-            let (k, v) = n.get_key_read_value_uncached(i, m);
-            (k.clone(), v.to_vec())
+            n.get_key_read_value_uncached(i, m)
         })
     }
 
