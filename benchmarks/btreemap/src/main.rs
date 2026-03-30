@@ -530,6 +530,42 @@ macro_rules! bench_traversal_tests {
     };
 }
 
+// First key value
+bench_tests! {
+    // key size variation (fixed Blob128 value)
+    btreemap_v2_first_key_value_blob_8_128,    first_key_value_helper_v2,   Blob8, Blob128;
+    btreemap_v2_first_key_value_blob_32_128,   first_key_value_helper_v2,  Blob32, Blob128;
+    btreemap_v2_first_key_value_blob_256_128,  first_key_value_helper_v2, Blob256, Blob128;
+    btreemap_v2_first_key_value_vec_32_128,    first_key_value_helper_v2, UnboundedVecN32, UnboundedVecN128;
+
+    // value size variation (fixed Blob32 key)
+    btreemap_v2_first_key_value_blob_32_0,     first_key_value_helper_v2, Blob32,    Empty;
+    btreemap_v2_first_key_value_blob_32_1024,  first_key_value_helper_v2, Blob32, Blob1024;
+    btreemap_v2_first_key_value_vec_32_vec128, first_key_value_helper_v2, UnboundedVecN32, UnboundedVecN128;
+
+    // common types
+    btreemap_v2_first_key_value_u64_u64,       first_key_value_helper_v2, u64, u64;
+    btreemap_v2_first_key_value_principal,     first_key_value_helper_v2, Principal, Empty;
+}
+
+// Last key value
+bench_tests! {
+    // key size variation (fixed Blob128 value)
+    btreemap_v2_last_key_value_blob_8_128,    last_key_value_helper_v2,   Blob8, Blob128;
+    btreemap_v2_last_key_value_blob_32_128,   last_key_value_helper_v2,  Blob32, Blob128;
+    btreemap_v2_last_key_value_blob_256_128,  last_key_value_helper_v2, Blob256, Blob128;
+    btreemap_v2_last_key_value_vec_32_128,    last_key_value_helper_v2, UnboundedVecN32, UnboundedVecN128;
+
+    // value size variation (fixed Blob32 key)
+    btreemap_v2_last_key_value_blob_32_0,     last_key_value_helper_v2, Blob32,    Empty;
+    btreemap_v2_last_key_value_blob_32_1024,  last_key_value_helper_v2, Blob32, Blob1024;
+    btreemap_v2_last_key_value_vec_32_vec128, last_key_value_helper_v2, UnboundedVecN32, UnboundedVecN128;
+
+    // common types
+    btreemap_v2_last_key_value_u64_u64,       last_key_value_helper_v2, u64, u64;
+    btreemap_v2_last_key_value_principal,     last_key_value_helper_v2, Principal, Empty;
+}
+
 // First
 bench_tests! {
     // blob K x 128
@@ -646,6 +682,44 @@ bench_tests! {
 
     // Principal
     btreemap_v2_pop_last_principal,      pop_last_helper_v2, Principal, Empty;
+}
+
+fn first_key_value_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
+    first_or_last_key_value_helper_v2::<K, V>(Position::First)
+}
+
+fn last_key_value_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
+    first_or_last_key_value_helper_v2::<K, V>(Position::Last)
+}
+
+fn first_or_last_key_value_helper_v2<K: TestKey, V: TestValue>(position: Position) -> BenchResult {
+    let btree = BTreeMap::new(DefaultMemoryImpl::default());
+    first_or_last_key_value_helper::<K, V>(btree, position)
+}
+
+fn first_or_last_key_value_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+    position: Position,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    bench_fn(|| {
+        for _ in 0..count {
+            match position {
+                Position::First => {
+                    btree.first_key_value();
+                }
+                Position::Last => {
+                    btree.last_key_value();
+                }
+            };
+        }
+    })
 }
 
 fn pop_first_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {

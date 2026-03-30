@@ -806,6 +806,7 @@ where
 
     /// Returns true if the key exists.
     pub fn contains_key(&self, key: &K) -> bool {
+        // An empty closure returns Some(()) if the key is found.
         self.root_addr != NULL && self.traverse(self.root_addr, 0, key, |_, _| ()).is_some()
     }
 
@@ -838,8 +839,8 @@ where
         }
     }
 
-    /// Traverses to the min or max leaf and extracts a result using the provided closure.
-    fn find_first_or_last<R, F>(&self, node: &Node<K>, is_first: bool, extract: F) -> R
+    /// A helper function to find either the first or last entry in the tree, depending on the `is_first` flag.
+    fn find_first_or_last<R, F>(&self, node: &Node<K>, is_first: bool, depth: u8, extract: F) -> R
     where
         F: Fn(&Node<K>, usize, &M) -> R,
     {
@@ -860,25 +861,28 @@ where
                     // Last child index in a 0-based array of children.
                     node.child(node.children_len() - 1)
                 };
-                let child = self.load_node(child_addr);
-                self.find_first_or_last(&child, is_first, extract)
+                let child = self.take_or_load_node(child_addr);
+                let new_depth = depth.saturating_add(1);
+                let result = self.find_first_or_last(&child, is_first, new_depth, extract);
+                self.return_node(child, new_depth);
+                result
             }
         }
     }
 
     #[inline(always)]
     fn first_key_inner(&self, node: &Node<K>) -> K {
-        self.find_first_or_last(node, true, |n, i, m| n.key(i, m).clone())
+        self.find_first_or_last(node, true, 0, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
     fn last_key_inner(&self, node: &Node<K>) -> K {
-        self.find_first_or_last(node, false, |n, i, m| n.key(i, m).clone())
+        self.find_first_or_last(node, false, 0, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
     fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.find_first_or_last(node, true, |n, i, m| {
+        self.find_first_or_last(node, true, 0, |n, i, m| {
             let (k, v) = n.get_key_read_value_uncached(i, m);
             (k.clone(), v.to_vec())
         })
@@ -886,7 +890,7 @@ where
 
     #[inline(always)]
     fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.find_first_or_last(node, false, |n, i, m| {
+        self.find_first_or_last(node, false, 0, |n, i, m| {
             let (k, v) = n.get_key_read_value_uncached(i, m);
             (k.clone(), v.to_vec())
         })
