@@ -6,8 +6,14 @@ use super::node::Node;
 /// Node-cache performance metrics.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct NodeCacheMetrics {
-    hits_counter: u64,
-    misses_counter: u64,
+    /// Successful cache lookups.
+    hit_counter: u64,
+
+    /// Misses where the target slot was empty.
+    cold_miss_counter: u64,
+
+    /// Misses where the slot was occupied by a different node.
+    collision_miss_counter: u64,
 }
 
 impl NodeCacheMetrics {
@@ -17,20 +23,34 @@ impl NodeCacheMetrics {
 
     /// Resets all counters to zero.
     pub fn clear_counters(&mut self) {
-        self.hits_counter = 0;
-        self.misses_counter = 0;
+        self.hit_counter = 0;
+        self.cold_miss_counter = 0;
+        self.collision_miss_counter = 0;
     }
 
+    /// Returns the number of successful cache lookups.
     pub fn hits(&self) -> u64 {
-        self.hits_counter
+        self.hit_counter
     }
 
+    /// Returns the number of cache misses where the target slot was empty.
+    pub fn cold_misses(&self) -> u64 {
+        self.cold_miss_counter
+    }
+
+    /// Returns the number of cache misses where the slot was occupied by a different node.
+    pub fn collision_misses(&self) -> u64 {
+        self.collision_miss_counter
+    }
+
+    /// Returns the total number of cache misses.
     pub fn misses(&self) -> u64 {
-        self.misses_counter
+        self.cold_miss_counter + self.collision_miss_counter
     }
 
+    /// Returns the total number of cache lookups (hits + misses).
     pub fn total(&self) -> u64 {
-        self.hits_counter + self.misses_counter
+        self.hit_counter + self.cold_miss_counter + self.collision_miss_counter
     }
 
     /// Returns the hit ratio as a value between 0.0 and 1.0.
@@ -40,16 +60,20 @@ impl NodeCacheMetrics {
         if total == 0 {
             0.0
         } else {
-            self.hits_counter as f64 / total as f64
+            self.hit_counter as f64 / total as f64
         }
     }
 
     fn observe_hit(&mut self) {
-        self.hits_counter += 1;
+        self.hit_counter += 1;
     }
 
-    fn observe_miss(&mut self) {
-        self.misses_counter += 1;
+    fn observe_cold_miss(&mut self) {
+        self.cold_miss_counter += 1;
+    }
+
+    fn observe_collision_miss(&mut self) {
+        self.collision_miss_counter += 1;
     }
 }
 
@@ -135,7 +159,11 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
             slot.address = NULL;
             slot.node.take()
         } else {
-            self.metrics.observe_miss();
+            if slot.node.is_none() {
+                self.metrics.observe_cold_miss();
+            } else {
+                self.metrics.observe_collision_miss();
+            }
             None
         }
     }
