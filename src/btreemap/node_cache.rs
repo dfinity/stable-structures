@@ -106,6 +106,21 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         !self.slots.is_empty()
     }
 
+    pub(super) fn num_slots(&self) -> usize {
+        self.slots.len()
+    }
+
+    pub(super) fn clear(&mut self) {
+        for slot in &mut self.slots {
+            *slot = CacheSlot::empty();
+        }
+        self.metrics.clear_counters();
+    }
+
+    pub(super) fn slot_size() -> usize {
+        std::mem::size_of::<CacheSlot<K>>()
+    }
+
     fn slot_index(&self, addr: Address) -> usize {
         debug_assert!(self.is_enabled());
         (addr.get() / self.page_size as u64) as usize % self.slots.len()
@@ -157,16 +172,5 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
 
     pub(super) fn clear_metrics(&mut self) {
         self.metrics.clear_counters();
-    }
-
-    pub(super) fn clear(&mut self) {
-        for slot in &mut self.slots {
-            *slot = CacheSlot::empty();
-        }
-        self.metrics.clear_counters();
-    }
-
-    pub(super) fn slot_size() -> usize {
-        std::mem::size_of::<CacheSlot<K>>()
     }
 }

@@ -94,7 +94,6 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 /// See [`BTreeMap::with_node_cache`] for guidance on choosing a size.
 const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 0;
 
-
 /// A B-Tree map implementation that stores its data into a designated memory.
 ///
 /// # Memory Implementations
@@ -370,6 +369,11 @@ where
     pub fn node_cache_resize(&mut self, num_slots: usize) {
         self.cache_num_slots = num_slots;
         *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
+    }
+
+    /// Returns the number of slots in the node cache.
+    pub fn node_cache_size(&self) -> usize {
+        self.cache.borrow().num_slots()
     }
 
     /// Evicts all cached nodes and resets metrics, keeping the
