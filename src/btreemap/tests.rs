@@ -1729,8 +1729,7 @@ fn create_btreemap_dump_file() {
     assert_eq!(btree.get(&key), Some(value));
 
     use std::io::prelude::*;
-    let mut file =
-        std::fs::File::create(format!("dumps/btreemap_v{LAYOUT_VERSION}.dump")).unwrap();
+    let mut file = std::fs::File::create(format!("dumps/btreemap_v{LAYOUT_VERSION}.dump")).unwrap();
     file.write_all(&mem.borrow()).unwrap();
 }
 
