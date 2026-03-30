@@ -918,8 +918,7 @@ where
         self.length = 0;
         self.allocator.clear();
         let num_slots = self.cache.get_mut().num_slots();
-        *self.cache.get_mut() =
-            NodeCache::new(self.version.page_size().get(), num_slots);
+        *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
         self.save_header();
     }
 
