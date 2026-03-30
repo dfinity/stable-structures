@@ -1,6 +1,6 @@
 use crate::{
     btreemap::{
-        test::{b, make_memory, run_btree_test},
+        tests::{b, make_memory, run_btree_test},
         BTreeMap,
     },
     storable::Blob,

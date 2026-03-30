@@ -104,7 +104,7 @@ impl<K: Storable + Ord + Clone> Node<K> {
         self.node_type
     }
 
-    pub(crate) fn num_entries(&self) -> usize {
+    pub fn num_entries(&self) -> usize {
         self.entries.len()
     }
 
