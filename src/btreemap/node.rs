@@ -238,36 +238,43 @@ impl<K: Storable + Ord + Clone> Node<K> {
         bytes
     }
 
+    #[inline(always)]
     fn page_size(&self) -> PageSize {
         self.version.page_size()
     }
 
     /// Returns the child's address at the given index.
+    #[inline(always)]
     pub fn child(&self, idx: usize) -> Address {
         self.children[idx]
     }
 
     /// Inserts the given child at the given index.
+    #[inline(always)]
     pub fn insert_child(&mut self, idx: usize, address: Address) {
         self.children.insert(idx, address)
     }
 
     /// Pushes the child to the far right of the node.
+    #[inline(always)]
     pub fn push_child(&mut self, address: Address) {
         self.children.push(address)
     }
 
     /// Removes the child at the given index.
+    #[inline(always)]
     pub fn remove_child(&mut self, idx: usize) -> Address {
         self.children.remove(idx)
     }
 
     /// Returns the number of children in the node.
+    #[inline(always)]
     pub fn children_len(&self) -> usize {
         self.children.len()
     }
 
     /// Pops the right-most child of the node.
+    #[inline(always)]
     pub fn pop_child(&mut self) -> Option<Address> {
         self.children.pop()
     }

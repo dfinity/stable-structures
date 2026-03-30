@@ -682,25 +682,28 @@ where
         }
     }
 
-    fn get_min_or_max<R>(
-        &self,
-        node: &Node<K>,
-        is_min: bool,
-        extract: fn(&Node<K>, usize, &M) -> R,
-    ) -> R {
-        match node.node_type() {
-            NodeType::Leaf => {
-                let idx = if is_min { 0 } else { node.num_entries() - 1 };
-                extract(node, idx, self.memory())
-            }
-            NodeType::Internal => {
-                let child_addr = if is_min {
-                    node.child(0)
-                } else {
-                    node.child(node.children_len() - 1)
-                };
-                let child = self.load_node(child_addr);
-                self.get_min_or_max(&child, is_min, extract)
+    /// Traverses to the min or max leaf and extracts a result using the provided closure.
+    fn get_min_or_max<R, F>(&self, node: &Node<K>, is_min: bool, extract: F) -> R
+    where
+        F: Fn(&Node<K>, usize, &M) -> R,
+    {
+        let mut current;
+        let mut current_ref = node;
+        loop {
+            match current_ref.node_type() {
+                NodeType::Leaf => {
+                    let idx = if is_min { 0 } else { current_ref.num_entries() - 1 };
+                    return extract(current_ref, idx, self.memory());
+                }
+                NodeType::Internal => {
+                    let child_addr = if is_min {
+                        current_ref.child(0)
+                    } else {
+                        current_ref.child(current_ref.children_len() - 1)
+                    };
+                    current = self.load_node(child_addr);
+                    current_ref = &current;
+                }
             }
         }
     }
