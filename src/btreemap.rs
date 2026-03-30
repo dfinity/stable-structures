@@ -313,21 +313,17 @@ where
     ///
     /// The cache is a direct-mapped cache that keeps frequently accessed
     /// B-tree nodes in heap memory to avoid repeated stable-memory reads.
-    /// Each slot can hold one deserialized node; collisions evict the
-    /// previous occupant.
+    /// Each slot can hold one deserialized node; on collision, shallower
+    /// nodes (closer to the root) are kept over deeper ones.
     ///
     /// Pass `0` to disable the cache (the default).
     ///
-    /// A good starting point is **32** — the smallest value that fits the
-    /// top 2 levels of the B-tree (root + its ~11 children) with no
-    /// collisions, giving 2 cache hits per operation regardless of tree
-    /// size.
-    ///
-    /// # Note on cache size
-    ///
-    /// Any value is accepted, but future cache implementations (e.g.
-    /// set-associative) may require power-of-two sizes for efficient
-    /// indexing. Prefer powers of two for forward compatibility.
+    /// The top 2 levels of the tree contain 13 nodes (1 root + up to
+    /// 12 children). **16** slots is the smallest power of two that
+    /// covers them, but a direct-mapped cache is sensitive to address
+    /// collisions, so **32** is a safer default that leaves headroom
+    /// and typically gives 2 cache hits per operation regardless of
+    /// tree size. Prefer powers of two for efficient slot indexing.
     ///
     /// # Examples
     ///
@@ -371,7 +367,9 @@ where
         *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
     }
 
-    /// Returns the number of slots in the node cache.
+    /// Returns the current number of slots in the node cache.
+    ///
+    /// Returns `0` when the cache is disabled.
     pub fn node_cache_size(&self) -> usize {
         self.cache.borrow().num_slots()
     }
@@ -408,25 +406,11 @@ where
         self.cache.borrow().metrics()
     }
 
-    /// Returns an estimate of the cache's heap usage in bytes.
+    /// Returns a rough estimate of the cache's heap usage in bytes.
     ///
-    /// The estimate is `num_slots * (page_size + per_slot_overhead)`.
-    /// Actual usage depends on key size and access patterns:
-    ///
-    /// - **Small keys** (≤ 16 bytes, e.g. `u64`): the estimate is roughly
-    ///   **2×** actual usage, because cached nodes only hold compact keys
-    ///   and child pointers — values are not cached.
-    /// - **Large keys** (> 16 bytes, e.g. 100-byte `String`): keys are
-    ///   lazily loaded into an `OnceCell` during search and remain
-    ///   materialized in the cache, so actual usage can **exceed** this
-    ///   estimate.
-    ///
-    /// For example, with 32 slots and the default 1024-byte page size:
-    /// ~35 KB estimated vs ~17 KB actual (`u64` keys) or ~50 KB actual
-    /// (100-byte `String` keys).
-    ///
-    /// Use this as a rough order-of-magnitude guide, not a precise budget.
-    /// For exact heap profiling, use platform-specific tools.
+    /// Actual usage depends on key size and how many slots are
+    /// occupied. Treat this as an order-of-magnitude guide, not a
+    /// precise budget.
     pub fn node_cache_size_bytes_approx(&self) -> usize {
         self.cache_num_slots
             * (self.version.page_size().get() as usize + NodeCache::<K>::slot_size())
