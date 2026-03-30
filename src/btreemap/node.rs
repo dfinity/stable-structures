@@ -253,7 +253,6 @@ impl<K: Storable + Ord + Clone> Node<K> {
     }
 
     /// Pushes the child to the far right of the node.
-    #[inline(always)]
     pub fn push_child(&mut self, address: Address) {
         self.children.push(address)
     }
