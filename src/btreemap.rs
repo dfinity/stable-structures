@@ -692,7 +692,11 @@ where
         loop {
             match current_ref.node_type() {
                 NodeType::Leaf => {
-                    let idx = if is_min { 0 } else { current_ref.num_entries() - 1 };
+                    let idx = if is_min {
+                        0
+                    } else {
+                        current_ref.num_entries() - 1
+                    };
                     return extract(current_ref, idx, self.memory());
                 }
                 NodeType::Internal => {
