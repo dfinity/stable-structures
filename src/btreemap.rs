@@ -695,7 +695,7 @@ where
                     let idx = if is_min {
                         0
                     } else {
-                        // Index of the last entry (0-based).
+                        // Last entry index in a 0-based array of entries.
                         current_ref.num_entries() - 1
                     };
                     return extract(current_ref, idx, self.memory());
@@ -704,9 +704,8 @@ where
                     let child_addr = if is_min {
                         current_ref.child(0)
                     } else {
-                        // An internal node has num_entries + 1 children,
-                        // so the last child is at index num_entries.
-                        current_ref.child(current_ref.num_entries())
+                        // Last child index in a 0-based array of children.
+                        current_ref.child(current_ref.children_len() - 1)
                     };
                     current = self.load_node(child_addr);
                     current_ref = &current;
