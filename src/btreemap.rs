@@ -682,6 +682,64 @@ where
         }
     }
 
+    /// Traverses to the min or max leaf and extracts a result using the provided closure.
+    fn get_min_or_max<R, F>(&self, node: &Node<K>, is_min: bool, extract: F) -> R
+    where
+        F: Fn(&Node<K>, usize, &M) -> R,
+    {
+        let mut current;
+        let mut current_ref = node;
+        loop {
+            match current_ref.node_type() {
+                NodeType::Leaf => {
+                    let idx = if is_min {
+                        0
+                    } else {
+                        // Last entry index in a 0-based array of entries.
+                        current_ref.num_entries() - 1
+                    };
+                    return extract(current_ref, idx, self.memory());
+                }
+                NodeType::Internal => {
+                    let child_addr = if is_min {
+                        current_ref.child(0)
+                    } else {
+                        // Last child index in a 0-based array of children.
+                        current_ref.child(current_ref.children_len() - 1)
+                    };
+                    current = self.load_node(child_addr);
+                    current_ref = &current;
+                }
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn first_key_inner(&self, node: &Node<K>) -> K {
+        self.get_min_or_max(node, true, |n, i, m| n.key(i, m).clone())
+    }
+
+    #[inline(always)]
+    fn last_key_inner(&self, node: &Node<K>) -> K {
+        self.get_min_or_max(node, false, |n, i, m| n.key(i, m).clone())
+    }
+
+    #[inline(always)]
+    fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
+        self.get_min_or_max(node, true, |n, i, m| {
+            let (k, v) = n.entry(i, m);
+            (k.clone(), v.to_vec())
+        })
+    }
+
+    #[inline(always)]
+    fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
+        self.get_min_or_max(node, false, |n, i, m| {
+            let (k, v) = n.entry(i, m);
+            (k.clone(), v.to_vec())
+        })
+    }
+
     /// Returns `true` if the map contains no elements.
     pub fn is_empty(&self) -> bool {
         self.length == 0
@@ -723,7 +781,7 @@ where
             return None;
         }
         let root = self.load_node(self.root_addr);
-        let (k, encoded_v) = root.get_min(self.memory());
+        let (k, encoded_v) = self.first_entry_inner(&root);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -734,7 +792,7 @@ where
             return None;
         }
         let root = self.load_node(self.root_addr);
-        let (k, encoded_v) = root.get_max(self.memory());
+        let (k, encoded_v) = self.last_entry_inner(&root);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -765,7 +823,7 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let (max_key, _) = root.get_max(self.memory());
+        let max_key = self.last_key_inner(&root);
         self.remove_helper(root, &max_key)
             .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -777,7 +835,7 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let (min_key, _) = root.get_min(self.memory());
+        let min_key = self.first_key_inner(&root);
         self.remove_helper(root, &min_key)
             .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -849,7 +907,7 @@ where
 
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = left_child.get_max(self.memory());
+                            let predecessor = self.last_entry_inner(&left_child);
                             self.remove_helper(left_child, &predecessor.0)?;
 
                             // Replace the `key` with its predecessor.
@@ -884,7 +942,7 @@ where
 
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let successor = right_child.get_min(self.memory());
+                            let successor = self.first_entry_inner(&right_child);
                             self.remove_helper(right_child, &successor.0)?;
 
                             // Replace the `key` with its successor.
