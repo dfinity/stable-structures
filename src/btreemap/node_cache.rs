@@ -151,7 +151,9 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     }
 
     pub(super) fn take(&mut self, addr: Address) -> Option<Node<K>> {
-        debug_assert!(self.is_enabled());
+        if !self.is_enabled() || addr == NULL {
+            return None;
+        }
         let idx = self.slot_index(addr);
         let slot = &mut self.slots[idx];
         if slot.address == addr {
@@ -169,7 +171,9 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     }
 
     pub(super) fn put(&mut self, addr: Address, node: Node<K>, depth: u8) {
-        debug_assert!(self.is_enabled());
+        if !self.is_enabled() {
+            return;
+        }
         let idx = self.slot_index(addr);
         let slot = &mut self.slots[idx];
         // Only evict an existing cached node if the new node is at the
@@ -186,7 +190,9 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
     }
 
     pub(super) fn invalidate(&mut self, addr: Address) {
-        debug_assert!(self.is_enabled());
+        if !self.is_enabled() {
+            return;
+        }
         let idx = self.slot_index(addr);
         let slot = &mut self.slots[idx];
         if slot.address == addr {

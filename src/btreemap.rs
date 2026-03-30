@@ -87,12 +87,14 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
 /// Default number of slots in the direct-mapped node cache.
 ///
-/// The cache is disabled by default (0 slots) to avoid unexpected heap
-/// usage. Users can opt in via [`BTreeMap::with_node_cache`] or
-/// [`BTreeMap::node_cache_resize`].
+/// 16 slots cover the top two tree levels (1 root + up to 12 children =
+/// 13 nodes) while keeping heap usage modest. The depth-aware eviction
+/// policy ensures these upper-level nodes stay cached even under
+/// collisions from deeper traversals.
 ///
-/// See [`BTreeMap::with_node_cache`] for guidance on choosing a size.
-const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 0;
+/// Users can adjust via [`BTreeMap::with_node_cache`] or
+/// [`BTreeMap::node_cache_resize`], including setting to 0 to disable.
+const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 16;
 
 /// A B-Tree map implementation that stores its data into a designated memory.
 ///
@@ -261,10 +263,6 @@ where
     // The number of elements in the map.
     length: u64,
 
-    // Number of slots in the direct-mapped node cache.
-    // Stored so we can recreate the cache with the same configuration on clear().
-    cache_num_slots: usize,
-
     // Direct-mapped node cache to avoid re-loading hot nodes from stable memory.
     cache: RefCell<NodeCache<K>>,
 
@@ -363,7 +361,6 @@ where
     /// }
     /// ```
     pub fn node_cache_resize(&mut self, num_slots: usize) {
-        self.cache_num_slots = num_slots;
         *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
     }
 
@@ -412,7 +409,7 @@ where
     /// occupied. Treat this as an order-of-magnitude guide, not a
     /// precise budget.
     pub fn node_cache_size_bytes_approx(&self) -> usize {
-        self.cache_num_slots
+        self.cache.borrow().num_slots()
             * (self.version.page_size().get() as usize + NodeCache::<K>::slot_size())
     }
 
@@ -485,7 +482,6 @@ where
             ),
             version: Version::V2(page_size),
             length: 0,
-            cache_num_slots: DEFAULT_NODE_CACHE_NUM_SLOTS,
             cache: RefCell::new(NodeCache::new(
                 page_size.get(),
                 DEFAULT_NODE_CACHE_NUM_SLOTS,
@@ -519,7 +515,6 @@ where
             ),
             version,
             length: 0,
-            cache_num_slots: DEFAULT_NODE_CACHE_NUM_SLOTS,
             cache: RefCell::new(NodeCache::new(
                 version.page_size().get(),
                 DEFAULT_NODE_CACHE_NUM_SLOTS,
@@ -573,7 +568,6 @@ where
             allocator: Allocator::load(memory, allocator_addr),
             version,
             length: header.length,
-            cache_num_slots: DEFAULT_NODE_CACHE_NUM_SLOTS,
             cache: RefCell::new(NodeCache::new(
                 version.page_size().get(),
                 DEFAULT_NODE_CACHE_NUM_SLOTS,
@@ -923,8 +917,9 @@ where
         self.root_addr = NULL;
         self.length = 0;
         self.allocator.clear();
+        let num_slots = self.cache.get_mut().num_slots();
         *self.cache.get_mut() =
-            NodeCache::new(self.version.page_size().get(), self.cache_num_slots);
+            NodeCache::new(self.version.page_size().get(), num_slots);
         self.save_header();
     }
 
@@ -1489,13 +1484,11 @@ where
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
         let source_addr = source.address();
         into.merge(source, median, &mut self.allocator);
-        if self.cache_num_slots > 0 {
-            // Node::merge saves `into` and deallocates `source` directly through
-            // the allocator, so we must invalidate both cache slots here.
-            let cache = self.cache.get_mut();
-            cache.invalidate(into.address());
-            cache.invalidate(source_addr);
-        }
+        // Node::merge saves `into` and deallocates `source` directly through
+        // the allocator, so we must invalidate both cache slots here.
+        let cache = self.cache.get_mut();
+        cache.invalidate(into.address());
+        cache.invalidate(source_addr);
         into
     }
 
@@ -1512,9 +1505,7 @@ where
     fn deallocate_node(&mut self, node: Node<K>) {
         let addr = node.address();
         node.deallocate(self.allocator_mut());
-        if self.cache_num_slots > 0 {
-            self.cache.get_mut().invalidate(addr);
-        }
+        self.cache.get_mut().invalidate(addr);
     }
 
     /// Takes a node from the cache, or loads it from memory if not cached.
@@ -1523,10 +1514,8 @@ where
     /// done to put the node back into the cache.
     #[inline(always)]
     fn take_or_load_node(&self, address: Address) -> Node<K> {
-        if self.cache_num_slots > 0 {
-            if let Some(node) = self.cache.borrow_mut().take(address) {
-                return node;
-            }
+        if let Some(node) = self.cache.borrow_mut().take(address) {
+            return node;
         }
         Node::load(address, self.version.page_size(), self.memory())
     }
@@ -1537,9 +1526,7 @@ where
     /// this to prefer keeping shallower nodes on slot collisions.
     #[inline(always)]
     fn return_node(&self, node: Node<K>, depth: u8) {
-        if self.cache_num_slots > 0 {
-            self.cache.borrow_mut().put(node.address(), node, depth);
-        }
+        self.cache.borrow_mut().put(node.address(), node, depth);
     }
 
     /// Loads a node from memory, bypassing the cache.
@@ -1552,9 +1539,7 @@ where
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
         node.save(self.allocator_mut());
-        if self.cache_num_slots > 0 {
-            self.cache.get_mut().invalidate(node.address());
-        }
+        self.cache.get_mut().invalidate(node.address());
     }
 
     /// Replaces the value at `idx` in the node, saves the node, and returns the old value.
