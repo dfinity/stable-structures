@@ -1030,7 +1030,9 @@ pub fn btreemap_v2_get_miss_zipf_10k_u64_u64() -> BenchResult {
     // Generate miss keys, then select from them with Zipf distribution.
     let miss_keys: Vec<u64> = (0..count).map(|_| rng.rand_u64()).collect();
     let zipf = ZipfSampler::new(count, 1.0);
-    let access: Vec<u64> = (0..count).map(|_| miss_keys[zipf.sample(&mut rng)]).collect();
+    let access: Vec<u64> = (0..count)
+        .map(|_| miss_keys[zipf.sample(&mut rng)])
+        .collect();
     bench_fn(|| {
         for key in access {
             btree.get(&key);
