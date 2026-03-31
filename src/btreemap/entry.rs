@@ -1,6 +1,6 @@
 use crate::btreemap::node::{Node, NodeType};
 use crate::{BTreeMap, Memory, Storable};
-use std::borrow::Cow;
+use std::cell::Cell;
 
 pub enum Entry<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> {
     Vacant(VacantEntry<'a, K, V, M>),
@@ -19,6 +19,7 @@ pub struct OccupiedEntry<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M
     pub(crate) key: K,
     pub(crate) node: Node<K>,
     pub(crate) idx: usize,
+    pub(crate) cached_value: Cell<Option<V>>,
 }
 
 impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> Entry<'a, K, V, M> {
@@ -35,6 +36,37 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> Entry<'a, 
             Entry::Vacant(entry) => entry.into_key(),
         }
     }
+
+    pub fn and_modify(self, f: impl FnOnce(&mut V)) -> Self {
+        match self {
+            Entry::Occupied(entry) => Entry::Occupied(entry.and_modify(f)),
+            Entry::Vacant(entry) => Entry::Vacant(entry),
+        }
+    }
+
+    pub fn or_insert(self, default: V) -> OccupiedEntry<'a, K, V, M> {
+        match self {
+            Entry::Occupied(entry) => entry,
+            Entry::Vacant(entry) => entry.insert(default),
+        }
+    }
+
+    pub fn or_insert_with<F: FnOnce() -> V>(self, default: F) -> OccupiedEntry<'a, K, V, M> {
+        match self {
+            Entry::Occupied(entry) => entry,
+            Entry::Vacant(entry) => entry.insert(default()),
+        }
+    }
+
+    pub fn or_default(self) -> OccupiedEntry<'a, K, V, M>
+    where
+        V: Default,
+    {
+        match self {
+            Entry::Occupied(entry) => entry,
+            Entry::Vacant(entry) => entry.insert(Default::default()),
+        }
+    }
 }
 
 impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> VacantEntry<'a, K, V, M> {
@@ -46,13 +78,23 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> VacantEntr
         self.key
     }
 
-    pub fn insert(mut self, value: V) {
-        self.node
-            .insert_entry(self.idx, (self.key, value.into_bytes_checked()));
+    pub fn insert(mut self, value: V) -> OccupiedEntry<'a, K, V, M> {
+        self.node.insert_entry(
+            self.idx,
+            (self.key.clone(), value.to_bytes_checked().into_owned()),
+        );
 
         self.map.save_node(&mut self.node);
         self.map.length += 1;
         self.map.save_header();
+
+        OccupiedEntry {
+            map: self.map,
+            key: self.key,
+            node: self.node,
+            idx: self.idx,
+            cached_value: Cell::new(Some(value)),
+        }
     }
 }
 
@@ -66,8 +108,22 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
     }
 
     pub fn get(&self) -> V {
-        let value_bytes = self.node.value(self.idx, self.map.memory());
-        V::from_bytes(Cow::Borrowed(value_bytes))
+        if let Some(cached) = self.cached_value.take() {
+            cached
+        } else {
+            self.get()
+        }
+    }
+
+    pub fn and_modify(mut self, f: impl FnOnce(&mut V)) -> Self {
+        let mut value = self.get();
+        f(&mut value);
+        self.map.update_value(
+            &mut self.node,
+            self.idx,
+            value.to_bytes_checked().into_owned(),
+        );
+        self
     }
 
     pub fn insert(mut self, value: V) {

@@ -62,6 +62,7 @@ use allocator::Allocator;
 pub use iter::Iter;
 use node::{DerivedPageSize, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -533,6 +534,7 @@ where
                 key,
                 node,
                 idx,
+                cached_value: Cell::default(),
             }),
             Err(idx) => entry::Entry::Vacant(entry::VacantEntry {
                 map: self,
