@@ -88,9 +88,7 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 /// Default number of slots in the direct-mapped node cache.
 ///
 /// 16 slots cover the top two tree levels (1 root + up to 12 children =
-/// 13 nodes) while keeping heap usage modest. The depth-aware eviction
-/// policy ensures these upper-level nodes stay cached even under
-/// collisions from deeper traversals.
+/// 13 nodes) while keeping heap usage modest.
 ///
 /// Users can adjust via [`BTreeMap::with_node_cache`] or
 /// [`BTreeMap::node_cache_resize`], including setting to 0 to disable.
@@ -1521,8 +1519,8 @@ where
 
     /// Returns a node to the cache after use on a read path.
     ///
-    /// `depth` is the distance from the root (root = 0). The cache uses
-    /// this to prefer keeping shallower nodes on slot collisions.
+    /// `depth` is the distance from the root (root = 0), used by the
+    /// cache eviction policy.
     #[inline(always)]
     fn return_node(&self, node: Node<K>, depth: u8) {
         self.cache.borrow_mut().put(node.address(), node, depth);

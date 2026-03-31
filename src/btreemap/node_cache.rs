@@ -81,10 +81,11 @@ impl NodeCacheMetrics {
 struct CacheSlot<K: Storable + Ord + Clone> {
     /// The stable-memory address of the cached node.
     address: Address,
+
     /// The cached node, or `None` if the slot is empty.
     node: Option<Node<K>>,
-    /// Distance from the tree root (root = 0). Used to resolve
-    /// collisions: shallower nodes are kept over deeper ones.
+
+    /// Distance from the tree root (root = 0). Used by the eviction policy.
     depth: u8,
 }
 
@@ -103,10 +104,11 @@ impl<K: Storable + Ord + Clone> CacheSlot<K> {
 /// Each slot is indexed by `(node_address / page_size) % num_slots`.
 /// Collision = eviction (no LRU tracking needed).
 ///
-/// Upper tree levels (root, depth-1) naturally stay cached because their
-/// addresses are stable and map to distinct slots. The depth-aware
-/// eviction policy further guarantees that a deeper node can never
-/// displace a shallower one from a shared slot.
+/// The root node (depth 0) is unconditionally protected — it can evict
+/// any other node but cannot itself be evicted. All other nodes compete
+/// on pure recency (last writer wins), so upper-level nodes stay cached
+/// through natural access frequency while hot leaves and working-set
+/// nodes can displace stale interior nodes.
 pub(super) struct NodeCache<K: Storable + Ord + Clone> {
     slots: Vec<CacheSlot<K>>,
     page_size: u32,
@@ -176,11 +178,12 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         }
         let idx = self.slot_index(addr);
         let slot = &mut self.slots[idx];
-        // Only evict an existing cached node if the new node is at the
-        // same depth or closer to the root (lower depth value).
-        // This keeps upper-level nodes cached even when a deeper node
-        // maps to the same slot.
-        if slot.node.is_none() || depth <= slot.depth {
+        // Always cache into empty slots. The root (depth 0) can evict
+        // anything — it is accessed on every operation. All other nodes
+        // compete on pure recency: a non-root node can evict any other
+        // non-root node. This lets hot leaves and working-set interior
+        // nodes stay cached while stale upper-level nodes get displaced.
+        if slot.node.is_none() || depth == 0 || slot.depth > 0 {
             *slot = CacheSlot {
                 address: addr,
                 node: Some(node),
