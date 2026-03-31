@@ -440,6 +440,23 @@ fn contains_helper<K: TestKey, V: TestValue>(
     })
 }
 
+#[bench(raw)]
+pub fn btreemap_v2_contains_10mib_values() -> BenchResult {
+    let count = 20;
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
+    for (i, value) in values.into_iter().enumerate() {
+        btree.insert(i as u32, value);
+    }
+
+    bench_fn(|| {
+        for i in 0..count {
+            btree.contains_key(&(i as u32));
+        }
+    })
+}
+
 /// Helper macro to generate traversal benchmarks.
 macro_rules! bench_traversal_tests {
     (
