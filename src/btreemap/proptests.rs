@@ -215,29 +215,38 @@ fn entry(
         for (key, operation) in keys.iter().copied().zip(operations.iter().copied()) {
             let entry = btree.entry(key);
             let std_entry = std_map.entry(key);
-            match (entry, std_entry) {
-                (Entry::Occupied(e), btree_map::Entry::Occupied(mut std_e)) => match operation {
-                    0 => {
-                        e.insert(key);
-                        std_e.insert(key);
-                    }
-                    1 => {
-                        let existing = e.get();
-                        let std_existing = *std_e.get();
-                        e.insert(existing.overflowing_add(1).0);
-                        std_e.insert(std_existing.overflowing_add(1).0);
-                    }
-                    2 => {
-                        e.remove();
-                        std_e.remove();
-                    }
-                    _ => unreachable!(),
-                },
-                (Entry::Vacant(e), btree_map::Entry::Vacant(std_e)) => {
-                    e.insert(key);
-                    std_e.insert(key);
+            let occupied = matches!(entry, Entry::Occupied(_));
+            let std_occupied = matches!(std_entry, btree_map::Entry::Occupied(_));
+            assert_eq!(occupied, std_occupied);
+
+            match operation {
+                0 => {
+                    entry.and_modify(|v| *v = key).or_insert(key);
+                    std_entry.and_modify(|v| *v = key).or_insert(key);
                 }
-                _ => prop_assert!(false, "Map out of sync with std lib BTreeMap"),
+                1 => {
+                    entry.and_modify(|v| *v += 1).or_insert(key);
+                    std_entry.and_modify(|v| *v += 1).or_insert(key);
+                }
+                2 => {
+                    match entry {
+                        Entry::Occupied(e) => {
+                            e.remove();
+                        }
+                        Entry::Vacant(e) => {
+                            e.insert(key);
+                        }
+                    }
+                    match std_entry {
+                        btree_map::Entry::Occupied(e) => {
+                            e.remove();
+                        }
+                        btree_map::Entry::Vacant(e) => {
+                            e.insert(key);
+                        }
+                    }
+                }
+                _ => unreachable!(),
             }
         }
 
@@ -378,35 +387,27 @@ fn execute_operation<M: Memory>(
             }
         }
         Operation::EntryInsertOrXor { key, value } => {
-            match std_btree.entry(key.clone()) {
-                btree_map::Entry::Occupied(mut entry) => {
-                    let existing = entry.get().clone();
-                    let xor = existing
+            std_btree
+                .entry(key.clone())
+                .and_modify(|existing| {
+                    *existing = existing
                         .into_iter()
                         .zip(value.clone())
                         .map(|(l, r)| l.bitxor(r))
                         .collect::<Vec<_>>();
-                    entry.insert(xor);
-                }
-                btree_map::Entry::Vacant(entry) => {
-                    entry.insert(value.clone());
-                }
-            };
+                })
+                .or_insert(value.clone());
 
-            match btree.entry(key.clone()) {
-                Entry::Occupied(entry) => {
-                    let existing = entry.get();
-                    let xor = existing
+            btree
+                .entry(key.clone())
+                .and_modify(|existing| {
+                    *existing = existing
                         .into_iter()
                         .zip(value.clone())
                         .map(|(l, r)| l.bitxor(r))
                         .collect::<Vec<_>>();
-                    entry.insert(xor);
-                }
-                Entry::Vacant(entry) => {
-                    entry.insert(value.clone());
-                }
-            }
+                })
+                .or_insert(value);
 
             assert_eq!(btree.get(&key).as_ref(), std_btree.get(&key));
         }
