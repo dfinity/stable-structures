@@ -178,12 +178,14 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         let idx = self.slot_index(addr);
         let slot = &mut self.slots[idx];
         // Always cache into empty slots. Depth 0–1 (root + its children)
-        // are pinned: they can evict anything but cannot themselves be
-        // evicted by deeper nodes — these nodes are hit on every
-        // traversal. Depth 2+ nodes compete on pure recency: any
-        // non-pinned node can evict any other non-pinned node, letting
-        // hot leaves displace stale interior nodes.
-        if slot.node.is_none() || depth <= 1 || slot.depth > 1 {
+        // are pinned: a shallower-or-equal pinned node always wins its
+        // slot, and no unpinned node can displace a pinned one. Among
+        // unpinned nodes (depth 2+), pure recency applies: any unpinned
+        // node can evict any other unpinned node, letting hot leaves
+        // displace stale interior nodes.
+        let dominated = depth <= slot.depth;
+        let both_unpinned = depth > 1 && slot.depth > 1;
+        if slot.node.is_none() || dominated || both_unpinned {
             *slot = CacheSlot {
                 address: addr,
                 node: Some(node),
@@ -209,5 +211,238 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
 
     pub(super) fn clear_metrics(&mut self) {
         self.metrics.clear_counters();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::btreemap::node::{NodeType, PageSize};
+
+    const PAGE_SIZE: u32 = 64;
+    const NUM_SLOTS: usize = 4;
+
+    fn make_cache() -> NodeCache<Vec<u8>> {
+        NodeCache::new(PAGE_SIZE, NUM_SLOTS)
+    }
+
+    /// Creates a leaf node at the given address.
+    fn leaf(addr: u64) -> Node<Vec<u8>> {
+        Node::new_v2(Address::from(addr), NodeType::Leaf, PageSize::Value(512))
+    }
+
+    /// First realistic node address (past allocator header + chunk header).
+    const ADDR_A: u64 = 116;
+    /// Second address that maps to the same cache slot as ADDR_A.
+    const ADDR_B: u64 = ADDR_A + NUM_SLOTS as u64 * PAGE_SIZE as u64;
+
+    /// Returns a pair of non-NULL addresses that map to the same cache slot.
+    fn colliding_pair() -> (Address, Address) {
+        (Address::from(ADDR_A), Address::from(ADDR_B))
+    }
+
+    #[test]
+    fn put_and_take() {
+        let mut cache = make_cache();
+        let addr = Address::from(ADDR_A);
+        cache.put(addr, leaf(ADDR_A), 0);
+        assert!(cache.take(addr).is_some());
+    }
+
+    #[test]
+    fn take_removes_entry() {
+        let mut cache = make_cache();
+        let addr = Address::from(ADDR_A);
+        cache.put(addr, leaf(ADDR_A), 0);
+        cache.take(addr);
+        assert!(cache.take(addr).is_none());
+    }
+
+    #[test]
+    fn take_miss_on_empty_slot() {
+        let mut cache = make_cache();
+        assert!(cache.take(Address::from(ADDR_A)).is_none());
+    }
+
+    #[test]
+    fn take_miss_on_wrong_address() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 2);
+        assert!(cache.take(b).is_none());
+    }
+
+    #[test]
+    fn invalidate_removes_entry() {
+        let mut cache = make_cache();
+        let addr = Address::from(ADDR_A);
+        cache.put(addr, leaf(ADDR_A), 0);
+        cache.invalidate(addr);
+        assert!(cache.take(addr).is_none());
+    }
+
+    #[test]
+    fn invalidate_ignores_wrong_address() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 2);
+        cache.invalidate(b); // different address, same slot
+        assert!(cache.take(a).is_some());
+    }
+
+    #[test]
+    fn depth0_cannot_be_evicted_by_depth1() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 0);
+        cache.put(b, leaf(ADDR_B), 1);
+        // depth-0 node survives
+        assert!(cache.take(a).is_some());
+    }
+
+    #[test]
+    fn depth0_cannot_be_evicted_by_depth2() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 0);
+        cache.put(b, leaf(ADDR_B), 2);
+        assert!(cache.take(a).is_some());
+    }
+
+    #[test]
+    fn depth1_cannot_be_evicted_by_depth2() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 1);
+        cache.put(b, leaf(ADDR_B), 2);
+        assert!(cache.take(a).is_some());
+    }
+
+    #[test]
+    fn depth0_evicts_depth1() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 1);
+        cache.put(b, leaf(ADDR_B), 0);
+        // depth-0 replaced depth-1
+        assert!(cache.take(b).is_some());
+        assert!(cache.take(a).is_none());
+    }
+
+    #[test]
+    fn depth0_evicts_depth2() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 2);
+        cache.put(b, leaf(ADDR_B), 0);
+        assert!(cache.take(b).is_some());
+    }
+
+    #[test]
+    fn depth1_evicts_depth2() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 2);
+        cache.put(b, leaf(ADDR_B), 1);
+        assert!(cache.take(b).is_some());
+    }
+
+    // ---------------------------------------------------------------
+    // Eviction policy: unpinned levels (depth 2+) compete on recency
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn depth3_evicts_depth2() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 2);
+        cache.put(b, leaf(ADDR_B), 3);
+        // recency wins — deeper node replaced shallower
+        assert!(cache.take(b).is_some());
+        assert!(cache.take(a).is_none());
+    }
+
+    #[test]
+    fn depth2_evicts_depth5() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 5);
+        cache.put(b, leaf(ADDR_B), 2);
+        assert!(cache.take(b).is_some());
+    }
+
+    #[test]
+    fn same_depth_evicts() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 3);
+        cache.put(b, leaf(ADDR_B), 3);
+        assert!(cache.take(b).is_some());
+        assert!(cache.take(a).is_none());
+    }
+
+    // ---------------------------------------------------------------
+    // Disabled cache
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn disabled_cache_returns_none() {
+        let mut cache: NodeCache<Vec<u8>> = NodeCache::new(PAGE_SIZE, 0);
+        assert!(!cache.is_enabled());
+        cache.put(Address::from(ADDR_A), leaf(ADDR_A), 0);
+        assert!(cache.take(Address::from(ADDR_A)).is_none());
+    }
+
+    // ---------------------------------------------------------------
+    // NULL address
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn take_null_returns_none() {
+        let mut cache = make_cache();
+        assert!(cache.take(NULL).is_none());
+    }
+
+    // ---------------------------------------------------------------
+    // Metrics
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn metrics_hit() {
+        let mut cache = make_cache();
+        let addr = Address::from(ADDR_A);
+        cache.put(addr, leaf(ADDR_A), 0);
+        cache.take(addr);
+        assert_eq!(cache.metrics().hits(), 1);
+    }
+
+    #[test]
+    fn metrics_cold_miss() {
+        let mut cache = make_cache();
+        cache.take(Address::from(ADDR_A));
+        assert_eq!(cache.metrics().cold_misses(), 1);
+        assert_eq!(cache.metrics().collision_misses(), 0);
+    }
+
+    #[test]
+    fn metrics_collision_miss() {
+        let mut cache = make_cache();
+        let (a, b) = colliding_pair();
+        cache.put(a, leaf(ADDR_A), 2);
+        cache.clear_metrics();
+        cache.take(b); // occupied by a, not b
+        assert_eq!(cache.metrics().collision_misses(), 1);
+        assert_eq!(cache.metrics().cold_misses(), 0);
+    }
+
+    #[test]
+    fn clear_resets_slots_and_metrics() {
+        let mut cache = make_cache();
+        let addr = Address::from(ADDR_A);
+        cache.put(addr, leaf(ADDR_A), 0);
+        cache.take(addr);
+        cache.clear();
+        assert_eq!(cache.metrics().total(), 0);
+        assert!(cache.take(addr).is_none());
     }
 }
