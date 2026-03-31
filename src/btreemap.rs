@@ -62,7 +62,6 @@ use allocator::Allocator;
 pub use iter::Iter;
 use node::{DerivedPageSize, Node, NodeType, PageSize, Version};
 use std::borrow::Cow;
-use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -526,6 +525,19 @@ where
     /// Once you have the entry you can `get` the value, `insert` a new value, or `remove`
     /// the value.
     pub fn entry(&mut self, key: K) -> entry::Entry<K, V, M> {
+        // For an empty map the key is trivially absent.  Avoid calling
+        // `find_node_for_insert` here because that eagerly allocates a root
+        // node and persists `root_addr` to the header, which would leave the
+        // map in an inconsistent state if the returned `VacantEntry` is dropped
+        // without calling `insert`.
+        if self.root_addr == NULL {
+            return entry::Entry::Vacant(entry::VacantEntry {
+                map: self,
+                key,
+                location: None,
+            });
+        }
+
         let (node, search_result) = self.find_node_for_insert(&key);
 
         match search_result {
@@ -534,13 +546,11 @@ where
                 key,
                 node,
                 idx,
-                cached_value: Cell::default(),
             }),
             Err(idx) => entry::Entry::Vacant(entry::VacantEntry {
                 map: self,
                 key,
-                node,
-                idx,
+                location: Some((node, idx)),
             }),
         }
     }
