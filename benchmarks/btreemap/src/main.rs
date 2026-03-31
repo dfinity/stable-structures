@@ -587,44 +587,6 @@ bench_tests! {
     btreemap_v2_pop_last_principal,     pop_last_helper_v2, Principal, Empty;
 }
 
-fn first_key_value_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
-    first_or_last_key_value_helper_v2::<K, V>(Position::First)
-}
-
-fn last_key_value_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
-    first_or_last_key_value_helper_v2::<K, V>(Position::Last)
-}
-
-fn first_or_last_key_value_helper_v2<K: TestKey, V: TestValue>(position: Position) -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    first_or_last_key_value_helper::<K, V>(btree, position)
-}
-
-fn first_or_last_key_value_helper<K: TestKey, V: TestValue>(
-    mut btree: BTreeMap<K, V, impl Memory>,
-    position: Position,
-) -> BenchResult {
-    let count = 10_000;
-    let mut rng = Rng::from_seed(0);
-    let items = generate_random_kv::<K, V>(count, &mut rng);
-    for (k, v) in items {
-        btree.insert(k, v);
-    }
-
-    bench_fn(|| {
-        for _ in 0..count {
-            match position {
-                Position::First => {
-                    btree.first_key_value();
-                }
-                Position::Last => {
-                    btree.last_key_value();
-                }
-            };
-        }
-    })
-}
-
 fn pop_first_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
     pop_helper_v2::<K, V>(Position::First)
 }
