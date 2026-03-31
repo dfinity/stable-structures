@@ -104,11 +104,10 @@ impl<K: Storable + Ord + Clone> CacheSlot<K> {
 /// Each slot is indexed by `(node_address / page_size) % num_slots`.
 /// Collision = eviction (no LRU tracking needed).
 ///
-/// The root node (depth 0) is unconditionally protected — it can evict
-/// any other node but cannot itself be evicted. All other nodes compete
-/// on pure recency (last writer wins), so upper-level nodes stay cached
-/// through natural access frequency while hot leaves and working-set
-/// nodes can displace stale interior nodes.
+/// Nodes at depth 0–1 (root and its immediate children) are pinned:
+/// they can evict any node but cannot be evicted by deeper nodes.
+/// All other nodes compete on pure recency (last writer wins), so
+/// hot leaves and working-set interior nodes can displace stale ones.
 pub(super) struct NodeCache<K: Storable + Ord + Clone> {
     slots: Vec<CacheSlot<K>>,
     page_size: u32,
@@ -178,12 +177,13 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         }
         let idx = self.slot_index(addr);
         let slot = &mut self.slots[idx];
-        // Always cache into empty slots. The root (depth 0) can evict
-        // anything — it is accessed on every operation. All other nodes
-        // compete on pure recency: a non-root node can evict any other
-        // non-root node. This lets hot leaves and working-set interior
-        // nodes stay cached while stale upper-level nodes get displaced.
-        if slot.node.is_none() || depth == 0 || slot.depth > 0 {
+        // Always cache into empty slots. Depth 0–1 (root + its children)
+        // are pinned: they can evict anything but cannot themselves be
+        // evicted by deeper nodes — these nodes are hit on every
+        // traversal. Depth 2+ nodes compete on pure recency: any
+        // non-pinned node can evict any other non-pinned node, letting
+        // hot leaves displace stale interior nodes.
+        if slot.node.is_none() || depth <= 1 || slot.depth > 1 {
             *slot = CacheSlot {
                 address: addr,
                 node: Some(node),
