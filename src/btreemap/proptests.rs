@@ -391,7 +391,7 @@ fn execute_operation<M: Memory>(
                 .entry(key.clone())
                 .and_modify(|existing| {
                     *existing = existing
-                        .into_iter()
+                        .iter()
                         .zip(value.clone())
                         .map(|(l, r)| l.bitxor(r))
                         .collect::<Vec<_>>();
@@ -402,7 +402,7 @@ fn execute_operation<M: Memory>(
                 .entry(key.clone())
                 .and_modify(|existing| {
                     *existing = existing
-                        .into_iter()
+                        .iter()
                         .zip(value.clone())
                         .map(|(l, r)| l.bitxor(r))
                         .collect::<Vec<_>>();
