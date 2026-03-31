@@ -890,4 +890,152 @@ pub fn btreemap_v2_range_small_u64_u64() -> BenchResult {
     })
 }
 
+// --- Zipf-distributed benchmarks (realistic skewed access patterns) ---
+
+/// Precomputed inverse-CDF table for Zipf sampling.
+/// `sample()` returns a 0-based index in [0, n).
+struct ZipfSampler {
+    cdf: Vec<f64>,
+}
+
+impl ZipfSampler {
+    fn new(n: usize, alpha: f64) -> Self {
+        let mut cdf = Vec::with_capacity(n);
+        let mut sum = 0.0;
+        for k in 1..=n {
+            sum += 1.0 / (k as f64).powf(alpha);
+            cdf.push(sum);
+        }
+        // Normalize to [0, 1].
+        let total = sum;
+        for v in &mut cdf {
+            *v /= total;
+        }
+        Self { cdf }
+    }
+
+    fn sample(&self, rng: &mut Rng) -> usize {
+        let u = rng.rand_f64();
+        // Binary search for the first CDF entry >= u.
+        match self.cdf.binary_search_by(|v| v.partial_cmp(&u).unwrap()) {
+            Ok(i) => i,
+            Err(i) => i.min(self.cdf.len() - 1),
+        }
+    }
+}
+
+// Zipf get on 10K tree, α=1.0 (classic Zipf's law).
+// A small fraction of keys receive most accesses — cache should help significantly.
+#[bench(raw)]
+pub fn btreemap_v2_get_zipf_10k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let access: Vec<u64> = (0..count).map(|_| keys[zipf.sample(&mut rng)]).collect();
+    bench_fn(|| {
+        for key in access {
+            btree.get(&key);
+        }
+    })
+}
+
+// Zipf get on 100K tree, α=1.0.
+// Deeper tree (depth 5-6) where cache covers a smaller fraction — Zipf locality compensates.
+#[bench(raw)]
+pub fn btreemap_v2_get_zipf_100k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 100_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let access: Vec<u64> = (0..count).map(|_| keys[zipf.sample(&mut rng)]).collect();
+    bench_fn(|| {
+        for key in access {
+            btree.get(&key);
+        }
+    })
+}
+
+// Zipf get on 10K tree, α=1.5 (heavy skew — top ~1% of keys get ~90% of accesses).
+// Shows cache near its best: hot paths stay resident.
+#[bench(raw)]
+pub fn btreemap_v2_get_zipf_heavy_10k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.5);
+    let access: Vec<u64> = (0..count).map(|_| keys[zipf.sample(&mut rng)]).collect();
+    bench_fn(|| {
+        for key in access {
+            btree.get(&key);
+        }
+    })
+}
+
+// Zipf overwrites on 10K tree, α=1.0.
+// Hot keys are updated frequently — tests cache invalidation under skewed writes.
+#[bench(raw)]
+pub fn btreemap_v2_insert_overwrite_zipf_10k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let overwrites: Vec<(u64, u64)> = (0..count)
+        .map(|_| (keys[zipf.sample(&mut rng)], rng.rand_u64()))
+        .collect();
+    bench_fn(|| {
+        for (k, v) in overwrites {
+            btree.insert(k, v);
+        }
+    })
+}
+
+// Zipf misses on 10K tree, α=1.0.
+// Hot missing keys repeatedly traverse the same tree paths without finding a match.
+// Pure traversal cost — cache benefit is proportionally larger with no value-read cost.
+#[bench(raw)]
+pub fn btreemap_v2_get_miss_zipf_10k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    // Generate miss keys, then select from them with Zipf distribution.
+    let miss_keys: Vec<u64> = (0..count).map(|_| rng.rand_u64()).collect();
+    let zipf = ZipfSampler::new(count, 1.0);
+    let access: Vec<u64> = (0..count).map(|_| miss_keys[zipf.sample(&mut rng)]).collect();
+    bench_fn(|| {
+        for key in access {
+            btree.get(&key);
+        }
+    })
+}
+
 fn main() {}
