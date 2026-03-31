@@ -889,48 +889,4 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
     })
 }
 
-// --- Cached (32-slot) variants ---
-//
-// These duplicate a representative subset of benchmarks with a 32-slot
-// direct-mapped node cache enabled, so the effect of caching can be
-// compared against the default (cache disabled) results above.
-
-fn insert_helper_v2_cached_32entry<K: TestKey, V: TestValue>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(32);
-    insert_helper::<K, V>(btree)
-}
-
-fn get_helper_v2_cached_32entry<K: TestKey, V: TestValue>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(32);
-    get_helper::<K, V>(btree)
-}
-
-fn remove_helper_v2_cached_32entry<K: TestKey, V: TestValue>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(32);
-    remove_helper::<K, V>(btree)
-}
-
-fn contains_helper_v2_cached_32entry<K: TestKey, V: TestValue>() -> BenchResult {
-    let btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(32);
-    contains_helper::<K, V>(btree)
-}
-
-bench_tests! {
-    btreemap_v2_insert_u64_u64_cached_32entry,       insert_helper_v2_cached_32entry,   u64,   u64;
-    btreemap_v2_insert_blob_32_128_cached_32entry,   insert_helper_v2_cached_32entry, Blob32, Blob128;
-    btreemap_v2_insert_vec_32_128_cached_32entry,    insert_helper_v2_cached_32entry, UnboundedVecN32, UnboundedVecN128;
-
-    btreemap_v2_get_u64_u64_cached_32entry,          get_helper_v2_cached_32entry,      u64,   u64;
-    btreemap_v2_get_blob_32_128_cached_32entry,      get_helper_v2_cached_32entry,    Blob32, Blob128;
-    btreemap_v2_get_vec_32_128_cached_32entry,       get_helper_v2_cached_32entry,   UnboundedVecN32, UnboundedVecN128;
-
-    btreemap_v2_remove_u64_u64_cached_32entry,       remove_helper_v2_cached_32entry,   u64,   u64;
-    btreemap_v2_remove_blob_32_128_cached_32entry,   remove_helper_v2_cached_32entry, Blob32, Blob128;
-    btreemap_v2_remove_vec_32_128_cached_32entry,    remove_helper_v2_cached_32entry, UnboundedVecN32, UnboundedVecN128;
-
-    btreemap_v2_contains_u64_u64_cached_32entry,     contains_helper_v2_cached_32entry,   u64,   u64;
-    btreemap_v2_contains_blob_32_128_cached_32entry, contains_helper_v2_cached_32entry, Blob32, Blob128;
-    btreemap_v2_contains_vec_32_128_cached_32entry,  contains_helper_v2_cached_32entry, UnboundedVecN32, UnboundedVecN128;
-}
-
 fn main() {}

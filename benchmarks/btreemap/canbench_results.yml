@@ -62,13 +62,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_v2_contains_blob_32_128_cached_32entry:
-    total:
-      calls: 1
-      instructions: 227531804
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_v2_contains_blob_32_16:
     total:
       calls: 1
@@ -167,13 +160,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_v2_contains_u64_u64_cached_32entry:
-    total:
-      calls: 1
-      instructions: 156934212
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_v2_contains_u64_vec8:
     total:
       calls: 1
@@ -234,13 +220,6 @@ benches:
     total:
       calls: 1
       instructions: 293090409
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_v2_contains_vec_32_128_cached_32entry:
-    total:
-      calls: 1
-      instructions: 275581501
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -447,13 +426,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_v2_get_blob_32_128_cached_32entry:
-    total:
-      calls: 1
-      instructions: 232190576
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_v2_get_blob_32_16:
     total:
       calls: 1
@@ -552,13 +524,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_v2_get_u64_u64_cached_32entry:
-    total:
-      calls: 1
-      instructions: 161625639
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_v2_get_u64_vec8:
     total:
       calls: 1
@@ -619,13 +584,6 @@ benches:
     total:
       calls: 1
       instructions: 299430441
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_v2_get_vec_32_128_cached_32entry:
-    total:
-      calls: 1
-      instructions: 282068824
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -769,13 +727,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 28
     scopes: {}
-  btreemap_v2_insert_blob_32_128_cached_32entry:
-    total:
-      calls: 1
-      instructions: 548695845
-      heap_increase: 0
-      stable_memory_increase: 28
-    scopes: {}
   btreemap_v2_insert_blob_32_16:
     total:
       calls: 1
@@ -874,13 +825,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 6
     scopes: {}
-  btreemap_v2_insert_u64_u64_cached_32entry:
-    total:
-      calls: 1
-      instructions: 420091297
-      heap_increase: 0
-      stable_memory_increase: 6
-    scopes: {}
   btreemap_v2_insert_u64_vec8:
     total:
       calls: 1
@@ -941,13 +885,6 @@ benches:
     total:
       calls: 1
       instructions: 757469321
-      heap_increase: 0
-      stable_memory_increase: 33
-    scopes: {}
-  btreemap_v2_insert_vec_32_128_cached_32entry:
-    total:
-      calls: 1
-      instructions: 763310125
       heap_increase: 0
       stable_memory_increase: 33
     scopes: {}
@@ -1945,13 +1882,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_v2_remove_blob_32_128_cached_32entry:
-    total:
-      calls: 1
-      instructions: 754775213
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_v2_remove_blob_32_16:
     total:
       calls: 1
@@ -2050,13 +1980,6 @@ benches:
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
-  btreemap_v2_remove_u64_u64_cached_32entry:
-    total:
-      calls: 1
-      instructions: 597566884
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
   btreemap_v2_remove_u64_vec8:
     total:
       calls: 1
@@ -2117,13 +2040,6 @@ benches:
     total:
       calls: 1
       instructions: 1040270284
-      heap_increase: 0
-      stable_memory_increase: 0
-    scopes: {}
-  btreemap_v2_remove_vec_32_128_cached_32entry:
-    total:
-      calls: 1
-      instructions: 1039488275
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
