@@ -30,6 +30,7 @@
 use crate::btreemap::node::{Node, NodeType};
 use crate::{BTreeMap, Memory, Storable};
 use std::borrow::Cow;
+use std::marker::PhantomData;
 
 /// A view into a single entry of a [`BTreeMap`], which may either be occupied or vacant.
 ///
@@ -64,6 +65,11 @@ pub struct OccupiedEntry<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M
     pub(crate) key: K,
     pub(crate) node: Node<K>,
     pub(crate) idx: usize,
+}
+
+pub struct LazyValue<T: Storable> {
+    bytes: Vec<u8>,
+    phantom_data: PhantomData<T>,
 }
 
 impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> Entry<'a, K, V, M> {
@@ -133,10 +139,7 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> Entry<'a, 
     /// map.entry(7).or_insert_with_key(|&k| k * 2);
     /// assert_eq!(map.get(&7), Some(14));
     /// ```
-    pub fn or_insert_with_key(
-        self,
-        default: impl FnOnce(&K) -> V,
-    ) -> OccupiedEntry<'a, K, V, M> {
+    pub fn or_insert_with_key(self, default: impl FnOnce(&K) -> V) -> OccupiedEntry<'a, K, V, M> {
         match self {
             Entry::Occupied(entry) => entry,
             Entry::Vacant(entry) => {
@@ -229,7 +232,12 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> VacantEntr
                 map.insert(key.clone(), value);
                 let (node, result) = map.find_node_for_insert(&key);
                 let idx = result.expect("key was just inserted");
-                OccupiedEntry { map, key, node, idx }
+                OccupiedEntry {
+                    map,
+                    key,
+                    node,
+                    idx,
+                }
             }
         }
     }
@@ -294,11 +302,11 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
     /// }
     /// assert_eq!(map.get(&1), Some(99));
     /// ```
-    pub fn insert(mut self, value: V) -> V {
+    pub fn insert(mut self, value: V) -> LazyValue<V> {
         let old_bytes = self
             .map
             .update_value(&mut self.node, self.idx, value.into_bytes_checked());
-        V::from_bytes(Cow::Owned(old_bytes))
+        LazyValue::new(old_bytes)
     }
 
     /// Removes the entry from the map and returns the value that was stored.
@@ -316,13 +324,13 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
     /// }
     /// assert!(map.is_empty());
     /// ```
-    pub fn remove(self) -> V {
+    pub fn remove(self) -> LazyValue<V> {
         let bytes = match self.node.node_type() {
             NodeType::Leaf if self.node.can_remove_entry_without_merging() => {
                 self.map.remove_from_leaf_node(self.node, self.idx)
             }
             NodeType::Leaf => {
-                // TODO: avoid this slow path by walking the tree upward from the leaf.
+                // TODO: avoid this slow path
                 let root = self.map.load_node(self.map.root_addr);
                 self.map
                     .remove_helper(root, &self.key)
@@ -332,7 +340,20 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
                 .map
                 .remove_from_internal_node(self.node, self.idx, &self.key),
         };
-        V::from_bytes(Cow::Owned(bytes))
+        LazyValue::new(bytes)
+    }
+}
+
+impl<T: Storable> LazyValue<T> {
+    pub fn new(bytes: Vec<u8>) -> Self {
+        LazyValue {
+            bytes,
+            phantom_data: PhantomData,
+        }
+    }
+
+    pub fn into_value(self) -> T {
+        T::from_bytes(Cow::Owned(self.bytes))
     }
 }
 
@@ -362,7 +383,7 @@ mod tests {
                 panic!();
             };
             assert_eq!(i, e.get());
-            let old = e.insert(i + 1);
+            let old = e.insert(i + 1).into_value();
             assert_eq!(old, i);
         }
 
@@ -371,7 +392,7 @@ mod tests {
                 panic!();
             };
             assert_eq!(i + 1, e.get());
-            let removed = e.remove();
+            let removed = e.remove().into_value();
             assert_eq!(removed, i + 1);
         }
 
@@ -452,7 +473,7 @@ mod tests {
         let Entry::Occupied(e) = map.entry(1) else {
             panic!();
         };
-        assert_eq!(e.insert(99), 10);
+        assert_eq!(e.insert(99).into_value(), 10);
         assert_eq!(map.get(&1), Some(99));
     }
 
@@ -463,7 +484,7 @@ mod tests {
         let Entry::Occupied(e) = map.entry(1) else {
             panic!();
         };
-        assert_eq!(e.remove(), 42);
+        assert_eq!(e.remove().into_value(), 42);
         assert!(map.is_empty());
     }
 
