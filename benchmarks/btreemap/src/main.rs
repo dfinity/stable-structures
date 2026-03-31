@@ -737,4 +737,140 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
     })
 }
 
+// --- Benchmarks for deeper trees and realistic access patterns ---
+
+// 100K benchmarks: tests depth 5-6 tree where cache covers a smaller fraction of node loads.
+#[bench(raw)]
+pub fn btreemap_v2_insert_100k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 100_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+
+    bench_fn(|| {
+        for (k, v) in items {
+            btree.insert(k, v);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_100k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 100_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let keys: Vec<u64> = items.into_iter().map(|(k, _)| k).collect();
+    bench_fn(|| {
+        for key in keys {
+            btree.get(&key);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_remove_100k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 100_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let keys: Vec<u64> = items.into_iter().map(|(k, _)| k).collect();
+    bench_fn(|| {
+        for key in keys {
+            btree.remove(&key);
+        }
+    })
+}
+
+// Update existing keys: insert 10K items, then re-insert all with new values.
+// Tests the overwrite path (traverse cached nodes → replace value → invalidate leaf).
+#[bench(raw)]
+pub fn btreemap_v2_insert_overwrite_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    // Re-insert with different values.
+    let new_items: Vec<(u64, u64)> = items
+        .into_iter()
+        .map(|(k, _)| (k, rng.rand_u64()))
+        .collect();
+    bench_fn(|| {
+        for (k, v) in new_items {
+            btree.insert(k, v);
+        }
+    })
+}
+
+// Get keys that are NOT in the map: pure traversal to leaf, no value deserialization.
+// Cache impact is proportionally larger since there's no value-read cost.
+#[bench(raw)]
+pub fn btreemap_v2_get_miss_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    // Generate keys that are very unlikely to collide with inserted ones.
+    let miss_keys: Vec<u64> = (0..count).map(|_| rng.rand_u64()).collect();
+    bench_fn(|| {
+        for key in miss_keys {
+            btree.get(&key);
+        }
+    })
+}
+
+// Sequential key insertion: monotonically increasing u64 keys.
+// Always appends to rightmost leaf, same path cached, but frequent splits.
+#[bench(raw)]
+pub fn btreemap_v2_insert_seq_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000u64;
+    let mut rng = Rng::from_seed(0);
+
+    // Sequential keys, random values.
+    let items: Vec<(u64, u64)> = (0..count).map(|i| (i, rng.rand_u64())).collect();
+    bench_fn(|| {
+        for (k, v) in items {
+            btree.insert(k, v);
+        }
+    })
+}
+
+// Small repeated range queries: insert 10K, then do 100 range queries each returning ~100 entries.
+// The seek-to-start is a full traversal (cache helps), iteration is sequential I/O.
+#[bench(raw)]
+pub fn btreemap_v2_range_small_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000u64;
+    for i in 0..count {
+        btree.insert(i, i);
+    }
+
+    bench_fn(|| {
+        // 100 range queries, each spanning 100 entries, at different offsets.
+        for start in (0..count).step_by(100) {
+            let end = start + 100;
+            for entry in btree.range(start..end) {
+                let _ = entry.value();
+            }
+        }
+    })
+}
+
 fn main() {}
