@@ -67,6 +67,31 @@ pub struct OccupiedEntry<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M
     pub(crate) idx: usize,
 }
 
+/// A value returned by [`OccupiedEntry::insert`] or [`OccupiedEntry::remove`] that has not
+/// yet been deserialised.
+///
+/// Deserialisation is deferred so that callers who do not need the previous value pay no
+/// decode cost. Call [`into_value`](LazyValue::into_value) to obtain the concrete `T`.
+///
+/// # Examples
+///
+/// ```rust
+/// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl, btreemap::entry::Entry};
+///
+/// let mut map: BTreeMap<u32, u32, _> = BTreeMap::new(DefaultMemoryImpl::default());
+/// map.insert(1, 10);
+///
+/// if let Entry::Occupied(e) = map.entry(1) {
+///     // Discard the old value without deserialising it.
+///     let _old: _ = e.insert(99);
+/// }
+///
+/// if let Entry::Occupied(e) = map.entry(1) {
+///     // Deserialise only when the value is actually needed.
+///     let old_value = e.insert(0).into_value();
+///     assert_eq!(old_value, 99);
+/// }
+/// ```
 pub struct LazyValue<T: Storable> {
     bytes: Vec<u8>,
     phantom_data: PhantomData<T>,
@@ -286,7 +311,8 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
         self
     }
 
-    /// Replaces the current value with `value` and returns the previous value.
+    /// Replaces the current value with `value` and returns the previous value as a
+    /// [`LazyValue`], which is only deserialised if you call [`LazyValue::into_value`].
     ///
     /// # Examples
     ///
@@ -297,7 +323,7 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
     /// map.insert(1, 10);
     ///
     /// if let Entry::Occupied(e) = map.entry(1) {
-    ///     let old = e.insert(99);
+    ///     let old = e.insert(99).into_value();
     ///     assert_eq!(old, 10);
     /// }
     /// assert_eq!(map.get(&1), Some(99));
@@ -309,7 +335,8 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
         LazyValue::new(old_bytes)
     }
 
-    /// Removes the entry from the map and returns the value that was stored.
+    /// Removes the entry from the map and returns the stored value as a [`LazyValue`], which
+    /// is only deserialised if you call [`LazyValue::into_value`].
     ///
     /// # Examples
     ///
@@ -320,7 +347,7 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
     /// map.insert(1, 42);
     ///
     /// if let Entry::Occupied(e) = map.entry(1) {
-    ///     assert_eq!(e.remove(), 42);
+    ///     assert_eq!(e.remove().into_value(), 42);
     /// }
     /// assert!(map.is_empty());
     /// ```
@@ -345,13 +372,14 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
 }
 
 impl<T: Storable> LazyValue<T> {
-    pub fn new(bytes: Vec<u8>) -> Self {
+    pub(crate) fn new(bytes: Vec<u8>) -> Self {
         LazyValue {
             bytes,
             phantom_data: PhantomData,
         }
     }
 
+    /// Deserialises and returns the value.
     pub fn into_value(self) -> T {
         T::from_bytes(Cow::Owned(self.bytes))
     }

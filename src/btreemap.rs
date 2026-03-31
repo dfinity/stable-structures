@@ -519,11 +519,47 @@ where
         }
     }
 
-    /// Searches for the entry within the map where the key belongs.
-    /// The value returned is either a `VacantEntry` (if the key doesn't already exist), or an
-    /// `OccupiedEntry` (if the key does exist).
-    /// Once you have the entry you can `get` the value, `insert` a new value, or `remove`
-    /// the value.
+    /// Gets an [`Entry`](entry::Entry) for the given `key`, which gives efficient in-place access
+    /// to a map's entries, allowing inspection or modification without redundant key lookups. The
+    /// API mirrors [`std::collections::btree_map::Entry`] as closely as the stable-memory model
+    /// allows.
+    ///
+    /// Returns [`Entry::Occupied`](entry::Entry::Occupied) when `key` is already present, or
+    /// [`Entry::Vacant`](entry::Entry::Vacant) when it is not. Both variants expose methods to
+    /// read, overwrite, or remove the value.
+    ///
+    /// # Differences from `std::collections::BTreeMap::entry`
+    ///
+    /// The standard library's `or_insert` returns `&mut V`, giving a direct reference into the
+    /// map. Because values live in stable memory, long-lived references are not possible here.
+    /// Instead, `or_insert` (and its variants) return an [`OccupiedEntry`](entry::OccupiedEntry),
+    /// which lets you continue operating on the entry without a second key lookup.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u32, u32, _> = BTreeMap::new(DefaultMemoryImpl::default());
+    ///
+    /// // Insert a default value when the key is absent, then read it back.
+    /// let val = map.entry(1).or_insert(0).get();
+    /// assert_eq!(val, 0);
+    ///
+    /// // Increment a counter, seeding it to 1 when first seen.
+    /// for key in [1, 1, 2, 3, 1] {
+    ///     map.entry(key).and_modify(|v| *v += 1).or_insert(1);
+    /// }
+    /// assert_eq!(map.get(&1), Some(3));
+    /// assert_eq!(map.get(&2), Some(1));
+    /// assert_eq!(map.get(&3), Some(1));
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`entry::Entry`] — the type returned by this method
+    /// - [`entry::OccupiedEntry`] — methods available when the key is present
+    /// - [`entry::VacantEntry`] — methods available when the key is absent
     pub fn entry(&mut self, key: K) -> entry::Entry<K, V, M> {
         // For an empty map the key is trivially absent.  Avoid calling
         // `find_node_for_insert` here because that eagerly allocates a root
