@@ -67,7 +67,7 @@ fn generate_random_blocks(count: usize, block_size: usize, rng: &mut Rng) -> Vec
         .collect()
 }
 
-// Benchmarks for `BTreeMap::insert`.
+// Benchmarks for `BTreeMap::insert`, full grid.
 bench_tests! {
     // blob K x 128
     btreemap_v2_insert_blob_4_128,    insert_helper_v2,    Blob4, Blob128;
@@ -172,7 +172,7 @@ pub fn btreemap_v2_insert_10mib_values() -> BenchResult {
     })
 }
 
-// Benchmarks for `BTreeMap::remove`.
+// Benchmarks for `BTreeMap::remove`, full grid.
 bench_tests! {
     // blob K x 128
     btreemap_v2_remove_blob_4_128,    remove_helper_v2,    Blob4, Blob128;
@@ -284,7 +284,7 @@ pub fn btreemap_v2_remove_10mib_values() -> BenchResult {
     })
 }
 
-// Benchmarks for `BTreeMap::get`.
+// Benchmarks for `BTreeMap::get`, full grid.
 bench_tests! {
     // blob K x 128
     btreemap_v2_get_blob_4_128,    get_helper_v2,    Blob4, Blob128;
@@ -397,79 +397,26 @@ pub fn btreemap_v2_get_10mib_values() -> BenchResult {
 }
 
 // Benchmarks for `BTreeMap::contains_key`.
+// Reduced grid: contains_key traversal is identical to get, only skips value deserialization.
 bench_tests! {
-    // blob K x 128
-    btreemap_v2_contains_blob_4_128,    contains_helper_v2,    Blob4, Blob128;
-    btreemap_v2_contains_blob_8_128,    contains_helper_v2,    Blob8, Blob128;
-    btreemap_v2_contains_blob_16_128,   contains_helper_v2,   Blob16, Blob128;
-    btreemap_v2_contains_blob_32_128,   contains_helper_v2,   Blob32, Blob128;
-    btreemap_v2_contains_blob_64_128,   contains_helper_v2,   Blob64, Blob128;
-    btreemap_v2_contains_blob_128_128,  contains_helper_v2,  Blob128, Blob128;
-    btreemap_v2_contains_blob_256_128,  contains_helper_v2,  Blob256, Blob128;
-    btreemap_v2_contains_blob_512_128,  contains_helper_v2,  Blob512, Blob128;
-    btreemap_v2_contains_blob_1024_128, contains_helper_v2, Blob1024, Blob128;
+    // key size variation (fixed Blob128 value)
+    btreemap_v2_contains_blob_8_128,    contains_helper_v2,   Blob8, Blob128;
+    btreemap_v2_contains_blob_32_128,   contains_helper_v2,  Blob32, Blob128;
+    btreemap_v2_contains_blob_256_128,  contains_helper_v2, Blob256, Blob128;
+    btreemap_v2_contains_vec_32_128,    contains_helper_v2, UnboundedVecN32, UnboundedVecN128;
 
-    // blob 32 x V
-    btreemap_v2_contains_blob_32_0,    contains_helper_v2, Blob32,    Empty;
-    btreemap_v2_contains_blob_32_4,    contains_helper_v2, Blob32,    Blob4;
-    btreemap_v2_contains_blob_32_8,    contains_helper_v2, Blob32,    Blob8;
-    btreemap_v2_contains_blob_32_16,   contains_helper_v2, Blob32,   Blob16;
-    btreemap_v2_contains_blob_32_32,   contains_helper_v2, Blob32,   Blob32;
-    btreemap_v2_contains_blob_32_64,   contains_helper_v2, Blob32,   Blob64;
-    //btreemap_v2_contains_blob_32_128,  contains_helper_v2, Blob32,  Blob128;  // Skip repeated.
-    btreemap_v2_contains_blob_32_256,  contains_helper_v2, Blob32,  Blob256;
-    btreemap_v2_contains_blob_32_512,  contains_helper_v2, Blob32,  Blob512;
-    btreemap_v2_contains_blob_32_1024, contains_helper_v2, Blob32, Blob1024;
+    // value size variation (fixed Blob32 key)
+    btreemap_v2_contains_blob_32_0,     contains_helper_v2, Blob32,    Empty;
+    btreemap_v2_contains_blob_32_1024,  contains_helper_v2, Blob32, Blob1024;
+    btreemap_v2_contains_vec_32_vec128, contains_helper_v2, UnboundedVecN32, UnboundedVecN128;
 
-    // vec K x 128
-    btreemap_v2_contains_vec_4_128,    contains_helper_v2,    UnboundedVecN4, UnboundedVecN128;
-    btreemap_v2_contains_vec_8_128,    contains_helper_v2,    UnboundedVecN8, UnboundedVecN128;
-    btreemap_v2_contains_vec_16_128,   contains_helper_v2,   UnboundedVecN16, UnboundedVecN128;
-    btreemap_v2_contains_vec_32_128,   contains_helper_v2,   UnboundedVecN32, UnboundedVecN128;
-    btreemap_v2_contains_vec_64_128,   contains_helper_v2,   UnboundedVecN64, UnboundedVecN128;
-    btreemap_v2_contains_vec_128_128,  contains_helper_v2,  UnboundedVecN128, UnboundedVecN128;
-    btreemap_v2_contains_vec_256_128,  contains_helper_v2,  UnboundedVecN256, UnboundedVecN128;
-    btreemap_v2_contains_vec_512_128,  contains_helper_v2,  UnboundedVecN512, UnboundedVecN128;
-    btreemap_v2_contains_vec_1024_128, contains_helper_v2, UnboundedVecN1024, UnboundedVecN128;
-
-    // vec 32 x V
-    btreemap_v2_contains_vec_32_0,    contains_helper_v2, UnboundedVecN32,             Empty;
-    btreemap_v2_contains_vec_32_4,    contains_helper_v2, UnboundedVecN32,    UnboundedVecN4;
-    btreemap_v2_contains_vec_32_8,    contains_helper_v2, UnboundedVecN32,    UnboundedVecN8;
-    btreemap_v2_contains_vec_32_16,   contains_helper_v2, UnboundedVecN32,   UnboundedVecN16;
-    btreemap_v2_contains_vec_32_32,   contains_helper_v2, UnboundedVecN32,   UnboundedVecN32;
-    btreemap_v2_contains_vec_32_64,   contains_helper_v2, UnboundedVecN32,   UnboundedVecN64;
-    //btreemap_v2_contains_vec_32_128,  contains_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
-    btreemap_v2_contains_vec_32_256,  contains_helper_v2, UnboundedVecN32,  UnboundedVecN256;
-    btreemap_v2_contains_vec_32_512,  contains_helper_v2, UnboundedVecN32,  UnboundedVecN512;
-    btreemap_v2_contains_vec_32_1024, contains_helper_v2, UnboundedVecN32, UnboundedVecN1024;
-
-    // u64 / blob8 / vec8
-    btreemap_v2_contains_u64_u64,        contains_helper_v2,            u64,            u64;
-    btreemap_v2_contains_u64_blob8,      contains_helper_v2,            u64,          Blob8;
-    btreemap_v2_contains_blob8_u64,      contains_helper_v2,          Blob8,            u64;
-    btreemap_v2_contains_u64_vec8,       contains_helper_v2,            u64, UnboundedVecN8;
-    btreemap_v2_contains_vec8_u64,       contains_helper_v2, UnboundedVecN8,            u64;
-
-    // Principal
-    btreemap_v2_contains_principal,      contains_helper_v2, Principal, Empty;
-
-    // memory manager u64 / blob512 / vec512
-    btreemap_v2_mem_manager_contains_u64_u64,      contains_helper_v2_mem_manager,              u64,              u64;
-    btreemap_v2_mem_manager_contains_u64_blob512,  contains_helper_v2_mem_manager,              u64,          Blob512;
-    btreemap_v2_mem_manager_contains_blob512_u64,  contains_helper_v2_mem_manager,          Blob512,              u64;
-    btreemap_v2_mem_manager_contains_u64_vec512,   contains_helper_v2_mem_manager,              u64, UnboundedVecN512;
-    btreemap_v2_mem_manager_contains_vec512_u64,   contains_helper_v2_mem_manager, UnboundedVecN512,              u64;
+    // common types
+    btreemap_v2_contains_u64_u64,       contains_helper_v2, u64, u64;
+    btreemap_v2_contains_principal,     contains_helper_v2, Principal, Empty;
 }
 
 fn contains_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
     let btree = BTreeMap::new(DefaultMemoryImpl::default());
-    contains_helper::<K, V>(btree)
-}
-
-fn contains_helper_v2_mem_manager<K: TestKey, V: TestValue>() -> BenchResult {
-    let memory_manager = MemoryManager::init(DefaultMemoryImpl::default());
-    let btree = BTreeMap::new(memory_manager.get(MemoryId::new(42)));
     contains_helper::<K, V>(btree)
 }
 
@@ -489,23 +436,6 @@ fn contains_helper<K: TestKey, V: TestValue>(
         // Checks if the keys are in the map.
         for random_key in keys {
             btree.contains_key(&random_key);
-        }
-    })
-}
-
-#[bench(raw)]
-pub fn btreemap_v2_contains_10mib_values() -> BenchResult {
-    let count = 20;
-    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
-    let mut rng = Rng::from_seed(0);
-    let values = generate_random_blocks(count, 10 * MiB, &mut rng);
-    for (i, value) in values.into_iter().enumerate() {
-        btree.insert(i as u32, value);
-    }
-
-    bench_fn(|| {
-        for i in 0..count {
-            btree.contains_key(&(i as u32));
         }
     })
 }
@@ -530,7 +460,7 @@ macro_rules! bench_traversal_tests {
     };
 }
 
-// First key value
+// First key value, reduced grid.
 bench_tests! {
     // key size variation (fixed Blob128 value)
     btreemap_v2_first_key_value_blob_8_128,    first_key_value_helper_v2,   Blob8, Blob128;
@@ -548,7 +478,7 @@ bench_tests! {
     btreemap_v2_first_key_value_principal,     first_key_value_helper_v2, Principal, Empty;
 }
 
-// Last key value
+// Last key value, reduced grid.
 bench_tests! {
     // key size variation (fixed Blob128 value)
     btreemap_v2_last_key_value_blob_8_128,    last_key_value_helper_v2,   Blob8, Blob128;
@@ -604,122 +534,40 @@ fn first_or_last_key_value_helper<K: TestKey, V: TestValue>(
     })
 }
 
-// First
+// Pop first, reduced grid.
 bench_tests! {
-    // blob K x 128
-    btreemap_v2_pop_first_blob_4_128,    pop_first_helper_v2,    Blob4, Blob128;
-    btreemap_v2_pop_first_blob_8_128,    pop_first_helper_v2,    Blob8, Blob128;
-    btreemap_v2_pop_first_blob_16_128,   pop_first_helper_v2,   Blob16, Blob128;
-    btreemap_v2_pop_first_blob_32_128,   pop_first_helper_v2,   Blob32, Blob128;
-    btreemap_v2_pop_first_blob_64_128,   pop_first_helper_v2,   Blob64, Blob128;
-    btreemap_v2_pop_first_blob_128_128,  pop_first_helper_v2,  Blob128, Blob128;
-    btreemap_v2_pop_first_blob_256_128,  pop_first_helper_v2,  Blob256, Blob128;
-    btreemap_v2_pop_first_blob_512_128,  pop_first_helper_v2,  Blob512, Blob128;
-    btreemap_v2_pop_first_blob_1024_128, pop_first_helper_v2, Blob1024, Blob128;
+    // key size variation (fixed Blob128 value)
+    btreemap_v2_pop_first_blob_8_128,    pop_first_helper_v2,   Blob8, Blob128;
+    btreemap_v2_pop_first_blob_32_128,   pop_first_helper_v2,  Blob32, Blob128;
+    btreemap_v2_pop_first_blob_256_128,  pop_first_helper_v2, Blob256, Blob128;
+    btreemap_v2_pop_first_vec_32_128,    pop_first_helper_v2, UnboundedVecN32, UnboundedVecN128;
 
-    // blob 32 x V
-    btreemap_v2_pop_first_blob_32_0,    pop_first_helper_v2, Blob32,    Empty;
-    btreemap_v2_pop_first_blob_32_4,    pop_first_helper_v2, Blob32,    Blob4;
-    btreemap_v2_pop_first_blob_32_8,    pop_first_helper_v2, Blob32,    Blob8;
-    btreemap_v2_pop_first_blob_32_16,   pop_first_helper_v2, Blob32,   Blob16;
-    btreemap_v2_pop_first_blob_32_32,   pop_first_helper_v2, Blob32,   Blob32;
-    btreemap_v2_pop_first_blob_32_64,   pop_first_helper_v2, Blob32,   Blob64;
-    //btreemap_v2_pop_first_blob_32_128,  pop_first_helper_v2, Blob32,  Blob128;  // Skip repeated.
-    btreemap_v2_pop_first_blob_32_256,  pop_first_helper_v2, Blob32,  Blob256;
-    btreemap_v2_pop_first_blob_32_512,  pop_first_helper_v2, Blob32,  Blob512;
-    btreemap_v2_pop_first_blob_32_1024, pop_first_helper_v2, Blob32, Blob1024;
+    // value size variation (fixed Blob32 key)
+    btreemap_v2_pop_first_blob_32_0,     pop_first_helper_v2, Blob32,    Empty;
+    btreemap_v2_pop_first_blob_32_1024,  pop_first_helper_v2, Blob32, Blob1024;
+    btreemap_v2_pop_first_vec_32_vec128, pop_first_helper_v2, UnboundedVecN32, UnboundedVecN128;
 
-    // vec K x 128
-    btreemap_v2_pop_first_vec_4_128,    pop_first_helper_v2,    UnboundedVecN4, UnboundedVecN128;
-    btreemap_v2_pop_first_vec_8_128,    pop_first_helper_v2,    UnboundedVecN8, UnboundedVecN128;
-    btreemap_v2_pop_first_vec_16_128,   pop_first_helper_v2,   UnboundedVecN16, UnboundedVecN128;
-    btreemap_v2_pop_first_vec_32_128,   pop_first_helper_v2,   UnboundedVecN32, UnboundedVecN128;
-    btreemap_v2_pop_first_vec_64_128,   pop_first_helper_v2,   UnboundedVecN64, UnboundedVecN128;
-    btreemap_v2_pop_first_vec_128_128,  pop_first_helper_v2,  UnboundedVecN128, UnboundedVecN128;
-    btreemap_v2_pop_first_vec_256_128,  pop_first_helper_v2,  UnboundedVecN256, UnboundedVecN128;
-    btreemap_v2_pop_first_vec_512_128,  pop_first_helper_v2,  UnboundedVecN512, UnboundedVecN128;
-    btreemap_v2_pop_first_vec_1024_128, pop_first_helper_v2, UnboundedVecN1024, UnboundedVecN128;
-
-    // vec 32 x V
-    btreemap_v2_pop_first_vec_32_0,    pop_first_helper_v2, UnboundedVecN32,             Empty;
-    btreemap_v2_pop_first_vec_32_4,    pop_first_helper_v2, UnboundedVecN32,    UnboundedVecN4;
-    btreemap_v2_pop_first_vec_32_8,    pop_first_helper_v2, UnboundedVecN32,    UnboundedVecN8;
-    btreemap_v2_pop_first_vec_32_16,   pop_first_helper_v2, UnboundedVecN32,   UnboundedVecN16;
-    btreemap_v2_pop_first_vec_32_32,   pop_first_helper_v2, UnboundedVecN32,   UnboundedVecN32;
-    btreemap_v2_pop_first_vec_32_64,   pop_first_helper_v2, UnboundedVecN32,   UnboundedVecN64;
-    //btreemap_v2_pop_first_vec_32_128,  pop_first_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
-    btreemap_v2_pop_first_vec_32_256,  pop_first_helper_v2, UnboundedVecN32,  UnboundedVecN256;
-    btreemap_v2_pop_first_vec_32_512,  pop_first_helper_v2, UnboundedVecN32,  UnboundedVecN512;
-    btreemap_v2_pop_first_vec_32_1024, pop_first_helper_v2, UnboundedVecN32, UnboundedVecN1024;
-
-    // u64 / blob8 / vec8
-    btreemap_v2_pop_first_u64_u64,        pop_first_helper_v2,            u64,            u64;
-    btreemap_v2_pop_first_u64_blob8,      pop_first_helper_v2,            u64,          Blob8;
-    btreemap_v2_pop_first_blob8_u64,      pop_first_helper_v2,          Blob8,            u64;
-    btreemap_v2_pop_first_u64_vec8,       pop_first_helper_v2,            u64, UnboundedVecN8;
-    btreemap_v2_pop_first_vec8_u64,       pop_first_helper_v2, UnboundedVecN8,            u64;
-
-    // Principal
-    btreemap_v2_pop_first_principal,      pop_first_helper_v2, Principal, Empty;
+    // common types
+    btreemap_v2_pop_first_u64_u64,       pop_first_helper_v2, u64, u64;
+    btreemap_v2_pop_first_principal,     pop_first_helper_v2, Principal, Empty;
 }
 
-// Last
+// Pop last, reduced grid.
 bench_tests! {
-    // blob K x 128
-    btreemap_v2_pop_last_blob_4_128,    pop_last_helper_v2,    Blob4, Blob128;
-    btreemap_v2_pop_last_blob_8_128,    pop_last_helper_v2,    Blob8, Blob128;
-    btreemap_v2_pop_last_blob_16_128,   pop_last_helper_v2,   Blob16, Blob128;
-    btreemap_v2_pop_last_blob_32_128,   pop_last_helper_v2,   Blob32, Blob128;
-    btreemap_v2_pop_last_blob_64_128,   pop_last_helper_v2,   Blob64, Blob128;
-    btreemap_v2_pop_last_blob_128_128,  pop_last_helper_v2,  Blob128, Blob128;
-    btreemap_v2_pop_last_blob_256_128,  pop_last_helper_v2,  Blob256, Blob128;
-    btreemap_v2_pop_last_blob_512_128,  pop_last_helper_v2,  Blob512, Blob128;
-    btreemap_v2_pop_last_blob_1024_128, pop_last_helper_v2, Blob1024, Blob128;
+    // key size variation (fixed Blob128 value)
+    btreemap_v2_pop_last_blob_8_128,    pop_last_helper_v2,   Blob8, Blob128;
+    btreemap_v2_pop_last_blob_32_128,   pop_last_helper_v2,  Blob32, Blob128;
+    btreemap_v2_pop_last_blob_256_128,  pop_last_helper_v2, Blob256, Blob128;
+    btreemap_v2_pop_last_vec_32_128,    pop_last_helper_v2, UnboundedVecN32, UnboundedVecN128;
 
-    // blob 32 x V
-    btreemap_v2_pop_last_blob_32_0,    pop_last_helper_v2, Blob32,    Empty;
-    btreemap_v2_pop_last_blob_32_4,    pop_last_helper_v2, Blob32,    Blob4;
-    btreemap_v2_pop_last_blob_32_8,    pop_last_helper_v2, Blob32,    Blob8;
-    btreemap_v2_pop_last_blob_32_16,   pop_last_helper_v2, Blob32,   Blob16;
-    btreemap_v2_pop_last_blob_32_32,   pop_last_helper_v2, Blob32,   Blob32;
-    btreemap_v2_pop_last_blob_32_64,   pop_last_helper_v2, Blob32,   Blob64;
-    //btreemap_v2_pop_last_blob_32_128,  pop_last_helper_v2, Blob32,  Blob128;  // Skip repeated.
-    btreemap_v2_pop_last_blob_32_256,  pop_last_helper_v2, Blob32,  Blob256;
-    btreemap_v2_pop_last_blob_32_512,  pop_last_helper_v2, Blob32,  Blob512;
-    btreemap_v2_pop_last_blob_32_1024, pop_last_helper_v2, Blob32, Blob1024;
+    // value size variation (fixed Blob32 key)
+    btreemap_v2_pop_last_blob_32_0,     pop_last_helper_v2, Blob32,    Empty;
+    btreemap_v2_pop_last_blob_32_1024,  pop_last_helper_v2, Blob32, Blob1024;
+    btreemap_v2_pop_last_vec_32_vec128, pop_last_helper_v2, UnboundedVecN32, UnboundedVecN128;
 
-    // vec K x 128
-    btreemap_v2_pop_last_vec_4_128,    pop_last_helper_v2,    UnboundedVecN4, UnboundedVecN128;
-    btreemap_v2_pop_last_vec_8_128,    pop_last_helper_v2,    UnboundedVecN8, UnboundedVecN128;
-    btreemap_v2_pop_last_vec_16_128,   pop_last_helper_v2,   UnboundedVecN16, UnboundedVecN128;
-    btreemap_v2_pop_last_vec_32_128,   pop_last_helper_v2,   UnboundedVecN32, UnboundedVecN128;
-    btreemap_v2_pop_last_vec_64_128,   pop_last_helper_v2,   UnboundedVecN64, UnboundedVecN128;
-    btreemap_v2_pop_last_vec_128_128,  pop_last_helper_v2,  UnboundedVecN128, UnboundedVecN128;
-    btreemap_v2_pop_last_vec_256_128,  pop_last_helper_v2,  UnboundedVecN256, UnboundedVecN128;
-    btreemap_v2_pop_last_vec_512_128,  pop_last_helper_v2,  UnboundedVecN512, UnboundedVecN128;
-    btreemap_v2_pop_last_vec_1024_128, pop_last_helper_v2, UnboundedVecN1024, UnboundedVecN128;
-
-    // vec 32 x V
-    btreemap_v2_pop_last_vec_32_0,    pop_last_helper_v2, UnboundedVecN32,             Empty;
-    btreemap_v2_pop_last_vec_32_4,    pop_last_helper_v2, UnboundedVecN32,    UnboundedVecN4;
-    btreemap_v2_pop_last_vec_32_8,    pop_last_helper_v2, UnboundedVecN32,    UnboundedVecN8;
-    btreemap_v2_pop_last_vec_32_16,   pop_last_helper_v2, UnboundedVecN32,   UnboundedVecN16;
-    btreemap_v2_pop_last_vec_32_32,   pop_last_helper_v2, UnboundedVecN32,   UnboundedVecN32;
-    btreemap_v2_pop_last_vec_32_64,   pop_last_helper_v2, UnboundedVecN32,   UnboundedVecN64;
-    //btreemap_v2_pop_last_vec_32_128,  pop_last_helper_v2, UnboundedVecN32,  UnboundedVecN128;  // Skip repeated.
-    btreemap_v2_pop_last_vec_32_256,  pop_last_helper_v2, UnboundedVecN32,  UnboundedVecN256;
-    btreemap_v2_pop_last_vec_32_512,  pop_last_helper_v2, UnboundedVecN32,  UnboundedVecN512;
-    btreemap_v2_pop_last_vec_32_1024, pop_last_helper_v2, UnboundedVecN32, UnboundedVecN1024;
-
-    // u64 / blob8 / vec8
-    btreemap_v2_pop_last_u64_u64,        pop_last_helper_v2,            u64,            u64;
-    btreemap_v2_pop_last_u64_blob8,      pop_last_helper_v2,            u64,          Blob8;
-    btreemap_v2_pop_last_blob8_u64,      pop_last_helper_v2,          Blob8,            u64;
-    btreemap_v2_pop_last_u64_vec8,       pop_last_helper_v2,            u64, UnboundedVecN8;
-    btreemap_v2_pop_last_vec8_u64,       pop_last_helper_v2, UnboundedVecN8,            u64;
-
-    // Principal
-    btreemap_v2_pop_last_principal,      pop_last_helper_v2, Principal, Empty;
+    // common types
+    btreemap_v2_pop_last_u64_u64,       pop_last_helper_v2, u64, u64;
+    btreemap_v2_pop_last_principal,     pop_last_helper_v2, Principal, Empty;
 }
 
 fn pop_first_helper_v2<K: TestKey, V: TestValue>() -> BenchResult {
