@@ -1040,4 +1040,164 @@ pub fn btreemap_v2_get_miss_zipf_10k_u64_u64() -> BenchResult {
     })
 }
 
+// --- Read-then-write benchmarks (cache warmed by read, reused by write) ---
+
+// Get-then-remove: get(k) warms the cache path, remove(k) reuses it.
+#[bench(raw)]
+pub fn btreemap_v2_get_then_remove_u64_u64() -> BenchResult {
+    get_then_remove_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_then_remove_blob_32_128() -> BenchResult {
+    get_then_remove_helper::<Blob32, Blob128>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+fn get_then_remove_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let keys: Vec<K> = items.into_iter().map(|(k, _)| k).collect();
+    bench_fn(|| {
+        for key in keys {
+            btree.get(&key);
+            btree.remove(&key);
+        }
+    })
+}
+
+// Get-then-insert (upsert): get(k) warms the path, insert(k, new_v) reuses it.
+#[bench(raw)]
+pub fn btreemap_v2_get_then_insert_u64_u64() -> BenchResult {
+    get_then_insert_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_then_insert_blob_32_128() -> BenchResult {
+    get_then_insert_helper::<Blob32, Blob128>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+fn get_then_insert_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let updates: Vec<(K, V)> = items
+        .into_iter()
+        .map(|(k, _)| (k, V::random(&mut rng)))
+        .collect();
+    bench_fn(|| {
+        for (k, v) in updates {
+            btree.get(&k);
+            btree.insert(k, v);
+        }
+    })
+}
+
+// Contains-then-remove: contains_key(k) warms the path, remove(k) reuses it.
+#[bench(raw)]
+pub fn btreemap_v2_contains_then_remove_u64_u64() -> BenchResult {
+    contains_then_remove_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_contains_then_remove_blob_32_128() -> BenchResult {
+    contains_then_remove_helper::<Blob32, Blob128>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+fn contains_then_remove_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let keys: Vec<K> = items.into_iter().map(|(k, _)| k).collect();
+    bench_fn(|| {
+        for key in keys {
+            if btree.contains_key(&key) {
+                btree.remove(&key);
+            }
+        }
+    })
+}
+
+// Interleaved mixed: Zipf-distributed get/insert on 10K tree.
+// Hot keys are read then written — maximum cache reuse.
+#[bench(raw)]
+pub fn btreemap_v2_mixed_get_insert_zipf_10k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let ops: Vec<(u64, u64)> = (0..count)
+        .map(|_| (keys[zipf.sample(&mut rng)], rng.rand_u64()))
+        .collect();
+    bench_fn(|| {
+        for (k, v) in ops {
+            btree.get(&k);
+            btree.insert(k, v);
+        }
+    })
+}
+
+// Peek-then-pop: last_key_value() warms the path, pop_last() reuses it.
+// Simulates the common pattern of inspecting before removing.
+#[bench(raw)]
+pub fn btreemap_v2_peek_then_pop_last_u64_u64() -> BenchResult {
+    peek_then_pop_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()), Position::Last)
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_peek_then_pop_first_u64_u64() -> BenchResult {
+    peek_then_pop_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()), Position::First)
+}
+
+fn peek_then_pop_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+    position: Position,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    bench_fn(|| {
+        for _ in 0..count {
+            match position {
+                Position::First => {
+                    btree.first_key_value();
+                    btree.pop_first();
+                }
+                Position::Last => {
+                    btree.last_key_value();
+                    btree.pop_last();
+                }
+            };
+        }
+    })
+}
+
 fn main() {}
