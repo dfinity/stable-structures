@@ -251,17 +251,17 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> VacantEntr
             }
             None => {
                 // The map was empty when `entry()` was called. Delegate to the regular
-                // insert path which handles root allocation, then find the new entry.
+                // insert path which handles root allocation, then set the node and idx of the
+                // new `OccupiedEntry` to the root node and index 0.
                 let map = self.map;
                 let key = self.key;
                 map.insert(key.clone(), value);
-                let (node, result) = map.find_node_for_insert(&key);
-                let idx = result.expect("key was just inserted");
+                let node = map.load_node(map.root_addr);
                 OccupiedEntry {
                     map,
                     key,
                     node,
-                    idx,
+                    idx: 0,
                 }
             }
         }

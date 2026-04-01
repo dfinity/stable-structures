@@ -637,20 +637,109 @@ where
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         let value = value.into_bytes_checked();
 
-        let (mut node, search_result) = self.find_node_for_insert(&key);
+        let root = if self.root_addr == NULL {
+            // No root present. Allocate one.
+            let node = self.allocate_node(NodeType::Leaf);
+            self.root_addr = node.address();
+            self.save_header();
+            node
+        } else {
+            // Load the root from memory.
+            let mut root = self.load_node(self.root_addr);
 
-        match search_result {
-            Ok(idx) => Some(V::from_bytes(Cow::Owned(
-                self.update_value(&mut node, idx, value),
-            ))),
-            Err(idx) => {
-                node.insert_entry(idx, (key, value));
-                self.save_node(&mut node);
+            // Check if the key already exists in the root.
+            if let Ok(idx) = root.search(&key, self.memory()) {
+                // Key found, replace its value and return the old one.
+                return Some(V::from_bytes(Cow::Owned(
+                    self.update_value(&mut root, idx, value),
+                )));
+            }
 
-                // Update the length.
-                self.length += 1;
+            // If the root is full, we need to introduce a new node as the root.
+            //
+            // NOTE: In the case where we are overwriting an existing key, then introducing
+            // a new root node isn't strictly necessary. However, that's a micro-optimization
+            // that adds more complexity than it's worth.
+            if root.is_full() {
+                // The root is full. Allocate a new node that will be used as the new root.
+                let mut new_root = self.allocate_node(NodeType::Internal);
+
+                // The new root has the old root as its only child.
+                new_root.push_child(self.root_addr);
+
+                // Update the root address.
+                self.root_addr = new_root.address();
                 self.save_header();
-                None
+
+                // Split the old (full) root.
+                self.split_child(&mut new_root, 0);
+
+                new_root
+            } else {
+                root
+            }
+        };
+
+        self.insert_nonfull(root, key, value)
+            .map(Cow::Owned)
+            .map(V::from_bytes)
+    }
+
+    /// Inserts an entry into a node that is *not full*.
+    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
+        // We're guaranteed by the caller that the provided node is not full.
+        assert!(!node.is_full());
+
+        // Look for the key in the node.
+        match node.search(&key, self.memory()) {
+            Ok(idx) => {
+                // Key found, replace its value and return the old one.
+                Some(self.update_value(&mut node, idx, value))
+            }
+            Err(idx) => {
+                // The key isn't in the node. `idx` is where that key should be inserted.
+
+                match node.node_type() {
+                    NodeType::Leaf => {
+                        // The node is a non-full leaf.
+                        // Insert the entry at the proper location.
+                        node.insert_entry(idx, (key, value));
+                        self.save_node(&mut node);
+
+                        // Update the length.
+                        self.length += 1;
+                        self.save_header();
+
+                        // No previous value to return.
+                        None
+                    }
+                    NodeType::Internal => {
+                        // The node is an internal node.
+                        // Load the child that we should add the entry to.
+                        let mut child = self.load_node(node.child(idx));
+
+                        if child.is_full() {
+                            // Check if the key already exists in the child.
+                            if let Ok(idx) = child.search(&key, self.memory()) {
+                                // Key found, replace its value and return the old one.
+                                return Some(self.update_value(&mut child, idx, value));
+                            }
+
+                            // The child is full. Split the child.
+                            self.split_child(&mut node, idx);
+
+                            // The children have now changed. Search again for
+                            // the child where we need to store the entry in.
+                            let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
+                            child = self.load_node(node.child(idx));
+                        }
+
+                        // The child should now be not full.
+                        assert!(!child.is_full());
+
+                        self.insert_nonfull(child, key, value)
+                    }
+                }
             }
         }
     }
@@ -710,7 +799,40 @@ where
             });
         }
 
-        let (node, search_result) = self.find_node_for_insert(&key);
+        // Load the root from memory.
+        let mut root = self.load_node(self.root_addr);
+
+        let (node, search_result) = {
+            // Check if the key already exists in the root.
+            if let Ok(idx) = root.search(&key, self.memory()) {
+                // Key found
+                (root, Ok(idx))
+            } else {
+                // If the root is full, we need to introduce a new node as the root.
+                //
+                // NOTE: In the case where we are overwriting an existing key, then introducing
+                // a new root node isn't strictly necessary. However, that's a micro-optimization
+                // that adds more complexity than it's worth.
+                if root.is_full() {
+                    // The root is full. Allocate a new node that will be used as the new root.
+                    let mut new_root = self.allocate_node(NodeType::Internal);
+
+                    // The new root has the old root as its only child.
+                    new_root.push_child(self.root_addr);
+
+                    // Update the root address.
+                    self.root_addr = new_root.address();
+                    self.save_header();
+
+                    // Split the old (full) root.
+                    self.split_child(&mut new_root, 0);
+
+                    root = new_root;
+                }
+
+                self.find_node_for_insert_nonfull(root, &key)
+            }
+        };
 
         match search_result {
             Ok(idx) => entry::Entry::Occupied(entry::OccupiedEntry {
@@ -725,53 +847,6 @@ where
                 location: Some((node, idx)),
             }),
         }
-    }
-
-    /// Finds the node the key (and its corresponding value) should be inserted into
-    /// Return value is a tuple, the first value is the node the key should be inserted into, the
-    /// seconds value is a `Result` which is `Ok` if the key exists in the node, or `Err` if not.
-    /// The value in either case is the index at which the key should be inserted.
-    fn find_node_for_insert(&mut self, key: &K) -> (Node<K>, Result<usize, usize>) {
-        if self.root_addr == NULL {
-            // No root present. Allocate one.
-            let node = self.allocate_node(NodeType::Leaf);
-            self.root_addr = node.address();
-            self.save_header();
-            return (node, Err(0));
-        }
-
-        // Load the root from memory.
-        let mut root = self.load_node(self.root_addr);
-
-        // Check if the key already exists in the root.
-        if let Ok(idx) = root.search(key, self.memory()) {
-            // Key found
-            return (root, Ok(idx));
-        }
-
-        // If the root is full, we need to introduce a new node as the root.
-        //
-        // NOTE: In the case where we are overwriting an existing key, then introducing
-        // a new root node isn't strictly necessary. However, that's a micro-optimization
-        // that adds more complexity than it's worth.
-        if root.is_full() {
-            // The root is full. Allocate a new node that will be used as the new root.
-            let mut new_root = self.allocate_node(NodeType::Internal);
-
-            // The new root has the old root as its only child.
-            new_root.push_child(self.root_addr);
-
-            // Update the root address.
-            self.root_addr = new_root.address();
-            self.save_header();
-
-            // Split the old (full) root.
-            self.split_child(&mut new_root, 0);
-
-            root = new_root;
-        }
-
-        self.find_node_for_insert_nonfull(root, key)
     }
 
     /// Finds the node the key (and its corresponding value) should be inserted into
@@ -1308,6 +1383,7 @@ where
     /// PRECONDITION
     ///   - `node` is a leaf node
     ///   - `node.entries_len() > 1` or node is the root node
+    #[inline(always)]
     fn remove_from_leaf_node(&mut self, mut node: Node<K>, idx: usize) -> Vec<u8> {
         debug_assert_eq!(node.node_type(), NodeType::Leaf);
 
@@ -1337,6 +1413,7 @@ where
     /// PRECONDITION
     ///   - `node` is an internal node
     ///   - `node` contains `key` at index `idx`
+    #[inline(always)]
     fn remove_from_internal_node(&mut self, mut node: Node<K>, idx: usize, key: &K) -> Vec<u8> {
         debug_assert_eq!(node.node_type(), NodeType::Internal);
         debug_assert_eq!(node.search(key, self.memory()), Ok(idx));
