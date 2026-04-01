@@ -1,7 +1,7 @@
 use crate::btreemap::entry::Entry;
 use crate::{
     btreemap::{
-        test::{b, make_memory, run_btree_test},
+        tests::{b, make_memory, run_btree_test},
         BTreeMap,
     },
     storable::Blob,
@@ -69,6 +69,18 @@ fn comprehensive(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Op
 
     // Execute all the operations, validating that the stable btreemap behaves similarly to a std
     // btreemap.
+    for op in ops.into_iter() {
+        execute_operation(&mut std_btree, &mut btree, op);
+    }
+}
+
+// Same as `comprehensive` but with the node cache enabled.
+#[proptest(cases = 10)]
+fn comprehensive_cached(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
+    let mem = make_memory();
+    let mut btree = BTreeMap::new(mem).with_node_cache(32);
+    let mut std_btree = StdBTreeMap::new();
+
     for op in ops.into_iter() {
         execute_operation(&mut std_btree, &mut btree, op);
     }
