@@ -685,7 +685,13 @@ where
     }
 
     /// Inserts an entry into a node that is *not full*.
-    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>, depth: u8) -> Option<Vec<u8>> {
+    fn insert_nonfull(
+        &mut self,
+        mut node: Node<K>,
+        key: K,
+        value: Vec<u8>,
+        depth: u8,
+    ) -> Option<Vec<u8>> {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
 
@@ -1061,7 +1067,11 @@ where
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
                             let predecessor = self.last_entry_inner(&left_child);
-                            self.remove_helper(left_child, &predecessor.0, depth.saturating_add(1))?;
+                            self.remove_helper(
+                                left_child,
+                                &predecessor.0,
+                                depth.saturating_add(1),
+                            )?;
 
                             // Replace the `key` with its predecessor.
                             let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
