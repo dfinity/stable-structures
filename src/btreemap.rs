@@ -51,6 +51,7 @@
 mod allocator;
 mod iter;
 mod node;
+mod node_cache;
 use crate::btreemap::iter::{IterInternal, KeysIter, ValuesIter};
 use crate::{
     storable::Bound as StorableBound,
@@ -60,7 +61,10 @@ use crate::{
 use allocator::Allocator;
 pub use iter::Iter;
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
+use node_cache::NodeCache;
+pub use node_cache::NodeCacheMetrics;
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -80,6 +84,15 @@ const DEFAULT_PAGE_SIZE: u32 = 1024;
 
 // A marker to indicate that the `PageSize` stored in the header is a `PageSize::Value`.
 const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
+
+/// Default number of slots in the direct-mapped node cache.
+///
+/// 16 slots cover the top two tree levels (1 root + up to 12 children =
+/// 13 nodes) while keeping heap usage modest.
+///
+/// Users can adjust via [`BTreeMap::with_node_cache`] or
+/// [`BTreeMap::node_cache_resize`], including setting to 0 to disable.
+const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 16;
 
 /// A B-Tree map implementation that stores its data into a designated memory.
 ///
@@ -248,6 +261,9 @@ where
     // The number of elements in the map.
     length: u64,
 
+    // Direct-mapped node cache to avoid re-loading hot nodes from stable memory.
+    cache: RefCell<NodeCache<K>>,
+
     // A marker to communicate to the Rust compiler that we own these types.
     _phantom: PhantomData<(K, V)>,
 }
@@ -287,6 +303,112 @@ where
             // The memory already contains a BTreeMap. Load it.
             BTreeMap::load(memory)
         }
+    }
+
+    /// Configures the number of node-cache slots during construction.
+    ///
+    /// The cache is a direct-mapped cache that keeps frequently accessed
+    /// B-tree nodes in heap memory to avoid repeated stable-memory reads.
+    /// Each slot can hold one deserialized node; on collision, shallower
+    /// nodes (closer to the root) are kept over deeper ones.
+    ///
+    /// Pass `0` to disable the cache (the default).
+    ///
+    /// The top 2 levels of the tree contain 13 nodes (1 root + up to
+    /// 12 children). **16** slots is the smallest power of two that
+    /// covers them, but a direct-mapped cache is sensitive to address
+    /// collisions, so **32** is a safer default that leaves headroom
+    /// and typically gives 2 cache hits per operation regardless of
+    /// tree size. Prefer powers of two for efficient slot indexing.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let map: BTreeMap<u64, u64, _> =
+    ///     BTreeMap::init(DefaultMemoryImpl::default())
+    ///         .with_node_cache(32);
+    /// ```
+    pub fn with_node_cache(mut self, num_slots: usize) -> Self {
+        self.node_cache_resize(num_slots);
+        self
+    }
+
+    /// Resizes the node cache at runtime.
+    ///
+    /// Existing cache contents and performance counters are discarded.
+    ///
+    /// Pass `0` to disable the cache entirely.
+    ///
+    /// See [`with_node_cache`](Self::with_node_cache) for guidance on
+    /// choosing a size.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u64, u64, _> =
+    ///     BTreeMap::init(DefaultMemoryImpl::default())
+    ///         .with_node_cache(32);
+    ///
+    /// // After observing a poor hit ratio, grow the cache.
+    /// if map.node_cache_metrics().hit_ratio() < 0.5 {
+    ///     map.node_cache_resize(64);
+    /// }
+    /// ```
+    pub fn node_cache_resize(&mut self, num_slots: usize) {
+        *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
+    }
+
+    /// Returns the current number of slots in the node cache.
+    ///
+    /// Returns `0` when the cache is disabled.
+    pub fn node_cache_size(&self) -> usize {
+        self.cache.borrow().num_slots()
+    }
+
+    /// Evicts all cached nodes and resets metrics, keeping the
+    /// current cache capacity.
+    pub fn node_cache_clear(&mut self) {
+        self.cache.get_mut().clear();
+    }
+
+    /// Resets cache metrics (hit/miss counters) without evicting
+    /// cached nodes.
+    pub fn node_cache_clear_metrics(&mut self) {
+        self.cache.get_mut().clear_metrics();
+    }
+
+    /// Returns node-cache performance metrics.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u64, u64, _> =
+    ///     BTreeMap::init(DefaultMemoryImpl::default())
+    ///         .with_node_cache(32);
+    /// map.insert(1, 100);
+    /// let _ = map.get(&1);
+    ///
+    /// let metrics = map.node_cache_metrics();
+    /// println!("hit ratio: {:.1}%", metrics.hit_ratio() * 100.0);
+    /// ```
+    pub fn node_cache_metrics(&self) -> NodeCacheMetrics {
+        self.cache.borrow().metrics()
+    }
+
+    /// Returns a rough estimate of the cache's heap usage in bytes.
+    ///
+    /// Actual usage depends on key size and how many slots are
+    /// occupied. Treat this as an order-of-magnitude guide, not a
+    /// precise budget.
+    pub fn node_cache_size_bytes_approx(&self) -> usize {
+        self.cache.borrow().num_slots()
+            * (self.version.page_size().get() as usize + NodeCache::<K>::slot_size())
     }
 
     /// Initializes a v1 `BTreeMap`.
@@ -358,6 +480,10 @@ where
             ),
             version: Version::V2(page_size),
             length: 0,
+            cache: RefCell::new(NodeCache::new(
+                page_size.get(),
+                DEFAULT_NODE_CACHE_NUM_SLOTS,
+            )),
             _phantom: PhantomData,
         };
 
@@ -373,6 +499,11 @@ where
         let max_key_size = K::BOUND.max_size();
         let max_value_size = V::BOUND.max_size();
 
+        let version = Version::V1(DerivedPageSize {
+            max_key_size,
+            max_value_size,
+        });
+
         let btree = Self {
             root_addr: NULL,
             allocator: Allocator::new(
@@ -380,11 +511,12 @@ where
                 Address::from(ALLOCATOR_OFFSET as u64),
                 Node::<K>::max_size(max_key_size, max_value_size),
             ),
-            version: Version::V1(DerivedPageSize {
-                max_key_size,
-                max_value_size,
-            }),
+            version,
             length: 0,
+            cache: RefCell::new(NodeCache::new(
+                version.page_size().get(),
+                DEFAULT_NODE_CACHE_NUM_SLOTS,
+            )),
             _phantom: PhantomData,
         };
 
@@ -434,6 +566,10 @@ where
             allocator: Allocator::load(memory, allocator_addr),
             version,
             length: header.length,
+            cache: RefCell::new(NodeCache::new(
+                version.page_size().get(),
+                DEFAULT_NODE_CACHE_NUM_SLOTS,
+            )),
             _phantom: PhantomData,
         }
     }
@@ -653,8 +789,8 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        self.traverse(self.root_addr, key, |node, idx| {
-            node.extract_entry_at(idx, self.memory()).1 // Extract value.
+        self.traverse(self.root_addr, 0, key, |node, idx| {
+            node.read_value_uncached(idx, self.memory())
         })
         .map(Cow::Owned)
         .map(V::from_bytes)
@@ -663,80 +799,88 @@ where
     /// Returns true if the key exists.
     pub fn contains_key(&self, key: &K) -> bool {
         // An empty closure returns Some(()) if the key is found.
-        self.root_addr != NULL && self.traverse(self.root_addr, key, |_, _| ()).is_some()
+        self.root_addr != NULL && self.traverse(self.root_addr, 0, key, |_, _| ()).is_some()
     }
 
     /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
-    fn traverse<F, R>(&self, node_addr: Address, key: &K, f: F) -> Option<R>
+    ///
+    /// Uses the node cache: nodes are taken out before use and returned after.
+    /// `depth` is the distance from the root (root = 0).
+    fn traverse<F, R>(&self, node_addr: Address, depth: u8, key: &K, f: F) -> Option<R>
     where
-        F: Fn(&mut Node<K>, usize) -> R,
+        F: Fn(&Node<K>, usize) -> R,
     {
-        let mut node = self.load_node(node_addr);
-        // Look for the key in the current node.
+        let node = self.take_or_load_node(node_addr);
         match node.search(key, self.memory()) {
-            Ok(idx) => Some(f(&mut node, idx)), // Key found: apply `f`.
+            Ok(idx) => {
+                let result = f(&node, idx); // Key found: apply `f`.
+                self.return_node(node, depth);
+                Some(result)
+            }
             Err(idx) => match node.node_type() {
-                NodeType::Leaf => None, // At a leaf: key not present.
-                NodeType::Internal => self.traverse(node.child(idx), key, f), // Continue search in child.
+                NodeType::Leaf => {
+                    self.return_node(node, depth);
+                    None // At a leaf: key not present.
+                }
+                NodeType::Internal => {
+                    let child_addr = node.child(idx);
+                    self.return_node(node, depth);
+                    self.traverse(child_addr, depth.saturating_add(1), key, f)
+                }
             },
         }
     }
 
-    /// Traverses to the min or max leaf and extracts a result using the provided closure.
-    fn get_min_or_max<R, F>(&self, node: &Node<K>, is_min: bool, extract: F) -> R
+    /// A helper function to find either the first or last entry in the tree, depending on the `is_first` flag.
+    fn find_first_or_last<R, F>(&self, node: &Node<K>, is_first: bool, depth: u8, extract: F) -> R
     where
         F: Fn(&Node<K>, usize, &M) -> R,
     {
-        let mut current;
-        let mut current_ref = node;
-        loop {
-            match current_ref.node_type() {
-                NodeType::Leaf => {
-                    let idx = if is_min {
-                        0
-                    } else {
-                        // Last entry index in a 0-based array of entries.
-                        current_ref.num_entries() - 1
-                    };
-                    return extract(current_ref, idx, self.memory());
-                }
-                NodeType::Internal => {
-                    let child_addr = if is_min {
-                        current_ref.child(0)
-                    } else {
-                        // Last child index in a 0-based array of children.
-                        current_ref.child(current_ref.children_len() - 1)
-                    };
-                    current = self.load_node(child_addr);
-                    current_ref = &current;
-                }
+        match node.node_type() {
+            NodeType::Leaf => {
+                let idx = if is_first {
+                    0
+                } else {
+                    // Last entry index in a 0-based array of entries.
+                    node.num_entries() - 1
+                };
+                extract(node, idx, self.memory())
+            }
+            NodeType::Internal => {
+                let child_addr = if is_first {
+                    node.child(0)
+                } else {
+                    // Last child index in a 0-based array of children.
+                    node.child(node.children_len() - 1)
+                };
+                let child = self.take_or_load_node(child_addr);
+                let new_depth = depth.saturating_add(1);
+                let result = self.find_first_or_last(&child, is_first, new_depth, extract);
+                self.return_node(child, new_depth);
+                result
             }
         }
     }
 
     #[inline(always)]
     fn first_key_inner(&self, node: &Node<K>) -> K {
-        self.get_min_or_max(node, true, |n, i, m| n.key(i, m).clone())
+        self.find_first_or_last(node, true, 0, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
     fn last_key_inner(&self, node: &Node<K>) -> K {
-        self.get_min_or_max(node, false, |n, i, m| n.key(i, m).clone())
+        self.find_first_or_last(node, false, 0, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
     fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.get_min_or_max(node, true, |n, i, m| {
-            let (k, v) = n.entry(i, m);
-            (k.clone(), v.to_vec())
-        })
+        self.find_first_or_last(node, true, 0, |n, i, m| n.get_key_read_value_uncached(i, m))
     }
 
     #[inline(always)]
     fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.get_min_or_max(node, false, |n, i, m| {
-            let (k, v) = n.entry(i, m);
-            (k.clone(), v.to_vec())
+        self.find_first_or_last(node, false, 0, |n, i, m| {
+            n.get_key_read_value_uncached(i, m)
         })
     }
 
@@ -771,6 +915,8 @@ where
         self.root_addr = NULL;
         self.length = 0;
         self.allocator.clear();
+        let num_slots = self.cache.get_mut().num_slots();
+        *self.cache.get_mut() = NodeCache::new(self.version.page_size().get(), num_slots);
         self.save_header();
     }
 
@@ -780,8 +926,9 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        let root = self.load_node(self.root_addr);
+        let root = self.take_or_load_node(self.root_addr);
         let (k, encoded_v) = self.first_entry_inner(&root);
+        self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -791,8 +938,9 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        let root = self.load_node(self.root_addr);
+        let root = self.take_or_load_node(self.root_addr);
         let (k, encoded_v) = self.last_entry_inner(&root);
+        self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -823,9 +971,9 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let max_key = self.last_key_inner(&root);
-        self.remove_helper(root, &max_key)
-            .map(|v| (max_key, V::from_bytes(Cow::Owned(v))))
+        let last_key = self.last_key_inner(&root);
+        self.remove_helper(root, &last_key)
+            .map(|v| (last_key, V::from_bytes(Cow::Owned(v))))
     }
 
     /// Removes and returns the first element in the map. The key of this element is the minimum key that was in the map
@@ -835,9 +983,9 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let min_key = self.first_key_inner(&root);
-        self.remove_helper(root, &min_key)
-            .map(|v| (min_key, V::from_bytes(Cow::Owned(v))))
+        let first_key = self.first_key_inner(&root);
+        self.remove_helper(root, &first_key)
+            .map(|v| (first_key, V::from_bytes(Cow::Owned(v))))
     }
 
     /// A helper method for recursively removing a key from the B-tree.
@@ -1331,7 +1479,13 @@ where
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
     fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
+        let source_addr = source.address();
         into.merge(source, median, &mut self.allocator);
+        // Node::merge saves `into` and deallocates `source` directly through
+        // the allocator, so we must invalidate both cache slots here.
+        let cache = self.cache.get_mut();
+        cache.invalidate(into.address());
+        cache.invalidate(source_addr);
         into
     }
 
@@ -1343,22 +1497,46 @@ where
         }
     }
 
-    /// Deallocates a node.
+    /// Deallocates a node and invalidates its cache slot.
     #[inline]
     fn deallocate_node(&mut self, node: Node<K>) {
+        let addr = node.address();
         node.deallocate(self.allocator_mut());
+        self.cache.get_mut().invalidate(addr);
     }
 
-    /// Loads a node from memory.
+    /// Takes a node from the cache, or loads it from memory if not cached.
+    ///
+    /// Used by read paths (`&self`). The caller must call `return_node` when
+    /// done to put the node back into the cache.
+    #[inline(always)]
+    fn take_or_load_node(&self, address: Address) -> Node<K> {
+        if let Some(node) = self.cache.borrow_mut().take(address) {
+            return node;
+        }
+        Node::load(address, self.version.page_size(), self.memory())
+    }
+
+    /// Returns a node to the cache after use on a read path.
+    ///
+    /// `depth` is the distance from the root (root = 0), used by the
+    /// cache eviction policy.
+    #[inline(always)]
+    fn return_node(&self, node: Node<K>, depth: u8) {
+        self.cache.borrow_mut().put(node.address(), node, depth);
+    }
+
+    /// Loads a node from memory, bypassing the cache.
     #[inline]
     fn load_node(&self, address: Address) -> Node<K> {
         Node::load(address, self.version.page_size(), self.memory())
     }
 
-    /// Saves the node to memory.
+    /// Saves the node to memory and invalidates the cache slot.
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
         node.save(self.allocator_mut());
+        self.cache.get_mut().invalidate(node.address());
     }
 
     /// Replaces the value at `idx` in the node, saves the node, and returns the old value.

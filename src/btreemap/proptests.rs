@@ -69,6 +69,18 @@ fn comprehensive(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Op
     }
 }
 
+// Same as `comprehensive` but with the node cache enabled.
+#[proptest(cases = 10)]
+fn comprehensive_cached(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
+    let mem = make_memory();
+    let mut btree = BTreeMap::new(mem).with_node_cache(32);
+    let mut std_btree = StdBTreeMap::new();
+
+    for op in ops.into_iter() {
+        execute_operation(&mut std_btree, &mut btree, op);
+    }
+}
+
 // A comprehensive fuzz test that runs until it's explicitly terminated. To run:
 //
 // ```
