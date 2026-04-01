@@ -1383,7 +1383,6 @@ where
     /// PRECONDITION
     ///   - `node` is a leaf node
     ///   - `node.entries_len() > 1` or node is the root node
-    #[inline(always)]
     fn remove_from_leaf_node(&mut self, mut node: Node<K>, idx: usize) -> Vec<u8> {
         debug_assert_eq!(node.node_type(), NodeType::Leaf);
 
@@ -1413,7 +1412,6 @@ where
     /// PRECONDITION
     ///   - `node` is an internal node
     ///   - `node` contains `key` at index `idx`
-    #[inline(always)]
     fn remove_from_internal_node(&mut self, mut node: Node<K>, idx: usize, key: &K) -> Vec<u8> {
         debug_assert_eq!(node.node_type(), NodeType::Internal);
         debug_assert_eq!(node.search(key, self.memory()), Ok(idx));
