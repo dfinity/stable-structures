@@ -655,93 +655,25 @@ where
                 )));
             }
 
-            // If the root is full, we need to introduce a new node as the root.
-            //
             // NOTE: In the case where we are overwriting an existing key, then introducing
             // a new root node isn't strictly necessary. However, that's a micro-optimization
             // that adds more complexity than it's worth.
-            if root.is_full() {
-                // The root is full. Allocate a new node that will be used as the new root.
-                let mut new_root = self.allocate_node(NodeType::Internal);
-
-                // The new root has the old root as its only child.
-                new_root.push_child(self.root_addr);
-
-                // Update the root address.
-                self.root_addr = new_root.address();
-                self.save_header();
-
-                // Split the old (full) root.
-                self.split_child(&mut new_root, 0);
-
-                new_root
-            } else {
-                root
-            }
+            self.split_root_if_full(root)
         };
 
-        self.insert_nonfull(root, key, value)
-            .map(Cow::Owned)
-            .map(V::from_bytes)
-    }
-
-    /// Inserts an entry into a node that is *not full*.
-    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
-        // We're guaranteed by the caller that the provided node is not full.
-        assert!(!node.is_full());
-
-        // Look for the key in the node.
-        match node.search(&key, self.memory()) {
-            Ok(idx) => {
-                // Key found, replace its value and return the old one.
-                Some(self.update_value(&mut node, idx, value))
+        self.find_node_for_insert(root, key, move |map, mut node, idx, key, key_exists| {
+            if key_exists {
+                Some(map.update_value(&mut node, idx, value))
+            } else {
+                node.insert_entry(idx, (key, value));
+                map.save_node(&mut node);
+                map.length += 1;
+                map.save_header();
+                None
             }
-            Err(idx) => {
-                // The key isn't in the node. `idx` is where that key should be inserted.
-
-                match node.node_type() {
-                    NodeType::Leaf => {
-                        // The node is a non-full leaf.
-                        // Insert the entry at the proper location.
-                        node.insert_entry(idx, (key, value));
-                        self.save_node(&mut node);
-
-                        // Update the length.
-                        self.length += 1;
-                        self.save_header();
-
-                        // No previous value to return.
-                        None
-                    }
-                    NodeType::Internal => {
-                        // The node is an internal node.
-                        // Load the child that we should add the entry to.
-                        let mut child = self.load_node(node.child(idx));
-
-                        if child.is_full() {
-                            // Check if the key already exists in the child.
-                            if let Ok(idx) = child.search(&key, self.memory()) {
-                                // Key found, replace its value and return the old one.
-                                return Some(self.update_value(&mut child, idx, value));
-                            }
-
-                            // The child is full. Split the child.
-                            self.split_child(&mut node, idx);
-
-                            // The children have now changed. Search again for
-                            // the child where we need to store the entry in.
-                            let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
-                            child = self.load_node(node.child(idx));
-                        }
-
-                        // The child should now be not full.
-                        assert!(!child.is_full());
-
-                        self.insert_nonfull(child, key, value)
-                    }
-                }
-            }
-        }
+        })
+        .map(Cow::Owned)
+        .map(V::from_bytes)
     }
 
     /// Gets an [`Entry`](entry::Entry) for the given `key`, which gives efficient in-place access
@@ -802,37 +734,27 @@ where
         // Load the root from memory.
         let mut root = self.load_node(self.root_addr);
 
-        let (node, search_result) = {
-            // Check if the key already exists in the root.
-            if let Ok(idx) = root.search(&key, self.memory()) {
-                // Key found
-                (root, Ok(idx))
-            } else {
-                // If the root is full, we need to introduce a new node as the root.
-                //
-                // NOTE: In the case where we are overwriting an existing key, then introducing
-                // a new root node isn't strictly necessary. However, that's a micro-optimization
-                // that adds more complexity than it's worth.
-                if root.is_full() {
-                    // The root is full. Allocate a new node that will be used as the new root.
-                    let mut new_root = self.allocate_node(NodeType::Internal);
+        // Check if the key already exists in the root.
+        if let Ok(idx) = root.search(&key, self.memory()) {
+            // Key found
+            return entry::Entry::Occupied(entry::OccupiedEntry {
+                map: self,
+                key,
+                node: root,
+                idx,
+            });
+        }
 
-                    // The new root has the old root as its only child.
-                    new_root.push_child(self.root_addr);
+        root = self.split_root_if_full(root);
 
-                    // Update the root address.
-                    self.root_addr = new_root.address();
-                    self.save_header();
-
-                    // Split the old (full) root.
-                    self.split_child(&mut new_root, 0);
-
-                    root = new_root;
+        let (key, node, search_result) =
+            self.find_node_for_insert(root, key, |_, node, idx, key, key_exists| {
+                if key_exists {
+                    (key, node, Ok(idx))
+                } else {
+                    (key, node, Err(idx))
                 }
-
-                self.find_node_for_insert_nonfull(root, &key)
-            }
-        };
+            });
 
         match search_result {
             Ok(idx) => entry::Entry::Occupied(entry::OccupiedEntry {
@@ -849,23 +771,61 @@ where
         }
     }
 
-    /// Finds the node the key (and its corresponding value) should be inserted into
+    /// Ensures the root node is not full, called before an insertion.
     ///
-    /// PRECONDITION:
-    ///   - `node` is not full.
-    fn find_node_for_insert_nonfull(
+    /// If `root` is full, a new internal node is allocated, made the parent of the old
+    /// root, and the old root is split into two children.  The new (non-full) root is
+    /// returned.  If `root` is not full it is returned unchanged.
+    fn split_root_if_full(&mut self, root: Node<K>) -> Node<K> {
+        if !root.is_full() {
+            return root;
+        }
+
+        // Allocate a new node that will become the new root.
+        let mut new_root = self.allocate_node(NodeType::Internal);
+
+        // The new root has the old root as its only child.
+        new_root.push_child(self.root_addr);
+
+        // Persist the updated root address before splitting.
+        self.root_addr = new_root.address();
+        self.save_header();
+
+        // Split the old (full) root into two children of new_root.
+        self.split_child(&mut new_root, 0);
+
+        new_root
+    }
+
+    /// Core B-tree insertion traversal, shared by [`BTreeMap::insert`] and [`BTreeMap::entry`].
+    ///
+    /// Descends from `node` (which must not be full) to the leaf or internal node where
+    /// `key` either already exists or should be inserted, then invokes `callback` with:
+    ///
+    /// * `map`        — mutable access to the map (for saving nodes, updating length, etc.)
+    /// * `node`       — the target node
+    /// * `idx`        — the relevant slot index within `node`
+    /// * `key`        — the key being inserted
+    /// * `key_exists` — `true` if `key` is already present at `idx`; `false` if `idx` is
+    ///                  the position where `key` should be inserted
+    ///
+    /// The callback's return value is propagated back to the caller.
+    ///
+    /// PRECONDITION: `node` is not full.
+    fn find_node_for_insert<R>(
         &mut self,
         mut node: Node<K>,
-        key: &K,
-    ) -> (Node<K>, Result<usize, usize>) {
+        key: K,
+        callback: impl FnOnce(&mut Self, Node<K>, usize, K, bool) -> R,
+    ) -> R {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
 
         // Look for the key in the node.
-        match node.search(key, self.memory()) {
+        match node.search(&key, self.memory()) {
             Ok(idx) => {
-                // Key found
-                (node, Ok(idx))
+                // Key found.
+                callback(self, node, idx, key, true)
             }
             Err(idx) => {
                 // The key isn't in the node. `idx` is where that key should be inserted.
@@ -873,7 +833,7 @@ where
                 match node.node_type() {
                     NodeType::Leaf => {
                         // The node is a non-full leaf.
-                        (node, Err(idx))
+                        callback(self, node, idx, key, false)
                     }
                     NodeType::Internal => {
                         // The node is an internal node.
@@ -882,9 +842,9 @@ where
 
                         if child.is_full() {
                             // Check if the key already exists in the child.
-                            if let Ok(idx) = child.search(key, self.memory()) {
-                                // Key found
-                                return (child, Ok(idx));
+                            if let Ok(idx) = child.search(&key, self.memory()) {
+                                // Key found.
+                                return callback(self, child, idx, key, true);
                             }
 
                             // The child is full. Split the child.
@@ -892,14 +852,14 @@ where
 
                             // The children have now changed. Search again for
                             // the child where we need to store the entry in.
-                            let idx = node.search(key, self.memory()).unwrap_or_else(|idx| idx);
+                            let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
                             child = self.load_node(node.child(idx));
                         }
 
                         // The child should now be not full.
                         assert!(!child.is_full());
 
-                        self.find_node_for_insert_nonfull(child, key)
+                        self.find_node_for_insert(child, key, callback)
                     }
                 }
             }
