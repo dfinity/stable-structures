@@ -1104,9 +1104,7 @@ pub fn btreemap_v2_remove_zipf_10k_u64_u64() -> BenchResult {
     // Select keys to remove with Zipf distribution.
     // Some keys will be selected multiple times; remove() on an already-removed key is a miss.
     let zipf = ZipfSampler::new(count, 1.0);
-    let to_remove: Vec<u64> = (0..count)
-        .map(|_| keys[zipf.sample(&mut rng)])
-        .collect();
+    let to_remove: Vec<u64> = (0..count).map(|_| keys[zipf.sample(&mut rng)]).collect();
     bench_fn(|| {
         for key in to_remove {
             btree.remove(&key);
