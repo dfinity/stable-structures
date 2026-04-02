@@ -49,6 +49,7 @@
 //! ----------------------------------------
 //! ```
 mod allocator;
+pub mod entry;
 mod iter;
 mod node;
 mod node_cache;
@@ -60,7 +61,7 @@ use crate::{
 };
 use allocator::Allocator;
 pub use iter::Iter;
-use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
+use node::{DerivedPageSize, Node, NodeType, PageSize, Version};
 use node_cache::NodeCache;
 pub use node_cache::NodeCacheMetrics;
 use std::borrow::Cow;
@@ -654,46 +655,177 @@ where
                 )));
             }
 
-            // If the root is full, we need to introduce a new node as the root.
-            //
             // NOTE: In the case where we are overwriting an existing key, then introducing
             // a new root node isn't strictly necessary. However, that's a micro-optimization
             // that adds more complexity than it's worth.
-            if root.is_full() {
-                // The root is full. Allocate a new node that will be used as the new root.
-                let mut new_root = self.allocate_node(NodeType::Internal);
-
-                // The new root has the old root as its only child.
-                new_root.push_child(self.root_addr);
-
-                // Update the root address.
-                self.root_addr = new_root.address();
-                self.save_header();
-
-                // Split the old (full) root.
-                self.split_child(&mut new_root, 0);
-
-                new_root
-            } else {
-                root
-            }
+            self.split_root_if_full(root)
         };
 
-        self.insert_nonfull(root, key, value)
-            .map(Cow::Owned)
-            .map(V::from_bytes)
+        self.find_node_for_insert(root, key, move |map, mut node, idx, key, key_exists| {
+            if key_exists {
+                Some(map.update_value(&mut node, idx, value))
+            } else {
+                node.insert_entry(idx, (key, value));
+                map.save_node(&mut node);
+                map.length += 1;
+                map.save_header();
+                None
+            }
+        })
+        .map(Cow::Owned)
+        .map(V::from_bytes)
     }
 
-    /// Inserts an entry into a node that is *not full*.
-    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
+    /// Gets an [`Entry`](entry::Entry) for the given `key`, which gives efficient in-place access
+    /// to a map's entries, allowing inspection or modification without redundant key lookups. The
+    /// API mirrors [`std::collections::btree_map::Entry`] as closely as the stable-memory model
+    /// allows.
+    ///
+    /// Returns [`Entry::Occupied`](entry::Entry::Occupied) when `key` is already present, or
+    /// [`Entry::Vacant`](entry::Entry::Vacant) when it is not. Both variants expose methods to
+    /// read, overwrite, or remove the value.
+    ///
+    /// # Differences from `std::collections::BTreeMap::entry`
+    ///
+    /// The standard library's `or_insert` returns `&mut V`, giving a direct reference into the
+    /// map. Because values live in stable memory, long-lived references are not possible here.
+    /// Instead, `or_insert` (and its variants) return an [`OccupiedEntry`](entry::OccupiedEntry),
+    /// which lets you continue operating on the entry without a second key lookup.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u32, u32, _> = BTreeMap::new(DefaultMemoryImpl::default());
+    ///
+    /// // Insert a default value when the key is absent, then read it back.
+    /// let val = map.entry(1).or_insert(0).get();
+    /// assert_eq!(val, 0);
+    ///
+    /// // Increment a counter, seeding it to 1 when first seen.
+    /// for key in [1, 1, 2, 3, 1] {
+    ///     map.entry(key).and_modify(|v| *v += 1).or_insert(1);
+    /// }
+    /// assert_eq!(map.get(&1), Some(3));
+    /// assert_eq!(map.get(&2), Some(1));
+    /// assert_eq!(map.get(&3), Some(1));
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`entry::Entry`] — the type returned by this method
+    /// - [`entry::OccupiedEntry`] — methods available when the key is present
+    /// - [`entry::VacantEntry`] — methods available when the key is absent
+    pub fn entry(&mut self, key: K) -> entry::Entry<K, V, M> {
+        // For an empty map the key is trivially absent.  Avoid calling
+        // `find_node_for_insert` here because that eagerly allocates a root
+        // node and persists `root_addr` to the header, which would leave the
+        // map in an inconsistent state if the returned `VacantEntry` is dropped
+        // without calling `insert`.
+        if self.root_addr == NULL {
+            return entry::Entry::Vacant(entry::VacantEntry {
+                map: self,
+                key,
+                location: None,
+            });
+        }
+
+        // Load the root from memory.
+        let mut root = self.load_node(self.root_addr);
+
+        // Check if the key already exists in the root.
+        if let Ok(idx) = root.search(&key, self.memory()) {
+            // Key found
+            return entry::Entry::Occupied(entry::OccupiedEntry {
+                map: self,
+                key,
+                node: root,
+                idx,
+            });
+        }
+
+        root = self.split_root_if_full(root);
+
+        let (key, node, search_result) =
+            self.find_node_for_insert(root, key, |_, node, idx, key, key_exists| {
+                if key_exists {
+                    (key, node, Ok(idx))
+                } else {
+                    (key, node, Err(idx))
+                }
+            });
+
+        match search_result {
+            Ok(idx) => entry::Entry::Occupied(entry::OccupiedEntry {
+                map: self,
+                key,
+                node,
+                idx,
+            }),
+            Err(idx) => entry::Entry::Vacant(entry::VacantEntry {
+                map: self,
+                key,
+                location: Some((node, idx)),
+            }),
+        }
+    }
+
+    /// Ensures the root node is not full, called before an insertion.
+    ///
+    /// If `root` is full, a new internal node is allocated, made the parent of the old
+    /// root, and the old root is split into two children.  The new (non-full) root is
+    /// returned.  If `root` is not full it is returned unchanged.
+    fn split_root_if_full(&mut self, root: Node<K>) -> Node<K> {
+        if !root.is_full() {
+            return root;
+        }
+
+        // Allocate a new node that will become the new root.
+        let mut new_root = self.allocate_node(NodeType::Internal);
+
+        // The new root has the old root as its only child.
+        new_root.push_child(self.root_addr);
+
+        // Persist the updated root address before splitting.
+        self.root_addr = new_root.address();
+        self.save_header();
+
+        // Split the old (full) root into two children of new_root.
+        self.split_child(&mut new_root, 0);
+
+        new_root
+    }
+
+    /// Core B-tree insertion traversal, shared by [`BTreeMap::insert`] and [`BTreeMap::entry`].
+    ///
+    /// Descends from `node` (which must not be full) to the leaf or internal node where
+    /// `key` either already exists or should be inserted, then invokes `callback` with:
+    ///
+    /// * `map`        — mutable access to the map (for saving nodes, updating length, etc.)
+    /// * `node`       — the target node
+    /// * `idx`        — the relevant slot index within `node`
+    /// * `key`        — the key being inserted
+    /// * `key_exists` — `true` if `key` is already present at `idx`; `false` if `idx` is
+    ///                  the position where `key` should be inserted
+    ///
+    /// The callback's return value is propagated back to the caller.
+    ///
+    /// PRECONDITION: `node` is not full.
+    fn find_node_for_insert<R>(
+        &mut self,
+        mut node: Node<K>,
+        key: K,
+        callback: impl FnOnce(&mut Self, Node<K>, usize, K, bool) -> R,
+    ) -> R {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
 
         // Look for the key in the node.
         match node.search(&key, self.memory()) {
             Ok(idx) => {
-                // Key found, replace its value and return the old one.
-                Some(self.update_value(&mut node, idx, value))
+                // Key found.
+                callback(self, node, idx, key, true)
             }
             Err(idx) => {
                 // The key isn't in the node. `idx` is where that key should be inserted.
@@ -701,16 +833,7 @@ where
                 match node.node_type() {
                     NodeType::Leaf => {
                         // The node is a non-full leaf.
-                        // Insert the entry at the proper location.
-                        node.insert_entry(idx, (key, value));
-                        self.save_node(&mut node);
-
-                        // Update the length.
-                        self.length += 1;
-                        self.save_header();
-
-                        // No previous value to return.
-                        None
+                        callback(self, node, idx, key, false)
                     }
                     NodeType::Internal => {
                         // The node is an internal node.
@@ -720,8 +843,8 @@ where
                         if child.is_full() {
                             // Check if the key already exists in the child.
                             if let Ok(idx) = child.search(&key, self.memory()) {
-                                // Key found, replace its value and return the old one.
-                                return Some(self.update_value(&mut child, idx, value));
+                                // Key found.
+                                return callback(self, child, idx, key, true);
                             }
 
                             // The child is full. Split the child.
@@ -736,7 +859,7 @@ where
                         // The child should now be not full.
                         assert!(!child.is_full());
 
-                        self.insert_nonfull(child, key, value)
+                        self.find_node_for_insert(child, key, callback)
                     }
                 }
             }
@@ -873,12 +996,12 @@ where
     }
 
     #[inline(always)]
-    fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
+    fn first_entry_inner(&self, node: &Node<K>) -> node::Entry<K> {
         self.find_first_or_last(node, true, 0, |n, i, m| n.get_key_read_value_uncached(i, m))
     }
 
     #[inline(always)]
-    fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
+    fn last_entry_inner(&self, node: &Node<K>) -> node::Entry<K> {
         self.find_first_or_last(node, false, 0, |n, i, m| {
             n.get_key_read_value_uncached(i, m)
         })
@@ -1002,25 +1125,7 @@ where
             NodeType::Leaf => {
                 match node.search(key, self.memory()) {
                     Ok(idx) => {
-                        // Case 1: The node is a leaf node and the key exists in it.
-                        // This is the simplest case. The key is removed from the leaf.
-                        let value = node.remove_entry(idx, self.memory()).1;
-                        self.length -= 1;
-
-                        if node.entries_len() == 0 {
-                            assert_eq!(
-                                node.address(), self.root_addr,
-                                "Removal can only result in an empty leaf node if that node is the root"
-                            );
-
-                            // Deallocate the empty node.
-                            self.deallocate_node(node);
-                            self.root_addr = NULL;
-                        } else {
-                            self.save_node(&mut node);
-                        }
-
-                        self.save_header();
+                        let value = self.remove_from_leaf_node(node, idx);
                         Some(value)
                     }
                     _ => None, // Key not found.
@@ -1029,129 +1134,8 @@ where
             NodeType::Internal => {
                 match node.search(key, self.memory()) {
                     Ok(idx) => {
-                        // Case 2: The node is an internal node and the key exists in it.
-
-                        let left_child = self.load_node(node.child(idx));
-                        if left_child.can_remove_entry_without_merging() {
-                            // Case 2.a: A key can be removed from the left child without merging.
-                            //
-                            //                       parent
-                            //                  [..., key, ...]
-                            //                       /   \
-                            //            [left child]   [...]
-                            //           /            \
-                            //        [...]         [..., key predecessor]
-                            //
-                            // In this case, we replace `key` with the key's predecessor from the
-                            // left child's subtree, then we recursively delete the key's
-                            // predecessor for the following end result:
-                            //
-                            //                       parent
-                            //            [..., key predecessor, ...]
-                            //                       /   \
-                            //            [left child]   [...]
-                            //           /            \
-                            //        [...]          [...]
-
-                            // Recursively delete the predecessor.
-                            // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = self.last_entry_inner(&left_child);
-                            self.remove_helper(left_child, &predecessor.0)?;
-
-                            // Replace the `key` with its predecessor.
-                            let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
-
-                            // Save the parent node.
-                            self.save_node(&mut node);
-                            return Some(old_value);
-                        }
-
-                        let right_child = self.load_node(node.child(idx + 1));
-                        if right_child.can_remove_entry_without_merging() {
-                            // Case 2.b: A key can be removed from the right child without merging.
-                            //
-                            //                       parent
-                            //                  [..., key, ...]
-                            //                       /   \
-                            //                   [...]   [right child]
-                            //                          /             \
-                            //              [key successor, ...]     [...]
-                            //
-                            // In this case, we replace `key` with the key's successor from the
-                            // right child's subtree, then we recursively delete the key's
-                            // successor for the following end result:
-                            //
-                            //                       parent
-                            //            [..., key successor, ...]
-                            //                       /   \
-                            //                  [...]   [right child]
-                            //                           /            \
-                            //                        [...]          [...]
-
-                            // Recursively delete the successor.
-                            // TODO(EXC-1034): Do this in a single pass.
-                            let successor = self.first_entry_inner(&right_child);
-                            self.remove_helper(right_child, &successor.0)?;
-
-                            // Replace the `key` with its successor.
-                            let (_, old_value) = node.swap_entry(idx, successor, self.memory());
-
-                            // Save the parent node.
-                            self.save_node(&mut node);
-                            return Some(old_value);
-                        }
-
-                        // Case 2.c: Both the left and right child are at their minimum sizes.
-                        //
-                        //                       parent
-                        //                  [..., key, ...]
-                        //                       /   \
-                        //            [left child]   [right child]
-                        //
-                        // In this case, we merge (left child, key, right child) into a single
-                        // node. The result will look like this:
-                        //
-                        //                       parent
-                        //                     [...  ...]
-                        //                         |
-                        //          [left child, `key`, right child] <= new child
-                        //
-                        // We then recurse on this new child to delete `key`.
-                        //
-                        // If `parent` becomes empty (which can only happen if it's the root),
-                        // then `parent` is deleted and `new_child` becomes the new root.
-                        assert!(left_child.at_minimum());
-                        assert!(right_child.at_minimum());
-
-                        // Merge the right child into the left child.
-                        let mut new_child = self.merge(
-                            right_child,
-                            left_child,
-                            node.remove_entry(idx, self.memory()),
-                        );
-
-                        // Remove the right child from the parent node.
-                        node.remove_child(idx + 1);
-
-                        if node.entries_len() == 0 {
-                            // Can only happen if this node is root.
-                            assert_eq!(node.address(), self.root_addr);
-                            assert_eq!(node.child(0), new_child.address());
-                            assert_eq!(node.children_len(), 1);
-
-                            self.root_addr = new_child.address();
-
-                            // Deallocate the root node.
-                            self.deallocate_node(node);
-                            self.save_header();
-                        } else {
-                            self.save_node(&mut node);
-                        }
-
-                        self.save_node(&mut new_child);
-
-                        // Recursively delete the key.
-                        self.remove_helper(new_child, key)
+                        let value = self.remove_from_internal_node(node, idx, key);
+                        Some(value)
                     }
                     Err(idx) => {
                         // Case 3: The node is an internal node and the key does NOT exist in it.
@@ -1356,6 +1340,167 @@ where
         }
     }
 
+    /// PRECONDITION
+    ///   - `node` is a leaf node
+    ///   - `node.entries_len() > 1` or node is the root node
+    fn remove_from_leaf_node(&mut self, mut node: Node<K>, idx: usize) -> Vec<u8> {
+        debug_assert_eq!(node.node_type(), NodeType::Leaf);
+
+        // Case 1: The node is a leaf node and the key exists in it.
+        // This is the simplest case. The key is removed from the leaf.
+        let value = node.remove_entry(idx, self.memory()).1;
+        self.length -= 1;
+
+        if node.entries_len() == 0 {
+            assert_eq!(
+                node.address(),
+                self.root_addr,
+                "Removal can only result in an empty leaf node if that node is the root"
+            );
+
+            // Deallocate the empty node.
+            self.deallocate_node(node);
+            self.root_addr = NULL;
+        } else {
+            self.save_node(&mut node);
+        }
+
+        self.save_header();
+        value
+    }
+
+    /// PRECONDITION
+    ///   - `node` is an internal node
+    ///   - `node` contains `key` at index `idx`
+    fn remove_from_internal_node(&mut self, mut node: Node<K>, idx: usize, key: &K) -> Vec<u8> {
+        debug_assert_eq!(node.node_type(), NodeType::Internal);
+        debug_assert_eq!(node.search(key, self.memory()), Ok(idx));
+
+        // Case 2: The node is an internal node and the key exists in it.
+
+        let left_child = self.load_node(node.child(idx));
+        if left_child.can_remove_entry_without_merging() {
+            // Case 2.a: A key can be removed from the left child without merging.
+            //
+            //                       parent
+            //                  [..., key, ...]
+            //                       /   \
+            //            [left child]   [...]
+            //           /            \
+            //        [...]         [..., key predecessor]
+            //
+            // In this case, we replace `key` with the key's predecessor from the
+            // left child's subtree, then we recursively delete the key's
+            // predecessor for the following end result:
+            //
+            //                       parent
+            //            [..., key predecessor, ...]
+            //                       /   \
+            //            [left child]   [...]
+            //           /            \
+            //        [...]          [...]
+
+            // Recursively delete the predecessor.
+            // TODO(EXC-1034): Do this in a single pass.
+            let predecessor = self.last_entry_inner(&left_child);
+            self.remove_helper(left_child, &predecessor.0).unwrap();
+
+            // Replace the `key` with its predecessor.
+            let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
+
+            // Save the parent node.
+            self.save_node(&mut node);
+            return old_value;
+        }
+
+        let right_child = self.load_node(node.child(idx + 1));
+        if right_child.can_remove_entry_without_merging() {
+            // Case 2.b: A key can be removed from the right child without merging.
+            //
+            //                       parent
+            //                  [..., key, ...]
+            //                       /   \
+            //                   [...]   [right child]
+            //                          /             \
+            //              [key successor, ...]     [...]
+            //
+            // In this case, we replace `key` with the key's successor from the
+            // right child's subtree, then we recursively delete the key's
+            // successor for the following end result:
+            //
+            //                       parent
+            //            [..., key successor, ...]
+            //                       /   \
+            //                  [...]   [right child]
+            //                           /            \
+            //                        [...]          [...]
+
+            // Recursively delete the successor.
+            // TODO(EXC-1034): Do this in a single pass.
+            let successor = self.first_entry_inner(&right_child);
+            self.remove_helper(right_child, &successor.0).unwrap();
+
+            // Replace the `key` with its successor.
+            let (_, old_value) = node.swap_entry(idx, successor, self.memory());
+
+            // Save the parent node.
+            self.save_node(&mut node);
+            return old_value;
+        }
+
+        // Case 2.c: Both the left and right child are at their minimum sizes.
+        //
+        //                       parent
+        //                  [..., key, ...]
+        //                       /   \
+        //            [left child]   [right child]
+        //
+        // In this case, we merge (left child, key, right child) into a single
+        // node. The result will look like this:
+        //
+        //                       parent
+        //                     [...  ...]
+        //                         |
+        //          [left child, `key`, right child] <= new child
+        //
+        // We then recurse on this new child to delete `key`.
+        //
+        // If `parent` becomes empty (which can only happen if it's the root),
+        // then `parent` is deleted and `new_child` becomes the new root.
+        assert!(left_child.at_minimum());
+        assert!(right_child.at_minimum());
+
+        // Merge the right child into the left child.
+        let mut new_child = self.merge(
+            right_child,
+            left_child,
+            node.remove_entry(idx, self.memory()),
+        );
+
+        // Remove the right child from the parent node.
+        node.remove_child(idx + 1);
+
+        if node.entries_len() == 0 {
+            // Can only happen if this node is root.
+            assert_eq!(node.address(), self.root_addr);
+            assert_eq!(node.child(0), new_child.address());
+            assert_eq!(node.children_len(), 1);
+
+            self.root_addr = new_child.address();
+
+            // Deallocate the root node.
+            self.deallocate_node(node);
+            self.save_header();
+        } else {
+            self.save_node(&mut node);
+        }
+
+        self.save_node(&mut new_child);
+
+        // Recursively delete the key.
+        self.remove_helper(new_child, key).unwrap()
+    }
+
     /// Returns an iterator over the entries of the map, sorted by key.
     ///
     /// # Example
@@ -1478,7 +1623,7 @@ where
     /// Output:
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
-    fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
+    fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: node::Entry<K>) -> Node<K> {
         let source_addr = source.address();
         into.merge(source, median, &mut self.allocator);
         // Node::merge saves `into` and deallocates `source` directly through
