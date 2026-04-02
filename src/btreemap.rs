@@ -741,9 +741,6 @@ where
                             // the child where we need to store the entry in.
                             let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
                             child = self.load_node(node.child(idx));
-                            // split_child saved node to memory; return the
-                            // up-to-date in-memory copy to the cache.
-                            self.return_node(node, depth);
                         } else {
                             // Happy path: child is not full. The current node
                             // will not be modified — return it to cache.
