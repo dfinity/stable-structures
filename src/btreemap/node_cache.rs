@@ -86,6 +86,9 @@ struct CacheSlot<K: Storable + Ord + Clone> {
     node: Option<Node<K>>,
 
     /// Distance from the tree root (root = 0). Used by the eviction policy.
+    /// u8 is sufficient: with B=6 (min 6 children per node), a depth-255
+    /// tree holds at least 2*6^254 entries (~10^197), far beyond any
+    /// practical stable memory size.
     depth: u8,
 }
 
