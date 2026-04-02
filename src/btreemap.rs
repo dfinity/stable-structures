@@ -732,6 +732,8 @@ where
                             }
 
                             // The child is full. Split the child.
+                            // TODO: pass the already-loaded `child` into `split_child`
+                            // to avoid re-loading it from stable memory inside that method.
                             self.split_child(&mut node, idx);
 
                             // The children have now changed. Search again for
@@ -1553,6 +1555,9 @@ where
     }
 
     /// Saves the node to memory and invalidates the cache slot.
+    // TODO: benchmark putting the node back into the cache after saving
+    // instead of invalidating, so subsequent reads (especially of the root
+    // and depth-1 nodes) hit the cache. Requires cloning or taking ownership.
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
         node.save(self.allocator_mut());
