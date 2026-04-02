@@ -67,6 +67,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
+use std::rc::Rc;
 
 #[cfg(test)]
 mod proptests;
@@ -804,27 +805,19 @@ where
 
     /// Recursively traverses from `node_addr`, invoking `f` if `key` is found. Stops at a leaf if not.
     ///
-    /// Uses the node cache: nodes are taken out before use and returned after.
+    /// Uses the node cache: nodes are loaded (or retrieved from cache) as shared `Rc` references.
     /// `depth` is the distance from the root (root = 0).
     fn traverse<F, R>(&self, node_addr: Address, depth: u8, key: &K, f: F) -> Option<R>
     where
         F: Fn(&Node<K>, usize) -> R,
     {
-        let node = self.take_or_load_node(node_addr);
+        let node = self.get_or_load_node(node_addr, depth);
         match node.search(key, self.memory()) {
-            Ok(idx) => {
-                let result = f(&node, idx); // Key found: apply `f`.
-                self.return_node(node, depth);
-                Some(result)
-            }
+            Ok(idx) => Some(f(&node, idx)),
             Err(idx) => match node.node_type() {
-                NodeType::Leaf => {
-                    self.return_node(node, depth);
-                    None // At a leaf: key not present.
-                }
+                NodeType::Leaf => None,
                 NodeType::Internal => {
                     let child_addr = node.child(idx);
-                    self.return_node(node, depth);
                     self.traverse(child_addr, depth.saturating_add(1), key, f)
                 }
             },
@@ -853,11 +846,9 @@ where
                     // Last child index in a 0-based array of children.
                     node.child(node.children_len() - 1)
                 };
-                let child = self.take_or_load_node(child_addr);
                 let new_depth = depth.saturating_add(1);
-                let result = self.find_first_or_last(&child, is_first, new_depth, extract);
-                self.return_node(child, new_depth);
-                result
+                let child = self.get_or_load_node(child_addr, new_depth);
+                self.find_first_or_last(&child, is_first, new_depth, extract)
             }
         }
     }
@@ -926,9 +917,8 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        let root = self.take_or_load_node(self.root_addr);
+        let root = self.get_or_load_node(self.root_addr, 0);
         let (k, encoded_v) = self.first_entry_inner(&root);
-        self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -938,9 +928,8 @@ where
         if self.root_addr == NULL {
             return None;
         }
-        let root = self.take_or_load_node(self.root_addr);
+        let root = self.get_or_load_node(self.root_addr, 0);
         let (k, encoded_v) = self.last_entry_inner(&root);
-        self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
 
@@ -1505,25 +1494,19 @@ where
         self.cache.get_mut().invalidate(addr);
     }
 
-    /// Takes a node from the cache, or loads it from memory if not cached.
-    ///
-    /// Used by read paths (`&self`). The caller must call `return_node` when
-    /// done to put the node back into the cache.
-    #[inline(always)]
-    fn take_or_load_node(&self, address: Address) -> Node<K> {
-        if let Some(node) = self.cache.borrow_mut().take(address) {
-            return node;
-        }
-        Node::load(address, self.version.page_size(), self.memory())
-    }
-
-    /// Returns a node to the cache after use on a read path.
+    /// Returns a shared reference to the cached node, or loads from memory
+    /// and caches it.
     ///
     /// `depth` is the distance from the root (root = 0), used by the
     /// cache eviction policy.
     #[inline(always)]
-    fn return_node(&self, node: Node<K>, depth: u8) {
-        self.cache.borrow_mut().put(node.address(), node, depth);
+    fn get_or_load_node(&self, address: Address, depth: u8) -> Rc<Node<K>> {
+        if let Some(node) = self.cache.borrow_mut().get(address) {
+            return node;
+        }
+        let node = Rc::new(Node::load(address, self.version.page_size(), self.memory()));
+        self.cache.borrow_mut().put(address, Rc::clone(&node), depth);
+        node
     }
 
     /// Loads a node from memory, bypassing the cache.
