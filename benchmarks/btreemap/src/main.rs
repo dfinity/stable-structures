@@ -67,6 +67,51 @@ fn generate_random_blocks(count: usize, block_size: usize, rng: &mut Rng) -> Vec
         .collect()
 }
 
+enum Position {
+    First,
+    Last,
+}
+
+/// Precomputed inverse-CDF table for Zipf sampling.
+/// `sample()` returns a 0-based index in [0, n).
+struct ZipfSampler {
+    cdf: Vec<f64>,
+}
+
+impl ZipfSampler {
+    fn new(n: usize, alpha: f64) -> Self {
+        let mut cdf = Vec::with_capacity(n);
+        let mut sum = 0.0;
+        for k in 1..=n {
+            sum += 1.0 / (k as f64).powf(alpha);
+            cdf.push(sum);
+        }
+        // Normalize to [0, 1].
+        let total = sum;
+        for v in &mut cdf {
+            *v /= total;
+        }
+        Self { cdf }
+    }
+
+    fn sample(&self, rng: &mut Rng) -> usize {
+        let u = rng.rand_f64();
+        // Binary search for the first CDF entry >= u.
+        match self.cdf.binary_search_by(|v| v.partial_cmp(&u).unwrap()) {
+            Ok(i) => i,
+            Err(i) => i.min(self.cdf.len() - 1),
+        }
+    }
+}
+
+// =====================================================================
+// SECTION 1: GENERIC BENCHMARKS
+//
+// Regression benchmarks for method performance across key/value sizes.
+// These run with the default cache configuration and are not intended
+// to measure cache-specific behavior.
+// =====================================================================
+
 // Benchmarks for `BTreeMap::insert`, full grid.
 bench_tests! {
     // blob K x 128
@@ -457,26 +502,6 @@ pub fn btreemap_v2_contains_10mib_values() -> BenchResult {
     })
 }
 
-/// Helper macro to generate traversal benchmarks.
-macro_rules! bench_traversal_tests {
-    (
-        $(
-            $fn_name:ident,
-            $helper:ident,
-            $count:expr,
-            $value_size:expr,
-            $traversal_mode:expr
-        );+ $(;)?
-    ) => {
-        $(
-            #[bench(raw)]
-            pub fn $fn_name() -> BenchResult {
-                $helper($count, $value_size, $traversal_mode)
-            }
-        )+
-    };
-}
-
 // First key value, reduced grid.
 bench_tests! {
     // key size variation (fixed Blob128 value)
@@ -600,11 +625,6 @@ fn pop_helper_v2<K: TestKey, V: TestValue>(position: Position) -> BenchResult {
     pop_helper::<K, V>(btree, position)
 }
 
-enum Position {
-    First,
-    Last,
-}
-
 fn pop_helper<K: TestKey, V: TestValue>(
     mut btree: BTreeMap<K, V, impl Memory>,
     position: Position,
@@ -624,6 +644,26 @@ fn pop_helper<K: TestKey, V: TestValue>(
             };
         }
     })
+}
+
+/// Helper macro to generate traversal benchmarks.
+macro_rules! bench_traversal_tests {
+    (
+        $(
+            $fn_name:ident,
+            $helper:ident,
+            $count:expr,
+            $value_size:expr,
+            $traversal_mode:expr
+        );+ $(;)?
+    ) => {
+        $(
+            #[bench(raw)]
+            pub fn $fn_name() -> BenchResult {
+                $helper($count, $value_size, $traversal_mode)
+            }
+        )+
+    };
 }
 
 bench_traversal_tests! {
@@ -754,9 +794,25 @@ fn range_count_helper_v2(count: usize, size: usize) -> BenchResult {
     })
 }
 
-// --- Benchmarks for deeper trees and realistic access patterns ---
+// =====================================================================
+// SECTION 2: CACHE-SPECIFIC BENCHMARKS
+//
+// Benchmarks that test access patterns where the node cache has a
+// measurable impact. All use u64/u64 (or Blob32/Blob128 where noted)
+// to keep per-benchmark cost low.
+//
+// Subsections:
+//   2a. Deeper trees (100k items)
+//   2b. Access patterns
+//   2c. Zipf-distributed workloads
+//   2d. Read-then-write combos
+//   2e. No-cache baselines (cache=0) for A/B comparison
+// =====================================================================
 
-// 100K benchmarks: tests depth 5-6 tree where cache covers a smaller fraction of node loads.
+// --- 2a: Deeper trees (100k) ----------------------------------------
+// 100K items produce depth 5-6, where cache covers a smaller fraction
+// of the total node loads per operation.
+
 #[bench(raw)]
 pub fn btreemap_v2_insert_100k_u64_u64() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
@@ -807,8 +863,10 @@ pub fn btreemap_v2_remove_100k_u64_u64() -> BenchResult {
     })
 }
 
+// --- 2b: Access patterns --------------------------------------------
+
 // Update existing keys: insert 10K items, then re-insert all with new values.
-// Tests the overwrite path (traverse cached nodes → replace value → invalidate leaf).
+// Tests the overwrite path (traverse cached nodes -> replace value -> invalidate leaf).
 #[bench(raw)]
 pub fn btreemap_v2_insert_overwrite_u64_u64() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
@@ -890,42 +948,11 @@ pub fn btreemap_v2_range_small_u64_u64() -> BenchResult {
     })
 }
 
-// --- Zipf-distributed benchmarks (realistic skewed access patterns) ---
+// --- 2c: Zipf-distributed workloads ---------------------------------
+// Realistic skewed access patterns where a small fraction of keys
+// receive most accesses. Cache should help significantly here.
 
-/// Precomputed inverse-CDF table for Zipf sampling.
-/// `sample()` returns a 0-based index in [0, n).
-struct ZipfSampler {
-    cdf: Vec<f64>,
-}
-
-impl ZipfSampler {
-    fn new(n: usize, alpha: f64) -> Self {
-        let mut cdf = Vec::with_capacity(n);
-        let mut sum = 0.0;
-        for k in 1..=n {
-            sum += 1.0 / (k as f64).powf(alpha);
-            cdf.push(sum);
-        }
-        // Normalize to [0, 1].
-        let total = sum;
-        for v in &mut cdf {
-            *v /= total;
-        }
-        Self { cdf }
-    }
-
-    fn sample(&self, rng: &mut Rng) -> usize {
-        let u = rng.rand_f64();
-        // Binary search for the first CDF entry >= u.
-        match self.cdf.binary_search_by(|v| v.partial_cmp(&u).unwrap()) {
-            Ok(i) => i,
-            Err(i) => i.min(self.cdf.len() - 1),
-        }
-    }
-}
-
-// Zipf get on 10K tree, α=1.0 (classic Zipf's law).
-// A small fraction of keys receive most accesses — cache should help significantly.
+// Zipf get on 10K tree, alpha=1.0 (classic Zipf's law).
 #[bench(raw)]
 pub fn btreemap_v2_get_zipf_10k_u64_u64() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
@@ -946,8 +973,8 @@ pub fn btreemap_v2_get_zipf_10k_u64_u64() -> BenchResult {
     })
 }
 
-// Zipf get on 100K tree, α=1.0.
-// Deeper tree (depth 5-6) where cache covers a smaller fraction — Zipf locality compensates.
+// Zipf get on 100K tree, alpha=1.0.
+// Deeper tree (depth 5-6) where cache covers a smaller fraction.
 #[bench(raw)]
 pub fn btreemap_v2_get_zipf_100k_u64_u64() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
@@ -968,7 +995,7 @@ pub fn btreemap_v2_get_zipf_100k_u64_u64() -> BenchResult {
     })
 }
 
-// Zipf get on 10K tree, α=1.5 (heavy skew — top ~1% of keys get ~90% of accesses).
+// Zipf get on 10K tree, alpha=1.5 (heavy skew -- top ~1% of keys get ~90% of accesses).
 // Shows cache near its best: hot paths stay resident.
 #[bench(raw)]
 pub fn btreemap_v2_get_zipf_heavy_10k_u64_u64() -> BenchResult {
@@ -990,8 +1017,8 @@ pub fn btreemap_v2_get_zipf_heavy_10k_u64_u64() -> BenchResult {
     })
 }
 
-// Zipf overwrites on 10K tree, α=1.0.
-// Hot keys are updated frequently — tests cache invalidation under skewed writes.
+// Zipf overwrites on 10K tree, alpha=1.0.
+// Hot keys are updated frequently -- tests cache invalidation under skewed writes.
 #[bench(raw)]
 pub fn btreemap_v2_insert_overwrite_zipf_10k_u64_u64() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
@@ -1014,9 +1041,8 @@ pub fn btreemap_v2_insert_overwrite_zipf_10k_u64_u64() -> BenchResult {
     })
 }
 
-// Zipf misses on 10K tree, α=1.0.
+// Zipf misses on 10K tree, alpha=1.0.
 // Hot missing keys repeatedly traverse the same tree paths without finding a match.
-// Pure traversal cost — cache benefit is proportionally larger with no value-read cost.
 #[bench(raw)]
 pub fn btreemap_v2_get_miss_zipf_10k_u64_u64() -> BenchResult {
     let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
@@ -1038,6 +1064,399 @@ pub fn btreemap_v2_get_miss_zipf_10k_u64_u64() -> BenchResult {
             btree.get(&key);
         }
     })
+}
+
+// Zipf contains_key on 10K tree, alpha=1.0.
+// Cheapest traversal (no value deser) -- cache savings are proportionally largest.
+#[bench(raw)]
+pub fn btreemap_v2_contains_zipf_10k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let access: Vec<u64> = (0..count).map(|_| keys[zipf.sample(&mut rng)]).collect();
+    bench_fn(|| {
+        for key in access {
+            btree.contains_key(&key);
+        }
+    })
+}
+
+// Zipf remove on 10K tree, alpha=1.0.
+// Tests cache invalidation under skewed deletes -- hot nodes are modified/merged frequently.
+#[bench(raw)]
+pub fn btreemap_v2_remove_zipf_10k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    // Select keys to remove with Zipf distribution.
+    // Some keys will be selected multiple times; remove() on an already-removed key is a miss.
+    let zipf = ZipfSampler::new(count, 1.0);
+    let to_remove: Vec<u64> = (0..count).map(|_| keys[zipf.sample(&mut rng)]).collect();
+    bench_fn(|| {
+        for key in to_remove {
+            btree.remove(&key);
+        }
+    })
+}
+
+// --- 2d: Read-then-write combos -------------------------------------
+// Patterns where a read warms the cache path and the subsequent write
+// reuses it. These are common real-world usage patterns.
+
+// Get-then-remove: get(k) warms the cache path, remove(k) reuses it.
+#[bench(raw)]
+pub fn btreemap_v2_get_then_remove_u64_u64() -> BenchResult {
+    get_then_remove_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_then_remove_blob_32_128() -> BenchResult {
+    get_then_remove_helper::<Blob32, Blob128>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+fn get_then_remove_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let keys: Vec<K> = items.into_iter().map(|(k, _)| k).collect();
+    bench_fn(|| {
+        for key in keys {
+            btree.get(&key);
+            btree.remove(&key);
+        }
+    })
+}
+
+// Get-then-insert (upsert): get(k) warms the path, insert(k, new_v) reuses it.
+#[bench(raw)]
+pub fn btreemap_v2_get_then_insert_u64_u64() -> BenchResult {
+    get_then_insert_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_then_insert_blob_32_128() -> BenchResult {
+    get_then_insert_helper::<Blob32, Blob128>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+fn get_then_insert_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let updates: Vec<(K, V)> = items
+        .into_iter()
+        .map(|(k, _)| (k, V::random(&mut rng)))
+        .collect();
+    bench_fn(|| {
+        for (k, v) in updates {
+            btree.get(&k);
+            btree.insert(k, v);
+        }
+    })
+}
+
+// Contains-then-remove: contains_key(k) warms the path, remove(k) reuses it.
+#[bench(raw)]
+pub fn btreemap_v2_contains_then_remove_u64_u64() -> BenchResult {
+    contains_then_remove_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_contains_then_remove_blob_32_128() -> BenchResult {
+    contains_then_remove_helper::<Blob32, Blob128>(BTreeMap::new(DefaultMemoryImpl::default()))
+}
+
+fn contains_then_remove_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let keys: Vec<K> = items.into_iter().map(|(k, _)| k).collect();
+    bench_fn(|| {
+        for key in keys {
+            if btree.contains_key(&key) {
+                btree.remove(&key);
+            }
+        }
+    })
+}
+
+// Interleaved mixed: Zipf-distributed get/insert on 10K tree.
+// Hot keys are read then written -- maximum cache reuse.
+#[bench(raw)]
+pub fn btreemap_v2_mixed_get_insert_zipf_10k_u64_u64() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let ops: Vec<(u64, u64)> = (0..count)
+        .map(|_| (keys[zipf.sample(&mut rng)], rng.rand_u64()))
+        .collect();
+    bench_fn(|| {
+        for (k, v) in ops {
+            btree.get(&k);
+            btree.insert(k, v);
+        }
+    })
+}
+
+// Peek-then-pop: last_key_value() warms the path, pop_last() reuses it.
+// Simulates the common pattern of inspecting before removing.
+#[bench(raw)]
+pub fn btreemap_v2_peek_then_pop_last_u64_u64() -> BenchResult {
+    peek_then_pop_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()), Position::Last)
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_peek_then_pop_first_u64_u64() -> BenchResult {
+    peek_then_pop_helper::<u64, u64>(BTreeMap::new(DefaultMemoryImpl::default()), Position::First)
+}
+
+fn peek_then_pop_helper<K: TestKey, V: TestValue>(
+    mut btree: BTreeMap<K, V, impl Memory>,
+    position: Position,
+) -> BenchResult {
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<K, V>(count, &mut rng);
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    bench_fn(|| {
+        for _ in 0..count {
+            match position {
+                Position::First => {
+                    btree.first_key_value();
+                    btree.pop_first();
+                }
+                Position::Last => {
+                    btree.last_key_value();
+                    btree.pop_last();
+                }
+            };
+        }
+    })
+}
+
+// --- 2e: No-cache baselines (cache=0) --------------------------------
+// Mirror the most cache-sensitive benchmarks above with the cache
+// disabled, providing an A/B comparison to quantify cache impact.
+
+#[bench(raw)]
+pub fn btreemap_v2_get_100k_u64_u64_nocache() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0);
+    let count = 100_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let keys: Vec<u64> = items.into_iter().map(|(k, _)| k).collect();
+    bench_fn(|| {
+        for key in keys {
+            btree.get(&key);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_remove_100k_u64_u64_nocache() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0);
+    let count = 100_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let keys: Vec<u64> = items.into_iter().map(|(k, _)| k).collect();
+    bench_fn(|| {
+        for key in keys {
+            btree.remove(&key);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_insert_overwrite_u64_u64_nocache() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0);
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items.clone() {
+        btree.insert(k, v);
+    }
+
+    let new_items: Vec<(u64, u64)> = items
+        .into_iter()
+        .map(|(k, _)| (k, rng.rand_u64()))
+        .collect();
+    bench_fn(|| {
+        for (k, v) in new_items {
+            btree.insert(k, v);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_miss_u64_u64_nocache() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0);
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let miss_keys: Vec<u64> = (0..count).map(|_| rng.rand_u64()).collect();
+    bench_fn(|| {
+        for key in miss_keys {
+            btree.get(&key);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_insert_seq_u64_u64_nocache() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0);
+    let count = 10_000u64;
+    let mut rng = Rng::from_seed(0);
+
+    let items: Vec<(u64, u64)> = (0..count).map(|i| (i, rng.rand_u64())).collect();
+    bench_fn(|| {
+        for (k, v) in items {
+            btree.insert(k, v);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_zipf_10k_u64_u64_nocache() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0);
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let access: Vec<u64> = (0..count).map(|_| keys[zipf.sample(&mut rng)]).collect();
+    bench_fn(|| {
+        for key in access {
+            btree.get(&key);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_zipf_100k_u64_u64_nocache() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0);
+    let count = 100_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let access: Vec<u64> = (0..count).map(|_| keys[zipf.sample(&mut rng)]).collect();
+    bench_fn(|| {
+        for key in access {
+            btree.get(&key);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_then_remove_u64_u64_nocache() -> BenchResult {
+    get_then_remove_helper::<u64, u64>(
+        BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0),
+    )
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_get_then_insert_u64_u64_nocache() -> BenchResult {
+    get_then_insert_helper::<u64, u64>(
+        BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0),
+    )
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_contains_then_remove_u64_u64_nocache() -> BenchResult {
+    contains_then_remove_helper::<u64, u64>(
+        BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0),
+    )
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_mixed_get_insert_zipf_10k_u64_u64_nocache() -> BenchResult {
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0);
+    let count = 10_000;
+    let mut rng = Rng::from_seed(0);
+    let items = generate_random_kv::<u64, u64>(count, &mut rng);
+    let keys: Vec<u64> = items.iter().map(|(k, _)| *k).collect();
+    for (k, v) in items {
+        btree.insert(k, v);
+    }
+
+    let zipf = ZipfSampler::new(count, 1.0);
+    let ops: Vec<(u64, u64)> = (0..count)
+        .map(|_| (keys[zipf.sample(&mut rng)], rng.rand_u64()))
+        .collect();
+    bench_fn(|| {
+        for (k, v) in ops {
+            btree.get(&k);
+            btree.insert(k, v);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_v2_peek_then_pop_last_u64_u64_nocache() -> BenchResult {
+    peek_then_pop_helper::<u64, u64>(
+        BTreeMap::new(DefaultMemoryImpl::default()).with_node_cache(0),
+        Position::Last,
+    )
 }
 
 fn main() {}
