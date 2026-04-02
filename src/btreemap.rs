@@ -782,7 +782,8 @@ where
         assert!(!node.is_full());
 
         // Use the pre-loaded child if provided, otherwise load from memory.
-        let mut full_child = full_child.unwrap_or_else(|| self.load_node(node.child(full_child_idx)));
+        let mut full_child =
+            full_child.unwrap_or_else(|| self.load_node(node.child(full_child_idx)));
         assert!(full_child.is_full());
 
         // Create a sibling to this full child (which has to be the same type).
