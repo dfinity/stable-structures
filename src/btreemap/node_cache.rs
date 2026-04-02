@@ -1,5 +1,6 @@
 use crate::types::{Address, NULL};
 use crate::Storable;
+use std::rc::Rc;
 
 use super::node::Node;
 
@@ -83,7 +84,7 @@ struct CacheSlot<K: Storable + Ord + Clone> {
     address: Address,
 
     /// The cached node, or `None` if the slot is empty.
-    node: Option<Node<K>>,
+    node: Option<Rc<Node<K>>>,
 
     /// Distance from the tree root (root = 0). Used by the eviction policy.
     depth: u8,
@@ -151,16 +152,16 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         (addr.get() / self.page_size as u64) as usize % self.slots.len()
     }
 
-    pub(super) fn take(&mut self, addr: Address) -> Option<Node<K>> {
+    /// Returns a shared reference (Rc clone) to the cached node without removing it.
+    pub(super) fn get(&mut self, addr: Address) -> Option<Rc<Node<K>>> {
         if !self.is_enabled() || addr == NULL {
             return None;
         }
         let idx = self.slot_index(addr);
-        let slot = &mut self.slots[idx];
+        let slot = &self.slots[idx];
         if slot.address == addr {
             self.metrics.observe_hit();
-            slot.address = NULL;
-            slot.node.take()
+            slot.node.as_ref().map(Rc::clone)
         } else {
             if slot.node.is_none() {
                 self.metrics.observe_cold_miss();
@@ -171,7 +172,7 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         }
     }
 
-    pub(super) fn put(&mut self, addr: Address, node: Node<K>, depth: u8) {
+    pub(super) fn put(&mut self, addr: Address, node: Rc<Node<K>>, depth: u8) {
         if !self.is_enabled() {
             return;
         }
@@ -226,9 +227,13 @@ mod tests {
         NodeCache::new(PAGE_SIZE, NUM_SLOTS)
     }
 
-    /// Creates a leaf node at the given address.
-    fn leaf(addr: u64) -> Node<Vec<u8>> {
-        Node::new_v2(Address::from(addr), NodeType::Leaf, PageSize::Value(512))
+    /// Creates a leaf node at the given address, wrapped in Rc.
+    fn leaf(addr: u64) -> Rc<Node<Vec<u8>>> {
+        Rc::new(Node::new_v2(
+            Address::from(addr),
+            NodeType::Leaf,
+            PageSize::Value(512),
+        ))
     }
 
     /// First realistic node address (past allocator header + chunk header).
@@ -242,34 +247,35 @@ mod tests {
     }
 
     #[test]
-    fn put_and_take() {
+    fn put_and_get() {
         let mut cache = make_cache();
         let addr = Address::from(ADDR_A);
         cache.put(addr, leaf(ADDR_A), 0);
-        assert!(cache.take(addr).is_some());
+        assert!(cache.get(addr).is_some());
     }
 
     #[test]
-    fn take_removes_entry() {
+    fn get_does_not_remove_entry() {
         let mut cache = make_cache();
         let addr = Address::from(ADDR_A);
         cache.put(addr, leaf(ADDR_A), 0);
-        cache.take(addr);
-        assert!(cache.take(addr).is_none());
+        cache.get(addr);
+        // Node is still in the cache after get.
+        assert!(cache.get(addr).is_some());
     }
 
     #[test]
-    fn take_miss_on_empty_slot() {
+    fn get_miss_on_empty_slot() {
         let mut cache = make_cache();
-        assert!(cache.take(Address::from(ADDR_A)).is_none());
+        assert!(cache.get(Address::from(ADDR_A)).is_none());
     }
 
     #[test]
-    fn take_miss_on_wrong_address() {
+    fn get_miss_on_wrong_address() {
         let mut cache = make_cache();
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 2);
-        assert!(cache.take(b).is_none());
+        assert!(cache.get(b).is_none());
     }
 
     #[test]
@@ -278,7 +284,7 @@ mod tests {
         let addr = Address::from(ADDR_A);
         cache.put(addr, leaf(ADDR_A), 0);
         cache.invalidate(addr);
-        assert!(cache.take(addr).is_none());
+        assert!(cache.get(addr).is_none());
     }
 
     #[test]
@@ -287,7 +293,7 @@ mod tests {
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 2);
         cache.invalidate(b); // different address, same slot
-        assert!(cache.take(a).is_some());
+        assert!(cache.get(a).is_some());
     }
 
     #[test]
@@ -297,7 +303,7 @@ mod tests {
         cache.put(a, leaf(ADDR_A), 0);
         cache.put(b, leaf(ADDR_B), 1);
         // depth-0 node survives
-        assert!(cache.take(a).is_some());
+        assert!(cache.get(a).is_some());
     }
 
     #[test]
@@ -306,7 +312,7 @@ mod tests {
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 0);
         cache.put(b, leaf(ADDR_B), 2);
-        assert!(cache.take(a).is_some());
+        assert!(cache.get(a).is_some());
     }
 
     #[test]
@@ -315,7 +321,7 @@ mod tests {
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 1);
         cache.put(b, leaf(ADDR_B), 2);
-        assert!(cache.take(a).is_some());
+        assert!(cache.get(a).is_some());
     }
 
     #[test]
@@ -325,8 +331,8 @@ mod tests {
         cache.put(a, leaf(ADDR_A), 1);
         cache.put(b, leaf(ADDR_B), 0);
         // depth-0 replaced depth-1
-        assert!(cache.take(b).is_some());
-        assert!(cache.take(a).is_none());
+        assert!(cache.get(b).is_some());
+        assert!(cache.get(a).is_none());
     }
 
     #[test]
@@ -335,7 +341,7 @@ mod tests {
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 2);
         cache.put(b, leaf(ADDR_B), 0);
-        assert!(cache.take(b).is_some());
+        assert!(cache.get(b).is_some());
     }
 
     #[test]
@@ -344,7 +350,7 @@ mod tests {
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 2);
         cache.put(b, leaf(ADDR_B), 1);
-        assert!(cache.take(b).is_some());
+        assert!(cache.get(b).is_some());
     }
 
     // ---------------------------------------------------------------
@@ -358,8 +364,8 @@ mod tests {
         cache.put(a, leaf(ADDR_A), 2);
         cache.put(b, leaf(ADDR_B), 3);
         // recency wins — deeper node replaced shallower
-        assert!(cache.take(b).is_some());
-        assert!(cache.take(a).is_none());
+        assert!(cache.get(b).is_some());
+        assert!(cache.get(a).is_none());
     }
 
     #[test]
@@ -368,7 +374,7 @@ mod tests {
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 5);
         cache.put(b, leaf(ADDR_B), 2);
-        assert!(cache.take(b).is_some());
+        assert!(cache.get(b).is_some());
     }
 
     #[test]
@@ -377,8 +383,8 @@ mod tests {
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 3);
         cache.put(b, leaf(ADDR_B), 3);
-        assert!(cache.take(b).is_some());
-        assert!(cache.take(a).is_none());
+        assert!(cache.get(b).is_some());
+        assert!(cache.get(a).is_none());
     }
 
     // ---------------------------------------------------------------
@@ -390,7 +396,7 @@ mod tests {
         let mut cache: NodeCache<Vec<u8>> = NodeCache::new(PAGE_SIZE, 0);
         assert!(!cache.is_enabled());
         cache.put(Address::from(ADDR_A), leaf(ADDR_A), 0);
-        assert!(cache.take(Address::from(ADDR_A)).is_none());
+        assert!(cache.get(Address::from(ADDR_A)).is_none());
     }
 
     // ---------------------------------------------------------------
@@ -398,9 +404,9 @@ mod tests {
     // ---------------------------------------------------------------
 
     #[test]
-    fn take_null_returns_none() {
+    fn get_null_returns_none() {
         let mut cache = make_cache();
-        assert!(cache.take(NULL).is_none());
+        assert!(cache.get(NULL).is_none());
     }
 
     // ---------------------------------------------------------------
@@ -412,14 +418,14 @@ mod tests {
         let mut cache = make_cache();
         let addr = Address::from(ADDR_A);
         cache.put(addr, leaf(ADDR_A), 0);
-        cache.take(addr);
+        cache.get(addr);
         assert_eq!(cache.metrics().hits(), 1);
     }
 
     #[test]
     fn metrics_cold_miss() {
         let mut cache = make_cache();
-        cache.take(Address::from(ADDR_A));
+        cache.get(Address::from(ADDR_A));
         assert_eq!(cache.metrics().cold_misses(), 1);
         assert_eq!(cache.metrics().collision_misses(), 0);
     }
@@ -430,7 +436,7 @@ mod tests {
         let (a, b) = colliding_pair();
         cache.put(a, leaf(ADDR_A), 2);
         cache.clear_metrics();
-        cache.take(b); // occupied by a, not b
+        cache.get(b); // occupied by a, not b
         assert_eq!(cache.metrics().collision_misses(), 1);
         assert_eq!(cache.metrics().cold_misses(), 0);
     }
@@ -440,9 +446,9 @@ mod tests {
         let mut cache = make_cache();
         let addr = Address::from(ADDR_A);
         cache.put(addr, leaf(ADDR_A), 0);
-        cache.take(addr);
+        cache.get(addr);
         cache.clear();
         assert_eq!(cache.metrics().total(), 0);
-        assert!(cache.take(addr).is_none());
+        assert!(cache.get(addr).is_none());
     }
 }
