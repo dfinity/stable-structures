@@ -679,13 +679,19 @@ where
             }
         };
 
-        self.insert_nonfull(root, key, value)
+        self.insert_nonfull(root, key, value, 0)
             .map(Cow::Owned)
             .map(V::from_bytes)
     }
 
     /// Inserts an entry into a node that is *not full*.
-    fn insert_nonfull(&mut self, mut node: Node<K>, key: K, value: Vec<u8>) -> Option<Vec<u8>> {
+    fn insert_nonfull(
+        &mut self,
+        mut node: Node<K>,
+        key: K,
+        value: Vec<u8>,
+        depth: u8,
+    ) -> Option<Vec<u8>> {
         // We're guaranteed by the caller that the provided node is not full.
         assert!(!node.is_full());
 
@@ -716,6 +722,7 @@ where
                         // The node is an internal node.
                         // Load the child that we should add the entry to.
                         let mut child = self.take_or_load_node(node.child(idx));
+                        let child_depth = depth.saturating_add(1);
 
                         if child.is_full() {
                             // Check if the key already exists in the child.
@@ -731,12 +738,16 @@ where
                             // the child where we need to store the entry in.
                             let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
                             child = self.load_node(node.child(idx));
+                        } else {
+                            // Happy path: child is not full. The current node
+                            // will not be modified — return it to cache.
+                            self.return_node(node, depth);
                         }
 
                         // The child should now be not full.
                         assert!(!child.is_full());
 
-                        self.insert_nonfull(child, key, value)
+                        self.insert_nonfull(child, key, value, child_depth)
                     }
                 }
             }
@@ -959,7 +970,7 @@ where
         }
 
         let root_node = self.take_or_load_node(self.root_addr);
-        self.remove_helper(root_node, key)
+        self.remove_helper(root_node, key, 0)
             .map(Cow::Owned)
             .map(V::from_bytes)
     }
@@ -972,7 +983,7 @@ where
 
         let root = self.take_or_load_node(self.root_addr);
         let last_key = self.last_key_inner(&root);
-        self.remove_helper(root, &last_key)
+        self.remove_helper(root, &last_key, 0)
             .map(|v| (last_key, V::from_bytes(Cow::Owned(v))))
     }
 
@@ -984,12 +995,12 @@ where
 
         let root = self.take_or_load_node(self.root_addr);
         let first_key = self.first_key_inner(&root);
-        self.remove_helper(root, &first_key)
+        self.remove_helper(root, &first_key, 0)
             .map(|v| (first_key, V::from_bytes(Cow::Owned(v))))
     }
 
     /// A helper method for recursively removing a key from the B-tree.
-    fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
+    fn remove_helper(&mut self, mut node: Node<K>, key: &K, depth: u8) -> Option<Vec<u8>> {
         if node.address() != self.root_addr {
             // We're guaranteed that whenever this method is called an entry can be
             // removed from the node without it needing to be merged into a sibling.
@@ -1056,7 +1067,11 @@ where
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
                             let predecessor = self.last_entry_inner(&left_child);
-                            self.remove_helper(left_child, &predecessor.0)?;
+                            self.remove_helper(
+                                left_child,
+                                &predecessor.0,
+                                depth.saturating_add(1),
+                            )?;
 
                             // Replace the `key` with its predecessor.
                             let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
@@ -1091,7 +1106,7 @@ where
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
                             let successor = self.first_entry_inner(&right_child);
-                            self.remove_helper(right_child, &successor.0)?;
+                            self.remove_helper(right_child, &successor.0, depth.saturating_add(1))?;
 
                             // Replace the `key` with its successor.
                             let (_, old_value) = node.swap_entry(idx, successor, self.memory());
@@ -1151,7 +1166,7 @@ where
                         self.save_node(&mut new_child);
 
                         // Recursively delete the key.
-                        self.remove_helper(new_child, key)
+                        self.remove_helper(new_child, key, depth.saturating_add(1))
                     }
                     Err(idx) => {
                         // Case 3: The node is an internal node and the key does NOT exist in it.
@@ -1159,11 +1174,14 @@ where
                         // If the key does exist in the tree, it will exist in the subtree at index
                         // `idx`.
                         let mut child = self.take_or_load_node(node.child(idx));
+                        let child_depth = depth.saturating_add(1);
 
                         if child.can_remove_entry_without_merging() {
                             // The child has enough nodes. Recurse to delete the `key` from the
-                            // `child`. The current node is not modified.
-                            return self.remove_helper(child, key);
+                            // `child`.
+                            // The current node is not modified — return it to cache.
+                            self.return_node(node, depth);
+                            return self.remove_helper(child, key, child_depth);
                         }
 
                         // An entry can't be removed from the child without merging.
@@ -1233,7 +1251,7 @@ where
                                 self.save_node(left_sibling);
                                 self.save_node(&mut child);
                                 self.save_node(&mut node);
-                                return self.remove_helper(child, key);
+                                return self.remove_helper(child, key, child_depth);
                             }
                         }
 
@@ -1288,7 +1306,7 @@ where
                                 self.save_node(right_sibling);
                                 self.save_node(&mut child);
                                 self.save_node(&mut node);
-                                return self.remove_helper(child, key);
+                                return self.remove_helper(child, key, child_depth);
                             }
                         }
 
@@ -1319,7 +1337,7 @@ where
                                 self.save_node(&mut node);
                             }
 
-                            return self.remove_helper(left_sibling, key);
+                            return self.remove_helper(left_sibling, key, child_depth);
                         }
 
                         if let Some(right_sibling) = right_sibling {
@@ -1348,7 +1366,7 @@ where
                                 self.save_node(&mut node);
                             }
 
-                            return self.remove_helper(right_sibling, key);
+                            return self.remove_helper(right_sibling, key, child_depth);
                         }
 
                         unreachable!("At least one of the siblings must exist.");
