@@ -70,10 +70,11 @@ use std::ops::{Bound, Deref, RangeBounds};
 use std::rc::Rc;
 
 /// A node returned by `get_or_load_node` — either a shared cached reference
-/// or a plain owned node (when the cache is disabled or bypassed).
+/// or a heap-owned node (when the cache is disabled or bypassed).
+/// Both variants are pointer-sized so the enum stays small on the stack.
 enum CachedNode<K: Storable + Ord + Clone> {
     Shared(Rc<Node<K>>),
-    Owned(Node<K>),
+    Owned(Box<Node<K>>),
 }
 
 impl<K: Storable + Ord + Clone> Deref for CachedNode<K> {
@@ -1532,7 +1533,11 @@ where
             cache.put(address, Rc::clone(&node), depth);
             CachedNode::Shared(node)
         } else {
-            CachedNode::Owned(Node::load(address, self.version.page_size(), self.memory()))
+            CachedNode::Owned(Box::new(Node::load(
+                address,
+                self.version.page_size(),
+                self.memory(),
+            )))
         }
     }
 
