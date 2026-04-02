@@ -492,56 +492,56 @@ benches:
   btreeset_remove_blob_1024:
     total:
       calls: 1
-      instructions: 4423487563
+      instructions: 4423467563
       heap_increase: 1
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_128:
     total:
       calls: 1
-      instructions: 1006771587
+      instructions: 1006751587
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_16:
     total:
       calls: 1
-      instructions: 454180455
+      instructions: 454200455
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_256:
     total:
       calls: 1
-      instructions: 1525996294
+      instructions: 1525976294
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_32:
     total:
       calls: 1
-      instructions: 541064260
+      instructions: 541084260
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_512:
     total:
       calls: 1
-      instructions: 2404508269
+      instructions: 2404488269
       heap_increase: 1
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_64:
     total:
       calls: 1
-      instructions: 653175159
+      instructions: 653155159
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_blob_8:
     total:
       calls: 1
-      instructions: 416007533
+      instructions: 416027533
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
