@@ -93,7 +93,7 @@ where
                     .push(Cursor::Address(self.map.root_addr));
             }
             Bound::Included(key) | Bound::Excluded(key) => {
-                let mut node = self.map.load_node(self.map.root_addr);
+                let mut node = self.map.peek_or_load_node(self.map.root_addr);
                 loop {
                     match node.search(key, self.map.memory()) {
                         Ok(idx) => {
@@ -148,7 +148,7 @@ where
                                 NodeType::Internal => {
                                     // Note that loading a child node cannot fail since
                                     // len(children) = len(entries) + 1
-                                    Some(self.map.load_node(node.child(idx)))
+                                    Some(self.map.peek_or_load_node(node.child(idx)))
                                 }
                                 NodeType::Leaf => None,
                             };
@@ -189,7 +189,7 @@ where
                     .push(Cursor::Address(self.map.root_addr));
             }
             Bound::Included(key) | Bound::Excluded(key) => {
-                let mut node = self.map.load_node(self.map.root_addr);
+                let mut node = self.map.peek_or_load_node(self.map.root_addr);
                 loop {
                     match node.search(key, self.map.memory()) {
                         Ok(idx) => {
@@ -243,7 +243,7 @@ where
                                 NodeType::Internal => {
                                     // Note that loading a child node cannot fail since
                                     // len(children) = len(entries) + 1
-                                    Some(self.map.load_node(node.child(idx)))
+                                    Some(self.map.peek_or_load_node(node.child(idx)))
                                 }
                                 NodeType::Leaf => None,
                             };
@@ -286,7 +286,7 @@ where
             Cursor::Address(address) => {
                 if address != NULL {
                     // Load the node at the given address, and add it to the cursors.
-                    let node = self.map.load_node(address);
+                    let node = self.map.peek_or_load_node(address);
                     self.forward_cursors.push(Cursor::Node {
                         next: match node.node_type() {
                             // Iterate on internal nodes starting from the first child.
@@ -366,7 +366,7 @@ where
             Cursor::Address(address) => {
                 if address != NULL {
                     // Load the node at the given address, and add it to the cursors.
-                    let node = self.map.load_node(address);
+                    let node = self.map.peek_or_load_node(address);
                     if let Some(next) = match node.node_type() {
                         // Iterate on internal nodes starting from the last child.
                         NodeType::Internal if node.children_len() > 0 => {
