@@ -1517,6 +1517,19 @@ where
         Node::load(address, self.version.page_size(), self.memory())
     }
 
+    /// Returns a structural clone from the cache, or loads from memory.
+    ///
+    /// Unlike `take_or_load_node`, this does not remove the node from the cache.
+    /// Keys are cloned (for search), values stay unloaded (cheap).
+    /// Use this for read paths that consume the node (e.g. iterators).
+    #[inline(always)]
+    fn peek_or_load_node(&self, address: Address) -> Node<K> {
+        if let Some(node) = self.cache.borrow_mut().peek(address) {
+            return node;
+        }
+        Node::load(address, self.version.page_size(), self.memory())
+    }
+
     /// Returns a node to the cache after use on a read path.
     ///
     /// `depth` is the distance from the root (root = 0), used by the

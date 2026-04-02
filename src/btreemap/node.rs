@@ -67,6 +67,26 @@ pub struct Node<K: Storable + Ord + Clone> {
 }
 
 impl<K: Storable + Ord + Clone> Node<K> {
+    /// Returns a cheap clone suitable for read-only navigation.
+    ///
+    /// Keys are cloned (preserving loaded state for search), values are reset
+    /// to their unloaded `ByRef` state so no value data is copied. Structural
+    /// fields (address, children, node type, version, overflows) are copied.
+    pub fn structural_clone(&self) -> Self {
+        Self {
+            address: self.address,
+            entries: self
+                .entries
+                .iter()
+                .map(|(k, v)| (k.clone_with_key(), v.shallow_clone()))
+                .collect(),
+            children: self.children.clone(),
+            node_type: self.node_type,
+            version: self.version,
+            overflows: self.overflows.clone(),
+        }
+    }
+
     /// Loads a node from memory at the given address.
     pub fn load<M: Memory>(address: Address, page_size: PageSize, memory: &M) -> Self {
         // Load the header to determine which version the node is, then load the node accordingly.
@@ -504,6 +524,23 @@ enum LazyObject<T> {
 }
 
 impl<T> LazyObject<T> {
+    /// Returns a deferred copy that discards any loaded data.
+    /// `ByRef` entries keep their offset/size but get an empty `OnceCell`.
+    /// `ByVal` entries cannot be converted back to a reference, so this returns `None`.
+    #[inline(always)]
+    fn clone_as_ref(&self) -> Option<Self> {
+        match self {
+            LazyObject::ByRef { offset, size, .. } => {
+                Some(LazyObject::ByRef {
+                    offset: *offset,
+                    size: *size,
+                    loaded: OnceCell::new(),
+                })
+            }
+            LazyObject::ByVal(_) => None,
+        }
+    }
+
     #[inline(always)]
     pub fn by_value(value: T) -> Self {
         LazyObject::ByVal(value)
@@ -569,6 +606,19 @@ impl LazyValue {
         self.0.take_or_load(load)
     }
 
+    /// Returns a cheap copy with the value reset to its unloaded `ByRef` state.
+    /// Loaded data is discarded. `ByVal` entries are cloned as-is (no offset to refer to).
+    #[inline(always)]
+    fn shallow_clone(&self) -> Self {
+        match self.0.clone_as_ref() {
+            Some(lazy) => Self(lazy),
+            None => match &self.0 {
+                LazyObject::ByVal(v) => Self(LazyObject::ByVal(v.clone())),
+                _ => unreachable!(),
+            },
+        }
+    }
+
     /// Reads the value without populating the OnceCell.
     /// Returns the already-loaded value if present, otherwise reads from memory
     /// into a fresh buffer without storing it in the node.
@@ -590,6 +640,28 @@ impl LazyValue {
 
 #[derive(Debug)]
 struct LazyKey<K>(LazyObject<K>);
+
+impl<K: Clone> LazyKey<K> {
+    /// Returns a clone that preserves loaded keys (needed for search).
+    /// `ByRef` entries that haven't been loaded yet keep their deferred state.
+    #[inline(always)]
+    fn clone_with_key(&self) -> Self {
+        match &self.0 {
+            LazyObject::ByVal(v) => Self(LazyObject::ByVal(v.clone())),
+            LazyObject::ByRef { offset, size, loaded } => {
+                let new_loaded = OnceCell::new();
+                if let Some(v) = loaded.get() {
+                    let _ = new_loaded.set(v.clone());
+                }
+                Self(LazyObject::ByRef {
+                    offset: *offset,
+                    size: *size,
+                    loaded: new_loaded,
+                })
+            }
+        }
+    }
+}
 
 impl<K> LazyKey<K> {
     #[inline(always)]

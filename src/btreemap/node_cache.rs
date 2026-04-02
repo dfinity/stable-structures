@@ -151,6 +151,27 @@ impl<K: Storable + Ord + Clone> NodeCache<K> {
         (addr.get() / self.page_size as u64) as usize % self.slots.len()
     }
 
+    /// Returns a structural clone of the cached node without removing it.
+    /// Keys are cloned, values stay unloaded. The cache slot is not modified.
+    pub(super) fn peek(&mut self, addr: Address) -> Option<Node<K>> {
+        if !self.is_enabled() || addr == NULL {
+            return None;
+        }
+        let idx = self.slot_index(addr);
+        let slot = &self.slots[idx];
+        if slot.address == addr {
+            self.metrics.observe_hit();
+            slot.node.as_ref().map(|n| n.structural_clone())
+        } else {
+            if slot.node.is_none() {
+                self.metrics.observe_cold_miss();
+            } else {
+                self.metrics.observe_collision_miss();
+            }
+            None
+        }
+    }
+
     pub(super) fn take(&mut self, addr: Address) -> Option<Node<K>> {
         if !self.is_enabled() || addr == NULL {
             return None;
