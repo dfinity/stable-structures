@@ -671,7 +671,7 @@ where
                 self.save_header();
 
                 // Split the old (full) root.
-                self.split_child(&mut new_root, 0);
+                self.split_child(&mut new_root, 0, None);
 
                 new_root
             } else {
@@ -732,9 +732,8 @@ where
                             }
 
                             // The child is full. Split the child.
-                            // TODO: pass the already-loaded `child` into `split_child`
-                            // to avoid re-loading it from stable memory inside that method.
-                            self.split_child(&mut node, idx);
+                            // Pass the already-loaded child to avoid a redundant load.
+                            self.split_child(&mut node, idx, Some(child));
 
                             // The children have now changed. Search again for
                             // the child where we need to store the entry in.
@@ -773,12 +772,17 @@ where
     ///                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
     /// ```
     ///
-    fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
+    fn split_child(
+        &mut self,
+        node: &mut Node<K>,
+        full_child_idx: usize,
+        full_child: Option<Node<K>>,
+    ) {
         // The node must not be full.
         assert!(!node.is_full());
 
-        // The node's child must be full.
-        let mut full_child = self.load_node(node.child(full_child_idx));
+        // Use the pre-loaded child if provided, otherwise load from memory.
+        let mut full_child = full_child.unwrap_or_else(|| self.load_node(node.child(full_child_idx)));
         assert!(full_child.is_full());
 
         // Create a sibling to this full child (which has to be the same type).
