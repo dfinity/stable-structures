@@ -66,8 +66,27 @@ pub use node_cache::NodeCacheMetrics;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::marker::PhantomData;
-use std::ops::{Bound, RangeBounds};
+use std::ops::{Bound, Deref, RangeBounds};
 use std::rc::Rc;
+
+/// A node returned by `get_or_load_node` — either a shared cached reference
+/// or a plain owned node (when the cache is disabled or bypassed).
+enum CachedNode<K: Storable + Ord + Clone> {
+    Shared(Rc<Node<K>>),
+    Owned(Node<K>),
+}
+
+impl<K: Storable + Ord + Clone> Deref for CachedNode<K> {
+    type Target = Node<K>;
+
+    #[inline(always)]
+    fn deref(&self) -> &Node<K> {
+        match self {
+            CachedNode::Shared(rc) => rc,
+            CachedNode::Owned(node) => node,
+        }
+    }
+}
 
 #[cfg(test)]
 mod proptests;
@@ -1494,19 +1513,27 @@ where
         self.cache.get_mut().invalidate(addr);
     }
 
-    /// Returns a shared reference to the cached node, or loads from memory
-    /// and caches it.
+    /// Returns a cached or freshly-loaded node for read-only use.
+    ///
+    /// - Cache hit: returns a cheap `Rc::clone` (no allocation).
+    /// - Cache miss (cache enabled): loads, wraps in `Rc`, caches, returns `Rc`.
+    /// - Cache miss (cache disabled): loads and returns owned node (no `Rc` overhead).
     ///
     /// `depth` is the distance from the root (root = 0), used by the
     /// cache eviction policy.
     #[inline(always)]
-    fn get_or_load_node(&self, address: Address, depth: u8) -> Rc<Node<K>> {
-        if let Some(node) = self.cache.borrow_mut().get(address) {
-            return node;
+    fn get_or_load_node(&self, address: Address, depth: u8) -> CachedNode<K> {
+        let mut cache = self.cache.borrow_mut();
+        if let Some(node) = cache.get(address) {
+            return CachedNode::Shared(node);
         }
-        let node = Rc::new(Node::load(address, self.version.page_size(), self.memory()));
-        self.cache.borrow_mut().put(address, Rc::clone(&node), depth);
-        node
+        if cache.is_enabled() {
+            let node = Rc::new(Node::load(address, self.version.page_size(), self.memory()));
+            cache.put(address, Rc::clone(&node), depth);
+            CachedNode::Shared(node)
+        } else {
+            CachedNode::Owned(Node::load(address, self.version.page_size(), self.memory()))
+        }
     }
 
     /// Loads a node from memory, bypassing the cache.
