@@ -863,16 +863,6 @@ where
     }
 
     #[inline(always)]
-    fn first_key_inner(&self, node: &Node<K>) -> K {
-        self.find_first_or_last(node, true, 0, |n, i, m| n.key(i, m).clone())
-    }
-
-    #[inline(always)]
-    fn last_key_inner(&self, node: &Node<K>) -> K {
-        self.find_first_or_last(node, false, 0, |n, i, m| n.key(i, m).clone())
-    }
-
-    #[inline(always)]
     fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
         self.find_first_or_last(node, true, 0, |n, i, m| n.get_key_read_value_uncached(i, m))
     }
@@ -971,9 +961,8 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let last_key = self.last_key_inner(&root);
-        self.remove_helper(root, &last_key)
-            .map(|v| (last_key, V::from_bytes(Cow::Owned(v))))
+        self.remove_rightmost(root)
+            .map(|(k, v)| (k, V::from_bytes(Cow::Owned(v))))
     }
 
     /// Removes and returns the first element in the map. The key of this element is the minimum key that was in the map
@@ -983,9 +972,8 @@ where
         }
 
         let root = self.load_node(self.root_addr);
-        let first_key = self.first_key_inner(&root);
-        self.remove_helper(root, &first_key)
-            .map(|v| (first_key, V::from_bytes(Cow::Owned(v))))
+        self.remove_leftmost(root)
+            .map(|(k, v)| (k, V::from_bytes(Cow::Owned(v))))
     }
 
     /// A helper method for recursively removing a key from the B-tree.
@@ -1053,10 +1041,8 @@ where
                             //           /            \
                             //        [...]          [...]
 
-                            // Recursively delete the predecessor.
-                            // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = self.last_entry_inner(&left_child);
-                            self.remove_helper(left_child, &predecessor.0)?;
+                            // Remove the predecessor in a single pass (no double traversal).
+                            let predecessor = self.remove_rightmost(left_child)?;
 
                             // Replace the `key` with its predecessor.
                             let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
@@ -1088,10 +1074,8 @@ where
                             //                           /            \
                             //                        [...]          [...]
 
-                            // Recursively delete the successor.
-                            // TODO(EXC-1034): Do this in a single pass.
-                            let successor = self.first_entry_inner(&right_child);
-                            self.remove_helper(right_child, &successor.0)?;
+                            // Remove the successor in a single pass (no double traversal).
+                            let successor = self.remove_leftmost(right_child)?;
 
                             // Replace the `key` with its successor.
                             let (_, old_value) = node.swap_entry(idx, successor, self.memory());
@@ -1352,6 +1336,141 @@ where
                         unreachable!("At least one of the siblings must exist.");
                     }
                 }
+            }
+        }
+    }
+
+    /// Removes and returns the rightmost (maximum) entry in the subtree rooted
+    /// at `node`, in a single top-down pass. This avoids the double traversal
+    /// of the previous approach (get_max + remove_helper).
+    fn remove_rightmost(&mut self, mut node: Node<K>) -> Option<Entry<K>> {
+        match node.node_type() {
+            NodeType::Leaf => {
+                let entry = node.pop_entry(self.memory())?;
+                self.length -= 1;
+
+                if node.entries_len() == 0 {
+                    assert_eq!(node.address(), self.root_addr);
+                    self.deallocate_node(node);
+                    self.root_addr = NULL;
+                } else {
+                    self.save_node(&mut node);
+                }
+                self.save_header();
+                Some(entry)
+            }
+            NodeType::Internal => {
+                let last_idx = node.children_len() - 1;
+                let mut child = self.load_node(node.child(last_idx));
+
+                if child.can_remove_entry_without_merging() {
+                    return self.remove_rightmost(child);
+                }
+
+                // The rightmost child is at minimum. Steal from its left sibling or merge.
+                let left_sibling_idx = last_idx - 1;
+                let mut left_sibling = self.load_node(node.child(left_sibling_idx));
+
+                if left_sibling.can_remove_entry_without_merging() {
+                    // Rotate right: left_sibling -> parent -> child
+                    let (left_key, left_value) = left_sibling.pop_entry(self.memory()).unwrap();
+                    let (parent_key, parent_value) =
+                        node.swap_entry(last_idx - 1, (left_key, left_value), self.memory());
+                    child.insert_entry(0, (parent_key, parent_value));
+
+                    if let Some(last_child) = left_sibling.pop_child() {
+                        child.insert_child(0, last_child);
+                    }
+
+                    self.save_node(&mut left_sibling);
+                    self.save_node(&mut child);
+                    self.save_node(&mut node);
+                    return self.remove_rightmost(child);
+                }
+
+                // Both at minimum: merge child into left sibling.
+                let merged = self.merge(
+                    child,
+                    left_sibling,
+                    node.remove_entry(last_idx - 1, self.memory()),
+                );
+                node.remove_child(last_idx);
+
+                if node.entries_len() == 0 {
+                    assert_eq!(node.address(), self.root_addr);
+                    self.root_addr = merged.address();
+                    self.deallocate_node(node);
+                    self.save_header();
+                } else {
+                    self.save_node(&mut node);
+                }
+
+                self.remove_rightmost(merged)
+            }
+        }
+    }
+
+    /// Removes and returns the leftmost (minimum) entry in the subtree rooted
+    /// at `node`, in a single top-down pass.
+    fn remove_leftmost(&mut self, mut node: Node<K>) -> Option<Entry<K>> {
+        match node.node_type() {
+            NodeType::Leaf => {
+                if node.entries_len() == 0 {
+                    return None;
+                }
+                let entry = node.remove_entry(0, self.memory());
+                self.length -= 1;
+
+                if node.entries_len() == 0 {
+                    assert_eq!(node.address(), self.root_addr);
+                    self.deallocate_node(node);
+                    self.root_addr = NULL;
+                } else {
+                    self.save_node(&mut node);
+                }
+                self.save_header();
+                Some(entry)
+            }
+            NodeType::Internal => {
+                let mut child = self.load_node(node.child(0));
+
+                if child.can_remove_entry_without_merging() {
+                    return self.remove_leftmost(child);
+                }
+
+                // The leftmost child is at minimum. Steal from its right sibling or merge.
+                let mut right_sibling = self.load_node(node.child(1));
+
+                if right_sibling.can_remove_entry_without_merging() {
+                    // Rotate left: right_sibling -> parent -> child
+                    let (right_key, right_value) = right_sibling.remove_entry(0, self.memory());
+                    let parent_entry = node.swap_entry(0, (right_key, right_value), self.memory());
+                    child.push_entry(parent_entry);
+
+                    if right_sibling.node_type() == NodeType::Internal {
+                        child.push_child(right_sibling.remove_child(0));
+                    }
+
+                    self.save_node(&mut right_sibling);
+                    self.save_node(&mut child);
+                    self.save_node(&mut node);
+                    return self.remove_leftmost(child);
+                }
+
+                // Both at minimum: merge child into right sibling.
+                let merged = self.merge(child, right_sibling, node.remove_entry(0, self.memory()));
+                node.remove_child(0);
+
+                if node.entries_len() == 0 {
+                    assert_eq!(node.address(), self.root_addr);
+                    self.root_addr = merged.address();
+                    self.deallocate_node(node);
+                    self.save_header();
+                } else {
+                    self.save_node(&mut node);
+                }
+
+                self.remove_leftmost(merged)
             }
         }
     }
