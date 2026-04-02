@@ -728,6 +728,8 @@ where
                             // Check if the key already exists in the child.
                             if let Ok(idx) = child.search(&key, self.memory()) {
                                 // Key found, replace its value and return the old one.
+                                // The parent node is unmodified — return it to cache.
+                                self.return_node(node, depth);
                                 return Some(self.update_value(&mut child, idx, value));
                             }
 
@@ -881,23 +883,25 @@ where
     }
 
     #[inline(always)]
-    fn first_key_inner(&self, node: &Node<K>) -> K {
-        self.find_first_or_last(node, true, 0, |n, i, m| n.key(i, m).clone())
+    fn first_key_inner(&self, node: &Node<K>, depth: u8) -> K {
+        self.find_first_or_last(node, true, depth, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
-    fn last_key_inner(&self, node: &Node<K>) -> K {
-        self.find_first_or_last(node, false, 0, |n, i, m| n.key(i, m).clone())
+    fn last_key_inner(&self, node: &Node<K>, depth: u8) -> K {
+        self.find_first_or_last(node, false, depth, |n, i, m| n.key(i, m).clone())
     }
 
     #[inline(always)]
-    fn first_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.find_first_or_last(node, true, 0, |n, i, m| n.get_key_read_value_uncached(i, m))
+    fn first_entry_inner(&self, node: &Node<K>, depth: u8) -> Entry<K> {
+        self.find_first_or_last(node, true, depth, |n, i, m| {
+            n.get_key_read_value_uncached(i, m)
+        })
     }
 
     #[inline(always)]
-    fn last_entry_inner(&self, node: &Node<K>) -> Entry<K> {
-        self.find_first_or_last(node, false, 0, |n, i, m| {
+    fn last_entry_inner(&self, node: &Node<K>, depth: u8) -> Entry<K> {
+        self.find_first_or_last(node, false, depth, |n, i, m| {
             n.get_key_read_value_uncached(i, m)
         })
     }
@@ -945,7 +949,7 @@ where
             return None;
         }
         let root = self.take_or_load_node(self.root_addr);
-        let (k, encoded_v) = self.first_entry_inner(&root);
+        let (k, encoded_v) = self.first_entry_inner(&root, 0);
         self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
@@ -957,7 +961,7 @@ where
             return None;
         }
         let root = self.take_or_load_node(self.root_addr);
-        let (k, encoded_v) = self.last_entry_inner(&root);
+        let (k, encoded_v) = self.last_entry_inner(&root, 0);
         self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
@@ -989,7 +993,7 @@ where
         }
 
         let root = self.take_or_load_node(self.root_addr);
-        let last_key = self.last_key_inner(&root);
+        let last_key = self.last_key_inner(&root, 0);
         self.remove_helper(root, &last_key, 0)
             .map(|v| (last_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -1001,7 +1005,7 @@ where
         }
 
         let root = self.take_or_load_node(self.root_addr);
-        let first_key = self.first_key_inner(&root);
+        let first_key = self.first_key_inner(&root, 0);
         self.remove_helper(root, &first_key, 0)
             .map(|v| (first_key, V::from_bytes(Cow::Owned(v))))
     }
@@ -1041,7 +1045,11 @@ where
                         self.save_header();
                         Some(value)
                     }
-                    _ => None, // Key not found.
+                    _ => {
+                        // Key not found. Return the unmodified node to cache.
+                        self.return_node(node, depth);
+                        None
+                    }
                 }
             }
             NodeType::Internal => {
@@ -1073,7 +1081,8 @@ where
 
                             // Recursively delete the predecessor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let predecessor = self.last_entry_inner(&left_child);
+                            let predecessor =
+                                self.last_entry_inner(&left_child, depth.saturating_add(1));
                             self.remove_helper(
                                 left_child,
                                 &predecessor.0,
@@ -1115,7 +1124,8 @@ where
 
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
-                            let successor = self.first_entry_inner(&right_child);
+                            let successor =
+                                self.first_entry_inner(&right_child, depth.saturating_add(1));
                             self.remove_helper(right_child, &successor.0, depth.saturating_add(1))?;
 
                             // Replace the `key` with its successor.
