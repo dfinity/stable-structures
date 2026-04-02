@@ -506,7 +506,7 @@ benches:
   btreeset_remove_blob_16:
     total:
       calls: 1
-      instructions: 454220453
+      instructions: 454200453
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -520,7 +520,7 @@ benches:
   btreeset_remove_blob_32:
     total:
       calls: 1
-      instructions: 541104258
+      instructions: 541084258
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
@@ -541,14 +541,14 @@ benches:
   btreeset_remove_blob_8:
     total:
       calls: 1
-      instructions: 416047531
+      instructions: 416027531
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}
   btreeset_remove_u32:
     total:
       calls: 1
-      instructions: 349076871
+      instructions: 349096871
       heap_increase: 0
       stable_memory_increase: 0
     scopes: {}

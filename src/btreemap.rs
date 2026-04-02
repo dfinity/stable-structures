@@ -1110,6 +1110,9 @@ where
                             //                           /            \
                             //                        [...]          [...]
 
+                            // Return the unmodified left child to the cache.
+                            self.return_node(left_child, depth.saturating_add(1));
+
                             // Recursively delete the successor.
                             // TODO(EXC-1034): Do this in a single pass.
                             let successor = self.first_entry_inner(&right_child);
