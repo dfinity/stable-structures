@@ -2052,12 +2052,13 @@ where
 }
 
 /// Runs `f` with several cache sizes (disabled, tiny, default, large).
+/// Includes non-power-of-two sizes — users can pass any value to with_node_cache.
 fn run_with_various_cache_sizes<K, V, R>(f: impl Fn(BTreeMap<K, V, VectorMemory>) -> R)
 where
     K: Storable + Ord + Clone,
     V: Storable,
 {
-    for slots in [0, 1, 4, 16, 64] {
+    for slots in [0, 1, 3, 7, 16, 50] {
         run_with_cache(slots, &f);
     }
 }
@@ -2113,7 +2114,7 @@ fn cache_vs_no_cache_equivalence() {
     };
 
     let baseline = run_ops(0);
-    for slots in [1, 4, 16, 64, 256] {
+    for slots in [1, 3, 7, 16, 50, 256] {
         assert_eq!(
             baseline,
             run_ops(slots),
@@ -2399,7 +2400,7 @@ fn cache_rebalance_then_read_siblings() {
             let removed_pass1 = i % 3 == 0;
             let removed_pass2 = !removed_pass1 && {
                 let pos = (0..n).filter(|j| j % 3 != 0).position(|j| j == i);
-                pos.map_or(false, |p| p % 2 == 0)
+                pos.is_some_and(|p| p % 2 == 0)
             };
             if removed_pass1 || removed_pass2 {
                 assert_eq!(btree.get(&i), None, "get({i}) should be removed");
@@ -2602,7 +2603,8 @@ fn cached_last_key_value_cache_64() {
 // Cache metrics smoke tests
 // ---------------------------------------------------------------------------
 
-/// After inserting N keys and getting them all, the cache hit count must be > 0.
+/// After getting N keys, the cache hit count must be > 0.
+/// Clears metrics before the measured workload so counters reflect only gets.
 #[test]
 fn cache_metrics_nonzero_hits() {
     let mem = make_memory();
@@ -2612,7 +2614,11 @@ fn cache_metrics_nonzero_hits() {
     for i in 0..n {
         btree.insert(i, i);
     }
-    // Get all keys — traversal should hit cached upper-level nodes.
+
+    // Clear counters accumulated during inserts.
+    btree.node_cache_clear_metrics();
+
+    // Workload: get all keys — traversal should hit cached upper-level nodes.
     for i in 0..n {
         assert_eq!(btree.get(&i), Some(i));
     }
@@ -2621,6 +2627,11 @@ fn cache_metrics_nonzero_hits() {
     assert!(
         metrics.hits() > 0,
         "Expected cache hits > 0 after {n} gets, got {:?}",
+        metrics
+    );
+    assert!(
+        metrics.hit_ratio() > 0.0,
+        "Expected hit_ratio > 0 for get-heavy workload, got {:?}",
         metrics
     );
 }
@@ -2634,6 +2645,9 @@ fn cache_disabled_metrics_zero() {
     for i in 0..100u64 {
         btree.insert(i, i);
     }
+
+    btree.node_cache_clear_metrics();
+
     for i in 0..100u64 {
         assert_eq!(btree.get(&i), Some(i));
     }
@@ -2641,6 +2655,7 @@ fn cache_disabled_metrics_zero() {
     let metrics = btree.node_cache_metrics();
     assert_eq!(metrics.hits(), 0, "Disabled cache should have 0 hits");
     assert_eq!(metrics.misses(), 0, "Disabled cache should have 0 misses");
+    assert_eq!(metrics.total(), 0, "Disabled cache should have 0 lookups");
 }
 
 /// After clear_new(), cache metrics should be reset.
@@ -2652,14 +2667,19 @@ fn cache_metrics_reset_after_clear() {
     for i in 0..100u64 {
         btree.insert(i, i);
     }
+
+    btree.node_cache_clear_metrics();
+
     for i in 0..100u64 {
         let _ = btree.get(&i);
     }
-    assert!(btree.node_cache_metrics().hits() > 0);
+    let before = btree.node_cache_metrics();
+    assert!(before.hits() > 0);
 
     btree.clear_new();
 
-    let metrics = btree.node_cache_metrics();
-    assert_eq!(metrics.hits(), 0, "Metrics should reset after clear_new");
-    assert_eq!(metrics.misses(), 0, "Metrics should reset after clear_new");
+    let after = btree.node_cache_metrics();
+    assert_eq!(after.hits(), 0, "Metrics should reset after clear_new");
+    assert_eq!(after.misses(), 0, "Metrics should reset after clear_new");
+    assert_eq!(after.total(), 0, "Metrics should reset after clear_new");
 }

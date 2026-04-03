@@ -93,6 +93,7 @@ fn run_comprehensive(ops: Vec<Operation>, cache_slots: usize) {
 
 // Cache-parameterized variants: run the same comprehensive operation sequence
 // at different cache sizes to catch size-dependent correctness bugs.
+// Includes non-power-of-two sizes — users can pass any value to with_node_cache.
 // Fewer cases per variant to keep total runtime reasonable.
 
 #[proptest(cases = 3)]
@@ -106,8 +107,13 @@ fn comprehensive_cache_1(#[strategy(pvec(operation_strategy(), 100..5_000))] ops
 }
 
 #[proptest(cases = 3)]
-fn comprehensive_cache_4(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
-    run_comprehensive(ops, 4);
+fn comprehensive_cache_3(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
+    run_comprehensive(ops, 3);
+}
+
+#[proptest(cases = 3)]
+fn comprehensive_cache_7(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
+    run_comprehensive(ops, 7);
 }
 
 #[proptest(cases = 3)]
@@ -116,8 +122,8 @@ fn comprehensive_cache_16(#[strategy(pvec(operation_strategy(), 100..5_000))] op
 }
 
 #[proptest(cases = 3)]
-fn comprehensive_cache_64(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
-    run_comprehensive(ops, 64);
+fn comprehensive_cache_50(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
+    run_comprehensive(ops, 50);
 }
 
 #[proptest(cases = 3)]
