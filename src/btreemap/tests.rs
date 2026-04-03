@@ -152,6 +152,20 @@ where
     f(tree_v2);
 }
 
+/// Like `run_btree_test` but only tests V2 with a specific cache size.
+/// Used for cache-variant tests where V1/migration coverage is not needed
+/// (the original non-cached test already covers those).
+pub fn run_btree_test_cached<K, V, R, F>(cache_slots: usize, f: F)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    F: Fn(BTreeMap<K, V, VectorMemory>) -> R,
+{
+    let mem = make_memory();
+    let tree = BTreeMap::new(mem).with_node_cache(cache_slots);
+    f(tree);
+}
+
 /// Checks that objects from boundary u32 values are strictly increasing.
 /// This ensures multi-byte conversions preserve order.
 fn verify_monotonic<T: Builder + PartialOrd>() {
@@ -2400,6 +2414,194 @@ fn cache_rebalance_then_read_siblings() {
             } else {
                 assert_eq!(btree.get(&i), Some(i), "get({i}) should survive");
             }
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Cached variants of existing tests
+//
+// Re-run selected existing test functions with specific cache sizes.
+// Uses u32 key/value only (not the full type grid) to keep runtime bounded —
+// the non-cached originals already cover the full type matrix.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cached_insert_get_cache_1() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(1, |mut btree| {
+        let n = 1_000;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+            assert_eq!(btree.get(&key(i)), Some(value(i)));
+        }
+    });
+}
+
+#[test]
+fn cached_insert_get_cache_64() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(64, |mut btree| {
+        let n = 1_000;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+            assert_eq!(btree.get(&key(i)), Some(value(i)));
+        }
+    });
+}
+
+#[test]
+fn cached_insert_overwrites_cache_1() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(1, |mut btree| {
+        let n = 1_000;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+            assert_eq!(btree.insert(key(i), value(i + 1)), Some(value(i)));
+            assert_eq!(btree.get(&key(i)), Some(value(i + 1)));
+        }
+    });
+}
+
+#[test]
+fn cached_insert_overwrites_cache_64() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(64, |mut btree| {
+        let n = 1_000;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+            assert_eq!(btree.insert(key(i), value(i + 1)), Some(value(i)));
+            assert_eq!(btree.get(&key(i)), Some(value(i + 1)));
+        }
+    });
+}
+
+#[test]
+fn cached_insert_remove_many_cache_1() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(1, |mut btree| {
+        let n = 500;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+        }
+        for i in 0..n {
+            assert_eq!(btree.remove(&key(i)), Some(value(i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_insert_remove_many_cache_64() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(64, |mut btree| {
+        let n = 500;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+        }
+        for i in 0..n {
+            assert_eq!(btree.remove(&key(i)), Some(value(i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_pop_first_cache_1() {
+    run_btree_test_cached(1, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in 0..n {
+            assert_eq!(btree.pop_first(), Some((i, i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_pop_first_cache_64() {
+    run_btree_test_cached(64, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in 0..n {
+            assert_eq!(btree.pop_first(), Some((i, i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_pop_last_cache_1() {
+    run_btree_test_cached(1, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in (0..n).rev() {
+            assert_eq!(btree.pop_last(), Some((i, i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_pop_last_cache_64() {
+    run_btree_test_cached(64, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in (0..n).rev() {
+            assert_eq!(btree.pop_last(), Some((i, i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_first_key_value_cache_1() {
+    run_btree_test_cached(1, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in (0..n).rev() {
+            btree.insert(i, i);
+            assert_eq!(btree.first_key_value(), Some((i, i)));
+        }
+    });
+}
+
+#[test]
+fn cached_first_key_value_cache_64() {
+    run_btree_test_cached(64, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in (0..n).rev() {
+            btree.insert(i, i);
+            assert_eq!(btree.first_key_value(), Some((i, i)));
+        }
+    });
+}
+
+#[test]
+fn cached_last_key_value_cache_1() {
+    run_btree_test_cached(1, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+            assert_eq!(btree.last_key_value(), Some((i, i)));
+        }
+    });
+}
+
+#[test]
+fn cached_last_key_value_cache_64() {
+    run_btree_test_cached(64, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+            assert_eq!(btree.last_key_value(), Some((i, i)));
         }
     });
 }
