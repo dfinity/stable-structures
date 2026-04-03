@@ -40,4 +40,5 @@ When asked to "write PR description" or similar:
 - Title: under 70 characters, use conventional commit prefix (test, feat, fix, perf, refactor, docs, chore, ci)
 - Description: a single line summary on top, followed by a short explanation of what was added and why
 - Both must be correct, short, clear and informative
-- Do not use excessive formatting
+- Do not use excessive formatting, but use bullet points or tables if it improves readability
+- Don't list commits or files changed, the PR view already shows that
