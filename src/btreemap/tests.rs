@@ -2412,6 +2412,141 @@ fn cache_rebalance_then_read_siblings() {
 }
 
 // ---------------------------------------------------------------------------
+// Read-warm-write-read tests
+//
+// Verify correctness when the cache is warmed by reads, then a write
+// modifies the tree, then reads must still return correct data.
+// This catches bugs where a write invalidates some cached nodes but
+// leaves other (now-stale) nodes in cache.
+// ---------------------------------------------------------------------------
+
+/// Warm cache with reads, insert new keys (causing splits), read again.
+#[test]
+fn cache_read_warm_insert_read() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200u64;
+        // Populate.
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Warm cache: read every key.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Write: insert more keys, causing splits in the warmed tree.
+        for i in n..n * 2 {
+            btree.insert(i, i);
+        }
+        // Read all again: both old and new keys must be correct.
+        for i in 0..n * 2 {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) after warm+insert");
+        }
+    });
+}
+
+/// Warm cache with reads, overwrite existing keys, read again.
+#[test]
+fn cache_read_warm_overwrite_read() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Warm cache.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Overwrite every other key.
+        for i in (0..n).step_by(2) {
+            btree.insert(i, i + 1000);
+        }
+        // Read all: overwritten keys must return new value,
+        // non-overwritten keys must still return original value.
+        for i in 0..n {
+            let expected = if i % 2 == 0 { i + 1000 } else { i };
+            assert_eq!(btree.get(&i), Some(expected), "get({i}) after warm+overwrite");
+        }
+    });
+}
+
+/// Warm cache with reads, remove keys (causing merges), read remaining.
+#[test]
+fn cache_read_warm_remove_read() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Warm cache.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Remove half the keys, triggering merges in the warmed tree.
+        for i in (0..n).step_by(2) {
+            assert_eq!(btree.remove(&i), Some(i));
+        }
+        // Read all: removed keys must be None, remaining must be correct.
+        for i in 0..n {
+            if i % 2 == 0 {
+                assert_eq!(btree.get(&i), None, "get({i}) should be removed");
+            } else {
+                assert_eq!(btree.get(&i), Some(i), "get({i}) should remain");
+            }
+        }
+    });
+}
+
+/// Warm cache, pop_first/pop_last (single-pass algorithms), verify remaining.
+#[test]
+fn cache_read_warm_pop_read() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Warm cache.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Pop from both ends.
+        for i in 0..20 {
+            assert_eq!(btree.pop_first(), Some((i, i)));
+        }
+        for i in (n - 20..n).rev() {
+            assert_eq!(btree.pop_last(), Some((i, i)));
+        }
+        // Read remaining: middle keys must be intact.
+        for i in 20..n - 20 {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) after warm+pop");
+        }
+    });
+}
+
+/// Multiple read-write-read cycles to test cache coherence over time.
+#[test]
+fn cache_repeated_read_write_cycles() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 100u64;
+
+        for cycle in 0..5u64 {
+            let base = cycle * n;
+            // Write phase: insert a batch of keys.
+            for i in base..base + n {
+                btree.insert(i, i);
+            }
+            // Read phase: verify ALL keys inserted so far.
+            for i in 0..base + n {
+                assert_eq!(
+                    btree.get(&i),
+                    Some(i),
+                    "get({i}) in cycle {cycle}"
+                );
+            }
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Cached variants of existing tests
 //
 // Re-run selected existing test functions with specific cache sizes.
