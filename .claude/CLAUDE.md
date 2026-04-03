@@ -17,7 +17,7 @@ cargo clippy --tests --benches -- -D clippy::all
 cargo test
 ```
 
-After changing code, always run at least `cargo fmt` and `cargo clippy --tests --benches -- -D clippy::all`. 
+After changing code, always run at least `cargo fmt --all -- --check` and `cargo clippy --tests --benches -- -D clippy::all`. 
 Run `cargo test` when changes affect logic.
 
 ## Code style
