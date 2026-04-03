@@ -2464,7 +2464,11 @@ fn cache_read_warm_overwrite_read() {
         // non-overwritten keys must still return original value.
         for i in 0..n {
             let expected = if i % 2 == 0 { i + 1000 } else { i };
-            assert_eq!(btree.get(&i), Some(expected), "get({i}) after warm+overwrite");
+            assert_eq!(
+                btree.get(&i),
+                Some(expected),
+                "get({i}) after warm+overwrite"
+            );
         }
     });
 }
@@ -2536,11 +2540,7 @@ fn cache_repeated_read_write_cycles() {
             }
             // Read phase: verify ALL keys inserted so far.
             for i in 0..base + n {
-                assert_eq!(
-                    btree.get(&i),
-                    Some(i),
-                    "get({i}) in cycle {cycle}"
-                );
+                assert_eq!(btree.get(&i), Some(i), "get({i}) in cycle {cycle}");
             }
         }
     });
