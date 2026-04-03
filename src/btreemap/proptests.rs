@@ -96,37 +96,27 @@ fn run_comprehensive(ops: Vec<Operation>, cache_slots: usize) {
 // Fewer cases per variant to keep total runtime reasonable.
 
 #[proptest(cases = 3)]
-fn comprehensive_cache_0(
-    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
-) {
+fn comprehensive_cache_0(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
     run_comprehensive(ops, 0);
 }
 
 #[proptest(cases = 3)]
-fn comprehensive_cache_1(
-    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
-) {
+fn comprehensive_cache_1(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
     run_comprehensive(ops, 1);
 }
 
 #[proptest(cases = 3)]
-fn comprehensive_cache_4(
-    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
-) {
+fn comprehensive_cache_4(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
     run_comprehensive(ops, 4);
 }
 
 #[proptest(cases = 3)]
-fn comprehensive_cache_16(
-    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
-) {
+fn comprehensive_cache_16(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
     run_comprehensive(ops, 16);
 }
 
 #[proptest(cases = 3)]
-fn comprehensive_cache_64(
-    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
-) {
+fn comprehensive_cache_64(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>) {
     run_comprehensive(ops, 64);
 }
 

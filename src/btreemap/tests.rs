@@ -2071,8 +2071,7 @@ fn cache_vs_no_cache_equivalence() {
     // Collect results from a fixed operation sequence.
     let run_ops = |cache_slots: usize| -> Vec<String> {
         let mem = make_memory();
-        let mut btree: BTreeMap<u64, u64, _> =
-            BTreeMap::new(mem).with_node_cache(cache_slots);
+        let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(cache_slots);
         let mut results = Vec::new();
 
         // Insert
@@ -2081,10 +2080,7 @@ fn cache_vs_no_cache_equivalence() {
         }
         // Overwrite half
         for i in (0..n).step_by(2) {
-            results.push(format!(
-                "overwrite({i})={:?}",
-                btree.insert(i, i * 100)
-            ));
+            results.push(format!("overwrite({i})={:?}", btree.insert(i, i * 100)));
         }
         // Get all
         for i in 0..n {
@@ -2156,11 +2152,7 @@ fn cache_overwrite_then_get() {
         }
         // Read back: must see the new value, not the old cached one.
         for i in 0..n {
-            assert_eq!(
-                btree.get(&i),
-                Some(i + 1000),
-                "get({i}) after overwrite"
-            );
+            assert_eq!(btree.get(&i), Some(i + 1000), "get({i}) after overwrite");
         }
     });
 }
