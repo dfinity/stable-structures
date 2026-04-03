@@ -2605,3 +2605,69 @@ fn cached_last_key_value_cache_64() {
         }
     });
 }
+
+// ---------------------------------------------------------------------------
+// Cache metrics smoke tests
+// ---------------------------------------------------------------------------
+
+/// After inserting N keys and getting them all, the cache hit count must be > 0.
+#[test]
+fn cache_metrics_nonzero_hits() {
+    let mem = make_memory();
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(16);
+
+    let n = 200u64;
+    for i in 0..n {
+        btree.insert(i, i);
+    }
+    // Get all keys — traversal should hit cached upper-level nodes.
+    for i in 0..n {
+        assert_eq!(btree.get(&i), Some(i));
+    }
+
+    let metrics = btree.node_cache_metrics();
+    assert!(
+        metrics.hits() > 0,
+        "Expected cache hits > 0 after {n} gets, got {:?}",
+        metrics
+    );
+}
+
+/// With cache disabled (0 slots), operations succeed and metrics show 0 hits.
+#[test]
+fn cache_disabled_metrics_zero() {
+    let mem = make_memory();
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(0);
+
+    for i in 0..100u64 {
+        btree.insert(i, i);
+    }
+    for i in 0..100u64 {
+        assert_eq!(btree.get(&i), Some(i));
+    }
+
+    let metrics = btree.node_cache_metrics();
+    assert_eq!(metrics.hits(), 0, "Disabled cache should have 0 hits");
+    assert_eq!(metrics.misses(), 0, "Disabled cache should have 0 misses");
+}
+
+/// After clear_new(), cache metrics should be reset.
+#[test]
+fn cache_metrics_reset_after_clear() {
+    let mem = make_memory();
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(16);
+
+    for i in 0..100u64 {
+        btree.insert(i, i);
+    }
+    for i in 0..100u64 {
+        let _ = btree.get(&i);
+    }
+    assert!(btree.node_cache_metrics().hits() > 0);
+
+    btree.clear_new();
+
+    let metrics = btree.node_cache_metrics();
+    assert_eq!(metrics.hits(), 0, "Metrics should reset after clear_new");
+    assert_eq!(metrics.misses(), 0, "Metrics should reset after clear_new");
+}
