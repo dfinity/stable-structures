@@ -2782,7 +2782,11 @@ fn cache_mixed_reads_between_writes() {
                 assert!(btree.contains_key(&i), "round {round} contains({i})");
             }
             for i in 0..n {
-                assert_eq!(btree.get(&i), Some(i + round * 1000), "round {round} get({i})");
+                assert_eq!(
+                    btree.get(&i),
+                    Some(i + round * 1000),
+                    "round {round} get({i})"
+                );
             }
             assert_eq!(btree.first_key_value(), Some((0, round * 1000)));
             assert_eq!(btree.last_key_value(), Some((n - 1, n - 1 + round * 1000)));
