@@ -25,3 +25,19 @@ Run `cargo test` when changes affect logic.
 - Follow existing patterns in the codebase
 - No unnecessary comments, docstrings, or type annotations on unchanged code
 - Test names should describe the invariant being checked
+
+## Commit messages
+
+- Use conventional commit prefix (test, feat, fix, perf, refactor, docs, chore, ci)
+- First line: under 70 characters, short summary of what changed
+- Body (if needed): why the change was made, not how
+- Must be correct, short, clear and informative
+
+## PR title and description
+
+When asked to "write PR description" or similar:
+- Look at all commits in the current branch vs main
+- Title: under 70 characters, use conventional commit prefix (test, feat, fix, perf, refactor, docs, chore, ci)
+- Description: a single line summary on top, followed by a short explanation of what was added and why
+- Both must be correct, short, clear and informative
+- Do not use excessive formatting
