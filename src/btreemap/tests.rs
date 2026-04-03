@@ -2766,6 +2766,35 @@ fn cache_partial_iter_then_mutate() {
     });
 }
 
+/// Mix different read operations (get, contains_key, first/last_key_value)
+/// between bulk overwrites across multiple rounds.
+#[test]
+fn cache_mixed_reads_between_writes() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+
+        for round in 0..3u64 {
+            // Multiple read types on same tree state.
+            for i in 0..n {
+                assert!(btree.contains_key(&i), "round {round} contains({i})");
+            }
+            for i in 0..n {
+                assert_eq!(btree.get(&i), Some(i + round * 1000), "round {round} get({i})");
+            }
+            assert_eq!(btree.first_key_value(), Some((0, round * 1000)));
+            assert_eq!(btree.last_key_value(), Some((n - 1, n - 1 + round * 1000)));
+
+            // Write: overwrite all values.
+            for i in 0..n {
+                btree.insert(i, i + (round + 1) * 1000);
+            }
+        }
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Cached variants of existing tests
 //
