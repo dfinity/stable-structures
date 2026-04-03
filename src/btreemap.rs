@@ -1353,7 +1353,7 @@ where
                             self.save_node(&mut node);
                         }
 
-                        return self.remove_helper(right_sibling, key);
+                        self.remove_helper(right_sibling, key)
                     }
                 }
             }
