@@ -2111,3 +2111,195 @@ fn cache_vs_no_cache_equivalence() {
         );
     }
 }
+
+/// Insert N keys, then get each one. Verifies the cache does not serve stale data.
+#[test]
+fn cache_insert_then_get() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i * 10);
+        }
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i * 10), "get({i}) after insert");
+        }
+    });
+}
+
+/// Overwrite then get: must return new value, not stale cached value.
+/// This is the exact pattern that broke the save_and_cache_node attempt.
+#[test]
+fn cache_overwrite_then_get() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Overwrite every key with a new value.
+        for i in 0..n {
+            let old = btree.insert(i, i + 1000);
+            assert_eq!(old, Some(i), "overwrite({i}) old value");
+        }
+        // Read back: must see the new value, not the old cached one.
+        for i in 0..n {
+            assert_eq!(
+                btree.get(&i),
+                Some(i + 1000),
+                "get({i}) after overwrite"
+            );
+        }
+    });
+}
+
+/// Insert until splits occur, then get every key.
+/// Verifies split invalidation is correct.
+#[test]
+fn cache_split_then_get_all() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        // 500 keys is enough to cause multiple levels of splits.
+        let n = 500;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) after splits");
+        }
+    });
+}
+
+/// Insert many, remove until merges occur, get every remaining key.
+/// Verifies merge invalidation.
+#[test]
+fn cache_merge_then_get_remaining() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 500;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Remove every other key to trigger merges/rotations.
+        for i in (0..n).step_by(2) {
+            assert_eq!(btree.remove(&i), Some(i));
+        }
+        // Remaining odd keys must all be present.
+        for i in (1..n).step_by(2) {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) after merges");
+        }
+        // Removed keys must be gone.
+        for i in (0..n).step_by(2) {
+            assert_eq!(btree.get(&i), None, "get({i}) should be None");
+        }
+    });
+}
+
+/// Sequential inserts into the same leaf area, then get all.
+/// Tests the hot-leaf cache path.
+#[test]
+fn cache_sequential_inserts_then_gets() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300;
+        for i in 0..n {
+            btree.insert(i, i);
+            // Immediately verify the just-inserted key.
+            assert_eq!(btree.get(&i), Some(i), "get({i}) right after insert");
+        }
+    });
+}
+
+/// Interleave insert, get, and remove on overlapping keys with a small cache.
+/// Maximum eviction pressure.
+#[test]
+fn cache_interleaved_insert_get_remove() {
+    for cache_slots in [1, 2, 4] {
+        run_with_cache(cache_slots, |mut btree: BTreeMap<u64, u64, _>| {
+            let n = 300u64;
+            // Phase 1: insert all
+            for i in 0..n {
+                btree.insert(i, i);
+            }
+            // Phase 2: interleave operations
+            for i in 0..n {
+                // Get existing
+                if i % 3 != 0 {
+                    assert_eq!(btree.get(&i), Some(i), "get({i}) interleaved");
+                }
+                // Remove some
+                if i % 3 == 0 {
+                    assert_eq!(btree.remove(&i), Some(i));
+                }
+                // Re-insert with new value
+                if i % 5 == 0 {
+                    btree.insert(i, i + 1000);
+                }
+            }
+            // Phase 3: verify final state
+            for i in 0..n {
+                let expected = if i % 5 == 0 {
+                    Some(i + 1000)
+                } else if i % 3 == 0 {
+                    None
+                } else {
+                    Some(i)
+                };
+                assert_eq!(btree.get(&i), expected, "final get({i})");
+            }
+        });
+    }
+}
+
+/// pop_first/pop_last in a loop, verify each returned entry.
+/// Tests cache interaction with the single-pass pop algorithms.
+#[test]
+fn cache_pop_correctness() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+
+        // Pop from front
+        for i in 0..n / 2 {
+            assert_eq!(btree.pop_first(), Some((i, i)), "pop_first step {i}");
+        }
+
+        // Pop from back
+        for i in (n / 2..n).rev() {
+            assert_eq!(btree.pop_last(), Some((i, i)), "pop_last step {i}");
+        }
+
+        assert!(btree.is_empty());
+    });
+}
+
+/// Call first_key_value/last_key_value between inserts and removes.
+/// Reproduces the pattern from the test_first_key_value failure.
+#[test]
+fn cache_first_last_during_mutations() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+
+        // Insert in reverse order, check first_key_value after each insert.
+        for i in (0..n).rev() {
+            btree.insert(i, i);
+            assert_eq!(
+                btree.first_key_value(),
+                Some((i, i)),
+                "first_key_value after insert({i})"
+            );
+            assert_eq!(
+                btree.last_key_value(),
+                Some((n - 1, n - 1)),
+                "last_key_value after insert({i})"
+            );
+        }
+
+        // Remove from front, check first_key_value updates.
+        for i in 0..n - 1 {
+            btree.remove(&i);
+            assert_eq!(
+                btree.first_key_value(),
+                Some((i + 1, i + 1)),
+                "first_key_value after remove({i})"
+            );
+        }
+    });
+}
