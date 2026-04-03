@@ -2693,6 +2693,79 @@ fn cache_deeper_tree() {
     });
 }
 
+/// Resize cache mid-use: populate and read with one cache size, resize,
+/// then continue operating. Resizing drops all cached nodes.
+#[test]
+fn cache_resize_mid_use() {
+    let mem = make_memory();
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(16);
+
+    let n = 300u64;
+    for i in 0..n {
+        btree.insert(i, i);
+    }
+    // Warm cache at size 16.
+    for i in 0..n {
+        assert_eq!(btree.get(&i), Some(i));
+    }
+
+    // Resize to 1 slot — drops all cached nodes.
+    btree.node_cache_resize(1);
+    for i in 0..n {
+        assert_eq!(btree.get(&i), Some(i), "get({i}) after resize to 1");
+    }
+
+    // Resize to 0 — disable cache entirely.
+    btree.node_cache_resize(0);
+    btree.insert(n, n);
+    assert_eq!(btree.remove(&0), Some(0));
+    for i in 1..=n {
+        assert_eq!(btree.get(&i), Some(i), "get({i}) after disable");
+    }
+
+    // Resize back to 64.
+    btree.node_cache_resize(64);
+    for i in 1..=n {
+        assert_eq!(btree.get(&i), Some(i), "get({i}) after re-enable");
+    }
+}
+
+/// Partial iteration warms cache, then mutation modifies the tree,
+/// then full iteration must return correct data.
+#[test]
+fn cache_partial_iter_then_mutate() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+
+        // Partial forward iteration (warms cache for part of the tree).
+        let partial: Vec<_> = btree.iter().take(50).map(|e| e.into_pair()).collect();
+        assert_eq!(partial.len(), 50);
+
+        // Partial reverse iteration (warms cache for other end).
+        let partial_rev: Vec<_> = btree.iter().rev().take(50).map(|e| e.into_pair()).collect();
+        assert_eq!(partial_rev.len(), 50);
+
+        // Mutate: overwrite, insert new, remove some.
+        for i in (0..n).step_by(3) {
+            btree.insert(i, i + 1000);
+        }
+        btree.insert(n, n);
+        for i in (1..n).step_by(5) {
+            btree.remove(&i);
+        }
+
+        // Full iteration must be consistent with get.
+        let all: Vec<_> = btree.iter().map(|e| e.into_pair()).collect();
+        for (k, v) in &all {
+            assert_eq!(btree.get(k), Some(*v), "iter vs get mismatch at key {k}");
+        }
+        assert_eq!(all.len(), btree.len() as usize);
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Cached variants of existing tests
 //
