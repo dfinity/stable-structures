@@ -2021,3 +2021,93 @@ fn deallocating_root_does_not_leak_memory() {
 
     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 }
+
+// ---------------------------------------------------------------------------
+// Cache correctness tests
+// ---------------------------------------------------------------------------
+
+/// Runs `f` against a V2 BTreeMap with the given cache size.
+fn run_with_cache<K, V, R>(cache_slots: usize, f: impl Fn(BTreeMap<K, V, VectorMemory>) -> R)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+{
+    let mem = make_memory();
+    let tree = BTreeMap::new(mem).with_node_cache(cache_slots);
+    f(tree);
+}
+
+/// Runs `f` with several cache sizes (disabled, tiny, default, large).
+fn run_with_various_cache_sizes<K, V, R>(f: impl Fn(BTreeMap<K, V, VectorMemory>) -> R)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+{
+    for slots in [0, 1, 4, 16, 64] {
+        run_with_cache(slots, &f);
+    }
+}
+
+/// The cache must be invisible to the API: the same deterministic operation
+/// sequence must produce identical results regardless of cache size.
+#[test]
+fn cache_vs_no_cache_equivalence() {
+    let n = 500u64;
+
+    // Collect results from a fixed operation sequence.
+    let run_ops = |cache_slots: usize| -> Vec<String> {
+        let mem = make_memory();
+        let mut btree: BTreeMap<u64, u64, _> =
+            BTreeMap::new(mem).with_node_cache(cache_slots);
+        let mut results = Vec::new();
+
+        // Insert
+        for i in 0..n {
+            results.push(format!("insert({i})={:?}", btree.insert(i, i * 10)));
+        }
+        // Overwrite half
+        for i in (0..n).step_by(2) {
+            results.push(format!(
+                "overwrite({i})={:?}",
+                btree.insert(i, i * 100)
+            ));
+        }
+        // Get all
+        for i in 0..n {
+            results.push(format!("get({i})={:?}", btree.get(&i)));
+        }
+        // Contains
+        for i in 0..n + 10 {
+            results.push(format!("contains({i})={}", btree.contains_key(&i)));
+        }
+        // Remove some
+        for i in (0..n).step_by(3) {
+            results.push(format!("remove({i})={:?}", btree.remove(&i)));
+        }
+        // Get remaining
+        for i in 0..n {
+            results.push(format!("get2({i})={:?}", btree.get(&i)));
+        }
+        // first/last
+        results.push(format!("first={:?}", btree.first_key_value()));
+        results.push(format!("last={:?}", btree.last_key_value()));
+        // Pop
+        results.push(format!("pop_first={:?}", btree.pop_first()));
+        results.push(format!("pop_last={:?}", btree.pop_last()));
+        // Iterate remaining
+        let entries: Vec<_> = btree.iter().map(|e| e.into_pair()).collect();
+        results.push(format!("len={}", entries.len()));
+        results.push(format!("entries={entries:?}"));
+
+        results
+    };
+
+    let baseline = run_ops(0);
+    for slots in [1, 4, 16, 64, 256] {
+        assert_eq!(
+            baseline,
+            run_ops(slots),
+            "Results diverged with cache_slots={slots}"
+        );
+    }
+}
