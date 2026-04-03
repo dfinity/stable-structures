@@ -81,6 +81,62 @@ fn comprehensive_cached(#[strategy(pvec(operation_strategy(), 100..5_000))] ops:
     }
 }
 
+fn run_comprehensive(ops: Vec<Operation>, cache_slots: usize) {
+    let mem = make_memory();
+    let mut btree = BTreeMap::new(mem).with_node_cache(cache_slots);
+    let mut std_btree = StdBTreeMap::new();
+
+    for op in ops.into_iter() {
+        execute_operation(&mut std_btree, &mut btree, op);
+    }
+}
+
+// Cache-parameterized variants: run the same comprehensive operation sequence
+// at different cache sizes to catch size-dependent correctness bugs.
+// Fewer cases per variant to keep total runtime reasonable.
+
+#[proptest(cases = 3)]
+fn comprehensive_cache_0(
+    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
+) {
+    run_comprehensive(ops, 0);
+}
+
+#[proptest(cases = 3)]
+fn comprehensive_cache_1(
+    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
+) {
+    run_comprehensive(ops, 1);
+}
+
+#[proptest(cases = 3)]
+fn comprehensive_cache_4(
+    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
+) {
+    run_comprehensive(ops, 4);
+}
+
+#[proptest(cases = 3)]
+fn comprehensive_cache_16(
+    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
+) {
+    run_comprehensive(ops, 16);
+}
+
+#[proptest(cases = 3)]
+fn comprehensive_cache_64(
+    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
+) {
+    run_comprehensive(ops, 64);
+}
+
+#[proptest(cases = 3)]
+fn comprehensive_cache_256(
+    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
+) {
+    run_comprehensive(ops, 256);
+}
+
 // A comprehensive fuzz test that runs until it's explicitly terminated. To run:
 //
 // ```
