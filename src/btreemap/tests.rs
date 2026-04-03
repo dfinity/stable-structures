@@ -2303,3 +2303,103 @@ fn cache_first_last_during_mutations() {
         }
     });
 }
+
+// ---------------------------------------------------------------------------
+// Forward-looking tests for save-and-cache-node optimization
+//
+// These tests pass today (with invalidate-on-save). They are designed to
+// catch stale-cache-after-save bugs if save_and_cache_node is implemented.
+// ---------------------------------------------------------------------------
+
+/// Insert entries into a leaf, then verify ALL entries (including ones that
+/// were not just inserted) are still readable. Tests that lazy ByRef entries
+/// in a cached node survive a save cycle.
+#[test]
+fn cache_saved_leaf_other_entries_readable() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        // Insert enough keys to have multiple entries per leaf.
+        let n = 100u64;
+        for i in 0..n {
+            btree.insert(i, i * 10);
+        }
+        // Now overwrite a single key.
+        btree.insert(50, 999);
+        // Read ALL keys, not just the overwritten one.
+        // If the cached leaf has stale lazy values, a different entry will
+        // return wrong data.
+        for i in 0..n {
+            let expected = if i == 50 { 999 } else { i * 10 };
+            assert_eq!(btree.get(&i), Some(expected), "get({i})");
+        }
+    });
+}
+
+/// Overwrite values of different sizes in the same node.
+/// Tests that layout changes (from value size differences) do not break
+/// cached lazy offsets.
+#[test]
+fn cache_overwrite_varying_value_sizes() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, Vec<u8>, _>| {
+        let n = 100u64;
+        // Insert with small values.
+        for i in 0..n {
+            btree.insert(i, vec![i as u8; 5]);
+        }
+        // Overwrite some with larger values.
+        for i in (0..n).step_by(3) {
+            btree.insert(i, vec![i as u8; 50]);
+        }
+        // Overwrite some with smaller values.
+        for i in (1..n).step_by(3) {
+            btree.insert(i, vec![i as u8; 1]);
+        }
+        // Verify all entries.
+        for i in 0..n {
+            let expected_len = if i % 3 == 0 {
+                50
+            } else if i % 3 == 1 {
+                1
+            } else {
+                5
+            };
+            let val = btree.get(&i).unwrap();
+            assert_eq!(val.len(), expected_len, "get({i}) value length");
+            assert!(val.iter().all(|&b| b == i as u8), "get({i}) value content");
+        }
+    });
+}
+
+/// Trigger rotations/rebalancing, then read sibling entries.
+/// Tests that rebalancing + cache does not corrupt neighboring nodes.
+#[test]
+fn cache_rebalance_then_read_siblings() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 500u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Remove keys in a pattern that forces rotations and merges at
+        // various tree levels: remove every 3rd key, then every 2nd of
+        // what remains.
+        for i in (0..n).step_by(3) {
+            btree.remove(&i);
+        }
+        let remaining: Vec<u64> = (0..n).filter(|i| i % 3 != 0).collect();
+        for &i in remaining.iter().step_by(2) {
+            btree.remove(&i);
+        }
+        // Verify all remaining keys are correct.
+        for i in 0..n {
+            let removed_pass1 = i % 3 == 0;
+            let removed_pass2 = !removed_pass1 && {
+                let pos = (0..n).filter(|j| j % 3 != 0).position(|j| j == i);
+                pos.map_or(false, |p| p % 2 == 0)
+            };
+            if removed_pass1 || removed_pass2 {
+                assert_eq!(btree.get(&i), None, "get({i}) should be removed");
+            } else {
+                assert_eq!(btree.get(&i), Some(i), "get({i}) should survive");
+            }
+        }
+    });
+}
