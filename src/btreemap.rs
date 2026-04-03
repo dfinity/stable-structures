@@ -1152,19 +1152,12 @@ where
 
                         // An entry can't be removed from the child without merging.
                         // See if it has a sibling where an entry can be removed without merging.
-                        let mut left_sibling = if idx > 0 {
-                            Some(self.load_node(node.child(idx - 1)))
-                        } else {
-                            None
-                        };
+                        // Siblings are loaded lazily: if the left sibling can donate, we
+                        // never need to load the right sibling (saves one node load).
 
-                        let mut right_sibling = if idx + 1 < node.children_len() {
-                            Some(self.load_node(node.child(idx + 1)))
-                        } else {
-                            None
-                        };
+                        if idx > 0 {
+                            let mut left_sibling = self.load_node(node.child(idx - 1));
 
-                        if let Some(ref mut left_sibling) = left_sibling {
                             if left_sibling.can_remove_entry_without_merging() {
                                 // Case 3.a (left):
                                 // A key can be removed from the left child without merging.
@@ -1212,73 +1205,76 @@ where
                                     assert_eq!(child.node_type(), NodeType::Leaf);
                                 }
 
-                                self.save_node(left_sibling);
+                                self.save_node(&mut left_sibling);
                                 self.save_node(&mut child);
                                 self.save_node(&mut node);
                                 return self.remove_helper(child, key);
                             }
-                        }
 
-                        if let Some(right_sibling) = &mut right_sibling {
-                            if right_sibling.can_remove_entry_without_merging() {
-                                // Case 3.a (right):
-                                // A key can be removed from the right child without merging.
-                                //
-                                //                            [c] (parent)
-                                //                           /   \
-                                //             (child) [a, b]     [d, e, f] (right sibling)
-                                //                               /
-                                //                            [d']
-                                //
-                                // In this case, we move a key down from the parent into the child
-                                // and move a key from the right sibling up into the parent
-                                // resulting in the following tree:
-                                //
-                                //                            [d] (parent)
-                                //                           /   \
-                                //          (child) [a, b, c]     [e, f] (right sibling)
-                                //                          \
-                                //                           [d']
-                                //
-                                // We then recurse to delete the key from the child.
+                            // Left sibling is at minimum. Load right sibling to try
+                            // rotation or decide which merge to perform.
+                            if idx + 1 < node.children_len() {
+                                let mut right_sibling = self.load_node(node.child(idx + 1));
 
-                                // Remove the first entry from the right sibling.
-                                let (right_sibling_key, right_sibling_value) =
-                                    right_sibling.remove_entry(0, self.memory());
+                                if right_sibling.can_remove_entry_without_merging() {
+                                    // Case 3.a (right):
+                                    // A key can be removed from the right child without merging.
+                                    //
+                                    //                            [c] (parent)
+                                    //                           /   \
+                                    //             (child) [a, b]     [d, e, f] (right sibling)
+                                    //                               /
+                                    //                            [d']
+                                    //
+                                    // In this case, we move a key down from the parent into the child
+                                    // and move a key from the right sibling up into the parent
+                                    // resulting in the following tree:
+                                    //
+                                    //                            [d] (parent)
+                                    //                           /   \
+                                    //          (child) [a, b, c]     [e, f] (right sibling)
+                                    //                          \
+                                    //                           [d']
+                                    //
+                                    // We then recurse to delete the key from the child.
 
-                                // Replace the parent's entry with the one from the right sibling.
-                                let parent_entry = node.swap_entry(
-                                    idx,
-                                    (right_sibling_key, right_sibling_value),
-                                    self.memory(),
-                                );
+                                    // Remove the first entry from the right sibling.
+                                    let (right_sibling_key, right_sibling_value) =
+                                        right_sibling.remove_entry(0, self.memory());
 
-                                // Move the entry from the parent into the child.
-                                child.push_entry(parent_entry);
+                                    // Replace the parent's entry with the one from the right sibling.
+                                    let parent_entry = node.swap_entry(
+                                        idx,
+                                        (right_sibling_key, right_sibling_value),
+                                        self.memory(),
+                                    );
 
-                                // Move the first child of right_sibling into `child`.
-                                match right_sibling.node_type() {
-                                    NodeType::Internal => {
-                                        assert_eq!(child.node_type(), NodeType::Internal);
-                                        child.push_child(right_sibling.remove_child(0));
+                                    // Move the entry from the parent into the child.
+                                    child.push_entry(parent_entry);
+
+                                    // Move the first child of right_sibling into `child`.
+                                    match right_sibling.node_type() {
+                                        NodeType::Internal => {
+                                            assert_eq!(child.node_type(), NodeType::Internal);
+                                            child.push_child(right_sibling.remove_child(0));
+                                        }
+                                        NodeType::Leaf => {
+                                            assert_eq!(child.node_type(), NodeType::Leaf);
+                                        }
                                     }
-                                    NodeType::Leaf => {
-                                        assert_eq!(child.node_type(), NodeType::Leaf);
-                                    }
+
+                                    self.save_node(&mut right_sibling);
+                                    self.save_node(&mut child);
+                                    self.save_node(&mut node);
+                                    return self.remove_helper(child, key);
                                 }
 
-                                self.save_node(right_sibling);
-                                self.save_node(&mut child);
-                                self.save_node(&mut node);
-                                return self.remove_helper(child, key);
+                                // Case 3.b: both siblings at minimum — prefer merging
+                                // into the left sibling.
+                                drop(right_sibling);
                             }
-                        }
 
-                        // Case 3.b: Both the left and right siblings are at their minimum sizes.
-
-                        if let Some(left_sibling) = left_sibling {
-                            // Merge child into left sibling if it exists.
-
+                            // Case 3.b (left): Merge child into left sibling.
                             assert!(left_sibling.at_minimum());
                             let left_sibling = self.merge(
                                 child,
@@ -1304,36 +1300,60 @@ where
                             return self.remove_helper(left_sibling, key);
                         }
 
-                        if let Some(right_sibling) = right_sibling {
-                            // Merge child into right sibling.
+                        // No left sibling (idx == 0). The right sibling must exist.
+                        let mut right_sibling = self.load_node(node.child(idx + 1));
 
-                            assert!(right_sibling.at_minimum());
-                            let right_sibling = self.merge(
-                                child,
-                                right_sibling,
-                                node.remove_entry(idx, self.memory()),
+                        if right_sibling.can_remove_entry_without_merging() {
+                            // Case 3.a (right), no left sibling variant.
+
+                            let (right_sibling_key, right_sibling_value) =
+                                right_sibling.remove_entry(0, self.memory());
+
+                            let parent_entry = node.swap_entry(
+                                idx,
+                                (right_sibling_key, right_sibling_value),
+                                self.memory(),
                             );
 
-                            // Removing child from parent.
-                            node.remove_child(idx);
+                            child.push_entry(parent_entry);
 
-                            if node.entries_len() == 0 {
-                                let node_address = node.address();
-                                self.deallocate_node(node);
-
-                                if node_address == self.root_addr {
-                                    // Update the root.
-                                    self.root_addr = right_sibling.address();
-                                    self.save_header();
+                            match right_sibling.node_type() {
+                                NodeType::Internal => {
+                                    assert_eq!(child.node_type(), NodeType::Internal);
+                                    child.push_child(right_sibling.remove_child(0));
                                 }
-                            } else {
-                                self.save_node(&mut node);
+                                NodeType::Leaf => {
+                                    assert_eq!(child.node_type(), NodeType::Leaf);
+                                }
                             }
 
-                            return self.remove_helper(right_sibling, key);
+                            self.save_node(&mut right_sibling);
+                            self.save_node(&mut child);
+                            self.save_node(&mut node);
+                            return self.remove_helper(child, key);
                         }
 
-                        unreachable!("At least one of the siblings must exist.");
+                        // Case 3.b (right): Merge child into right sibling.
+                        assert!(right_sibling.at_minimum());
+                        let right_sibling =
+                            self.merge(child, right_sibling, node.remove_entry(idx, self.memory()));
+
+                        node.remove_child(idx);
+
+                        if node.entries_len() == 0 {
+                            let node_address = node.address();
+                            self.deallocate_node(node);
+
+                            if node_address == self.root_addr {
+                                // Update the root.
+                                self.root_addr = right_sibling.address();
+                                self.save_header();
+                            }
+                        } else {
+                            self.save_node(&mut node);
+                        }
+
+                        return self.remove_helper(right_sibling, key);
                     }
                 }
             }
