@@ -377,21 +377,11 @@ where
 
     /// Resets cache metrics (hit/miss counters) without evicting
     /// cached nodes.
-    ///
-    /// Call this before the workload you want to measure so that
-    /// counters reflect only that workload, not the entire lifetime
-    /// of the map.
     pub fn node_cache_clear_metrics(&mut self) {
         self.cache.get_mut().clear_metrics();
     }
 
     /// Returns node-cache performance metrics.
-    ///
-    /// Counters accumulate from map creation (or the last call to
-    /// [`node_cache_clear_metrics`](Self::node_cache_clear_metrics))
-    /// and are never cleared automatically. To measure a specific
-    /// workload, call `node_cache_clear_metrics` first, run the
-    /// workload, then read the metrics.
     ///
     /// # Examples
     ///
@@ -401,19 +391,8 @@ where
     /// let mut map: BTreeMap<u64, u64, _> =
     ///     BTreeMap::init(DefaultMemoryImpl::default())
     ///         .with_node_cache(32);
-    ///
-    /// // Populate the map (metrics accumulate during inserts).
-    /// for i in 0..100u64 {
-    ///     map.insert(i, i);
-    /// }
-    ///
-    /// // Clear counters before the workload we care about.
-    /// map.node_cache_clear_metrics();
-    ///
-    /// // Workload: read every key.
-    /// for i in 0..100u64 {
-    ///     let _ = map.get(&i);
-    /// }
+    /// map.insert(1, 100);
+    /// let _ = map.get(&1);
     ///
     /// let metrics = map.node_cache_metrics();
     /// println!("hit ratio: {:.1}%", metrics.hit_ratio() * 100.0);
