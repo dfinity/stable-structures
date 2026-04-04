@@ -152,20 +152,6 @@ where
     f(tree_v2);
 }
 
-/// Like `run_btree_test` but only tests V2 with a specific cache size.
-/// Used for cache-variant tests where V1/migration coverage is not needed
-/// (the original non-cached test already covers those).
-pub fn run_btree_test_cached<K, V, R, F>(cache_slots: usize, f: F)
-where
-    K: Storable + Ord + Clone,
-    V: Storable,
-    F: Fn(BTreeMap<K, V, VectorMemory>) -> R,
-{
-    let mem = make_memory();
-    let tree = BTreeMap::new(mem).with_node_cache(cache_slots);
-    f(tree);
-}
-
 /// Checks that objects from boundary u32 values are strictly increasing.
 /// This ensures multi-byte conversions preserve order.
 fn verify_monotonic<T: Builder + PartialOrd>() {
@@ -2039,6 +2025,19 @@ fn deallocating_root_does_not_leak_memory() {
 // ---------------------------------------------------------------------------
 // Cache correctness tests
 // ---------------------------------------------------------------------------
+
+/// Runs `f` against a V2 BTreeMap with the given cache size.
+/// Used for cache-variant tests where V1/migration coverage is not needed
+/// (the original non-cached test already covers those).
+fn run_btree_test_cached<K, V, R>(cache_slots: usize, f: impl Fn(BTreeMap<K, V, VectorMemory>) -> R)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+{
+    let mem = make_memory();
+    let tree = BTreeMap::new(mem).with_node_cache(cache_slots);
+    f(tree);
+}
 
 /// Runs `f` with several cache sizes (disabled, tiny, default, large).
 /// Includes non-power-of-two sizes — users can pass any value to with_node_cache.
