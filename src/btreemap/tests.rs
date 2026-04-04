@@ -2040,17 +2040,6 @@ fn deallocating_root_does_not_leak_memory() {
 // Cache correctness tests
 // ---------------------------------------------------------------------------
 
-/// Runs `f` against a V2 BTreeMap with the given cache size.
-fn run_with_cache<K, V, R>(cache_slots: usize, f: impl Fn(BTreeMap<K, V, VectorMemory>) -> R)
-where
-    K: Storable + Ord + Clone,
-    V: Storable,
-{
-    let mem = make_memory();
-    let tree = BTreeMap::new(mem).with_node_cache(cache_slots);
-    f(tree);
-}
-
 /// Runs `f` with several cache sizes (disabled, tiny, default, large).
 /// Includes non-power-of-two sizes — users can pass any value to with_node_cache.
 fn run_with_various_cache_sizes<K, V, R>(f: impl Fn(BTreeMap<K, V, VectorMemory>) -> R)
@@ -2059,7 +2048,7 @@ where
     V: Storable,
 {
     for slots in [0, 1, 3, 7, 16, 50] {
-        run_with_cache(slots, &f);
+        run_btree_test_cached(slots, &f);
     }
 }
 
@@ -2217,7 +2206,7 @@ fn cache_sequential_inserts_then_gets() {
 #[test]
 fn cache_interleaved_insert_get_remove() {
     for cache_slots in [1, 2, 4] {
-        run_with_cache(cache_slots, |mut btree: BTreeMap<u64, u64, _>| {
+        run_btree_test_cached(cache_slots, |mut btree: BTreeMap<u64, u64, _>| {
             let n = 300u64;
             // Phase 1: insert all
             for i in 0..n {
