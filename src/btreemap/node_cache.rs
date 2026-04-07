@@ -4,6 +4,11 @@ use crate::Storable;
 use super::node::Node;
 
 /// Node-cache performance metrics.
+///
+/// Counters accumulate over the lifetime of the cache and are **never
+/// cleared automatically**. To measure a specific workload, call
+/// [`BTreeMap::node_cache_reset_metrics`](super::BTreeMap::node_cache_reset_metrics)
+/// before the workload, then read the metrics afterward.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct NodeCacheMetrics {
     /// Successful cache lookups.
