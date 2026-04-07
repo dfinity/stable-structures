@@ -87,11 +87,18 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
 /// Default number of slots in the direct-mapped node cache.
 ///
-/// 16 slots cover the top two tree levels (1 root + up to 12 children =
-/// 13 nodes) while keeping heap usage modest.
+/// Sizing options (prefer powers of two for efficient slot indexing):
+///
+/// -  **0** — cache disabled, every access reads from stable memory.
+/// -  **1** — only the root node is cached; saves one read per operation.
+/// - **16** — covers the top two tree levels (1 root + up to 12
+///   children = 13 nodes). Good balance of hit rate and heap usage.
+/// - **32** — extra headroom over 16 that reduces collision evictions
+///   in the direct-mapped scheme and typically yields ≥2 cache hits
+///   per operation regardless of tree size.
 ///
 /// Users can adjust via [`BTreeMap::with_node_cache`] or
-/// [`BTreeMap::node_cache_resize`], including setting to 0 to disable.
+/// [`BTreeMap::node_cache_resize`].
 const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 16;
 
 /// A B-Tree map implementation that stores its data into a designated memory.
@@ -312,14 +319,8 @@ where
     /// Each slot can hold one deserialized node; on collision, shallower
     /// nodes (closer to the root) are kept over deeper ones.
     ///
-    /// Pass `0` to disable the cache (the default).
-    ///
-    /// The top 2 levels of the tree contain 13 nodes (1 root + up to
-    /// 12 children). **16** slots is the smallest power of two that
-    /// covers them, but a direct-mapped cache is sensitive to address
-    /// collisions, so **32** is a safer default that leaves headroom
-    /// and typically gives 2 cache hits per operation regardless of
-    /// tree size. Prefer powers of two for efficient slot indexing.
+    /// The cache is enabled by default. Pass `0` to disable.
+    /// Prefer powers of two for efficient slot indexing.
     ///
     /// # Examples
     ///
@@ -365,7 +366,7 @@ where
     /// Returns the current number of slots in the node cache.
     ///
     /// Returns `0` when the cache is disabled.
-    pub fn node_cache_size(&self) -> usize {
+    pub fn node_cache_num_slots(&self) -> usize {
         self.cache.borrow().num_slots()
     }
 
@@ -377,11 +378,21 @@ where
 
     /// Resets cache metrics (hit/miss counters) without evicting
     /// cached nodes.
-    pub fn node_cache_clear_metrics(&mut self) {
+    ///
+    /// Call this before the workload you want to measure so that
+    /// counters reflect only that workload, not the entire lifetime
+    /// of the map.
+    pub fn node_cache_reset_metrics(&mut self) {
         self.cache.get_mut().clear_metrics();
     }
 
     /// Returns node-cache performance metrics.
+    ///
+    /// Counters accumulate from map creation (or the last call to
+    /// [`node_cache_reset_metrics`](Self::node_cache_reset_metrics))
+    /// and are never cleared automatically. To measure a specific
+    /// workload, call `node_cache_reset_metrics` first, run the
+    /// workload, then read the metrics.
     ///
     /// # Examples
     ///
@@ -391,8 +402,19 @@ where
     /// let mut map: BTreeMap<u64, u64, _> =
     ///     BTreeMap::init(DefaultMemoryImpl::default())
     ///         .with_node_cache(32);
-    /// map.insert(1, 100);
-    /// let _ = map.get(&1);
+    ///
+    /// // Populate the map (metrics accumulate during inserts).
+    /// for i in 0..100u64 {
+    ///     map.insert(i, i);
+    /// }
+    ///
+    /// // Clear counters before the workload we care about.
+    /// map.node_cache_reset_metrics();
+    ///
+    /// // Workload: read every key.
+    /// for i in 0..100u64 {
+    ///     let _ = map.get(&i);
+    /// }
     ///
     /// let metrics = map.node_cache_metrics();
     /// println!("hit ratio: {:.1}%", metrics.hit_ratio() * 100.0);
@@ -406,7 +428,7 @@ where
     /// Actual usage depends on key size and how many slots are
     /// occupied. Treat this as an order-of-magnitude guide, not a
     /// precise budget.
-    pub fn node_cache_size_bytes_approx(&self) -> usize {
+    pub fn node_cache_heap_usage(&self) -> usize {
         self.cache.borrow().num_slots()
             * (self.version.page_size().get() as usize + NodeCache::<K>::slot_size())
     }
