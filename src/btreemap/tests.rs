@@ -2992,7 +2992,7 @@ fn cache_metrics_nonzero_hits() {
     }
 
     // Clear counters accumulated during inserts.
-    btree.node_cache_clear_metrics();
+    btree.node_cache_reset_metrics();
 
     // Workload: get all keys — traversal should hit cached upper-level nodes.
     for i in 0..n {
@@ -3022,7 +3022,7 @@ fn cache_disabled_metrics_zero() {
         btree.insert(i, i);
     }
 
-    btree.node_cache_clear_metrics();
+    btree.node_cache_reset_metrics();
 
     for i in 0..100u64 {
         assert_eq!(btree.get(&i), Some(i));
@@ -3044,7 +3044,7 @@ fn cache_metrics_reset_after_clear() {
         btree.insert(i, i);
     }
 
-    btree.node_cache_clear_metrics();
+    btree.node_cache_reset_metrics();
 
     for i in 0..100u64 {
         let _ = btree.get(&i);
