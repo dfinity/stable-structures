@@ -2021,3 +2021,1041 @@ fn deallocating_root_does_not_leak_memory() {
 
     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 }
+
+// ---------------------------------------------------------------------------
+// Cache correctness tests
+// ---------------------------------------------------------------------------
+
+/// Runs `f` against a V2 BTreeMap with the given cache size.
+/// Used for cache-variant tests where V1/migration coverage is not needed
+/// (the original non-cached test already covers those).
+fn run_btree_test_cached<K, V, R>(cache_slots: usize, f: impl Fn(BTreeMap<K, V, VectorMemory>) -> R)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+{
+    let mem = make_memory();
+    let tree = BTreeMap::new(mem).with_node_cache(cache_slots);
+    f(tree);
+}
+
+/// Runs `f` with several cache sizes (disabled, tiny, default, large).
+/// Includes non-power-of-two sizes — users can pass any value to with_node_cache.
+fn run_with_various_cache_sizes<K, V, R>(f: impl Fn(BTreeMap<K, V, VectorMemory>) -> R)
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+{
+    for slots in [0, 1, 3, 7, 16, 50] {
+        run_btree_test_cached(slots, &f);
+    }
+}
+
+/// The cache must be invisible to the API: the same deterministic operation
+/// sequence must produce identical results regardless of cache size.
+#[test]
+fn cache_vs_no_cache_equivalence() {
+    let n = 500u64;
+
+    // Collect results from a fixed operation sequence.
+    let run_ops = |cache_slots: usize| -> Vec<String> {
+        let mem = make_memory();
+        let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(cache_slots);
+        let mut results = Vec::new();
+
+        // Insert
+        for i in 0..n {
+            results.push(format!("insert({i})={:?}", btree.insert(i, i * 10)));
+        }
+        // Overwrite half
+        for i in (0..n).step_by(2) {
+            results.push(format!("overwrite({i})={:?}", btree.insert(i, i * 100)));
+        }
+        // Get all
+        for i in 0..n {
+            results.push(format!("get({i})={:?}", btree.get(&i)));
+        }
+        // Contains
+        for i in 0..n + 10 {
+            results.push(format!("contains({i})={}", btree.contains_key(&i)));
+        }
+        // Remove some
+        for i in (0..n).step_by(3) {
+            results.push(format!("remove({i})={:?}", btree.remove(&i)));
+        }
+        // Get remaining
+        for i in 0..n {
+            results.push(format!("get2({i})={:?}", btree.get(&i)));
+        }
+        // first/last
+        results.push(format!("first={:?}", btree.first_key_value()));
+        results.push(format!("last={:?}", btree.last_key_value()));
+        // Pop
+        results.push(format!("pop_first={:?}", btree.pop_first()));
+        results.push(format!("pop_last={:?}", btree.pop_last()));
+        // Iterate remaining
+        let entries: Vec<_> = btree.iter().map(|e| e.into_pair()).collect();
+        results.push(format!("len={}", entries.len()));
+        results.push(format!("entries={entries:?}"));
+
+        results
+    };
+
+    let baseline = run_ops(0);
+    for slots in [1, 3, 7, 16, 50, 256] {
+        assert_eq!(
+            baseline,
+            run_ops(slots),
+            "Results diverged with cache_slots={slots}"
+        );
+    }
+}
+
+/// Insert N keys, then get each one. Verifies the cache does not serve stale data.
+#[test]
+fn cache_insert_then_get() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i * 10);
+        }
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i * 10), "get({i}) after insert");
+        }
+    });
+}
+
+/// Overwrite then get: must return new value, not stale cached value.
+/// This is the exact pattern that broke the save_and_cache_node attempt.
+#[test]
+fn cache_overwrite_then_get() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Overwrite every key with a new value.
+        for i in 0..n {
+            let old = btree.insert(i, i + 1000);
+            assert_eq!(old, Some(i), "overwrite({i}) old value");
+        }
+        // Read back: must see the new value, not the old cached one.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i + 1000), "get({i}) after overwrite");
+        }
+    });
+}
+
+/// Insert until splits occur, then get every key.
+/// Verifies split invalidation is correct.
+#[test]
+fn cache_split_then_get_all() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        // 500 keys is enough to cause multiple levels of splits.
+        let n = 500;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) after splits");
+        }
+    });
+}
+
+/// Insert many, remove until merges occur, get every remaining key.
+/// Verifies merge invalidation.
+#[test]
+fn cache_merge_then_get_remaining() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 500;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Remove every other key to trigger merges/rotations.
+        for i in (0..n).step_by(2) {
+            assert_eq!(btree.remove(&i), Some(i));
+        }
+        // Remaining odd keys must all be present.
+        for i in (1..n).step_by(2) {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) after merges");
+        }
+        // Removed keys must be gone.
+        for i in (0..n).step_by(2) {
+            assert_eq!(btree.get(&i), None, "get({i}) should be None");
+        }
+    });
+}
+
+/// Sequential inserts into the same leaf area, then get all.
+/// Tests the hot-leaf cache path.
+#[test]
+fn cache_sequential_inserts_then_gets() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300;
+        for i in 0..n {
+            btree.insert(i, i);
+            // Immediately verify the just-inserted key.
+            assert_eq!(btree.get(&i), Some(i), "get({i}) right after insert");
+        }
+    });
+}
+
+/// Interleave insert, get, and remove on overlapping keys with a small cache.
+/// Maximum eviction pressure.
+#[test]
+fn cache_interleaved_insert_get_remove() {
+    for cache_slots in [1, 2, 4] {
+        run_btree_test_cached(cache_slots, |mut btree: BTreeMap<u64, u64, _>| {
+            let n = 300u64;
+            // Phase 1: insert all
+            for i in 0..n {
+                btree.insert(i, i);
+            }
+            // Phase 2: interleave operations
+            for i in 0..n {
+                // Get existing
+                if i % 3 != 0 {
+                    assert_eq!(btree.get(&i), Some(i), "get({i}) interleaved");
+                }
+                // Remove some
+                if i % 3 == 0 {
+                    assert_eq!(btree.remove(&i), Some(i));
+                }
+                // Re-insert with new value
+                if i % 5 == 0 {
+                    btree.insert(i, i + 1000);
+                }
+            }
+            // Phase 3: verify final state
+            for i in 0..n {
+                let expected = if i % 5 == 0 {
+                    Some(i + 1000)
+                } else if i % 3 == 0 {
+                    None
+                } else {
+                    Some(i)
+                };
+                assert_eq!(btree.get(&i), expected, "final get({i})");
+            }
+        });
+    }
+}
+
+/// pop_first/pop_last in a loop, verify each returned entry.
+/// Tests cache interaction with the single-pass pop algorithms.
+#[test]
+fn cache_pop_correctness() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+
+        // Pop from front
+        for i in 0..n / 2 {
+            assert_eq!(btree.pop_first(), Some((i, i)), "pop_first step {i}");
+        }
+
+        // Pop from back
+        for i in (n / 2..n).rev() {
+            assert_eq!(btree.pop_last(), Some((i, i)), "pop_last step {i}");
+        }
+
+        assert!(btree.is_empty());
+    });
+}
+
+/// Call first_key_value/last_key_value between inserts and removes.
+/// Reproduces the pattern from the test_first_key_value failure.
+#[test]
+fn cache_first_last_during_mutations() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+
+        // Insert in reverse order, check first_key_value after each insert.
+        for i in (0..n).rev() {
+            btree.insert(i, i);
+            assert_eq!(
+                btree.first_key_value(),
+                Some((i, i)),
+                "first_key_value after insert({i})"
+            );
+            assert_eq!(
+                btree.last_key_value(),
+                Some((n - 1, n - 1)),
+                "last_key_value after insert({i})"
+            );
+        }
+
+        // Remove from front, check first_key_value updates.
+        for i in 0..n - 1 {
+            btree.remove(&i);
+            assert_eq!(
+                btree.first_key_value(),
+                Some((i + 1, i + 1)),
+                "first_key_value after remove({i})"
+            );
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Forward-looking tests for save-and-cache-node optimization
+//
+// These tests pass today (with invalidate-on-save). They are designed to
+// catch stale-cache-after-save bugs if save_and_cache_node is implemented.
+// ---------------------------------------------------------------------------
+
+/// Insert entries into a leaf, then verify ALL entries (including ones that
+/// were not just inserted) are still readable. Tests that lazy ByRef entries
+/// in a cached node survive a save cycle.
+#[test]
+fn cache_saved_leaf_other_entries_readable() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        // Insert enough keys to have multiple entries per leaf.
+        let n = 100u64;
+        for i in 0..n {
+            btree.insert(i, i * 10);
+        }
+        // Now overwrite a single key.
+        btree.insert(50, 999);
+        // Read ALL keys, not just the overwritten one.
+        // If the cached leaf has stale lazy values, a different entry will
+        // return wrong data.
+        for i in 0..n {
+            let expected = if i == 50 { 999 } else { i * 10 };
+            assert_eq!(btree.get(&i), Some(expected), "get({i})");
+        }
+    });
+}
+
+/// Overwrite values of different sizes in the same node.
+/// Tests that layout changes (from value size differences) do not break
+/// cached lazy offsets.
+#[test]
+fn cache_overwrite_varying_value_sizes() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, Vec<u8>, _>| {
+        let n = 100u64;
+        // Insert with small values.
+        for i in 0..n {
+            btree.insert(i, vec![i as u8; 5]);
+        }
+        // Overwrite some with larger values.
+        for i in (0..n).step_by(3) {
+            btree.insert(i, vec![i as u8; 50]);
+        }
+        // Overwrite some with smaller values.
+        for i in (1..n).step_by(3) {
+            btree.insert(i, vec![i as u8; 1]);
+        }
+        // Verify all entries.
+        for i in 0..n {
+            let expected_len = if i % 3 == 0 {
+                50
+            } else if i % 3 == 1 {
+                1
+            } else {
+                5
+            };
+            let val = btree.get(&i).unwrap();
+            assert_eq!(val.len(), expected_len, "get({i}) value length");
+            assert!(val.iter().all(|&b| b == i as u8), "get({i}) value content");
+        }
+    });
+}
+
+/// Trigger rotations/rebalancing, then read sibling entries.
+/// Tests that rebalancing + cache does not corrupt neighboring nodes.
+#[test]
+fn cache_rebalance_then_read_siblings() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 500u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Remove keys in a pattern that forces rotations and merges at
+        // various tree levels: remove every 3rd key, then every 2nd of
+        // what remains.
+        for i in (0..n).step_by(3) {
+            btree.remove(&i);
+        }
+        let remaining: Vec<u64> = (0..n).filter(|i| i % 3 != 0).collect();
+        for &i in remaining.iter().step_by(2) {
+            btree.remove(&i);
+        }
+        // Verify all remaining keys are correct.
+        for i in 0..n {
+            let removed_pass1 = i % 3 == 0;
+            let removed_pass2 = !removed_pass1 && {
+                let pos = (0..n).filter(|j| j % 3 != 0).position(|j| j == i);
+                pos.is_some_and(|p| p % 2 == 0)
+            };
+            if removed_pass1 || removed_pass2 {
+                assert_eq!(btree.get(&i), None, "get({i}) should be removed");
+            } else {
+                assert_eq!(btree.get(&i), Some(i), "get({i}) should survive");
+            }
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Read-warm-write-read tests
+//
+// Verify correctness when the cache is warmed by reads, then a write
+// modifies the tree, then reads must still return correct data.
+// This catches bugs where a write invalidates some cached nodes but
+// leaves other (now-stale) nodes in cache.
+// ---------------------------------------------------------------------------
+
+/// Warm cache with reads, insert new keys (causing splits), read again.
+#[test]
+fn cache_read_warm_insert_read() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200u64;
+        // Populate.
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Warm cache: read every key.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Write: insert more keys, causing splits in the warmed tree.
+        for i in n..n * 2 {
+            btree.insert(i, i);
+        }
+        // Read all again: both old and new keys must be correct.
+        for i in 0..n * 2 {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) after warm+insert");
+        }
+    });
+}
+
+/// Warm cache with reads, overwrite existing keys, read again.
+#[test]
+fn cache_read_warm_overwrite_read() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Warm cache.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Overwrite every other key.
+        for i in (0..n).step_by(2) {
+            btree.insert(i, i + 1000);
+        }
+        // Read all: overwritten keys must return new value,
+        // non-overwritten keys must still return original value.
+        for i in 0..n {
+            let expected = if i % 2 == 0 { i + 1000 } else { i };
+            assert_eq!(
+                btree.get(&i),
+                Some(expected),
+                "get({i}) after warm+overwrite"
+            );
+        }
+    });
+}
+
+/// Warm cache with reads, remove keys (causing merges), read remaining.
+#[test]
+fn cache_read_warm_remove_read() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Warm cache.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Remove half the keys, triggering merges in the warmed tree.
+        for i in (0..n).step_by(2) {
+            assert_eq!(btree.remove(&i), Some(i));
+        }
+        // Read all: removed keys must be None, remaining must be correct.
+        for i in 0..n {
+            if i % 2 == 0 {
+                assert_eq!(btree.get(&i), None, "get({i}) should be removed");
+            } else {
+                assert_eq!(btree.get(&i), Some(i), "get({i}) should remain");
+            }
+        }
+    });
+}
+
+/// Warm cache, pop_first/pop_last (single-pass algorithms), verify remaining.
+#[test]
+fn cache_read_warm_pop_read() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Warm cache.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Pop from both ends.
+        for i in 0..20 {
+            assert_eq!(btree.pop_first(), Some((i, i)));
+        }
+        for i in (n - 20..n).rev() {
+            assert_eq!(btree.pop_last(), Some((i, i)));
+        }
+        // Read remaining: middle keys must be intact.
+        for i in 20..n - 20 {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) after warm+pop");
+        }
+    });
+}
+
+/// Multiple read-write-read cycles to test cache coherence over time.
+#[test]
+fn cache_repeated_read_write_cycles() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 100u64;
+
+        for cycle in 0..5u64 {
+            let base = cycle * n;
+            // Write phase: insert a batch of keys.
+            for i in base..base + n {
+                btree.insert(i, i);
+            }
+            // Read phase: verify ALL keys inserted so far.
+            for i in 0..base + n {
+                assert_eq!(btree.get(&i), Some(i), "get({i}) in cycle {cycle}");
+            }
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Cache path-reuse tests
+// ---------------------------------------------------------------------------
+
+/// Get non-existent keys with warm cache must return None.
+#[test]
+fn cache_get_miss() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        // Insert even keys only.
+        for i in (0..n).step_by(2) {
+            btree.insert(i, i);
+        }
+        // Warm cache by reading existing keys.
+        for i in (0..n).step_by(2) {
+            assert_eq!(btree.get(&i), Some(i));
+        }
+        // Get odd keys (misses): must all return None.
+        for i in (1..n).step_by(2) {
+            assert_eq!(btree.get(&i), None, "get({i}) should miss");
+        }
+        // Get keys beyond range: also misses.
+        for i in n..n + 50 {
+            assert_eq!(btree.get(&i), None, "get({i}) beyond range should miss");
+        }
+    });
+}
+
+/// Get a key then immediately remove it. The get warms the exact cache path
+/// that remove then modifies.
+#[test]
+fn cache_get_then_remove() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // For each key: get (warms path), then immediately remove.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) before remove");
+            assert_eq!(btree.remove(&i), Some(i), "remove({i})");
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+/// Get a key then immediately overwrite it. The get warms the exact cache
+/// path that insert then modifies.
+#[test]
+fn cache_get_then_insert() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // For each key: get (warms path), then overwrite with new value.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i), "get({i}) before overwrite");
+            assert_eq!(btree.insert(i, i + 1000), Some(i), "overwrite({i})");
+        }
+        // Verify all new values.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i + 1000), "get({i}) after overwrite");
+        }
+    });
+}
+
+/// contains_key then immediately remove. contains_key warms the path
+/// without reading the value.
+#[test]
+fn cache_contains_then_remove() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in 0..n {
+            assert!(btree.contains_key(&i), "contains({i})");
+            assert_eq!(btree.remove(&i), Some(i), "remove({i})");
+            assert!(!btree.contains_key(&i), "contains({i}) after remove");
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+/// Peek boundary then pop: last_key_value followed by pop_last, and
+/// first_key_value followed by pop_first. The peek reads through cache,
+/// then pop modifies the same leftmost/rightmost path.
+#[test]
+fn cache_peek_then_pop() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Peek-then-pop from back.
+        for i in (n / 2..n).rev() {
+            let peeked = btree.last_key_value();
+            assert_eq!(peeked, Some((i, i)), "peek last at step {i}");
+            let popped = btree.pop_last();
+            assert_eq!(popped, Some((i, i)), "pop last at step {i}");
+        }
+        // Peek-then-pop from front.
+        for i in 0..n / 2 {
+            let peeked = btree.first_key_value();
+            assert_eq!(peeked, Some((i, i)), "peek first at step {i}");
+            let popped = btree.pop_first();
+            assert_eq!(popped, Some((i, i)), "pop first at step {i}");
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+/// Deeper tree (2000 entries, depth ~5) to stress cache beyond the typical
+/// test size of 200-500 entries.
+#[test]
+fn cache_deeper_tree() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 2000u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        // Read all.
+        for i in 0..n {
+            assert_eq!(btree.get(&i), Some(i), "get({i})");
+        }
+        // Overwrite every 7th key (non-power-of-two stride).
+        for i in (0..n).step_by(7) {
+            btree.insert(i, i + n);
+        }
+        // Remove every 11th key.
+        for i in (0..n).step_by(11) {
+            btree.remove(&i);
+        }
+        // Verify final state.
+        for i in 0..n {
+            if i % 11 == 0 {
+                assert_eq!(btree.get(&i), None, "get({i}) removed");
+            } else if i % 7 == 0 {
+                assert_eq!(btree.get(&i), Some(i + n), "get({i}) overwritten");
+            } else {
+                assert_eq!(btree.get(&i), Some(i), "get({i}) original");
+            }
+        }
+    });
+}
+
+/// Resize cache mid-use: populate and read with one cache size, resize,
+/// then continue operating. Resizing drops all cached nodes.
+#[test]
+fn cache_resize_mid_use() {
+    let mem = make_memory();
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(16);
+
+    let n = 300u64;
+    for i in 0..n {
+        btree.insert(i, i);
+    }
+    // Warm cache at size 16.
+    for i in 0..n {
+        assert_eq!(btree.get(&i), Some(i));
+    }
+
+    // Resize to 1 slot — drops all cached nodes.
+    btree.node_cache_resize(1);
+    for i in 0..n {
+        assert_eq!(btree.get(&i), Some(i), "get({i}) after resize to 1");
+    }
+
+    // Resize to 0 — disable cache entirely.
+    btree.node_cache_resize(0);
+    btree.insert(n, n);
+    assert_eq!(btree.remove(&0), Some(0));
+    for i in 1..=n {
+        assert_eq!(btree.get(&i), Some(i), "get({i}) after disable");
+    }
+
+    // Resize back to 64.
+    btree.node_cache_resize(64);
+    for i in 1..=n {
+        assert_eq!(btree.get(&i), Some(i), "get({i}) after re-enable");
+    }
+}
+
+/// Partial iteration warms cache, then mutation modifies the tree,
+/// then full iteration must return correct data.
+#[test]
+fn cache_partial_iter_then_mutate() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+
+        // Partial forward iteration (warms cache for part of the tree).
+        let partial: Vec<_> = btree.iter().take(50).map(|e| e.into_pair()).collect();
+        assert_eq!(partial.len(), 50);
+
+        // Partial reverse iteration (warms cache for other end).
+        let partial_rev: Vec<_> = btree.iter().rev().take(50).map(|e| e.into_pair()).collect();
+        assert_eq!(partial_rev.len(), 50);
+
+        // Mutate: overwrite, insert new, remove some.
+        for i in (0..n).step_by(3) {
+            btree.insert(i, i + 1000);
+        }
+        btree.insert(n, n);
+        for i in (1..n).step_by(5) {
+            btree.remove(&i);
+        }
+
+        // Full iteration must be consistent with get.
+        let all: Vec<_> = btree.iter().map(|e| e.into_pair()).collect();
+        for (k, v) in &all {
+            assert_eq!(btree.get(k), Some(*v), "iter vs get mismatch at key {k}");
+        }
+        assert_eq!(all.len(), btree.len() as usize);
+    });
+}
+
+/// Mix different read operations (get, contains_key, first/last_key_value)
+/// between bulk overwrites across multiple rounds.
+#[test]
+fn cache_mixed_reads_between_writes() {
+    run_with_various_cache_sizes(|mut btree: BTreeMap<u64, u64, _>| {
+        let n = 300u64;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+
+        for round in 0..3u64 {
+            // Multiple read types on same tree state.
+            for i in 0..n {
+                assert!(btree.contains_key(&i), "round {round} contains({i})");
+            }
+            for i in 0..n {
+                assert_eq!(
+                    btree.get(&i),
+                    Some(i + round * 1000),
+                    "round {round} get({i})"
+                );
+            }
+            assert_eq!(btree.first_key_value(), Some((0, round * 1000)));
+            assert_eq!(btree.last_key_value(), Some((n - 1, n - 1 + round * 1000)));
+
+            // Write: overwrite all values.
+            for i in 0..n {
+                btree.insert(i, i + (round + 1) * 1000);
+            }
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Cached variants of existing tests
+//
+// Re-run selected existing test functions with specific cache sizes.
+// Uses u32 key/value only (not the full type grid) to keep runtime bounded —
+// the non-cached originals already cover the full type matrix.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cached_insert_get_cache_1() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(1, |mut btree| {
+        let n = 1_000;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+            assert_eq!(btree.get(&key(i)), Some(value(i)));
+        }
+    });
+}
+
+#[test]
+fn cached_insert_get_cache_64() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(64, |mut btree| {
+        let n = 1_000;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+            assert_eq!(btree.get(&key(i)), Some(value(i)));
+        }
+    });
+}
+
+#[test]
+fn cached_insert_overwrites_cache_1() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(1, |mut btree| {
+        let n = 1_000;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+            assert_eq!(btree.insert(key(i), value(i + 1)), Some(value(i)));
+            assert_eq!(btree.get(&key(i)), Some(value(i + 1)));
+        }
+    });
+}
+
+#[test]
+fn cached_insert_overwrites_cache_64() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(64, |mut btree| {
+        let n = 1_000;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+            assert_eq!(btree.insert(key(i), value(i + 1)), Some(value(i)));
+            assert_eq!(btree.get(&key(i)), Some(value(i + 1)));
+        }
+    });
+}
+
+#[test]
+fn cached_insert_remove_many_cache_1() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(1, |mut btree| {
+        let n = 500;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+        }
+        for i in 0..n {
+            assert_eq!(btree.remove(&key(i)), Some(value(i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_insert_remove_many_cache_64() {
+    let (key, value) = (u32::build, u32::build);
+    run_btree_test_cached(64, |mut btree| {
+        let n = 500;
+        for i in 0..n {
+            assert_eq!(btree.insert(key(i), value(i)), None);
+        }
+        for i in 0..n {
+            assert_eq!(btree.remove(&key(i)), Some(value(i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_pop_first_cache_1() {
+    run_btree_test_cached(1, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in 0..n {
+            assert_eq!(btree.pop_first(), Some((i, i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_pop_first_cache_64() {
+    run_btree_test_cached(64, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in 0..n {
+            assert_eq!(btree.pop_first(), Some((i, i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_pop_last_cache_1() {
+    run_btree_test_cached(1, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in (0..n).rev() {
+            assert_eq!(btree.pop_last(), Some((i, i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_pop_last_cache_64() {
+    run_btree_test_cached(64, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+        }
+        for i in (0..n).rev() {
+            assert_eq!(btree.pop_last(), Some((i, i)));
+        }
+        assert!(btree.is_empty());
+    });
+}
+
+#[test]
+fn cached_first_key_value_cache_1() {
+    run_btree_test_cached(1, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in (0..n).rev() {
+            btree.insert(i, i);
+            assert_eq!(btree.first_key_value(), Some((i, i)));
+        }
+    });
+}
+
+#[test]
+fn cached_first_key_value_cache_64() {
+    run_btree_test_cached(64, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in (0..n).rev() {
+            btree.insert(i, i);
+            assert_eq!(btree.first_key_value(), Some((i, i)));
+        }
+    });
+}
+
+#[test]
+fn cached_last_key_value_cache_1() {
+    run_btree_test_cached(1, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+            assert_eq!(btree.last_key_value(), Some((i, i)));
+        }
+    });
+}
+
+#[test]
+fn cached_last_key_value_cache_64() {
+    run_btree_test_cached(64, |mut btree: BTreeMap<u64, u64, _>| {
+        let n = 200;
+        for i in 0..n {
+            btree.insert(i, i);
+            assert_eq!(btree.last_key_value(), Some((i, i)));
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Cache metrics smoke tests
+// ---------------------------------------------------------------------------
+
+/// After getting N keys, the cache hit count must be > 0.
+/// Clears metrics before the measured workload so counters reflect only gets.
+#[test]
+fn cache_metrics_nonzero_hits() {
+    let mem = make_memory();
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(16);
+
+    let n = 200u64;
+    for i in 0..n {
+        btree.insert(i, i);
+    }
+
+    // Clear counters accumulated during inserts.
+    btree.node_cache_reset_metrics();
+
+    // Workload: get all keys — traversal should hit cached upper-level nodes.
+    for i in 0..n {
+        assert_eq!(btree.get(&i), Some(i));
+    }
+
+    let metrics = btree.node_cache_metrics();
+    assert!(
+        metrics.hits() > 0,
+        "Expected cache hits > 0 after {n} gets, got {:?}",
+        metrics
+    );
+    assert!(
+        metrics.hit_ratio() > 0.0,
+        "Expected hit_ratio > 0 for get-heavy workload, got {:?}",
+        metrics
+    );
+}
+
+/// With cache disabled (0 slots), operations succeed and metrics show 0 hits.
+#[test]
+fn cache_disabled_metrics_zero() {
+    let mem = make_memory();
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(0);
+
+    for i in 0..100u64 {
+        btree.insert(i, i);
+    }
+
+    btree.node_cache_reset_metrics();
+
+    for i in 0..100u64 {
+        assert_eq!(btree.get(&i), Some(i));
+    }
+
+    let metrics = btree.node_cache_metrics();
+    assert_eq!(metrics.hits(), 0, "Disabled cache should have 0 hits");
+    assert_eq!(metrics.misses(), 0, "Disabled cache should have 0 misses");
+    assert_eq!(metrics.total(), 0, "Disabled cache should have 0 lookups");
+}
+
+/// After clear_new(), cache metrics should be reset.
+#[test]
+fn cache_metrics_reset_after_clear() {
+    let mem = make_memory();
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(mem).with_node_cache(16);
+
+    for i in 0..100u64 {
+        btree.insert(i, i);
+    }
+
+    btree.node_cache_reset_metrics();
+
+    for i in 0..100u64 {
+        let _ = btree.get(&i);
+    }
+    let before = btree.node_cache_metrics();
+    assert!(before.hits() > 0);
+
+    btree.clear_new();
+
+    let after = btree.node_cache_metrics();
+    assert_eq!(after.hits(), 0, "Metrics should reset after clear_new");
+    assert_eq!(after.misses(), 0, "Metrics should reset after clear_new");
+    assert_eq!(after.total(), 0, "Metrics should reset after clear_new");
+}

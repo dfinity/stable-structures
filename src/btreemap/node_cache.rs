@@ -4,6 +4,11 @@ use crate::Storable;
 use super::node::Node;
 
 /// Node-cache performance metrics.
+///
+/// Counters accumulate over the lifetime of the cache and are **never
+/// cleared automatically**. To measure a specific workload, call
+/// [`BTreeMap::node_cache_reset_metrics`](super::BTreeMap::node_cache_reset_metrics)
+/// before the workload, then read the metrics afterward.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct NodeCacheMetrics {
     /// Successful cache lookups.
@@ -86,6 +91,9 @@ struct CacheSlot<K: Storable + Ord + Clone> {
     node: Option<Node<K>>,
 
     /// Distance from the tree root (root = 0). Used by the eviction policy.
+    /// u8 is sufficient: with B=6 (min 6 children per node), a depth-255
+    /// tree holds at least 2*6^254 entries (~10^197), far beyond any
+    /// practical stable memory size.
     depth: u8,
 }
 
