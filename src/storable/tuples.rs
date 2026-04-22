@@ -42,7 +42,24 @@ where
                 let b = B::from_bytes(Cow::Borrowed(&bytes[a_max_size..a_max_size + b_len]));
                 (a, b)
             }
-            _ => todo!("Deserializing tuples with unbounded types is not yet supported."),
+            Bound::Unbounded => {
+                let mut offset = 0;
+                let size_length_a = if A::BOUND.is_fixed_size() {
+                    None
+                } else {
+                    let lengths = decode_size_lengths(bytes[0], 1);
+                    offset += 1;
+                    Some(lengths[0])
+                };
+
+                let (a, read) = decode_tuple_element::<A>(&bytes[offset..], size_length_a, false);
+                offset += read;
+                let (b, read) = decode_tuple_element::<B>(&bytes[offset..], None, true);
+                offset += read;
+
+                debug_assert_eq!(offset, bytes.len());
+                (a, b)
+            }
         }
     }
 
@@ -100,7 +117,35 @@ where
 
             bytes
         }
-        _ => todo!("Serializing tuples with unbounded types is not yet supported."),
+        Bound::Unbounded => {
+            let a_bytes = a.to_bytes();
+            let b_bytes = b.to_bytes();
+            let a_size = a_bytes.len();
+            let b_size = b_bytes.len();
+
+            // If A is variable-size we need a 1B size_lengths header and A's size prefix.
+            // B is the last element, so its size is always inferred from remaining bytes.
+            let sizes_overhead = if A::BOUND.is_fixed_size() {
+                0
+            } else {
+                1 + bytes_to_store_size(a_size)
+            };
+
+            let output_size = a_size + b_size + sizes_overhead;
+            let mut bytes = vec![0; output_size];
+            let mut offset = 0;
+
+            if sizes_overhead != 0 {
+                bytes[offset] = encode_size_lengths(&[a_size]);
+                offset += 1;
+            }
+
+            offset += encode_tuple_element::<A>(&mut bytes[offset..], a_bytes.as_ref(), false);
+            offset += encode_tuple_element::<B>(&mut bytes[offset..], b_bytes.as_ref(), true);
+
+            debug_assert_eq!(offset, output_size);
+            bytes
+        }
     }
 }
 

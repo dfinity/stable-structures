@@ -122,6 +122,29 @@ proptest! {
         prop_assert_eq!(v.clone(), Storable::from_bytes(v.to_bytes()));
     }
 
+    // 2-tuple unbounded roundtrips
+
+    #[test]
+    fn tuple_two_unbounded_elements_roundtrip(v1 in pvec(any::<u8>(), 0..16), v2 in pvec(any::<u8>(), 0..32)) {
+        // (Vec<u8>, Vec<u8>): both unbounded
+        let tuple = (v1, v2);
+        prop_assert_eq!(tuple.clone(), Storable::from_bytes(tuple.to_bytes()));
+    }
+
+    #[test]
+    fn tuple_fixed_and_unbounded_roundtrip(x in any::<u64>(), v in pvec(any::<u8>(), 0..32)) {
+        // (u64, Vec<u8>): fixed A, unbounded B — no size_lengths overhead
+        let tuple = (x, v);
+        prop_assert_eq!(tuple.clone(), Storable::from_bytes(tuple.to_bytes()));
+    }
+
+    #[test]
+    fn tuple_unbounded_and_fixed_roundtrip(v in pvec(any::<u8>(), 0..32), x in any::<u64>()) {
+        // (Vec<u8>, u64): unbounded A, fixed B — size_lengths overhead needed
+        let tuple = (v, x);
+        prop_assert_eq!(tuple.clone(), Storable::from_bytes(tuple.to_bytes()));
+    }
+
     #[test]
     fn principal_roundtrip(mut bytes in pvec(any::<u8>(), 0..=28), tag in proptest::prop_oneof![Just(1),Just(2),Just(3),Just(4),Just(7)]) {
         bytes.push(tag);
