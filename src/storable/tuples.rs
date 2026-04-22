@@ -52,8 +52,7 @@ where
                     Some(lengths[0])
                 };
 
-                let (a, read) =
-                    decode_tuple_element::<A>(&bytes[offset..], size_length_a, false);
+                let (a, read) = decode_tuple_element::<A>(&bytes[offset..], size_length_a, false);
                 offset += read;
                 let (b, read) = decode_tuple_element::<B>(&bytes[offset..], None, true);
                 offset += read;
