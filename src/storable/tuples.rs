@@ -42,7 +42,7 @@ where
                 let b = B::from_bytes(Cow::Borrowed(&bytes[a_max_size..a_max_size + b_len]));
                 (a, b)
             }
-            _ => {
+            Bound::Unbounded => {
                 let mut offset = 0;
                 let size_length_a = if A::BOUND.is_fixed_size() {
                     None
@@ -118,7 +118,7 @@ where
 
             bytes
         }
-        _ => {
+        Bound::Unbounded => {
             let a_bytes = a.to_bytes();
             let b_bytes = b.to_bytes();
             let a_size = a_bytes.len();
