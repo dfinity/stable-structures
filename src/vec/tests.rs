@@ -350,3 +350,45 @@ fn set_last_element_to_large_blob() {
     // Store a large blob that would require growing the memory.
     sv.set(0, &Blob::try_from(vec![1; 65536].as_slice()).unwrap());
 }
+
+#[test]
+fn extend_empty_slice() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.extend(&[]);
+    assert_eq!(sv.len(), 0);
+    assert!(sv.is_empty());
+}
+
+#[test]
+fn extend_basic() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.extend(&[1, 2, 3]);
+    assert_eq!(sv.len(), 3);
+    assert_eq!(sv.to_vec(), vec![1, 2, 3]);
+}
+
+#[test]
+fn extend_after_push() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.push(&0);
+    sv.extend(&[1, 2, 3]);
+    assert_eq!(sv.len(), 4);
+    assert_eq!(sv.to_vec(), vec![0, 1, 2, 3]);
+}
+
+#[test]
+fn extend_multiple_calls() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.extend(&[1, 2]);
+    sv.extend(&[3, 4]);
+    assert_eq!(sv.to_vec(), vec![1, 2, 3, 4]);
+}
+
+#[test]
+fn extend_persistence() {
+    let sv = StableVec::<u64, M>::new(M::default());
+    sv.extend(&[10, 20, 30]);
+    let mem = sv.into_memory();
+    let sv = StableVec::<u64, M>::init(mem);
+    assert_eq!(sv.to_vec(), vec![10, 20, 30]);
+}
