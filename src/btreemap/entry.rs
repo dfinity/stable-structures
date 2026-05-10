@@ -354,18 +354,28 @@ impl<'a, K: 'a + Storable + Ord + Clone, V: 'a + Storable, M: Memory> OccupiedEn
     pub fn remove(self) -> LazyValue<V> {
         let bytes = match self.node.node_type() {
             NodeType::Leaf if self.node.can_remove_entry_without_merging() => {
-                self.map.remove_from_leaf_node(self.node, self.idx)
+                // Fast path: the leaf has enough entries to remove without merging.
+                let mut node = self.node;
+                let value = node.remove_entry(self.idx, self.map.memory()).1;
+                self.map.length -= 1;
+                if node.entries_len() == 0 {
+                    // The leaf was the only node (the root). Deallocate it.
+                    self.map.deallocate_node(node);
+                    self.map.root_addr = crate::types::NULL;
+                } else {
+                    self.map.save_node(&mut node);
+                }
+                self.map.save_header();
+                value
             }
-            NodeType::Leaf => {
-                // TODO: avoid this slow path
-                let root = self.map.load_node(self.map.root_addr);
+            _ => {
+                // Slow path: the node may need rebalancing/merging.
+                // Drop the already-loaded node and do a fresh traversal from the root.
+                let root = self.map.take_or_load_node(self.map.root_addr);
                 self.map
-                    .remove_helper(root, &self.key)
+                    .remove_helper(root, &self.key, 0)
                     .expect("key must exist")
             }
-            NodeType::Internal => self
-                .map
-                .remove_from_internal_node(self.node, self.idx, &self.key),
         };
         LazyValue::new(bytes)
     }

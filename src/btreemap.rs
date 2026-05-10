@@ -88,11 +88,18 @@ const PAGE_SIZE_VALUE_MARKER: u32 = u32::MAX;
 
 /// Default number of slots in the direct-mapped node cache.
 ///
-/// 16 slots cover the top two tree levels (1 root + up to 12 children =
-/// 13 nodes) while keeping heap usage modest.
+/// Sizing options (prefer powers of two for efficient slot indexing):
+///
+/// -  **0** — cache disabled, every access reads from stable memory.
+/// -  **1** — only the root node is cached; saves one read per operation.
+/// - **16** — covers the top two tree levels (1 root + up to 12
+///   children = 13 nodes). Good balance of hit rate and heap usage.
+/// - **32** — extra headroom over 16 that reduces collision evictions
+///   in the direct-mapped scheme and typically yields ≥2 cache hits
+///   per operation regardless of tree size.
 ///
 /// Users can adjust via [`BTreeMap::with_node_cache`] or
-/// [`BTreeMap::node_cache_resize`], including setting to 0 to disable.
+/// [`BTreeMap::node_cache_resize`].
 const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 16;
 
 /// A B-Tree map implementation that stores its data into a designated memory.
@@ -313,14 +320,8 @@ where
     /// Each slot can hold one deserialized node; on collision, shallower
     /// nodes (closer to the root) are kept over deeper ones.
     ///
-    /// Pass `0` to disable the cache (the default).
-    ///
-    /// The top 2 levels of the tree contain 13 nodes (1 root + up to
-    /// 12 children). **16** slots is the smallest power of two that
-    /// covers them, but a direct-mapped cache is sensitive to address
-    /// collisions, so **32** is a safer default that leaves headroom
-    /// and typically gives 2 cache hits per operation regardless of
-    /// tree size. Prefer powers of two for efficient slot indexing.
+    /// The cache is enabled by default. Pass `0` to disable.
+    /// Prefer powers of two for efficient slot indexing.
     ///
     /// # Examples
     ///
@@ -366,7 +367,7 @@ where
     /// Returns the current number of slots in the node cache.
     ///
     /// Returns `0` when the cache is disabled.
-    pub fn node_cache_size(&self) -> usize {
+    pub fn node_cache_num_slots(&self) -> usize {
         self.cache.borrow().num_slots()
     }
 
@@ -378,11 +379,21 @@ where
 
     /// Resets cache metrics (hit/miss counters) without evicting
     /// cached nodes.
-    pub fn node_cache_clear_metrics(&mut self) {
+    ///
+    /// Call this before the workload you want to measure so that
+    /// counters reflect only that workload, not the entire lifetime
+    /// of the map.
+    pub fn node_cache_reset_metrics(&mut self) {
         self.cache.get_mut().clear_metrics();
     }
 
     /// Returns node-cache performance metrics.
+    ///
+    /// Counters accumulate from map creation (or the last call to
+    /// [`node_cache_reset_metrics`](Self::node_cache_reset_metrics))
+    /// and are never cleared automatically. To measure a specific
+    /// workload, call `node_cache_reset_metrics` first, run the
+    /// workload, then read the metrics.
     ///
     /// # Examples
     ///
@@ -392,8 +403,19 @@ where
     /// let mut map: BTreeMap<u64, u64, _> =
     ///     BTreeMap::init(DefaultMemoryImpl::default())
     ///         .with_node_cache(32);
-    /// map.insert(1, 100);
-    /// let _ = map.get(&1);
+    ///
+    /// // Populate the map (metrics accumulate during inserts).
+    /// for i in 0..100u64 {
+    ///     map.insert(i, i);
+    /// }
+    ///
+    /// // Clear counters before the workload we care about.
+    /// map.node_cache_reset_metrics();
+    ///
+    /// // Workload: read every key.
+    /// for i in 0..100u64 {
+    ///     let _ = map.get(&i);
+    /// }
     ///
     /// let metrics = map.node_cache_metrics();
     /// println!("hit ratio: {:.1}%", metrics.hit_ratio() * 100.0);
@@ -407,7 +429,7 @@ where
     /// Actual usage depends on key size and how many slots are
     /// occupied. Treat this as an order-of-magnitude guide, not a
     /// precise budget.
-    pub fn node_cache_size_bytes_approx(&self) -> usize {
+    pub fn node_cache_heap_usage(&self) -> usize {
         self.cache.borrow().num_slots()
             * (self.version.page_size().get() as usize + NodeCache::<K>::slot_size())
     }
@@ -645,7 +667,7 @@ where
             node
         } else {
             // Load the root from memory.
-            let mut root = self.load_node(self.root_addr);
+            let mut root = self.take_or_load_node(self.root_addr);
 
             // Check if the key already exists in the root.
             if let Ok(idx) = root.search(&key, self.memory()) {
@@ -661,19 +683,9 @@ where
             self.split_root_if_full(root)
         };
 
-        self.find_node_for_insert(root, key, move |map, mut node, idx, key, key_exists| {
-            if key_exists {
-                Some(map.update_value(&mut node, idx, value))
-            } else {
-                node.insert_entry(idx, (key, value));
-                map.save_node(&mut node);
-                map.length += 1;
-                map.save_header();
-                None
-            }
-        })
-        .map(Cow::Owned)
-        .map(V::from_bytes)
+        self.insert_nonfull(root, key, value, 0)
+            .map(Cow::Owned)
+            .map(V::from_bytes)
     }
 
     /// Gets an [`Entry`](entry::Entry) for the given `key`, which gives efficient in-place access
@@ -748,7 +760,7 @@ where
         root = self.split_root_if_full(root);
 
         let (key, node, search_result) =
-            self.find_node_for_insert(root, key, |_, node, idx, key, key_exists| {
+            self.find_node_for_insert(root, key, 0, |_, node, idx, key, key_exists| {
                 if key_exists {
                     (key, node, Ok(idx))
                 } else {
@@ -792,12 +804,12 @@ where
         self.save_header();
 
         // Split the old (full) root into two children of new_root.
-        self.split_child(&mut new_root, 0);
+        self.split_child(&mut new_root, 0, None);
 
         new_root
     }
 
-    /// Core B-tree insertion traversal, shared by [`BTreeMap::insert`] and [`BTreeMap::entry`].
+    /// Core B-tree insertion traversal used by [`BTreeMap::entry`].
     ///
     /// Descends from `node` (which must not be full) to the leaf or internal node where
     /// `key` either already exists or should be inserted, then invokes `callback` with:
@@ -816,6 +828,7 @@ where
         &mut self,
         mut node: Node<K>,
         key: K,
+        depth: u8,
         callback: impl FnOnce(&mut Self, Node<K>, usize, K, bool) -> R,
     ) -> R {
         // We're guaranteed by the caller that the provided node is not full.
@@ -838,28 +851,103 @@ where
                     NodeType::Internal => {
                         // The node is an internal node.
                         // Load the child that we should add the entry to.
-                        let mut child = self.load_node(node.child(idx));
+                        let mut child = self.take_or_load_node(node.child(idx));
+                        let child_depth = depth.saturating_add(1);
 
                         if child.is_full() {
                             // Check if the key already exists in the child.
                             if let Ok(idx) = child.search(&key, self.memory()) {
-                                // Key found.
+                                // Key found. The parent node is unmodified — return it to cache.
+                                self.return_node(node, depth);
                                 return callback(self, child, idx, key, true);
                             }
 
                             // The child is full. Split the child.
-                            self.split_child(&mut node, idx);
+                            // Pass the already-loaded child to avoid a redundant load.
+                            self.split_child(&mut node, idx, Some(child));
 
                             // The children have now changed. Search again for
                             // the child where we need to store the entry in.
                             let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
                             child = self.load_node(node.child(idx));
+                        } else {
+                            // Happy path: child is not full. The current node
+                            // will not be modified — return it to cache.
+                            self.return_node(node, depth);
                         }
 
                         // The child should now be not full.
                         assert!(!child.is_full());
 
-                        self.find_node_for_insert(child, key, callback)
+                        self.find_node_for_insert(child, key, child_depth, callback)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Inserts an entry into a node that is *not full*.
+    fn insert_nonfull(
+        &mut self,
+        mut node: Node<K>,
+        key: K,
+        value: Vec<u8>,
+        depth: u8,
+    ) -> Option<Vec<u8>> {
+        // We're guaranteed by the caller that the provided node is not full.
+        assert!(!node.is_full());
+
+        // Look for the key in the node.
+        match node.search(&key, self.memory()) {
+            Ok(idx) => {
+                // Key found, replace its value and return the old one.
+                Some(self.update_value(&mut node, idx, value))
+            }
+            Err(idx) => {
+                // The key isn't in the node. `idx` is where that key should be inserted.
+
+                match node.node_type() {
+                    NodeType::Leaf => {
+                        // The node is a non-full leaf. Insert directly.
+                        node.insert_entry(idx, (key, value));
+                        self.save_node(&mut node);
+                        self.length += 1;
+                        self.save_header();
+                        None
+                    }
+                    NodeType::Internal => {
+                        // The node is an internal node.
+                        // Load the child that we should add the entry to.
+                        let mut child = self.take_or_load_node(node.child(idx));
+                        let child_depth = depth.saturating_add(1);
+
+                        if child.is_full() {
+                            // Check if the key already exists in the child.
+                            if let Ok(idx) = child.search(&key, self.memory()) {
+                                // Key found, replace its value and return the old one.
+                                // The parent node is unmodified — return it to cache.
+                                self.return_node(node, depth);
+                                return Some(self.update_value(&mut child, idx, value));
+                            }
+
+                            // The child is full. Split the child.
+                            // Pass the already-loaded child to avoid a redundant load.
+                            self.split_child(&mut node, idx, Some(child));
+
+                            // The children have now changed. Search again for
+                            // the child where we need to store the entry in.
+                            let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
+                            child = self.load_node(node.child(idx));
+                        } else {
+                            // Happy path: child is not full. The current node
+                            // will not be modified — return it to cache.
+                            self.return_node(node, depth);
+                        }
+
+                        // The child should now be not full.
+                        assert!(!child.is_full());
+
+                        self.insert_nonfull(child, key, value, child_depth)
                     }
                 }
             }
@@ -883,12 +971,18 @@ where
     ///                [ N  O  P  Q  R ]   [ T  U  V  W  X ]
     /// ```
     ///
-    fn split_child(&mut self, node: &mut Node<K>, full_child_idx: usize) {
+    fn split_child(
+        &mut self,
+        node: &mut Node<K>,
+        full_child_idx: usize,
+        full_child: Option<Node<K>>,
+    ) {
         // The node must not be full.
         assert!(!node.is_full());
 
-        // The node's child must be full.
-        let mut full_child = self.load_node(node.child(full_child_idx));
+        // Use the pre-loaded child if provided, otherwise load from memory.
+        let mut full_child =
+            full_child.unwrap_or_else(|| self.load_node(node.child(full_child_idx)));
         assert!(full_child.is_full());
 
         // Create a sibling to this full child (which has to be the same type).
@@ -986,23 +1080,15 @@ where
     }
 
     #[inline(always)]
-    fn first_key_inner(&self, node: &Node<K>) -> K {
-        self.find_first_or_last(node, true, 0, |n, i, m| n.key(i, m).clone())
+    fn first_entry_inner(&self, node: &Node<K>, depth: u8) -> node::Entry<K> {
+        self.find_first_or_last(node, true, depth, |n, i, m| {
+            n.get_key_read_value_uncached(i, m)
+        })
     }
 
     #[inline(always)]
-    fn last_key_inner(&self, node: &Node<K>) -> K {
-        self.find_first_or_last(node, false, 0, |n, i, m| n.key(i, m).clone())
-    }
-
-    #[inline(always)]
-    fn first_entry_inner(&self, node: &Node<K>) -> node::Entry<K> {
-        self.find_first_or_last(node, true, 0, |n, i, m| n.get_key_read_value_uncached(i, m))
-    }
-
-    #[inline(always)]
-    fn last_entry_inner(&self, node: &Node<K>) -> node::Entry<K> {
-        self.find_first_or_last(node, false, 0, |n, i, m| {
+    fn last_entry_inner(&self, node: &Node<K>, depth: u8) -> node::Entry<K> {
+        self.find_first_or_last(node, false, depth, |n, i, m| {
             n.get_key_read_value_uncached(i, m)
         })
     }
@@ -1050,7 +1136,7 @@ where
             return None;
         }
         let root = self.take_or_load_node(self.root_addr);
-        let (k, encoded_v) = self.first_entry_inner(&root);
+        let (k, encoded_v) = self.first_entry_inner(&root, 0);
         self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
@@ -1062,7 +1148,7 @@ where
             return None;
         }
         let root = self.take_or_load_node(self.root_addr);
-        let (k, encoded_v) = self.last_entry_inner(&root);
+        let (k, encoded_v) = self.last_entry_inner(&root, 0);
         self.return_node(root, 0);
         Some((k, V::from_bytes(Cow::Owned(encoded_v))))
     }
@@ -1081,8 +1167,8 @@ where
             return None;
         }
 
-        let root_node = self.load_node(self.root_addr);
-        self.remove_helper(root_node, key)
+        let root_node = self.take_or_load_node(self.root_addr);
+        self.remove_helper(root_node, key, 0)
             .map(Cow::Owned)
             .map(V::from_bytes)
     }
@@ -1093,10 +1179,9 @@ where
             return None;
         }
 
-        let root = self.load_node(self.root_addr);
-        let last_key = self.last_key_inner(&root);
-        self.remove_helper(root, &last_key)
-            .map(|v| (last_key, V::from_bytes(Cow::Owned(v))))
+        let root = self.take_or_load_node(self.root_addr);
+        self.remove_rightmost(root, 0)
+            .map(|(k, v)| (k, V::from_bytes(Cow::Owned(v))))
     }
 
     /// Removes and returns the first element in the map. The key of this element is the minimum key that was in the map
@@ -1105,14 +1190,13 @@ where
             return None;
         }
 
-        let root = self.load_node(self.root_addr);
-        let first_key = self.first_key_inner(&root);
-        self.remove_helper(root, &first_key)
-            .map(|v| (first_key, V::from_bytes(Cow::Owned(v))))
+        let root = self.take_or_load_node(self.root_addr);
+        self.remove_leftmost(root, 0)
+            .map(|(k, v)| (k, V::from_bytes(Cow::Owned(v))))
     }
 
     /// A helper method for recursively removing a key from the B-tree.
-    fn remove_helper(&mut self, mut node: Node<K>, key: &K) -> Option<Vec<u8>> {
+    fn remove_helper(&mut self, mut node: Node<K>, key: &K, depth: u8) -> Option<Vec<u8>> {
         if node.address() != self.root_addr {
             // We're guaranteed that whenever this method is called an entry can be
             // removed from the node without it needing to be merged into a sibling.
@@ -1125,33 +1209,182 @@ where
             NodeType::Leaf => {
                 match node.search(key, self.memory()) {
                     Ok(idx) => {
-                        let value = self.remove_from_leaf_node(node, idx);
+                        // Case 1: The node is a leaf node and the key exists in it.
+                        // This is the simplest case. The key is removed from the leaf.
+                        let value = node.remove_entry(idx, self.memory()).1;
+                        self.length -= 1;
+
+                        if node.entries_len() == 0 {
+                            assert_eq!(
+                                node.address(),
+                                self.root_addr,
+                                "Removal can only result in an empty leaf node if that node is the root"
+                            );
+                            // Deallocate the empty node.
+                            self.deallocate_node(node);
+                            self.root_addr = NULL;
+                        } else {
+                            self.save_node(&mut node);
+                        }
+
+                        self.save_header();
                         Some(value)
                     }
-                    _ => None, // Key not found.
+                    _ => {
+                        // Key not found. Return the unmodified node to cache.
+                        self.return_node(node, depth);
+                        None
+                    }
                 }
             }
             NodeType::Internal => {
                 match node.search(key, self.memory()) {
                     Ok(idx) => {
-                        let value = self.remove_from_internal_node(node, idx, key);
-                        Some(value)
+                        // Case 2: The node is an internal node and the key exists in it.
+
+                        let left_child = self.take_or_load_node(node.child(idx));
+                        if left_child.can_remove_entry_without_merging() {
+                            // Case 2.a: A key can be removed from the left child without merging.
+                            //
+                            //                       parent
+                            //                  [..., key, ...]
+                            //                       /   \
+                            //            [left child]   [...]
+                            //           /            \
+                            //        [...]         [..., key predecessor]
+                            //
+                            // In this case, we replace `key` with the key's predecessor from the
+                            // left child's subtree, then we recursively delete the key's
+                            // predecessor for the following end result:
+                            //
+                            //                       parent
+                            //            [..., key predecessor, ...]
+                            //                       /   \
+                            //            [left child]   [...]
+                            //           /            \
+                            //        [...]          [...]
+
+                            // Remove the predecessor in a single pass (no double traversal).
+                            let predecessor =
+                                self.remove_rightmost(left_child, depth.saturating_add(1))?;
+
+                            // Replace the `key` with its predecessor.
+                            let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
+
+                            // Save the parent node.
+                            self.save_node(&mut node);
+                            return Some(old_value);
+                        }
+
+                        let right_child = self.take_or_load_node(node.child(idx + 1));
+                        if right_child.can_remove_entry_without_merging() {
+                            // Case 2.b: A key can be removed from the right child without merging.
+                            //
+                            //                       parent
+                            //                  [..., key, ...]
+                            //                       /   \
+                            //                   [...]   [right child]
+                            //                          /             \
+                            //              [key successor, ...]     [...]
+                            //
+                            // In this case, we replace `key` with the key's successor from the
+                            // right child's subtree, then we recursively delete the key's
+                            // successor for the following end result:
+                            //
+                            //                       parent
+                            //            [..., key successor, ...]
+                            //                       /   \
+                            //                  [...]   [right child]
+                            //                           /            \
+                            //                        [...]          [...]
+
+                            // Return the unmodified left child to the cache.
+                            self.return_node(left_child, depth.saturating_add(1));
+
+                            // Remove the successor in a single pass (no double traversal).
+                            let successor =
+                                self.remove_leftmost(right_child, depth.saturating_add(1))?;
+
+                            // Replace the `key` with its successor.
+                            let (_, old_value) = node.swap_entry(idx, successor, self.memory());
+
+                            // Save the parent node.
+                            self.save_node(&mut node);
+                            return Some(old_value);
+                        }
+
+                        // Case 2.c: Both the left and right child are at their minimum sizes.
+                        //
+                        //                       parent
+                        //                  [..., key, ...]
+                        //                       /   \
+                        //            [left child]   [right child]
+                        //
+                        // In this case, we merge (left child, key, right child) into a single
+                        // node. The result will look like this:
+                        //
+                        //                       parent
+                        //                     [...  ...]
+                        //                         |
+                        //          [left child, `key`, right child] <= new child
+                        //
+                        // We then recurse on this new child to delete `key`.
+                        //
+                        // If `parent` becomes empty (which can only happen if it's the root),
+                        // then `parent` is deleted and `new_child` becomes the new root.
+                        assert!(left_child.at_minimum());
+                        assert!(right_child.at_minimum());
+
+                        // Merge the right child into the left child.
+                        let mut new_child = self.merge(
+                            right_child,
+                            left_child,
+                            node.remove_entry(idx, self.memory()),
+                        );
+
+                        // Remove the right child from the parent node.
+                        node.remove_child(idx + 1);
+
+                        if node.entries_len() == 0 {
+                            // Can only happen if this node is root.
+                            assert_eq!(node.address(), self.root_addr);
+                            assert_eq!(node.child(0), new_child.address());
+                            assert_eq!(node.children_len(), 1);
+
+                            self.root_addr = new_child.address();
+
+                            // Deallocate the root node.
+                            self.deallocate_node(node);
+                            self.save_header();
+                        } else {
+                            self.save_node(&mut node);
+                        }
+
+                        self.save_node(&mut new_child);
+
+                        // Recursively delete the key.
+                        self.remove_helper(new_child, key, depth.saturating_add(1))
                     }
                     Err(idx) => {
                         // Case 3: The node is an internal node and the key does NOT exist in it.
 
                         // If the key does exist in the tree, it will exist in the subtree at index
                         // `idx`.
-                        let mut child = self.load_node(node.child(idx));
+                        let mut child = self.take_or_load_node(node.child(idx));
+                        let child_depth = depth.saturating_add(1);
 
                         if child.can_remove_entry_without_merging() {
                             // The child has enough nodes. Recurse to delete the `key` from the
                             // `child`.
-                            return self.remove_helper(child, key);
+                            // The current node is not modified — return it to cache.
+                            self.return_node(node, depth);
+                            return self.remove_helper(child, key, child_depth);
                         }
 
                         // An entry can't be removed from the child without merging.
                         // See if it has a sibling where an entry can be removed without merging.
+                        // Siblings are loaded without cache: all rebalancing paths modify
+                        // and save every loaded node, so caching them would be wasted.
                         let mut left_sibling = if idx > 0 {
                             Some(self.load_node(node.child(idx - 1)))
                         } else {
@@ -1215,7 +1448,7 @@ where
                                 self.save_node(left_sibling);
                                 self.save_node(&mut child);
                                 self.save_node(&mut node);
-                                return self.remove_helper(child, key);
+                                return self.remove_helper(child, key, child_depth);
                             }
                         }
 
@@ -1270,7 +1503,7 @@ where
                                 self.save_node(right_sibling);
                                 self.save_node(&mut child);
                                 self.save_node(&mut node);
-                                return self.remove_helper(child, key);
+                                return self.remove_helper(child, key, child_depth);
                             }
                         }
 
@@ -1301,7 +1534,7 @@ where
                                 self.save_node(&mut node);
                             }
 
-                            return self.remove_helper(left_sibling, key);
+                            return self.remove_helper(left_sibling, key, child_depth);
                         }
 
                         if let Some(right_sibling) = right_sibling {
@@ -1330,7 +1563,7 @@ where
                                 self.save_node(&mut node);
                             }
 
-                            return self.remove_helper(right_sibling, key);
+                            return self.remove_helper(right_sibling, key, child_depth);
                         }
 
                         unreachable!("At least one of the siblings must exist.");
@@ -1340,165 +1573,151 @@ where
         }
     }
 
-    /// PRECONDITION
-    ///   - `node` is a leaf node
-    ///   - `node.entries_len() > 1` or node is the root node
-    fn remove_from_leaf_node(&mut self, mut node: Node<K>, idx: usize) -> Vec<u8> {
-        debug_assert_eq!(node.node_type(), NodeType::Leaf);
+    /// Removes and returns the rightmost (maximum) entry in the subtree rooted
+    /// at `node`, in a single top-down pass. This avoids the double traversal
+    /// of the previous approach (get_max + remove_helper).
+    fn remove_rightmost(&mut self, mut node: Node<K>, depth: u8) -> Option<node::Entry<K>> {
+        match node.node_type() {
+            NodeType::Leaf => {
+                let entry = node.pop_entry(self.memory())?;
+                self.length -= 1;
 
-        // Case 1: The node is a leaf node and the key exists in it.
-        // This is the simplest case. The key is removed from the leaf.
-        let value = node.remove_entry(idx, self.memory()).1;
-        self.length -= 1;
+                if node.entries_len() == 0 {
+                    assert_eq!(node.address(), self.root_addr);
+                    self.deallocate_node(node);
+                    self.root_addr = NULL;
+                } else {
+                    self.save_node(&mut node);
+                }
+                self.save_header();
+                Some(entry)
+            }
+            NodeType::Internal => {
+                let last_idx = node.children_len() - 1;
+                let child_depth = depth.saturating_add(1);
+                let child = self.take_or_load_node(node.child(last_idx));
 
-        if node.entries_len() == 0 {
-            assert_eq!(
-                node.address(),
-                self.root_addr,
-                "Removal can only result in an empty leaf node if that node is the root"
-            );
+                if child.can_remove_entry_without_merging() {
+                    // The current node is not modified — return it to cache.
+                    self.return_node(node, depth);
+                    return self.remove_rightmost(child, child_depth);
+                }
 
-            // Deallocate the empty node.
-            self.deallocate_node(node);
-            self.root_addr = NULL;
-        } else {
-            self.save_node(&mut node);
+                // The rightmost child is at minimum. Steal from its left sibling or merge.
+                // Siblings are loaded without cache: all rebalancing paths modify
+                // and save every loaded node, so caching them would be wasted.
+                let left_sibling_idx = last_idx - 1;
+                let mut left_sibling = self.load_node(node.child(left_sibling_idx));
+
+                if left_sibling.can_remove_entry_without_merging() {
+                    // Rotate right: left_sibling -> parent -> child
+                    let mut child = child;
+                    let (left_key, left_value) = left_sibling.pop_entry(self.memory()).unwrap();
+                    let (parent_key, parent_value) =
+                        node.swap_entry(last_idx - 1, (left_key, left_value), self.memory());
+                    child.insert_entry(0, (parent_key, parent_value));
+
+                    if let Some(last_child) = left_sibling.pop_child() {
+                        child.insert_child(0, last_child);
+                    }
+
+                    self.save_node(&mut left_sibling);
+                    self.save_node(&mut child);
+                    self.save_node(&mut node);
+                    return self.remove_rightmost(child, child_depth);
+                }
+
+                // Both at minimum: merge child into left sibling.
+                let merged = self.merge(
+                    child,
+                    left_sibling,
+                    node.remove_entry(last_idx - 1, self.memory()),
+                );
+                node.remove_child(last_idx);
+
+                if node.entries_len() == 0 {
+                    assert_eq!(node.address(), self.root_addr);
+                    self.root_addr = merged.address();
+                    self.deallocate_node(node);
+                    self.save_header();
+                } else {
+                    self.save_node(&mut node);
+                }
+
+                self.remove_rightmost(merged, child_depth)
+            }
         }
-
-        self.save_header();
-        value
     }
 
-    /// PRECONDITION
-    ///   - `node` is an internal node
-    ///   - `node` contains `key` at index `idx`
-    fn remove_from_internal_node(&mut self, mut node: Node<K>, idx: usize, key: &K) -> Vec<u8> {
-        debug_assert_eq!(node.node_type(), NodeType::Internal);
-        debug_assert_eq!(node.search(key, self.memory()), Ok(idx));
+    /// Removes and returns the leftmost (minimum) entry in the subtree rooted
+    /// at `node`, in a single top-down pass.
+    fn remove_leftmost(&mut self, mut node: Node<K>, depth: u8) -> Option<node::Entry<K>> {
+        match node.node_type() {
+            NodeType::Leaf => {
+                if node.entries_len() == 0 {
+                    return None;
+                }
+                let entry = node.remove_entry(0, self.memory());
+                self.length -= 1;
 
-        // Case 2: The node is an internal node and the key exists in it.
+                if node.entries_len() == 0 {
+                    assert_eq!(node.address(), self.root_addr);
+                    self.deallocate_node(node);
+                    self.root_addr = NULL;
+                } else {
+                    self.save_node(&mut node);
+                }
+                self.save_header();
+                Some(entry)
+            }
+            NodeType::Internal => {
+                let child_depth = depth.saturating_add(1);
+                let child = self.take_or_load_node(node.child(0));
 
-        let left_child = self.load_node(node.child(idx));
-        if left_child.can_remove_entry_without_merging() {
-            // Case 2.a: A key can be removed from the left child without merging.
-            //
-            //                       parent
-            //                  [..., key, ...]
-            //                       /   \
-            //            [left child]   [...]
-            //           /            \
-            //        [...]         [..., key predecessor]
-            //
-            // In this case, we replace `key` with the key's predecessor from the
-            // left child's subtree, then we recursively delete the key's
-            // predecessor for the following end result:
-            //
-            //                       parent
-            //            [..., key predecessor, ...]
-            //                       /   \
-            //            [left child]   [...]
-            //           /            \
-            //        [...]          [...]
+                if child.can_remove_entry_without_merging() {
+                    // The current node is not modified — return it to cache.
+                    self.return_node(node, depth);
+                    return self.remove_leftmost(child, child_depth);
+                }
 
-            // Recursively delete the predecessor.
-            // TODO(EXC-1034): Do this in a single pass.
-            let predecessor = self.last_entry_inner(&left_child);
-            self.remove_helper(left_child, &predecessor.0).unwrap();
+                // The leftmost child is at minimum. Steal from its right sibling or merge.
+                // Siblings are loaded without cache: all rebalancing paths modify
+                // and save every loaded node, so caching them would be wasted.
+                let mut right_sibling = self.load_node(node.child(1));
 
-            // Replace the `key` with its predecessor.
-            let (_, old_value) = node.swap_entry(idx, predecessor, self.memory());
+                if right_sibling.can_remove_entry_without_merging() {
+                    // Rotate left: right_sibling -> parent -> child
+                    let mut child = child;
+                    let (right_key, right_value) = right_sibling.remove_entry(0, self.memory());
+                    let parent_entry = node.swap_entry(0, (right_key, right_value), self.memory());
+                    child.push_entry(parent_entry);
 
-            // Save the parent node.
-            self.save_node(&mut node);
-            return old_value;
+                    if right_sibling.node_type() == NodeType::Internal {
+                        child.push_child(right_sibling.remove_child(0));
+                    }
+
+                    self.save_node(&mut right_sibling);
+                    self.save_node(&mut child);
+                    self.save_node(&mut node);
+                    return self.remove_leftmost(child, child_depth);
+                }
+
+                // Both at minimum: merge child into right sibling.
+                let merged = self.merge(child, right_sibling, node.remove_entry(0, self.memory()));
+                node.remove_child(0);
+
+                if node.entries_len() == 0 {
+                    assert_eq!(node.address(), self.root_addr);
+                    self.root_addr = merged.address();
+                    self.deallocate_node(node);
+                    self.save_header();
+                } else {
+                    self.save_node(&mut node);
+                }
+
+                self.remove_leftmost(merged, child_depth)
+            }
         }
-
-        let right_child = self.load_node(node.child(idx + 1));
-        if right_child.can_remove_entry_without_merging() {
-            // Case 2.b: A key can be removed from the right child without merging.
-            //
-            //                       parent
-            //                  [..., key, ...]
-            //                       /   \
-            //                   [...]   [right child]
-            //                          /             \
-            //              [key successor, ...]     [...]
-            //
-            // In this case, we replace `key` with the key's successor from the
-            // right child's subtree, then we recursively delete the key's
-            // successor for the following end result:
-            //
-            //                       parent
-            //            [..., key successor, ...]
-            //                       /   \
-            //                  [...]   [right child]
-            //                           /            \
-            //                        [...]          [...]
-
-            // Recursively delete the successor.
-            // TODO(EXC-1034): Do this in a single pass.
-            let successor = self.first_entry_inner(&right_child);
-            self.remove_helper(right_child, &successor.0).unwrap();
-
-            // Replace the `key` with its successor.
-            let (_, old_value) = node.swap_entry(idx, successor, self.memory());
-
-            // Save the parent node.
-            self.save_node(&mut node);
-            return old_value;
-        }
-
-        // Case 2.c: Both the left and right child are at their minimum sizes.
-        //
-        //                       parent
-        //                  [..., key, ...]
-        //                       /   \
-        //            [left child]   [right child]
-        //
-        // In this case, we merge (left child, key, right child) into a single
-        // node. The result will look like this:
-        //
-        //                       parent
-        //                     [...  ...]
-        //                         |
-        //          [left child, `key`, right child] <= new child
-        //
-        // We then recurse on this new child to delete `key`.
-        //
-        // If `parent` becomes empty (which can only happen if it's the root),
-        // then `parent` is deleted and `new_child` becomes the new root.
-        assert!(left_child.at_minimum());
-        assert!(right_child.at_minimum());
-
-        // Merge the right child into the left child.
-        let mut new_child = self.merge(
-            right_child,
-            left_child,
-            node.remove_entry(idx, self.memory()),
-        );
-
-        // Remove the right child from the parent node.
-        node.remove_child(idx + 1);
-
-        if node.entries_len() == 0 {
-            // Can only happen if this node is root.
-            assert_eq!(node.address(), self.root_addr);
-            assert_eq!(node.child(0), new_child.address());
-            assert_eq!(node.children_len(), 1);
-
-            self.root_addr = new_child.address();
-
-            // Deallocate the root node.
-            self.deallocate_node(node);
-            self.save_header();
-        } else {
-            self.save_node(&mut node);
-        }
-
-        self.save_node(&mut new_child);
-
-        // Recursively delete the key.
-        self.remove_helper(new_child, key).unwrap()
     }
 
     /// Returns an iterator over the entries of the map, sorted by key.
@@ -1678,6 +1897,9 @@ where
     }
 
     /// Saves the node to memory and invalidates the cache slot.
+    // TODO: benchmark putting the node back into the cache after saving
+    // instead of invalidating, so subsequent reads (especially of the root
+    // and depth-1 nodes) hit the cache. Requires cloning or taking ownership.
     #[inline]
     fn save_node(&mut self, node: &mut Node<K>) {
         node.save(self.allocator_mut());
