@@ -33,5 +33,5 @@ jobs:
           method: chat.postMessage
           token: ${{ secrets.SLACK_API_TOKEN }}
           payload: |
-            channel: eng-dsm-alerts
+            channel: eng-core-protocol-alerts
             text: "${{ inputs.dryRun == true && 'DRY RUN: ' || '' }}Cargo publish attempted for `stable-structures` (ref `${{ github.ref_name }}`). <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow run>."
