@@ -1,6 +1,7 @@
 use benchmarks::{random::Random, vec::UnboundedVecN};
 use canbench_rs::{bench, bench_fn, BenchResult};
 use candid::Principal;
+use ic_stable_structures::btreemap::entry::Entry::Occupied;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager};
 use ic_stable_structures::{storable::Blob, BTreeMap, DefaultMemoryImpl, Memory, Storable};
 use std::ops::Bound;
@@ -437,6 +438,45 @@ pub fn btreemap_v2_get_10mib_values() -> BenchResult {
     bench_fn(|| {
         for i in 0..count {
             btree.get(&(i as u32));
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_get_and_incr() -> BenchResult {
+    let count = 10000;
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let values = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (key, value) in values.iter().copied() {
+        btree.insert(key, value);
+    }
+
+    bench_fn(|| {
+        for (key, _) in values {
+            let existing = btree.get(&key).unwrap();
+            btree.insert(key, existing + 1);
+        }
+    })
+}
+
+#[bench(raw)]
+pub fn btreemap_get_and_incr_via_entry() -> BenchResult {
+    let count = 10000;
+    let mut btree = BTreeMap::new(DefaultMemoryImpl::default());
+    let mut rng = Rng::from_seed(0);
+    let values = generate_random_kv::<u64, u64>(count, &mut rng);
+    for (key, value) in values.iter().copied() {
+        btree.insert(key, value);
+    }
+
+    bench_fn(|| {
+        for (key, _) in values {
+            let Occupied(e) = btree.entry(key) else {
+                panic!()
+            };
+            let existing = e.get();
+            e.insert(existing + 1);
         }
     })
 }

@@ -49,6 +49,7 @@
 //! ----------------------------------------
 //! ```
 mod allocator;
+pub mod entry;
 mod iter;
 mod node;
 mod node_cache;
@@ -60,7 +61,7 @@ use crate::{
 };
 use allocator::Allocator;
 pub use iter::Iter;
-use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
+use node::{DerivedPageSize, Node, NodeType, PageSize, Version};
 use node_cache::NodeCache;
 pub use node_cache::NodeCacheMetrics;
 use std::borrow::Cow;
@@ -676,34 +677,213 @@ where
                 )));
             }
 
-            // If the root is full, we need to introduce a new node as the root.
-            //
             // NOTE: In the case where we are overwriting an existing key, then introducing
             // a new root node isn't strictly necessary. However, that's a micro-optimization
             // that adds more complexity than it's worth.
-            if root.is_full() {
-                // The root is full. Allocate a new node that will be used as the new root.
-                let mut new_root = self.allocate_node(NodeType::Internal);
-
-                // The new root has the old root as its only child.
-                new_root.push_child(self.root_addr);
-
-                // Update the root address.
-                self.root_addr = new_root.address();
-                self.save_header();
-
-                // Split the old (full) root.
-                self.split_child(&mut new_root, 0, None);
-
-                new_root
-            } else {
-                root
-            }
+            self.split_root_if_full(root)
         };
 
         self.insert_nonfull(root, key, value, 0)
             .map(Cow::Owned)
             .map(V::from_bytes)
+    }
+
+    /// Gets an [`Entry`](entry::Entry) for the given `key`, which gives efficient in-place access
+    /// to a map's entries, allowing inspection or modification without redundant key lookups. The
+    /// API mirrors [`std::collections::btree_map::Entry`] as closely as the stable-memory model
+    /// allows.
+    ///
+    /// Returns [`Entry::Occupied`](entry::Entry::Occupied) when `key` is already present, or
+    /// [`Entry::Vacant`](entry::Entry::Vacant) when it is not. Both variants expose methods to
+    /// read, overwrite, or remove the value.
+    ///
+    /// # Differences from `std::collections::BTreeMap::entry`
+    ///
+    /// The standard library's `or_insert` returns `&mut V`, giving a direct reference into the
+    /// map. Because values live in stable memory, long-lived references are not possible here.
+    /// Instead, `or_insert` (and its variants) return an [`OccupiedEntry`](entry::OccupiedEntry),
+    /// which lets you continue operating on the entry without a second key lookup.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u32, u32, _> = BTreeMap::new(DefaultMemoryImpl::default());
+    ///
+    /// // Insert a default value when the key is absent, then read it back.
+    /// let val = map.entry(1).or_insert(0).get();
+    /// assert_eq!(val, 0);
+    ///
+    /// // Increment a counter, seeding it to 1 when first seen.
+    /// for key in [1, 1, 2, 3, 1] {
+    ///     map.entry(key).and_modify(|v| *v += 1).or_insert(1);
+    /// }
+    /// assert_eq!(map.get(&1), Some(3));
+    /// assert_eq!(map.get(&2), Some(1));
+    /// assert_eq!(map.get(&3), Some(1));
+    /// ```
+    ///
+    /// # See also
+    ///
+    /// - [`entry::Entry`] — the type returned by this method
+    /// - [`entry::OccupiedEntry`] — methods available when the key is present
+    /// - [`entry::VacantEntry`] — methods available when the key is absent
+    pub fn entry(&mut self, key: K) -> entry::Entry<K, V, M> {
+        // For an empty map the key is trivially absent.  Avoid calling
+        // `find_node_for_insert` here because that eagerly allocates a root
+        // node and persists `root_addr` to the header, which would leave the
+        // map in an inconsistent state if the returned `VacantEntry` is dropped
+        // without calling `insert`.
+        if self.root_addr == NULL {
+            return entry::Entry::Vacant(entry::VacantEntry {
+                map: self,
+                key,
+                location: None,
+            });
+        }
+
+        // Load the root from memory.
+        let mut root = self.load_node(self.root_addr);
+
+        // Check if the key already exists in the root.
+        if let Ok(idx) = root.search(&key, self.memory()) {
+            // Key found
+            return entry::Entry::Occupied(entry::OccupiedEntry {
+                map: self,
+                key,
+                node: root,
+                idx,
+            });
+        }
+
+        root = self.split_root_if_full(root);
+
+        let (key, node, search_result) =
+            self.find_node_for_insert(root, key, 0, |_, node, idx, key, key_exists| {
+                if key_exists {
+                    (key, node, Ok(idx))
+                } else {
+                    (key, node, Err(idx))
+                }
+            });
+
+        match search_result {
+            Ok(idx) => entry::Entry::Occupied(entry::OccupiedEntry {
+                map: self,
+                key,
+                node,
+                idx,
+            }),
+            Err(idx) => entry::Entry::Vacant(entry::VacantEntry {
+                map: self,
+                key,
+                location: Some((node, idx)),
+            }),
+        }
+    }
+
+    /// Ensures the root node is not full, called before an insertion.
+    ///
+    /// If `root` is full, a new internal node is allocated, made the parent of the old
+    /// root, and the old root is split into two children.  The new (non-full) root is
+    /// returned.  If `root` is not full it is returned unchanged.
+    fn split_root_if_full(&mut self, root: Node<K>) -> Node<K> {
+        if !root.is_full() {
+            return root;
+        }
+
+        // Allocate a new node that will become the new root.
+        let mut new_root = self.allocate_node(NodeType::Internal);
+
+        // The new root has the old root as its only child.
+        new_root.push_child(self.root_addr);
+
+        // Persist the updated root address before splitting.
+        self.root_addr = new_root.address();
+        self.save_header();
+
+        // Split the old (full) root into two children of new_root.
+        self.split_child(&mut new_root, 0, None);
+
+        new_root
+    }
+
+    /// Core B-tree insertion traversal used by [`BTreeMap::entry`].
+    ///
+    /// Descends from `node` (which must not be full) to the leaf or internal node where
+    /// `key` either already exists or should be inserted, then invokes `callback` with:
+    ///
+    /// * `map`        — mutable access to the map (for saving nodes, updating length, etc.)
+    /// * `node`       — the target node
+    /// * `idx`        — the relevant slot index within `node`
+    /// * `key`        — the key being inserted
+    /// * `key_exists` — `true` if `key` is already present at `idx`; `false` if `idx` is
+    ///                  the position where `key` should be inserted
+    ///
+    /// The callback's return value is propagated back to the caller.
+    ///
+    /// PRECONDITION: `node` is not full.
+    fn find_node_for_insert<R>(
+        &mut self,
+        mut node: Node<K>,
+        key: K,
+        depth: u8,
+        callback: impl FnOnce(&mut Self, Node<K>, usize, K, bool) -> R,
+    ) -> R {
+        // We're guaranteed by the caller that the provided node is not full.
+        assert!(!node.is_full());
+
+        // Look for the key in the node.
+        match node.search(&key, self.memory()) {
+            Ok(idx) => {
+                // Key found.
+                callback(self, node, idx, key, true)
+            }
+            Err(idx) => {
+                // The key isn't in the node. `idx` is where that key should be inserted.
+
+                match node.node_type() {
+                    NodeType::Leaf => {
+                        // The node is a non-full leaf.
+                        callback(self, node, idx, key, false)
+                    }
+                    NodeType::Internal => {
+                        // The node is an internal node.
+                        // Load the child that we should add the entry to.
+                        let mut child = self.take_or_load_node(node.child(idx));
+                        let child_depth = depth.saturating_add(1);
+
+                        if child.is_full() {
+                            // Check if the key already exists in the child.
+                            if let Ok(idx) = child.search(&key, self.memory()) {
+                                // Key found. The parent node is unmodified — return it to cache.
+                                self.return_node(node, depth);
+                                return callback(self, child, idx, key, true);
+                            }
+
+                            // The child is full. Split the child.
+                            // Pass the already-loaded child to avoid a redundant load.
+                            self.split_child(&mut node, idx, Some(child));
+
+                            // The children have now changed. Search again for
+                            // the child where we need to store the entry in.
+                            let idx = node.search(&key, self.memory()).unwrap_or_else(|idx| idx);
+                            child = self.load_node(node.child(idx));
+                        } else {
+                            // Happy path: child is not full. The current node
+                            // will not be modified — return it to cache.
+                            self.return_node(node, depth);
+                        }
+
+                        // The child should now be not full.
+                        assert!(!child.is_full());
+
+                        self.find_node_for_insert(child, key, child_depth, callback)
+                    }
+                }
+            }
+        }
     }
 
     /// Inserts an entry into a node that is *not full*.
@@ -728,16 +908,11 @@ where
 
                 match node.node_type() {
                     NodeType::Leaf => {
-                        // The node is a non-full leaf.
-                        // Insert the entry at the proper location.
+                        // The node is a non-full leaf. Insert directly.
                         node.insert_entry(idx, (key, value));
                         self.save_node(&mut node);
-
-                        // Update the length.
                         self.length += 1;
                         self.save_header();
-
-                        // No previous value to return.
                         None
                     }
                     NodeType::Internal => {
@@ -905,14 +1080,14 @@ where
     }
 
     #[inline(always)]
-    fn first_entry_inner(&self, node: &Node<K>, depth: u8) -> Entry<K> {
+    fn first_entry_inner(&self, node: &Node<K>, depth: u8) -> node::Entry<K> {
         self.find_first_or_last(node, true, depth, |n, i, m| {
             n.get_key_read_value_uncached(i, m)
         })
     }
 
     #[inline(always)]
-    fn last_entry_inner(&self, node: &Node<K>, depth: u8) -> Entry<K> {
+    fn last_entry_inner(&self, node: &Node<K>, depth: u8) -> node::Entry<K> {
         self.find_first_or_last(node, false, depth, |n, i, m| {
             n.get_key_read_value_uncached(i, m)
         })
@@ -1041,10 +1216,10 @@ where
 
                         if node.entries_len() == 0 {
                             assert_eq!(
-                                node.address(), self.root_addr,
+                                node.address(),
+                                self.root_addr,
                                 "Removal can only result in an empty leaf node if that node is the root"
                             );
-
                             // Deallocate the empty node.
                             self.deallocate_node(node);
                             self.root_addr = NULL;
@@ -1401,7 +1576,7 @@ where
     /// Removes and returns the rightmost (maximum) entry in the subtree rooted
     /// at `node`, in a single top-down pass. This avoids the double traversal
     /// of the previous approach (get_max + remove_helper).
-    fn remove_rightmost(&mut self, mut node: Node<K>, depth: u8) -> Option<Entry<K>> {
+    fn remove_rightmost(&mut self, mut node: Node<K>, depth: u8) -> Option<node::Entry<K>> {
         match node.node_type() {
             NodeType::Leaf => {
                 let entry = node.pop_entry(self.memory())?;
@@ -1476,7 +1651,7 @@ where
 
     /// Removes and returns the leftmost (minimum) entry in the subtree rooted
     /// at `node`, in a single top-down pass.
-    fn remove_leftmost(&mut self, mut node: Node<K>, depth: u8) -> Option<Entry<K>> {
+    fn remove_leftmost(&mut self, mut node: Node<K>, depth: u8) -> Option<node::Entry<K>> {
         match node.node_type() {
             NodeType::Leaf => {
                 if node.entries_len() == 0 {
@@ -1667,7 +1842,7 @@ where
     /// Output:
     ///   [1, 2, 3, 4, 5, 6, 7] (stored in the `into` node)
     ///   `source` is deallocated.
-    fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: Entry<K>) -> Node<K> {
+    fn merge(&mut self, source: Node<K>, mut into: Node<K>, median: node::Entry<K>) -> Node<K> {
         let source_addr = source.address();
         into.merge(source, median, &mut self.allocator);
         // Node::merge saves `into` and deallocates `source` directly through
