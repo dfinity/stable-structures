@@ -89,6 +89,15 @@ impl<T: Storable, M: Memory> Vec<T, M> {
             .expect("Failed to push item to the vector");
     }
 
+    /// Adds multiple items at the end of the vector.
+    ///
+    /// Complexity: O(n * max_size(T))
+    pub fn extend(&self, items: &[T]) {
+        self.0
+            .extend(items)
+            .expect("Failed to extend the vector");
+    }
+
     /// Removes the item at the end of the vector.
     ///
     /// Complexity: O(max_size(T))

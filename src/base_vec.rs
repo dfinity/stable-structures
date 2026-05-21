@@ -227,6 +227,22 @@ impl<T: Storable, M: Memory> BaseVec<T, M> {
         Ok(())
     }
 
+    /// Adds multiple items at the end of the vector.
+    ///
+    /// Complexity: O(n * max_size(T))
+    pub fn extend(&self, items: &[T]) -> Result<(), GrowFailed> {
+        let start_index = self.len();
+        let slot = slot_size::<T>() as u64;
+        for (i, item) in items.iter().enumerate() {
+            let offset = DATA_OFFSET + slot * (start_index + i as u64);
+            let bytes = item.to_bytes_checked();
+            let data_offset = self.write_entry_size(offset, bytes.len() as u32)?;
+            safe_write(&self.memory, data_offset, bytes.borrow())?;
+        }
+        self.set_len(start_index + items.len() as u64);
+        Ok(())
+    }
+
     /// Removes the item at the end of the vector.
     ///
     /// Complexity: O(max_size(T))
