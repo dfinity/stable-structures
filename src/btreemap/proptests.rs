@@ -1,3 +1,4 @@
+use crate::btreemap::entry::Entry;
 use crate::{
     btreemap::{
         tests::{b, make_memory, run_btree_test},
@@ -9,7 +10,8 @@ use crate::{
 use proptest::collection::btree_set as pset;
 use proptest::collection::vec as pvec;
 use proptest::prelude::*;
-use std::collections::{BTreeMap as StdBTreeMap, BTreeSet};
+use std::collections::{btree_map, BTreeMap as StdBTreeMap, BTreeSet};
+use std::ops::BitXor;
 use test_strategy::proptest;
 
 #[derive(Debug, Clone)]
@@ -21,6 +23,8 @@ enum Operation {
     Values { from: usize, len: usize },
     Get(usize),
     Remove(usize),
+    EntryInsertOrXor { key: Vec<u8>, value: Vec<u8> },
+    EntryRemove(usize),
     Range { from: usize, len: usize },
     PopLast,
     PopFirst,
@@ -43,6 +47,9 @@ fn operation_strategy() -> impl Strategy<Value = Operation> {
             .prop_map(|(from, len)| Operation::Values { from, len }),
         50 => (any::<usize>()).prop_map(Operation::Get),
         15 => (any::<usize>()).prop_map(Operation::Remove),
+        10 => (any::<Vec<u8>>(), any::<Vec<u8>>())
+            .prop_map(|(key, value)| Operation::EntryInsertOrXor { key, value }),
+        10 => (any::<usize>()).prop_map(Operation::EntryRemove),
         5 => (any::<usize>(), any::<usize>())
             .prop_map(|(from, len)| Operation::Range { from, len }),
         2 =>  Just(Operation::PopFirst),
@@ -256,6 +263,72 @@ fn no_memory_leaks(#[strategy(pvec(pvec(0..u8::MAX, 100..10_000), 100))] keys: V
     assert_eq!(btree.allocator.num_allocated_chunks(), 0);
 }
 
+// A node holds up to `CAPACITY` (11) entries, so the operation count has to comfortably
+// exceed that for the tree to actually split and merge. This is also the only entry-API
+// coverage of the V1 and V1-migrated-to-V2 layouts, via `run_btree_test`.
+#[proptest]
+fn entry(
+    #[strategy(pvec(0..255u8, 200))] keys: Vec<u8>,
+    #[strategy(pvec(0..3u8, 200))] operations: Vec<u8>,
+) {
+    run_btree_test(|mut btree| {
+        let mut std_map = StdBTreeMap::new();
+
+        // Operations (if Occupied):
+        // 0 - insert
+        // 1 - increment
+        // 2 - remove
+        //
+        // Operations (if Vacant):
+        //   - always insert
+        for (key, operation) in keys.iter().copied().zip(operations.iter().copied()) {
+            let entry = btree.entry(key);
+            let std_entry = std_map.entry(key);
+            let occupied = matches!(entry, Entry::Occupied(_));
+            let std_occupied = matches!(std_entry, btree_map::Entry::Occupied(_));
+            assert_eq!(occupied, std_occupied);
+
+            match operation {
+                0 => {
+                    entry.and_modify(|v| *v = key).or_insert(key);
+                    std_entry.and_modify(|v| *v = key).or_insert(key);
+                }
+                1 => {
+                    entry.and_modify(|v| *v = v.wrapping_add(1)).or_insert(key);
+                    std_entry
+                        .and_modify(|v| *v = v.wrapping_add(1))
+                        .or_insert(key);
+                }
+                2 => {
+                    match entry {
+                        Entry::Occupied(e) => {
+                            e.remove();
+                        }
+                        Entry::Vacant(e) => {
+                            e.insert(key);
+                        }
+                    }
+                    match std_entry {
+                        btree_map::Entry::Occupied(e) => {
+                            e.remove();
+                        }
+                        btree_map::Entry::Vacant(e) => {
+                            e.insert(key);
+                        }
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        let entries: Vec<_> = btree.iter().map(|e| (*e.key(), e.value())).collect();
+        let std_entries: Vec<_> = std_map.into_iter().collect();
+
+        prop_assert_eq!(entries, std_entries);
+        Ok(())
+    });
+}
+
 // Given an operation, executes it on the given stable btreemap and standard btreemap, verifying
 // that the result of the operation is equal in both btrees.
 fn execute_operation<M: Memory>(
@@ -384,6 +457,57 @@ fn execute_operation<M: Memory>(
                 assert_eq!(btree.remove(&k), Some(v));
             }
         }
+        Operation::EntryInsertOrXor { key, value } => {
+            std_btree
+                .entry(key.clone())
+                .and_modify(|existing| {
+                    *existing = existing
+                        .iter()
+                        .zip(value.clone())
+                        .map(|(l, r)| l.bitxor(r))
+                        .collect::<Vec<_>>();
+                })
+                .or_insert(value.clone());
+
+            btree
+                .entry(key.clone())
+                .and_modify(|existing| {
+                    *existing = existing
+                        .iter()
+                        .zip(value.clone())
+                        .map(|(l, r)| l.bitxor(r))
+                        .collect::<Vec<_>>();
+                })
+                .or_insert(value);
+
+            assert_eq!(btree.get(&key).as_ref(), std_btree.get(&key));
+        }
+        Operation::EntryRemove(idx) => {
+            assert_eq!(std_btree.len(), btree.len() as usize);
+            if std_btree.is_empty() {
+                return;
+            }
+
+            let idx = idx % std_btree.len();
+
+            if let Some(k) = btree
+                .iter()
+                .skip(idx)
+                .take(1)
+                .next()
+                .map(|entry| entry.key().clone())
+            {
+                eprintln!("EntryRemove({})", hex::encode(&k));
+                let expected = std_btree.remove(&k).expect("key must exist in std map");
+                match btree.entry(k) {
+                    Entry::Occupied(e) => {
+                        assert_eq!(e.remove().into_value(), expected);
+                    }
+                    Entry::Vacant(_) => panic!("entry must be occupied"),
+                }
+            }
+        }
+
         Operation::Range { from, len } => {
             assert_eq!(std_btree.len(), btree.len() as usize);
             if std_btree.is_empty() {
