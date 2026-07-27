@@ -49,6 +49,7 @@
 //! ----------------------------------------
 //! ```
 mod allocator;
+mod bulk_insert;
 mod iter;
 mod node;
 mod node_cache;
@@ -59,6 +60,7 @@ use crate::{
     Memory, Storable,
 };
 use allocator::Allocator;
+use bulk_insert::BulkInsert;
 pub use iter::Iter;
 use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
 use node_cache::NodeCache;
@@ -704,6 +706,61 @@ where
         self.insert_nonfull(root, key, value, 0)
             .map(Cow::Owned)
             .map(V::from_bytes)
+    }
+
+    /// Inserts many key-value pairs, writing each modified node to stable memory at most
+    /// once instead of once per key.
+    ///
+    /// [`insert`](Self::insert) writes the target node — and, when a node splits, its
+    /// sibling and parent too — on every call, so inserting a run of nearby keys rewrites
+    /// the same node again and again. `insert_many` instead keeps the current root-to-leaf
+    /// path in memory and saves a modified node to stable memory only once the input has
+    /// moved past it. It also writes the header once for the whole call rather than once
+    /// per key.
+    ///
+    /// The iterator is consumed lazily and never collected, so the memory cost is one tree
+    /// path however many pairs are supplied.
+    ///
+    /// Duplicate keys are applied in the order given, so the last occurrence wins, exactly
+    /// as with repeated `insert` calls — the resulting map is identical, only the number of
+    /// writes differs.
+    ///
+    /// PRECONDITION: for every pair
+    ///   key.to_bytes().len() <= max_size(Key)
+    ///   value.to_bytes().len() <= max_size(Value)
+    ///
+    /// # Supply keys in sorted order for best performance
+    ///
+    /// The coalescing pays off exactly when consecutive keys land in the same node, so
+    /// **feed the pairs in sorted key order**. Both ascending and descending work just as
+    /// well — what matters is that consecutive keys are close together, not which way the
+    /// run travels.
+    ///
+    /// Out-of-order keys are still handled correctly — the path unwinds to an ancestor that
+    /// covers the key, as far as the root if necessary — but each one costs a fresh
+    /// descent, and shuffled input performs no better than calling
+    /// [`insert`](Self::insert) in a loop. Sort first if the data is not already ordered.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(DefaultMemoryImpl::default());
+    ///
+    /// // Streamed straight from the iterator; nothing is materialized.
+    /// map.insert_many((0..1_000).map(|i| (i, i * 2)));
+    ///
+    /// assert_eq!(map.len(), 1_000);
+    /// assert_eq!(map.get(&500), Some(1_000));
+    /// ```
+    pub fn insert_many(&mut self, entries: impl IntoIterator<Item = (K, V)>) {
+        let mut bulk = BulkInsert::new(self);
+        for (key, value) in entries {
+            bulk.insert(key, value);
+        }
+        // Dropping `bulk` here writes out the path it is still holding, along with the
+        // header. That is what completes the batch.
     }
 
     /// Inserts an entry into a node that is *not full*.

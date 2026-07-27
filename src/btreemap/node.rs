@@ -18,9 +18,9 @@ use io::NodeReader;
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.
-const B: usize = 6;
+pub(super) const B: usize = 6;
 // The maximum number of entries per node.
-const CAPACITY: usize = 2 * B - 1;
+pub(super) const CAPACITY: usize = 2 * B - 1;
 const LAYOUT_VERSION_1: u8 = 1;
 const LAYOUT_VERSION_2: u8 = 2;
 const MAGIC: &[u8; 3] = b"BTN";
@@ -111,6 +111,13 @@ impl<K: Storable + Ord + Clone> Node<K> {
     /// Returns true if the node cannot store anymore entries, false otherwise.
     pub fn is_full(&self) -> bool {
         self.entries.len() >= CAPACITY
+    }
+
+    /// Replaces the value at `idx`, discarding the old one without reading it.
+    ///
+    /// Prefer this to [`Node::swap_value`] when the previous value is not needed.
+    pub fn set_value(&mut self, idx: usize, new: Vec<u8>) {
+        self.entries[idx].1 = LazyValue::by_value(new);
     }
 
     /// Replaces the value at `idx` and returns the old one.

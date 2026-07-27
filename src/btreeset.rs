@@ -256,6 +256,29 @@ where
         self.map.insert(key, ()).is_none()
     }
 
+    /// Inserts many keys, writing each modified node to stable memory at most once instead
+    /// of once per key. See [`BTreeMap::insert_many`] for the details.
+    ///
+    /// Supply the keys in sorted order — ascending or descending — for the coalescing to
+    /// pay off. Out-of-order keys are handled correctly but forfeit the speedup.
+    ///
+    /// The iterator is consumed lazily and never collected.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeSet, DefaultMemoryImpl};
+    ///
+    /// let mut set: BTreeSet<u64, _> = BTreeSet::new(DefaultMemoryImpl::default());
+    /// set.insert_many(0..1_000);
+    ///
+    /// assert_eq!(set.len(), 1_000);
+    /// assert!(set.contains(&500));
+    /// ```
+    pub fn insert_many(&mut self, keys: impl IntoIterator<Item = K>) {
+        self.map.insert_many(keys.into_iter().map(|key| (key, ())));
+    }
+
     /// Returns `true` if the key exists in the set, `false` otherwise.
     ///
     /// # Complexity
@@ -1247,6 +1270,48 @@ mod test {
 
         let range: Vec<_> = btreeset.range(10..20).collect();
         assert!(range.is_empty());
+    }
+
+    #[test]
+    fn test_insert_many_matches_repeated_insert() {
+        // Ascending, descending, unordered and duplicated inputs must all leave the set in
+        // exactly the state repeated `insert` calls would.
+        let n = 1_000u32;
+        let batches: Vec<(&str, Vec<u32>)> = vec![
+            ("ascending", (0..n).collect()),
+            ("descending", (0..n).rev().collect()),
+            ("sawtooth", (0..n).map(|i| (i * 7) % n).collect()),
+            ("duplicates", vec![1, 2, 1, 3, 2, 1]),
+        ];
+
+        for (label, batch) in batches {
+            let mut expected: BTreeSet<u32, _> = BTreeSet::new(make_memory());
+            for key in &batch {
+                expected.insert(*key);
+            }
+            let mut actual: BTreeSet<u32, _> = BTreeSet::new(make_memory());
+            actual.insert_many(batch.clone());
+
+            assert_eq!(actual.len(), expected.len(), "{label}");
+            let actual_keys: Vec<u32> = actual.iter().collect();
+            let expected_keys: Vec<u32> = expected.iter().collect();
+            assert_eq!(actual_keys, expected_keys, "{label}");
+            for key in &expected_keys {
+                assert!(actual.contains(key), "{label} key {key}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_insert_many_empty_batch_is_a_no_op() {
+        let mut btreeset: BTreeSet<u32, _> = BTreeSet::new(make_memory());
+        btreeset.insert_many(Vec::new());
+        assert!(btreeset.is_empty());
+
+        btreeset.insert(1);
+        btreeset.insert_many(Vec::new());
+        assert_eq!(btreeset.len(), 1);
+        assert!(btreeset.contains(&1));
     }
 
     #[test]

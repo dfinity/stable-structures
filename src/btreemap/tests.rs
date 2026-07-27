@@ -1,10 +1,12 @@
 use super::*;
 use crate::{
     btreemap::iter::LazyEntry,
+    btreemap::node::{B, CAPACITY},
     storable::{Blob, Bound as StorableBound},
     VectorMemory,
 };
 use std::cell::RefCell;
+use std::collections::{BTreeMap as StdBTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::rc::Rc;
 
@@ -3058,4 +3060,573 @@ fn cache_metrics_reset_after_clear() {
     assert_eq!(after.hits(), 0, "Metrics should reset after clear_new");
     assert_eq!(after.misses(), 0, "Metrics should reset after clear_new");
     assert_eq!(after.total(), 0, "Metrics should reset after clear_new");
+}
+
+// --- insert_many -----------------------------------------------------------
+
+/// Builds the same map twice — once with repeated `insert`, once with `insert_many` — and
+/// asserts they are indistinguishable.
+fn assert_insert_many_matches(existing: &[(u64, u64)], batch: &[(u64, u64)], cache_slots: usize) {
+    let mut expected: BTreeMap<u64, u64, _> =
+        BTreeMap::new(make_memory()).with_node_cache(cache_slots);
+    let mut actual: BTreeMap<u64, u64, _> =
+        BTreeMap::new(make_memory()).with_node_cache(cache_slots);
+
+    for (key, value) in existing {
+        expected.insert(*key, *value);
+        actual.insert(*key, *value);
+    }
+    for (key, value) in batch {
+        expected.insert(*key, *value);
+    }
+    actual.insert_many(batch.to_vec());
+
+    assert_eq!(expected.len(), actual.len(), "cache {cache_slots}");
+    assert_eq!(
+        collect_entry(expected.iter()),
+        collect_entry(actual.iter()),
+        "cache {cache_slots}"
+    );
+}
+
+#[test]
+fn insert_many_empty_batch_is_a_no_op() {
+    let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(make_memory());
+    map.insert_many(Vec::new());
+    assert!(map.is_empty());
+
+    map.insert(1, 1);
+    map.insert_many(Vec::new());
+    assert_eq!(map.len(), 1);
+    assert_eq!(map.get(&1), Some(1));
+}
+
+#[test]
+fn insert_many_into_empty_map() {
+    for cache_slots in [0, 1, 16] {
+        // A single pair has to allocate the root.
+        assert_insert_many_matches(&[], &[(7, 70)], cache_slots);
+        // Enough to split the root leaf several times over.
+        let batch: Vec<(u64, u64)> = (0..500).map(|i| (i, i * 3)).collect();
+        assert_insert_many_matches(&[], &batch, cache_slots);
+    }
+}
+
+#[test]
+fn insert_many_orders_and_deduplicates_like_repeated_insert() {
+    // Descending input must come out sorted.
+    let descending: Vec<(u64, u64)> = (0..300).rev().map(|i| (i, i)).collect();
+    assert_insert_many_matches(&[], &descending, 16);
+
+    // Repeated keys: the last occurrence in the input wins, as with repeated `insert`.
+    let duplicated = vec![(1, 10), (2, 20), (1, 11), (2, 21), (1, 12)];
+    assert_insert_many_matches(&[], &duplicated, 16);
+    let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(make_memory());
+    map.insert_many(duplicated);
+    assert_eq!(map.get(&1), Some(12));
+    assert_eq!(map.get(&2), Some(21));
+    assert_eq!(map.len(), 2);
+}
+
+#[test]
+fn insert_many_over_existing_entries() {
+    let existing: Vec<(u64, u64)> = (0..400).map(|i| (i, i)).collect();
+
+    // Pure overwrite: no key is new, so the length must not move.
+    let overwrite: Vec<(u64, u64)> = (0..400).map(|i| (i, i + 1_000)).collect();
+    assert_insert_many_matches(&existing, &overwrite, 16);
+
+    // Interleaved between existing keys, which fills leaves and forces splits.
+    let interleaved: Vec<(u64, u64)> = (0..400).map(|i| (i * 2 + 1, i)).collect();
+    assert_insert_many_matches(&existing, &interleaved, 16);
+
+    // A run appended past the end, which keeps splitting the rightmost path.
+    let appended: Vec<(u64, u64)> = (10_000..10_500).map(|i| (i, i)).collect();
+    assert_insert_many_matches(&existing, &appended, 16);
+}
+
+#[test]
+fn insert_many_exercises_the_split_cascade() {
+    // Dense runs into a map whose leaves are already near capacity drive both cascade
+    // routes: a full root, and a parent with no room for a promoted median. The batch
+    // sizes straddle the node capacity of 11 so that splits land on the boundaries.
+    for existing_len in [0u64, 5, 11, 12, 100] {
+        let existing: Vec<(u64, u64)> = (0..existing_len).map(|i| (i * 100, i)).collect();
+        for batch_len in [1u64, 5, 11, 12, 60, 500] {
+            let batch: Vec<(u64, u64)> = (0..batch_len).map(|i| (i, i)).collect();
+            assert_insert_many_matches(&existing, &batch, 0);
+            assert_insert_many_matches(&existing, &batch, 16);
+        }
+    }
+}
+
+#[test]
+fn insert_many_grows_the_tree_through_repeated_root_splits() {
+    // Enough keys to push the root down several levels, so the cascade has to grow a new
+    // root more than once and re-index the levels below each split it performs. Draining
+    // the map afterwards is the structural check: a mislinked child or a stale index would
+    // strand nodes and leave the allocator holding chunks.
+    for descending in [false, true] {
+        for cache_slots in [0, 16] {
+            let n = 20_000u64;
+            let keys: Vec<u64> = if descending {
+                (0..n).rev().collect()
+            } else {
+                (0..n).collect()
+            };
+
+            let mut map: BTreeMap<u64, u64, _> =
+                BTreeMap::new(make_memory()).with_node_cache(cache_slots);
+            map.insert_many(keys.iter().map(|k| (*k, k * 2)));
+
+            let label = format!("descending={descending} cache={cache_slots}");
+            assert_eq!(map.len(), n, "{label}");
+            assert_eq!(map.first_key_value(), Some((0, 0)), "{label}");
+            assert_eq!(map.last_key_value(), Some((n - 1, (n - 1) * 2)), "{label}");
+
+            // Every key readable, and in order.
+            let entries = collect_entry(map.iter());
+            assert_eq!(entries.len(), n as usize, "{label}");
+            for (i, (key, value)) in entries.into_iter().enumerate() {
+                assert_eq!(key, i as u64, "{label}");
+                assert_eq!(value, i as u64 * 2, "{label}");
+            }
+
+            for key in 0..n {
+                assert_eq!(map.remove(&key), Some(key * 2), "{label} key {key}");
+            }
+            assert!(map.is_empty(), "{label}");
+            assert_eq!(map.allocator.num_allocated_chunks(), 0, "{label}");
+        }
+    }
+}
+
+#[test]
+fn map_is_fully_usable_after_insert_many() {
+    let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(make_memory());
+    map.insert_many((0..1_000u64).map(|i| (i * 2, i)));
+
+    assert_eq!(map.len(), 1_000);
+    assert_eq!(map.first_key_value(), Some((0, 0)));
+    assert_eq!(map.last_key_value(), Some((1_998, 999)));
+    assert_eq!(map.range(10..20).count(), 5);
+    assert_eq!(map.get(&500), Some(250));
+    assert_eq!(map.get(&501), None);
+
+    // Ordinary mutation still works on top of a batch-built tree.
+    map.insert(501, 12_345);
+    assert_eq!(map.get(&501), Some(12_345));
+    assert_eq!(map.remove(&500), Some(250));
+    assert_eq!(map.len(), 1_000);
+
+    for i in 0..1_000u64 {
+        map.remove(&(i * 2));
+    }
+    map.remove(&501);
+    assert!(map.is_empty());
+    assert_eq!(map.allocator.num_allocated_chunks(), 0);
+}
+
+#[test]
+fn insert_many_with_unbounded_values() {
+    let mut map: BTreeMap<u64, Vec<u8>, _> = BTreeMap::new(make_memory());
+    // Values large enough to spill onto V2 overflow pages.
+    let batch: Vec<(u64, Vec<u8>)> = (0..200u64).map(|i| (i, vec![i as u8; 3_000])).collect();
+    map.insert_many(batch.clone());
+
+    assert_eq!(map.len(), 200);
+    for (key, value) in &batch {
+        assert_eq!(map.get(key).as_ref(), Some(value));
+    }
+
+    // Overwriting with shorter values through a second batch must reclaim the pages.
+    map.insert_many((0..200u64).map(|i| (i, vec![i as u8; 2])));
+    for i in 0..200u64 {
+        assert_eq!(map.get(&i), Some(vec![i as u8; 2]));
+    }
+    for i in 0..200u64 {
+        map.remove(&i);
+    }
+    assert_eq!(map.allocator.num_allocated_chunks(), 0);
+}
+
+#[test]
+fn insert_many_across_layouts() {
+    // The V1 node layout differs from V2 in how keys and values are sized and written, and
+    // `run_btree_test` covers V1, V1-migrated-to-V2 and V2. Bounded types are required
+    // here: `run_btree_test` silently skips the V1 arms for unbounded ones.
+    let n = 500u64;
+    let batches: Vec<(&str, Vec<(u64, u64)>)> = vec![
+        ("ascending", (0..n).map(|i| (i, i * 3)).collect()),
+        ("descending", (0..n).rev().map(|i| (i, i * 3)).collect()),
+        ("sawtooth", (0..n).map(|i| ((i * 7) % n, i)).collect()),
+        ("duplicates", vec![(1, 10), (2, 20), (1, 11), (2, 21)]),
+    ];
+
+    for (label, batch) in batches {
+        run_btree_test::<u64, u64, _, _>(|mut actual| {
+            let mut expected = std::collections::BTreeMap::new();
+            for (key, value) in batch.clone() {
+                expected.insert(key, value);
+            }
+            actual.insert_many(batch.clone());
+
+            assert_eq!(actual.len() as usize, expected.len(), "{label}");
+            let actual_entries: Vec<(u64, u64)> =
+                actual.iter().map(|e| (*e.key(), e.value())).collect();
+            let expected_entries: Vec<(u64, u64)> = expected.into_iter().collect();
+            assert_eq!(actual_entries, expected_entries, "{label}");
+            for (key, value) in &expected_entries {
+                assert_eq!(actual.get(key), Some(*value), "{label} key {key}");
+            }
+        });
+    }
+}
+
+#[test]
+fn insert_many_handles_out_of_order_input() {
+    // `insert_many` is tuned for ascending keys, but wrong ordering must never corrupt the
+    // tree — it may only cost extra descents. These orderings are chosen to make the path
+    // unwind constantly, including all the way back to the root.
+    let n = 1_500u64;
+    let orderings: Vec<(&str, Vec<(u64, u64)>)> = vec![
+        ("descending", (0..n).rev().map(|i| (i, i)).collect()),
+        (
+            // Alternating between the two ends, so every key jumps across the whole tree.
+            "zigzag",
+            (0..n)
+                .map(|i| {
+                    let k = if i % 2 == 0 { i / 2 } else { n - 1 - i / 2 };
+                    (k, k)
+                })
+                .collect(),
+        ),
+        (
+            // Ascending runs that repeatedly restart from the beginning.
+            "sawtooth",
+            (0..n).map(|i| ((i * 7) % n, i)).collect(),
+        ),
+        (
+            // Deterministic shuffle.
+            "shuffled",
+            {
+                let mut keys: Vec<u64> = (0..n).collect();
+                let mut state = 0x2545F4914F6CDD1Du64;
+                for i in (1..keys.len()).rev() {
+                    state ^= state << 13;
+                    state ^= state >> 7;
+                    state ^= state << 17;
+                    keys.swap(i, (state % (i as u64 + 1)) as usize);
+                }
+                keys.into_iter().map(|k| (k, k)).collect()
+            },
+        ),
+    ];
+
+    for (label, batch) in orderings {
+        for cache_slots in [0, 16] {
+            let mut expected: BTreeMap<u64, u64, _> =
+                BTreeMap::new(make_memory()).with_node_cache(cache_slots);
+            let mut actual: BTreeMap<u64, u64, _> =
+                BTreeMap::new(make_memory()).with_node_cache(cache_slots);
+            for (key, value) in &batch {
+                expected.insert(*key, *value);
+            }
+            actual.insert_many(batch.clone());
+
+            assert_eq!(expected.len(), actual.len(), "{label} cache {cache_slots}");
+            assert_eq!(
+                collect_entry(expected.iter()),
+                collect_entry(actual.iter()),
+                "{label} cache {cache_slots}"
+            );
+        }
+    }
+}
+
+#[test]
+fn insert_many_streams_without_materializing() {
+    // The iterator is consumed lazily, so a source far larger than any batch we would want
+    // to hold in memory still works. `Iterator::map` here is never collected.
+    let mut map: BTreeMap<u64, u64, _> = BTreeMap::new(make_memory());
+    map.insert_many((0..50_000u64).map(|i| (i, i ^ 0xFFFF)));
+
+    assert_eq!(map.len(), 50_000);
+    assert_eq!(map.get(&0), Some(0xFFFF));
+    assert_eq!(map.get(&49_999), Some(49_999 ^ 0xFFFF));
+    assert_eq!(map.first_key_value(), Some((0, 0xFFFF)));
+    assert_eq!(map.last_key_value(), Some((49_999, 49_999 ^ 0xFFFF)));
+}
+
+#[test]
+fn insert_many_coalesces_in_either_direction() {
+    // A descending run is as local as an ascending one — the held path just unwinds
+    // leftwards — so both must behave the same. Compare against repeated `insert`.
+    for descending in [false, true] {
+        let keys: Vec<u64> = if descending {
+            (0..3_000u64).rev().collect()
+        } else {
+            (0..3_000u64).collect()
+        };
+        let batch: Vec<(u64, u64)> = keys.iter().map(|k| (*k, k * 3)).collect();
+
+        let mut expected: BTreeMap<u64, u64, _> = BTreeMap::new(make_memory());
+        for (key, value) in &batch {
+            expected.insert(*key, *value);
+        }
+        let mut actual: BTreeMap<u64, u64, _> = BTreeMap::new(make_memory());
+        actual.insert_many(batch);
+
+        assert_eq!(expected.len(), actual.len(), "descending={descending}");
+        assert_eq!(
+            collect_entry(expected.iter()),
+            collect_entry(actual.iter()),
+            "descending={descending}"
+        );
+    }
+}
+
+// --- structural invariants ----------------------------------------------------------
+
+/// Reads the tree back out of memory and asserts every structural invariant a B-tree has.
+///
+/// The other tests check behaviour — that iteration matches `std`, that lookups agree,
+/// that draining returns every allocator chunk — and so notice corruption only through
+/// its consequences. `insert_many` manipulates the shape directly when it splits a node
+/// and cascades the split upwards, so it is worth asserting the shape itself: a mislinked
+/// child or a stale index shows up here at the node it broke, rather than downstream as a
+/// missing key.
+fn assert_btree_invariants<K, V, M>(map: &BTreeMap<K, V, M>, ctx: &str)
+where
+    K: Storable + Ord + Clone + std::fmt::Debug,
+    V: Storable,
+    M: Memory,
+{
+    if map.root_addr == NULL {
+        assert_eq!(map.len(), 0, "{ctx}: no root, but the length is not zero");
+        return;
+    }
+
+    let mut walk = TreeWalk {
+        map,
+        ctx,
+        leaf_depths: BTreeSet::new(),
+        entries: 0,
+    };
+    walk.check(map.root_addr, 0, None, None, true);
+
+    assert_eq!(
+        walk.leaf_depths.len(),
+        1,
+        "{ctx}: the tree is unbalanced, leaves sit at depths {:?}",
+        walk.leaf_depths
+    );
+    assert_eq!(
+        walk.entries,
+        map.len(),
+        "{ctx}: walked {} entries but the header says {}",
+        walk.entries,
+        map.len()
+    );
+}
+
+struct TreeWalk<'a, K, V, M>
+where
+    K: Storable + Ord + Clone,
+    V: Storable,
+    M: Memory,
+{
+    map: &'a BTreeMap<K, V, M>,
+    ctx: &'a str,
+    leaf_depths: BTreeSet<u32>,
+    entries: u64,
+}
+
+impl<K, V, M> TreeWalk<'_, K, V, M>
+where
+    K: Storable + Ord + Clone + std::fmt::Debug,
+    V: Storable,
+    M: Memory,
+{
+    /// Checks the node at `address` and everything below it. `lower` and `upper` are the
+    /// separators either side of it in its parent, which every key beneath it must fall
+    /// strictly between.
+    fn check(
+        &mut self,
+        address: Address,
+        depth: u32,
+        lower: Option<K>,
+        upper: Option<K>,
+        is_root: bool,
+    ) {
+        let ctx = self.ctx;
+        let node = self.map.load_node(address);
+        let len = node.entries_len();
+
+        assert!(len > 0, "{ctx}: empty node at depth {depth}");
+        assert!(
+            len <= CAPACITY,
+            "{ctx}: node at depth {depth} holds {len} entries, over the capacity of {CAPACITY}"
+        );
+        if !is_root {
+            assert!(
+                len >= B - 1,
+                "{ctx}: node at depth {depth} holds only {len} entries, under the minimum of {}",
+                B - 1
+            );
+        }
+
+        let keys: Vec<K> = (0..len)
+            .map(|i| node.key(i, self.map.memory()).clone())
+            .collect();
+        for pair in keys.windows(2) {
+            assert!(
+                pair[0] < pair[1],
+                "{ctx}: keys out of order at depth {depth}: {:?} then {:?}",
+                pair[0],
+                pair[1]
+            );
+        }
+        if let Some(lower) = &lower {
+            assert!(
+                &keys[0] > lower,
+                "{ctx}: key {:?} at depth {depth} is not above its separator {lower:?}",
+                keys[0]
+            );
+        }
+        if let Some(upper) = &upper {
+            assert!(
+                &keys[len - 1] < upper,
+                "{ctx}: key {:?} at depth {depth} is not below its separator {upper:?}",
+                keys[len - 1]
+            );
+        }
+        self.entries += len as u64;
+
+        match node.node_type() {
+            NodeType::Leaf => {
+                assert_eq!(
+                    node.children_len(),
+                    0,
+                    "{ctx}: leaf at depth {depth} has children"
+                );
+                self.leaf_depths.insert(depth);
+            }
+            NodeType::Internal => {
+                assert_eq!(
+                    node.children_len(),
+                    len + 1,
+                    "{ctx}: internal node at depth {depth} has {} children for {len} entries",
+                    node.children_len()
+                );
+                for i in 0..=len {
+                    let child_lower = if i == 0 {
+                        lower.clone()
+                    } else {
+                        Some(keys[i - 1].clone())
+                    };
+                    let child_upper = if i == len {
+                        upper.clone()
+                    } else {
+                        Some(keys[i].clone())
+                    };
+                    self.check(node.child(i), depth + 1, child_lower, child_upper, false);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn insert_many_preserves_the_btree_invariants() {
+    // Batches of varying shape, interleaved with the ordinary single-key operations, so
+    // that trees built by one are reshaped by the other. The tree is walked after every
+    // step, which is what makes this stronger than comparing iteration order: a split that
+    // linked a child wrongly is caught at that node rather than wherever it surfaces.
+    for seed in 0..12u64 {
+        let mut rng = seed.wrapping_mul(0x9E3779B97F4A7C15) | 1;
+        let mut next = move || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            rng
+        };
+        let cache_slots = [0usize, 1, 16][(seed % 3) as usize];
+        let mut actual: BTreeMap<u64, u64, _> =
+            BTreeMap::new(make_memory()).with_node_cache(cache_slots);
+        let mut expected = StdBTreeMap::new();
+
+        for step in 0..20 {
+            let ctx = format!("seed {seed} step {step} cache {cache_slots}");
+            let base = next() % 4_000;
+            let span = 1 + next() % 2_500;
+
+            match next() % 8 {
+                0..=4 => {
+                    let len = 1 + next() % 300;
+                    let mut keys: Vec<u64> = (0..len).map(|_| base + next() % span).collect();
+                    match next() % 3 {
+                        0 => keys.sort_unstable(),
+                        1 => {
+                            keys.sort_unstable();
+                            keys.reverse();
+                        }
+                        _ => {} // leave it shuffled
+                    }
+                    for key in &keys {
+                        expected.insert(*key, key.wrapping_mul(31));
+                    }
+                    actual.insert_many(keys.iter().map(|k| (*k, k.wrapping_mul(31))));
+                }
+                5 => {
+                    let key = base + next() % span;
+                    let value = next();
+                    assert_eq!(
+                        actual.insert(key, value),
+                        expected.insert(key, value),
+                        "{ctx}: insert {key}"
+                    );
+                }
+                6 => {
+                    let key = base + next() % span;
+                    assert_eq!(
+                        actual.remove(&key),
+                        expected.remove(&key),
+                        "{ctx}: remove {key}"
+                    );
+                }
+                _ => {
+                    for key in expected.keys().copied().take(40).collect::<Vec<_>>() {
+                        assert_eq!(
+                            actual.remove(&key),
+                            expected.remove(&key),
+                            "{ctx}: drain {key}"
+                        );
+                    }
+                }
+            }
+
+            assert_btree_invariants(&actual, &ctx);
+            assert_eq!(actual.len() as usize, expected.len(), "{ctx}: length");
+            assert_eq!(
+                collect_entry(actual.iter()),
+                expected.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>(),
+                "{ctx}: contents"
+            );
+        }
+
+        // Everything the batches put in must come back out.
+        for key in expected.keys().copied().collect::<Vec<_>>() {
+            assert!(
+                actual.remove(&key).is_some(),
+                "seed {seed}: final drain {key}"
+            );
+        }
+        assert!(actual.is_empty(), "seed {seed}");
+        assert_eq!(
+            actual.allocator.num_allocated_chunks(),
+            0,
+            "seed {seed}: chunks left allocated"
+        );
+    }
 }

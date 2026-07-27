@@ -444,3 +444,87 @@ fn execute_operation<M: Memory>(
         }
     };
 }
+
+// `insert_many` must be indistinguishable from calling `insert` on each pair, whatever the
+// batch looks like: unsorted, duplicated, overlapping what is already stored, and whatever
+// the node cache is doing.
+#[proptest(cases = 30)]
+fn insert_many_matches_repeated_insert(
+    #[strategy(pvec(0..400u64, 0..250))] existing: Vec<u64>,
+    #[strategy(pvec((0..400u64, any::<u64>()), 0..400))] batch: Vec<(u64, u64)>,
+) {
+    for cache_slots in [0usize, 1, 16] {
+        let mut expected: BTreeMap<u64, u64, _> =
+            BTreeMap::new(make_memory()).with_node_cache(cache_slots);
+        let mut actual: BTreeMap<u64, u64, _> =
+            BTreeMap::new(make_memory()).with_node_cache(cache_slots);
+
+        for key in &existing {
+            expected.insert(*key, *key);
+            actual.insert(*key, *key);
+        }
+
+        for (key, value) in &batch {
+            expected.insert(*key, *value);
+        }
+        actual.insert_many(batch.clone());
+
+        assert_eq!(expected.len(), actual.len(), "cache {cache_slots}");
+        let expected_entries: Vec<_> = expected.iter().map(|e| (*e.key(), e.value())).collect();
+        let actual_entries: Vec<_> = actual.iter().map(|e| (*e.key(), e.value())).collect();
+        assert_eq!(expected_entries, actual_entries, "cache {cache_slots}");
+
+        // Every key must still be individually reachable, and removable.
+        for (key, _) in &expected_entries {
+            assert_eq!(actual.get(key), expected.get(key), "key {key}");
+        }
+    }
+}
+
+// Variable-length keys and values exercise V2 overflow pages and re-serialization, and
+// `run_btree_test` covers the V1 and V1-migrated-to-V2 layouts too.
+#[proptest(cases = 20)]
+fn insert_many_matches_repeated_insert_unbounded(
+    #[strategy(pvec((pvec(0..8u8, 0..6), pvec(0..255u8, 0..300)), 0..200))] batch: Vec<(
+        Vec<u8>,
+        Vec<u8>,
+    )>,
+) {
+    run_btree_test(|mut actual| {
+        let mut expected = StdBTreeMap::new();
+        for (key, value) in batch.clone() {
+            expected.insert(key, value);
+        }
+        actual.insert_many(batch.clone());
+
+        let actual_entries: Vec<_> = actual
+            .iter()
+            .map(|e| (e.key().clone(), e.value()))
+            .collect();
+        let expected_entries: Vec<_> = expected
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        prop_assert_eq!(actual_entries, expected_entries);
+        prop_assert_eq!(actual.len() as usize, expected.len());
+        Ok(())
+    });
+}
+
+// Nodes buffered by `insert_many` must all be accounted for: draining the map afterwards
+// has to return every chunk to the allocator.
+#[proptest(cases = 10)]
+fn insert_many_does_not_leak_memory(
+    #[strategy(pvec((0..2_000u64, any::<u64>()), 500..2_000))] batch: Vec<(u64, u64)>,
+) {
+    let mut btree: BTreeMap<u64, u64, _> = BTreeMap::new(make_memory());
+    btree.insert_many(batch.clone());
+
+    let keys: BTreeSet<u64> = batch.iter().map(|(k, _)| *k).collect();
+    assert_eq!(btree.len() as usize, keys.len());
+    for key in keys {
+        assert!(btree.remove(&key).is_some());
+    }
+    assert!(btree.is_empty());
+    assert_eq!(btree.allocator.num_allocated_chunks(), 0);
+}
