@@ -15,6 +15,7 @@ mod v1;
 mod v2;
 
 use io::NodeReader;
+pub(crate) use v2::MINIMUM_PAGE_SIZE;
 
 // The minimum degree to use in the btree.
 // This constant is taken from Rust's std implementation of BTreeMap.

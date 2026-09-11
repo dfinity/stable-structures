@@ -1586,6 +1586,57 @@ fn accepts_small_or_equal_value_sizes() {
     let _btree: BTreeMap<Blob<4>, Blob<3>, _> = BTreeMap::init(btree.into_memory());
 }
 
+#[test]
+fn new_with_page_size_persists_the_page_size() {
+    let mut btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new_with_page_size(make_memory(), 200);
+    btree.insert(vec![1], vec![2]);
+
+    let btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::load(btree.into_memory());
+    assert_eq!(btree.version, Version::V2(PageSize::Value(200)));
+    assert_eq!(btree.get(&vec![1]), Some(vec![2]));
+}
+
+#[test]
+fn new_with_page_size_overrides_the_page_size_of_bounded_types() {
+    let btree: BTreeMap<u64, u64, _> = BTreeMap::new_with_page_size(make_memory(), 4096);
+    assert_eq!(btree.version, Version::V2(PageSize::Value(4096)));
+}
+
+#[test]
+#[should_panic(expected = "page_size must be at least 128 bytes, got 127")]
+fn new_with_page_size_rejects_pages_below_the_minimum() {
+    let _btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new_with_page_size(make_memory(), 127);
+}
+
+#[test]
+fn init_with_page_size_creates_a_map_with_the_page_size() {
+    let btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::init_with_page_size(make_memory(), 256);
+    assert_eq!(btree.version, Version::V2(PageSize::Value(256)));
+}
+
+#[test]
+fn init_with_page_size_keeps_the_page_size_of_an_existing_map() {
+    let mut btree: BTreeMap<Vec<u8>, Vec<u8>, _> =
+        BTreeMap::init_with_page_size(make_memory(), 256);
+    btree.insert(vec![1], vec![2]);
+
+    // The page size is fixed when the map is created, so a different page
+    // size passed when reinitializing is ignored.
+    let btree: BTreeMap<Vec<u8>, Vec<u8>, _> =
+        BTreeMap::init_with_page_size(btree.into_memory(), 1024);
+    assert_eq!(btree.version, Version::V2(PageSize::Value(256)));
+    assert_eq!(btree.get(&vec![1]), Some(vec![2]));
+
+    // Likewise for a map created with the default page size.
+    let btree: BTreeMap<Vec<u8>, Vec<u8>, _> = BTreeMap::new(make_memory());
+    let btree: BTreeMap<Vec<u8>, Vec<u8>, _> =
+        BTreeMap::init_with_page_size(btree.into_memory(), 256);
+    assert_eq!(
+        btree.version,
+        Version::V2(PageSize::Value(DEFAULT_PAGE_SIZE))
+    );
+}
+
 fn bruteforce_range_search<K: TestKey, V: TestValue>() {
     let (key, value) = (K::build, V::build);
     run_btree_test(|mut stable_map| {

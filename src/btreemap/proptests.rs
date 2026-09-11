@@ -1,7 +1,7 @@
 use crate::{
     btreemap::{
         tests::{b, make_memory, run_btree_test},
-        BTreeMap,
+        BTreeMap, MINIMUM_PAGE_SIZE,
     },
     storable::Blob,
     Memory,
@@ -64,6 +64,21 @@ fn comprehensive(#[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Op
 
     // Execute all the operations, validating that the stable btreemap behaves similarly to a std
     // btreemap.
+    for op in ops.into_iter() {
+        execute_operation(&mut std_btree, &mut btree, op);
+    }
+}
+
+// Same as `comprehensive` but with the smallest page size allowed, where
+// nodes routinely spill into overflow pages.
+#[proptest(cases = 10)]
+fn comprehensive_min_page_size(
+    #[strategy(pvec(operation_strategy(), 100..5_000))] ops: Vec<Operation>,
+) {
+    let mem = make_memory();
+    let mut btree = BTreeMap::new_with_page_size(mem, MINIMUM_PAGE_SIZE);
+    let mut std_btree = StdBTreeMap::new();
+
     for op in ops.into_iter() {
         execute_operation(&mut std_btree, &mut btree, op);
     }
@@ -239,9 +254,22 @@ fn iter_count_test(#[strategy(0..250u8)] start: u8, #[strategy(#start..255u8)] e
 
 #[proptest]
 fn no_memory_leaks(#[strategy(pvec(pvec(0..u8::MAX, 100..10_000), 100))] keys: Vec<Vec<u8>>) {
-    let mem = make_memory();
-    let mut btree = BTreeMap::new(mem);
+    run_no_memory_leaks(keys, BTreeMap::new(make_memory()));
+}
 
+// Same as `no_memory_leaks` but with the smallest page size allowed, where
+// every node spans many overflow pages.
+#[proptest(cases = 32)]
+fn no_memory_leaks_min_page_size(
+    #[strategy(pvec(pvec(0..u8::MAX, 100..10_000), 100))] keys: Vec<Vec<u8>>,
+) {
+    run_no_memory_leaks(
+        keys,
+        BTreeMap::new_with_page_size(make_memory(), MINIMUM_PAGE_SIZE),
+    );
+}
+
+fn run_no_memory_leaks<M: Memory>(keys: Vec<Vec<u8>>, mut btree: BTreeMap<Vec<u8>, (), M>) {
     // Insert entries.
     for k in keys.iter() {
         btree.insert(k.clone(), ());

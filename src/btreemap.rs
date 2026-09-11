@@ -60,7 +60,7 @@ use crate::{
 };
 use allocator::Allocator;
 pub use iter::Iter;
-use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version};
+use node::{DerivedPageSize, Entry, Node, NodeType, PageSize, Version, MINIMUM_PAGE_SIZE};
 use node_cache::NodeCache;
 pub use node_cache::NodeCacheMetrics;
 use std::borrow::Cow;
@@ -236,6 +236,9 @@ const DEFAULT_NODE_CACHE_NUM_SLOTS: usize = 16;
 ///   - Use when your type's serialized size can vary or has no fixed maximum
 ///   - Recommended for most custom types, especially those containing Strings or Vecs
 ///   - Example: `const BOUND: Bound = Bound::Unbounded;`
+///   - The map stores its nodes in 1024-byte pages by default. If your entries are
+///     typically much smaller, pick a smaller page size with
+///     [`init_with_page_size`](BTreeMap::init_with_page_size) to save memory.
 ///
 /// - **Bounded (`Bound::Bounded{ max_size, is_fixed_size }`)**:
 ///   - Use when you know the maximum serialized size of your type
@@ -295,21 +298,54 @@ where
     /// If the memory provided already contains a `BTreeMap`, then that
     /// map is loaded. Otherwise, a new `BTreeMap` instance is created.
     pub fn init(memory: M) -> Self {
+        if Self::contains_map(&memory) {
+            BTreeMap::load(memory)
+        } else {
+            BTreeMap::new(memory)
+        }
+    }
+
+    /// Initializes a `BTreeMap` that stores its nodes in pages of `page_size` bytes.
+    ///
+    /// If the memory provided already contains a `BTreeMap`, then that map is
+    /// loaded and `page_size` is ignored, as a map's page size is fixed when
+    /// it's created. Otherwise, a new `BTreeMap` is created with the given
+    /// page size. See [`new_with_page_size`](Self::new_with_page_size) for
+    /// guidance on choosing a page size.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a new map is created and `page_size` is less than 128 bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// // Entries are unbounded but typically ~20 bytes (key and value
+    /// // combined), so a page much smaller than the default 1024 bytes fits
+    /// // a typical node.
+    /// let map: BTreeMap<String, String, _> =
+    ///     BTreeMap::init_with_page_size(DefaultMemoryImpl::default(), 384);
+    /// ```
+    pub fn init_with_page_size(memory: M, page_size: u32) -> Self {
+        if Self::contains_map(&memory) {
+            BTreeMap::load(memory)
+        } else {
+            BTreeMap::new_with_page_size(memory, page_size)
+        }
+    }
+
+    // Returns true if the memory already contains a `BTreeMap`.
+    fn contains_map(memory: &M) -> bool {
         if memory.size() == 0 {
-            // Memory is empty. Create a new map.
-            return BTreeMap::new(memory);
+            return false;
         }
 
         // Check if the magic in the memory corresponds to a BTreeMap.
-        let mut dst = vec![0; 3];
+        let mut dst = [0; 3];
         memory.read(0, &mut dst);
-        if dst != MAGIC {
-            // No BTreeMap found. Create a new instance.
-            BTreeMap::new(memory)
-        } else {
-            // The memory already contains a BTreeMap. Load it.
-            BTreeMap::load(memory)
-        }
+        dst == *MAGIC
     }
 
     /// Configures the number of node-cache slots during construction.
@@ -438,21 +474,11 @@ where
     /// This is exposed only in testing.
     #[cfg(test)]
     pub fn init_v1(memory: M) -> Self {
-        if memory.size() == 0 {
-            // Memory is empty. Create a new map.
-            return BTreeMap::new_v1(memory);
-        }
-
-        // Check if the magic in the memory corresponds to a BTreeMap.
-        let mut dst = vec![0; 3];
-        memory.read(0, &mut dst);
-        if dst != MAGIC {
-            // No BTreeMap found. Create a new instance.
-            BTreeMap::new_v1(memory)
-        } else {
-            // The memory already contains a BTreeMap. Load it, making sure
-            // we don't migrate the BTreeMap to v2.
+        if Self::contains_map(&memory) {
+            // Load the map, making sure we don't migrate the BTreeMap to v2.
             BTreeMap::load_helper(memory, false)
+        } else {
+            BTreeMap::new_v1(memory)
         }
     }
 
@@ -493,6 +519,65 @@ where
             _ => PageSize::Value(DEFAULT_PAGE_SIZE),
         };
 
+        Self::new_helper(memory, page_size)
+    }
+
+    /// Creates a new `BTreeMap` that stores its nodes in pages of `page_size` bytes.
+    ///
+    /// Each node of the tree is allocated a page, and a node that doesn't fit
+    /// in its page continues into overflow pages, so keys and values of any
+    /// size can be stored regardless of the page size. The page size trades
+    /// off memory usage against performance:
+    ///
+    /// * A page that's too large wastes memory, as every node occupies a full
+    ///   page no matter how few bytes it uses.
+    /// * A page that's too small makes nodes spill into overflow pages, each
+    ///   of which adds a few bytes of overhead and extra reads and writes
+    ///   whenever the node is loaded or saved.
+    ///
+    /// A good page size is one that fits a typical node. A node holds at most
+    /// 11 entries, and a 4-byte length is stored alongside each unbounded key
+    /// and value, so a full leaf node takes roughly
+    /// `15 + 11 * (4 + key_size) + 11 * (4 + value_size)` bytes, and an
+    /// internal node another 96 bytes for the addresses of its children.
+    ///
+    /// [`new`](Self::new) picks a page size automatically: if both keys and
+    /// values are bounded, it's derived from their maximum sizes, and
+    /// otherwise it's 1024 bytes. That can waste most of each page when
+    /// entries are unbounded but typically small, which is when a smaller
+    /// page size pays off.
+    ///
+    /// The page size is stored in memory, and can't be changed once the map
+    /// is created.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `page_size` is less than 128 bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use ic_stable_structures::{BTreeMap, DefaultMemoryImpl};
+    ///
+    /// // Entries of ~20 bytes (key and value combined) need ~420 bytes per
+    /// // full internal node, and nodes are rarely full, so 384-byte pages
+    /// // fit nearly every node.
+    /// let mut map: BTreeMap<Vec<u8>, Vec<u8>, _> =
+    ///     BTreeMap::new_with_page_size(DefaultMemoryImpl::default(), 384);
+    ///
+    /// // Entries larger than a page are still supported.
+    /// map.insert(vec![1], vec![0; 10_000]);
+    /// assert_eq!(map.get(&vec![1]), Some(vec![0; 10_000]));
+    /// ```
+    pub fn new_with_page_size(memory: M, page_size: u32) -> Self {
+        assert!(
+            page_size >= MINIMUM_PAGE_SIZE,
+            "page_size must be at least {MINIMUM_PAGE_SIZE} bytes, got {page_size}",
+        );
+        Self::new_helper(memory, PageSize::Value(page_size))
+    }
+
+    fn new_helper(memory: M, page_size: PageSize) -> Self {
         let btree = Self {
             root_addr: NULL,
             allocator: Allocator::new(
