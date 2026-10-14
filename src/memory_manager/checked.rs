@@ -255,6 +255,9 @@ impl<M: Memory> VirtualMemory<M> {
 
 impl<M: Memory> MemoryManagerInner<M> {
     pub(super) fn try_grow(&mut self, id: MemoryId, pages: u64) -> Result<u64, MemoryManagerError> {
+        if self.bucket_size_in_pages == 0 {
+            return Err(MemoryManagerError::ZeroBucketSize);
+        }
         let old_size = self.memory_size(id);
         if pages == 0 {
             return Ok(old_size);
@@ -366,6 +369,10 @@ mod tests {
 
     #[test]
     fn checked_growth_refusal_and_retry_preserve_assignments() {
+        let unchecked = MemoryManager::init_with_bucket_size(VectorMemory::default(), 0);
+        let invalid = unchecked.get(MemoryId::new(10));
+        assert_eq!(invalid.try_grow(1), Err(MemoryManagerError::ZeroBucketSize));
+        assert_eq!(invalid.grow(1), -1);
         let backing = RefusingMemory::default();
         assert!(matches!(
             MemoryManager::try_init_with_bucket_size(backing.clone(), 0),
