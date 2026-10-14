@@ -41,7 +41,7 @@
 //! assert_eq!(bytes, vec![4, 5, 6]);
 //! ```
 use crate::{
-    read_struct, read_to_vec,
+    read_to_vec,
     types::{Address, Bytes},
     write, write_struct, Memory, WASM_PAGE_SIZE,
 };
@@ -136,6 +136,9 @@ const HEADER_RESERVED_BYTES: usize = 32;
 pub struct MemoryManager<M: Memory> {
     inner: Rc<RefCell<MemoryManagerInner<M>>>,
 }
+
+mod checked;
+pub use checked::{MemoryManagerError, MemoryManagerLayout};
 
 impl<M: Memory> MemoryManager<M> {
     /// Initializes a `MemoryManager` with the given memory.
@@ -289,31 +292,13 @@ impl<M: Memory> MemoryManagerInner<M> {
     }
 
     fn load(memory: M) -> Self {
-        // Read the header from memory.
-        let header: Header = read_struct(Address::from(0), &memory);
-        assert_eq!(&header.magic, MAGIC, "Bad magic.");
-        assert_eq!(header.version, LAYOUT_VERSION, "Unsupported version.");
-
-        let mut buckets = vec![];
-        read_to_vec(
-            &memory,
-            bucket_allocations_address(BucketId(0)),
-            &mut buckets,
-            MAX_NUM_BUCKETS as usize,
-        );
-
-        let mut memory_buckets = vec![vec![]; MAX_NUM_MEMORIES as usize];
-        for (bucket_idx, memory) in buckets.into_iter().enumerate() {
-            if memory != UNALLOCATED_BUCKET_MARKER {
-                memory_buckets[memory as usize].push(BucketId(bucket_idx as u16));
-            }
-        }
-
+        let (layout, memory_buckets) = checked::load_checked(&memory)
+            .unwrap_or_else(|error| panic!("Invalid memory manager: {error}"));
         Self {
             memory,
-            allocated_buckets: header.num_allocated_buckets,
-            bucket_size_in_pages: header.bucket_size_in_pages,
-            memory_sizes_in_pages: header.memory_sizes_in_pages,
+            allocated_buckets: layout.allocated_buckets,
+            bucket_size_in_pages: layout.bucket_size_in_pages,
+            memory_sizes_in_pages: layout.memory_sizes_in_pages,
             memory_buckets,
         }
     }
@@ -338,52 +323,9 @@ impl<M: Memory> MemoryManagerInner<M> {
 
     /// Grows the memory with the given id by the given number of pages.
     fn grow(&mut self, id: MemoryId, pages: u64) -> i64 {
-        // Compute how many additional buckets are needed.
-        let old_size = self.memory_size(id);
-        let new_size = old_size + pages;
-        let current_buckets = self.num_buckets_needed(old_size);
-        let required_buckets = self.num_buckets_needed(new_size);
-        let new_buckets_needed = required_buckets - current_buckets;
-
-        if new_buckets_needed + self.allocated_buckets as u64 > MAX_NUM_BUCKETS {
-            // Exceeded the memory that can be managed.
-            return -1;
-        }
-
-        let memory_bucket = &mut self.memory_buckets[id.0 as usize];
-        // Allocate new buckets as needed.
-        memory_bucket.reserve(new_buckets_needed as usize);
-        for _ in 0..new_buckets_needed {
-            let new_bucket_id = BucketId(self.allocated_buckets);
-            memory_bucket.push(new_bucket_id);
-
-            // Write in stable store that this bucket belongs to the memory with the provided `id`.
-            write(
-                &self.memory,
-                bucket_allocations_address(new_bucket_id).get(),
-                &[id.0],
-            );
-
-            self.allocated_buckets += 1;
-        }
-
-        // Grow the underlying memory if necessary.
-        let pages_needed = BUCKETS_OFFSET_IN_PAGES
-            + self.bucket_size_in_pages as u64 * self.allocated_buckets as u64;
-        if pages_needed > self.memory.size() {
-            let additional_pages_needed = pages_needed - self.memory.size();
-            let prev_pages = self.memory.grow(additional_pages_needed);
-            if prev_pages == -1 {
-                panic!("{id:?}: grow failed");
-            }
-        }
-
-        // Update the memory with the new size.
-        self.memory_sizes_in_pages[id.0 as usize] = new_size;
-
-        // Update the header and return the old size.
-        self.save_header();
-        old_size as i64
+        self.try_grow(id, pages)
+            .map(|previous| previous as i64)
+            .unwrap_or(-1)
     }
 
     fn write(&self, id: MemoryId, offset: u64, src: &[u8], bucket_cache: &BucketCache) {

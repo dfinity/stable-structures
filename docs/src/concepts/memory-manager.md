@@ -10,6 +10,24 @@ When used with stable memory, this allows you to maintain up to 255 separate sta
 
 ## Usage Example
 
+For nonempty memory whose provenance is not already trusted, use
+`MemoryManager::try_init` or `try_init_with_bucket_size`. These validate the
+current manager layout before opening it, returning `MemoryManagerError` for
+foreign, unsupported or corrupt memory without rewriting it. The explicit
+bucket-size variant also rejects a mismatch with persisted geometry.
+
+`VirtualMemory::try_grow` returns typed overflow, exhaustion, reentrancy and
+backing-refusal errors. Capacity is reserved before any bucket assignment, so an
+ordinary refusal preserves manager metadata and virtual extents. The `Memory`
+trait's `grow` method uses the same implementation and returns `-1` on refusal.
+Backing traps or partial writes still obey the backing's own execution semantics.
+
+`MemoryManager::inspect_layout` validates the persisted geometry and per-memory
+extents for diagnostics; its snapshot does not grant memory access or replace
+cached translation state. Reopening and inspection scan the bounded bucket
+table. Collection contents remain owned and validated by their respective
+stable structures.
+
 The following example demonstrates how to use the Memory Manager to create multiple stable structures:
 
 ```rust
